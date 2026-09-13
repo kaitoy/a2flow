@@ -55,6 +55,10 @@ export default function TagDetailPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
+  // Only an admin may set or clear the access-control flag; a developer sees
+  // the stored value and the form echoes it back unchanged, which the backend
+  // accepts (it 403s only a change).
+  const canSetAccessControl = useHasRole(Role.ADMIN);
   const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -84,7 +88,11 @@ export default function TagDetailPage() {
       .then((tag) => {
         setName(tag.name);
         setColor(resolveTagColor(tag.color));
-        reset({ name: tag.name, description: tag.description ?? "" });
+        reset({
+          name: tag.name,
+          description: tag.description ?? "",
+          accessControl: tag.accessControl ?? false,
+        });
         setAudit({
           createdBy: tag.createdBy,
           updatedBy: tag.updatedBy,
@@ -165,7 +173,13 @@ export default function TagDetailPage() {
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
           {canEdit ? (
-            <TagFields register={register} errors={errors} />
+            <TagFields
+              register={register}
+              errors={errors}
+              accessControlValue={
+                canSetAccessControl ? undefined : (getValues("accessControl") ?? false)
+              }
+            />
           ) : (
             <TagFields readOnly values={getValues()} />
           )}

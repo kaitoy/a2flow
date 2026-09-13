@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 from typing import Protocol
 
+from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -72,19 +73,46 @@ class SqlSecretRepository(TenantScopedRepository[Secret]):
 
     model = Secret
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
-        """Store the SQLModel session and the tenant these operations are scoped to."""
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str | None,
+        access_tag_ids: frozenset[str] | None = None,
+    ) -> None:
+        """Store the session, the tenant scope, and the caller's access-control tags.
+
+        Args:
+            session: The SQLModel session to run queries on.
+            tenant_id: Tenant every query is filtered by, or ``None`` for a
+                platform-scoped read across every tenant.
+            access_tag_ids: The caller's group tags for access control, or
+                ``None`` for an unrestricted caller -- see
+                :class:`repositories.tags.TagLinks`.
+        """
         super().__init__(session, tenant_id=tenant_id)
-        self._tags = TagLinks(session, SecretTag, tenant_id=tenant_id)
+        self._tags = TagLinks(
+            session, SecretTag, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+        )
+
+    def _visibility_clause(self) -> ColumnElement[bool] | None:
+        """Hide secrets gated by an access-control tag the caller does not hold."""
+        return self._tags.visibility_clause(col(Secret.id))
 
     async def get(self, secret_id: str) -> Secret | None:
-        """Return the Secret with the given ID, or ``None`` if missing."""
+        """Return the Secret with the given ID, or ``None`` if missing or hidden."""
         return await self._get_scoped(secret_id)
 
     async def get_by_name(self, name: str) -> Secret | None:
-        """Return the Secret with the given unique name, or ``None`` if missing."""
+        """Return the Secret with the given unique name, or ``None`` if missing.
+
+        Resolves ``${secret:NAME/KEY}`` references on behalf of an MCP server
+        or a skill, so it is scoped to the tenant only (``_in_tenant``): the
+        caller need not be able to open the secret in the admin UI for a
+        record that names it to keep working.
+        """
         stmt = select(Secret).where(Secret.name == name)
-        stmt = self._scoped(stmt)
+        stmt = self._in_tenant(stmt)
         result = await self._db.exec(stmt)
         return result.first()
 

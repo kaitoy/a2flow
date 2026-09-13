@@ -28,15 +28,20 @@ from infrastructure.demo_data import (
     DEMO_APPROVER_2_USER_ID,
     DEMO_APPROVER_USER_ID,
     DEMO_APPROVERS_GROUP_ID,
+    DEMO_AWS_DEVELOPER_USER_ID,
+    DEMO_AWS_GROUP_ID,
+    DEMO_AWS_REQUESTER_USER_ID,
     DEMO_AWS_SECRET_ID,
     DEMO_AWS_SECRET_NAME,
     DEMO_AWS_TAG_ID,
     DEMO_AWS_TAG_NAME,
     DEMO_CALL_AWS_MOCK_ID,
     DEMO_DELETE_POD_MOCK_ID,
-    DEMO_DEVELOPER_USER_ID,
     DEMO_DEVELOPERS_GROUP_ID,
     DEMO_GCP_API_KEY_ENTRY_KEY,
+    DEMO_GCP_DEVELOPER_USER_ID,
+    DEMO_GCP_GROUP_ID,
+    DEMO_GCP_REQUESTER_USER_ID,
     DEMO_GCP_SECRET_ID,
     DEMO_GCP_SECRET_NAME,
     DEMO_GCP_TAG_ID,
@@ -48,8 +53,6 @@ from infrastructure.demo_data import (
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
     DEMO_REQUEST_APPROVAL_MOCK_ID,
-    DEMO_REQUESTER_2_USER_ID,
-    DEMO_REQUESTER_USER_ID,
     DEMO_REQUESTERS_GROUP_ID,
     DEMO_RUN_SCRIPT_MOCK_ID,
     DEMO_SECRET_KEY_ENTRY_KEY,
@@ -67,6 +70,7 @@ from models.tag import (
     McpToolMockTag,
     SecretTag,
     Tag,
+    UserGroupTag,
 )
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
@@ -214,12 +218,13 @@ async def test_sync_demo_data_seeds_the_full_dataset(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 5
+    assert len(await _demo_users(engine)) == 6
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 4
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
+    assert len(await _rows(engine, UserGroup)) == 5
 
 
 async def test_sync_demo_data_returns_the_new_skill_ids(
@@ -245,16 +250,18 @@ async def test_sync_demo_data_is_idempotent(
     _enable(monkeypatch)
     await _sync(engine)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 5
+    assert len(await _demo_users(engine)) == 6
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 4
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
+    assert len(await _rows(engine, UserGroup)) == 5
     assert len(await _rows(engine, SecretTag)) == 2
     assert len(await _rows(engine, McpServerTag)) == 2
     assert len(await _rows(engine, AgentSkillTag)) == 4
     assert len(await _rows(engine, McpToolMockTag)) == 2
+    assert len(await _rows(engine, UserGroupTag)) == 2
 
 
 async def test_demo_tags_classify_records_across_four_taggable_kinds(
@@ -304,18 +311,34 @@ async def test_demo_users_hold_no_direct_roles(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    approver, approver_2, developer, requester, requester_2 = await _demo_users(engine)
+    (
+        approver,
+        approver_2,
+        aws_developer,
+        aws_requester,
+        gcp_developer,
+        gcp_requester,
+    ) = await _demo_users(engine)
     assert approver.id == DEMO_APPROVER_USER_ID
     assert approver.username == "demo-approver-1"
     assert approver_2.id == DEMO_APPROVER_2_USER_ID
     assert approver_2.username == "demo-approver-2"
-    assert developer.id == DEMO_DEVELOPER_USER_ID
-    assert developer.username == "demo-developer"
-    assert requester.id == DEMO_REQUESTER_USER_ID
-    assert requester.username == "demo-requester-1"
-    assert requester_2.id == DEMO_REQUESTER_2_USER_ID
-    assert requester_2.username == "demo-requester-2"
-    for user in (approver, approver_2, developer, requester, requester_2):
+    assert aws_developer.id == DEMO_AWS_DEVELOPER_USER_ID
+    assert aws_developer.username == "demo-aws-developer"
+    assert aws_requester.id == DEMO_AWS_REQUESTER_USER_ID
+    assert aws_requester.username == "demo-aws-requester"
+    assert gcp_developer.id == DEMO_GCP_DEVELOPER_USER_ID
+    assert gcp_developer.username == "demo-gcp-developer"
+    assert gcp_requester.id == DEMO_GCP_REQUESTER_USER_ID
+    assert gcp_requester.username == "demo-gcp-requester"
+    for user in (
+        approver,
+        approver_2,
+        aws_developer,
+        aws_requester,
+        gcp_developer,
+        gcp_requester,
+    ):
         assert user.roles == []
         assert user.tenant_id == TENANT_ID
         assert user.enabled is True
@@ -328,21 +351,23 @@ async def test_demo_groups_grant_the_approver_requester_and_developer_roles(
     _enable(monkeypatch)
     await _sync(engine)
     groups = {group.id: group for group in await _rows(engine, UserGroup)}
-    assert len(groups) == 3
-    expected = {
+    assert len(groups) == 5
+    expected: dict[str, tuple[str, Role | None]] = {
         DEMO_APPROVERS_GROUP_ID: ("Demo Approvers", Role.approver),
         DEMO_REQUESTERS_GROUP_ID: ("Demo Requesters", Role.requester),
         DEMO_DEVELOPERS_GROUP_ID: ("Demo Developers", Role.developer),
+        DEMO_AWS_GROUP_ID: ("Demo AWS Group", None),
+        DEMO_GCP_GROUP_ID: ("Demo GCP Group", None),
     }
     for group_id, (name, role) in expected.items():
         group = groups[group_id]
         assert group.name == name
-        assert group.roles == [role.value]
+        assert group.roles == ([role.value] if role is not None else [])
         assert group.tenant_id == TENANT_ID
         assert group.created_by == SYSTEM_USER_ID
 
 
-async def test_demo_approvers_and_requesters_groups_hold_two_developers_holds_one(
+async def test_demo_groups_hold_their_expected_members(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -353,9 +378,14 @@ async def test_demo_approvers_and_requesters_groups_hold_two_developers_holds_on
     assert members == {
         (DEMO_APPROVERS_GROUP_ID, DEMO_APPROVER_USER_ID),
         (DEMO_APPROVERS_GROUP_ID, DEMO_APPROVER_2_USER_ID),
-        (DEMO_REQUESTERS_GROUP_ID, DEMO_REQUESTER_USER_ID),
-        (DEMO_REQUESTERS_GROUP_ID, DEMO_REQUESTER_2_USER_ID),
-        (DEMO_DEVELOPERS_GROUP_ID, DEMO_DEVELOPER_USER_ID),
+        (DEMO_REQUESTERS_GROUP_ID, DEMO_AWS_REQUESTER_USER_ID),
+        (DEMO_REQUESTERS_GROUP_ID, DEMO_GCP_REQUESTER_USER_ID),
+        (DEMO_DEVELOPERS_GROUP_ID, DEMO_AWS_DEVELOPER_USER_ID),
+        (DEMO_DEVELOPERS_GROUP_ID, DEMO_GCP_DEVELOPER_USER_ID),
+        (DEMO_AWS_GROUP_ID, DEMO_AWS_DEVELOPER_USER_ID),
+        (DEMO_AWS_GROUP_ID, DEMO_AWS_REQUESTER_USER_ID),
+        (DEMO_GCP_GROUP_ID, DEMO_GCP_DEVELOPER_USER_ID),
+        (DEMO_GCP_GROUP_ID, DEMO_GCP_REQUESTER_USER_ID),
     }
 
 
@@ -369,18 +399,126 @@ async def test_demo_users_effective_roles_come_from_their_group(
             [
                 DEMO_APPROVER_USER_ID,
                 DEMO_APPROVER_2_USER_ID,
-                DEMO_REQUESTER_USER_ID,
-                DEMO_REQUESTER_2_USER_ID,
-                DEMO_DEVELOPER_USER_ID,
+                DEMO_AWS_REQUESTER_USER_ID,
+                DEMO_GCP_REQUESTER_USER_ID,
+                DEMO_AWS_DEVELOPER_USER_ID,
+                DEMO_GCP_DEVELOPER_USER_ID,
             ]
         )
     assert inherited == {
         DEMO_APPROVER_USER_ID: frozenset({Role.approver.value}),
         DEMO_APPROVER_2_USER_ID: frozenset({Role.approver.value}),
-        DEMO_REQUESTER_USER_ID: frozenset({Role.requester.value}),
-        DEMO_REQUESTER_2_USER_ID: frozenset({Role.requester.value}),
-        DEMO_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
+        DEMO_AWS_REQUESTER_USER_ID: frozenset({Role.requester.value}),
+        DEMO_GCP_REQUESTER_USER_ID: frozenset({Role.requester.value}),
+        DEMO_AWS_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
+        DEMO_GCP_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
     }
+
+
+async def test_demo_aws_and_gcp_tags_are_access_control(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    tags = {tag.id: tag for tag in await _rows(engine, Tag)}
+    assert tags[DEMO_AWS_TAG_ID].access_control is True
+    assert tags[DEMO_GCP_TAG_ID].access_control is True
+    assert tags[DEMO_APPROVAL_TAG_ID].access_control is False
+
+
+async def test_demo_aws_and_gcp_groups_hold_their_access_control_tag(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    group_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, UserGroupTag)
+    }
+    assert group_tags == {
+        (DEMO_AWS_GROUP_ID, DEMO_AWS_TAG_ID),
+        (DEMO_GCP_GROUP_ID, DEMO_GCP_TAG_ID),
+    }
+
+
+async def test_admin_user_joins_both_access_control_groups(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The tenant's admin, seeded separately from this module, still gets AC access."""
+    admin_id = "tenant-admin"
+    async with AsyncSession(engine) as session:
+        session.add(
+            User(
+                id=admin_id,
+                username="admin",
+                first_name="Admin",
+                last_name="User",
+                password="hash",
+                email="admin@example.com",
+                roles=[Role.admin.value],
+                tenant_id=TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+    _enable(monkeypatch)
+    await _sync(engine)
+    members = {
+        (row.group_id, row.user_id) for row in await _rows(engine, UserGroupMember)
+    }
+    assert (DEMO_AWS_GROUP_ID, admin_id) in members
+    assert (DEMO_GCP_GROUP_ID, admin_id) in members
+
+
+async def test_reviving_an_older_demo_tag_gains_access_control(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A tag seeded before this module made AWS/GCP access-control picks it up."""
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        legacy = await session.get(Tag, DEMO_AWS_TAG_ID)
+        assert legacy is not None
+        legacy.access_control = False
+        session.add(legacy)
+        await session.commit()
+
+    await _sync(engine)
+
+    async with AsyncSession(engine) as session:
+        migrated = await session.get(Tag, DEMO_AWS_TAG_ID)
+        assert migrated is not None
+        assert migrated.access_control is True
+
+
+async def test_reviving_renames_an_older_demo_username(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A user seeded under this module's previous generic username is renamed."""
+    _enable(monkeypatch)
+    async with AsyncSession(engine) as session:
+        session.add(
+            User(
+                id=DEMO_AWS_DEVELOPER_USER_ID,
+                username="demo-developer",
+                first_name="Carol",
+                last_name="Bennett",
+                password="hash",
+                email="demo-developer@example.com",
+                roles=[],
+                tenant_id=TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+
+    await _sync(engine)
+
+    async with AsyncSession(engine) as session:
+        migrated = await session.get(User, DEMO_AWS_DEVELOPER_USER_ID)
+        assert migrated is not None
+        assert migrated.username == "demo-aws-developer"
 
 
 async def test_reviving_an_older_demo_user_strips_its_direct_roles(
@@ -714,10 +852,12 @@ async def test_disabling_removes_the_full_dataset(
     assert await _rows(engine, MCPToolMock) == []
     assert await _rows(engine, AgentSkill) == []
     assert await _rows(engine, Tag) == []
+    assert await _rows(engine, UserGroup) == []
     assert await _rows(engine, SecretTag) == []
     assert await _rows(engine, McpServerTag) == []
     assert await _rows(engine, AgentSkillTag) == []
     assert await _rows(engine, McpToolMockTag) == []
+    assert await _rows(engine, UserGroupTag) == []
 
 
 async def test_removal_on_a_database_without_demo_data_is_a_noop(
@@ -799,7 +939,7 @@ async def test_removal_soft_deletes_a_referenced_demo_user(
     await _sync(engine)
     async with AsyncSession(engine) as session:
         approver = await session.get(User, DEMO_APPROVER_USER_ID)
-        requester = await session.get(User, DEMO_REQUESTER_USER_ID)
+        requester = await session.get(User, DEMO_AWS_REQUESTER_USER_ID)
     assert approver is not None
     assert approver.deleted_at is not None
     assert approver.enabled is False

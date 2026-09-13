@@ -1,7 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { DEVELOPER, REQUESTER } from "@/test/auth-state";
+import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -30,8 +30,50 @@ describe("NewTagPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(body).toEqual({ name: "production", color: "slate", description: null })
+      expect(body).toEqual({
+        name: "production",
+        color: "slate",
+        description: null,
+        accessControl: false,
+      })
     );
+  });
+
+  it("submits the access-control flag when ticked", async () => {
+    const user = userEvent.setup();
+    let body: { accessControl?: boolean } | undefined;
+    server.use(
+      http.post(`${BASE}/api/v1/tags`, async ({ request }) => {
+        body = (await request.json()) as { accessControl?: boolean };
+        return envelope({ id: "new-tag-id" }, 201);
+      })
+    );
+
+    render(<NewTagPage />, { preloadedState: ADMIN });
+    await user.type(screen.getByLabelText(/Name/), "finance");
+    await user.click(screen.getByLabelText("Access control"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(body?.accessControl).toBe(true));
+  });
+
+  it("shows the access-control flag read-only to a developer and submits it off", async () => {
+    const user = userEvent.setup();
+    let body: { accessControl?: boolean } | undefined;
+    server.use(
+      http.post(`${BASE}/api/v1/tags`, async ({ request }) => {
+        body = (await request.json()) as { accessControl?: boolean };
+        return envelope({ id: "new-tag-id" }, 201);
+      })
+    );
+
+    render(<NewTagPage />, { preloadedState: DEVELOPER });
+    expect(screen.queryByRole("checkbox", { name: "Access control" })).not.toBeInTheDocument();
+    expect(screen.getByText("No")).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/Name/), "finance");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(body?.accessControl).toBe(false));
   });
 
   it("submits the typed description", async () => {

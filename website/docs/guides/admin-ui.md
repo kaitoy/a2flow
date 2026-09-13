@@ -36,7 +36,7 @@ The breadcrumb trail above every title mirrors that path — `Admin › Workflow
 
 A section missing from your sidebar is one your roles cannot write to. Reads stay open, so a colleague can still send you a direct link to a record inside it — see [Roles and authorization](../concepts/authorization.md).
 
-[Audit Logs](./audit-logs.md) is the exception: its reads are restricted too, and a direct link into it gets an access-denied screen without the Admin role.
+[Audit Logs](./audit-logs.md) is the exception: its reads are restricted too, and a direct link into it gets an access-denied screen without the Admin role. A record carrying an [access-control tag](./tags.md#access-control-tags) is the other: unless your groups carry that tag, the link says the record was not found.
 
 ## The list screen
 

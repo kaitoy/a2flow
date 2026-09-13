@@ -21,6 +21,8 @@ export interface ChipRowItem {
   color?: TagColor;
   /** Longer free text shown in the chip's hover tooltip. */
   description?: string;
+  /** Whether the chip carries the lock glyph of an access-control tag. */
+  locked?: boolean;
 }
 
 /** Props for {@link ChipRow}. */
@@ -240,6 +242,7 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
           <Chip
             key={item.key}
             label={item.label}
+            locked={item.locked}
             color={item.color}
             description={item.description}
             size="xs"
@@ -284,6 +287,7 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
                 <Chip
                   key={item.key}
                   label={item.label}
+                  locked={item.locked}
                   color={item.color}
                   description={item.description}
                   size="xs"

@@ -89,11 +89,11 @@ Open **User Groups** in the admin sidebar to manage groups — named bundles of 
 | **Description** | Free text. |
 | **Roles granted** | Held by every member on top of their own grants. |
 | **Members** | The accounts in the group. |
-| **Tags** | Labels for classifying groups, shared with the other taggable sections. |
+| **Tags** | Labels for classifying groups, shared with the other taggable sections. An access-control tag here grants every member access to the records carrying it. |
 
 **Roles granted** uses the same picker as the Users pages, minus **Super Admin** — a group can never grant it, and the option is hidden from everyone, Super Admins included. Since a Super Admin belongs to no tenant, one can never be a member either.
 
-**Tags** are the same tenant-wide vocabulary secrets and the other taggable registries share. The create form and detail page carry a **Tags** picker, and the list has a filterable **Tags** column — see [Tags](./tags.md).
+**Tags** are the same tenant-wide vocabulary secrets and the other taggable registries share. The create form and detail page carry a **Tags** picker, and the list has a filterable **Tags** column — see [Tags](./tags.md). A group is also where access is granted: attaching an [access-control tag](./tags.md#access-control-tags) to a group lets its members see the records that carry the tag, and an admin may attach such a tag to a group without holding it themselves.
 
 **Members** show as removable chips; **Select members…** opens a paged, filterable table of the tenant's users. Platform-scoped accounts are omitted, because they belong to no tenant. Supplying members replaces the membership wholesale; leaving the field untouched on an edit keeps it as it is. The same membership is editable from each [user's](./users-and-groups.md#users) side.
 

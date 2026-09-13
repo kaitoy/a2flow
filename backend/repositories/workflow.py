@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from sqlalchemy import and_, case, literal, null
+from sqlalchemy import ColumnElement, and_, case, literal, null
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
@@ -107,12 +107,31 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         skills: AgentSkillRepository,
         *,
         tenant_id: str | None,
+        access_tag_ids: frozenset[str] | None = None,
     ) -> None:
+        """Store the session, the skill repository, the tenant scope, and the caller's tags.
+
+        Args:
+            session: The SQLModel session to run queries on.
+            skills: Repository used to validate ``agent_skill_id`` references.
+            tenant_id: Tenant every query is filtered by, or ``None`` for a
+                platform-scoped read across every tenant.
+            access_tag_ids: The caller's group tags for access control, or
+                ``None`` for an unrestricted caller -- see
+                :class:`repositories.tags.TagLinks`.
+        """
         super().__init__(session, tenant_id=tenant_id)
         self._skills = skills
-        self._tags = TagLinks(session, WorkflowTag, tenant_id=tenant_id)
+        self._tags = TagLinks(
+            session, WorkflowTag, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+        )
+
+    def _visibility_clause(self) -> ColumnElement[bool] | None:
+        """Hide workflows gated by an access-control tag the caller does not hold."""
+        return self._tags.visibility_clause(col(Workflow.id))
 
     async def get(self, workflow_id: str) -> Workflow | None:
+        """Return the Workflow with the given ID, or ``None`` if missing or hidden."""
         return await self._get_scoped(workflow_id)
 
     async def get_by_session_id(self, session_id: str) -> Workflow | None:

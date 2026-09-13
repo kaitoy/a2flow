@@ -10,9 +10,9 @@ Tags are the labels records are classified by. One vocabulary is shared by all s
 ![Flowchart showing one shared tag vocabulary per tenant applied to six taggable registries: Secrets, MCP Servers, Agent Skills, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary.svg#gh-light-mode-only)
 ![Flowchart showing one shared tag vocabulary per tenant applied to six taggable registries: Secrets, MCP Servers, Agent Skills, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary-dark.svg#gh-dark-mode-only)
 
-Open **Tags** in the admin sidebar to curate the vocabulary. Each tag has a **Name**, unique within the tenant, an optional **Description**, and a **color** picked from a fixed eight-slot palette — an arbitrary color value is refused.
+Open **Tags** in the admin sidebar to curate the vocabulary. Each tag has a **Name**, unique within the tenant, an optional **Description**, a **color** picked from a fixed eight-slot palette — an arbitrary color value is refused — and an **Access control** checkbox, off by default, that turns the tag from a plain label into a gate (see [Access-control tags](#access-control-tags)).
 
-Creating a tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the six taggable resources, so a tag can always be minted by whoever is about to need it. Reads stay open like every other section.
+Creating a tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the six taggable resources, so a tag can always be minted by whoever is about to need it. The one exception is the **Access control** checkbox: only an Admin (or Super Admin) can tick or untick it. A Developer sees the flag as a fixed value on the form and can still create the tag or edit its other fields. Reads stay open like every other section.
 
 ## Attaching tags to a record
 
@@ -29,6 +29,26 @@ Attaching tags is gated by the record's own write role, independent of whatever 
 Every taggable list has a **Tags** column showing each record's chips, and its column header menu offers a multi-select. The column keeps every row one line tall: it shows as many chips as its current width holds and counts the rest in a trailing `+N` chip. Click that chip to open a dialog listing every tag on the record, each showing its description on hover. Widen the column, by dragging its edge or by hiding another column, and the counted tags come back as chips. The selection is **conjunctive** — stated in the menu as "Filter (all of)" — so a record must carry *every* tag you pick, and adding one narrows the result. It applies across the whole dataset, not just the page on screen.
 
 Tags are a separate axis from the other column filters, but they follow the same rule about visibility: hiding the Tags column through the [column picker](./admin-ui.md) clears the tag filter, exactly as hiding any other column clears its own.
+
+## Access-control tags {#access-control-tags}
+
+A tag with **Access control** ticked restricts who can see the records it is attached to. Its chip carries a lock glyph wherever it appears — in the Tags list's **Preview** column, in a record's **Tags** column, and in the picker — and the Tags list gains an **Access control** column you can filter on.
+
+Access is decided by your [user groups](./users-and-groups.md#user-groups): a group carries tags of its own, and the tags of all your groups are pooled together.
+
+| A record carries… | You see it when… |
+|---|---|
+| No access-control tag (only plain tags, or none) | Always — plain tags never restrict anything |
+| One or more access-control tags | Your groups, between them, carry **every** one of them |
+
+A record you may not see is simply absent: it is not in the list, and opening a direct link to it says it was not found. A Super Admin sees everything — that account is platform-wide and belongs to no group, so no other rule could reach it.
+
+Two guard rails apply when tagging:
+
+- **You cannot attach an access-control tag your groups do not carry.** The save is rejected with an error, since it would hide the record from you on your next page load. Ask an admin to add you to a group carrying the tag first. Tagging a *user group* is exempt — that is how an admin grants access in the first place.
+- **Turning Access control on for a tag already in use restricts those records immediately**, including for the admin who ticked the box. Join a group carrying the tag first.
+
+The restriction is about who can open, edit, run, or delete a record. What a record uses behind the scenes is untouched: a workflow still runs with the agent skill it was generated from and the secrets its MCP servers reference, even for a requester who could not open that skill or secret themselves.
 
 ## Renaming and deleting
 

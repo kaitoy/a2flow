@@ -5,6 +5,14 @@ MCPServer, an AgentSkill, an MCPToolMock, or a UserGroup. One tag set is shared
 by all six resource types, so filtering a list by ``aws`` narrows secrets and
 MCP servers alike.
 
+A tag flagged ``access_control`` additionally **gates** the records it labels:
+such a record is visible only to a caller whose groups, taken together, carry
+every access-control tag the record has (a ``super_admin`` bypasses this).
+The predicate is applied in the repository layer, next to tenant scoping — see
+:meth:`repositories.tags.TagLinks.visibility_clause` and the "Access-control
+tags" section of ``.claude/rules/backend-patterns.md``. Unflagged tags remain
+plain filters.
+
 Attachment lives in one join table per resource type
 (:class:`SecretTag`, :class:`WorkflowTag`, :class:`McpServerTag`,
 :class:`AgentSkillTag`, :class:`McpToolMockTag`, :class:`UserGroupTag`), each
@@ -84,6 +92,9 @@ class TagUpdate(SQLModel):
     name: EntityName | None = None
     color: TagColor | None = None
     description: DescText | None = None
+    #: Whether the tag restricts access to the records it labels — see the
+    #: module docstring. ``None`` leaves the flag unchanged on update.
+    access_control: bool | None = None
 
 
 class TagCreate(TagUpdate):
@@ -91,6 +102,8 @@ class TagCreate(TagUpdate):
 
     name: EntityName
     color: TagColor = TagColor.slate
+    #: A new tag is a plain filter unless the flag is set explicitly.
+    access_control: bool = False
 
 
 class Tag(TagCreate, TenantScoped, BaseEntity, table=True):

@@ -1,11 +1,12 @@
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { LOCKED_CHIP_LABEL } from "@/components/ui/chip";
 import { store as appStore } from "@/store";
 import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import TagsPage from "./page";
 
 const BASE = "http://localhost:8000";
@@ -41,7 +42,23 @@ describe("TagsPage", () => {
   it("shows each tag's description, falling back to an em dash when absent", async () => {
     renderPage();
     expect(await screen.findByText("Live customer-facing environment.")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // `aws` has no description; its row's Description cell is the dash right
+    // after its name link (the Access control column has a dash of its own).
+    const awsRow = screen.getByRole("link", { name: "aws" }).closest("tr");
+    expect(awsRow).not.toBeNull();
+    const cells = within(awsRow as HTMLTableRowElement).getAllByRole("cell");
+    const nameIndex = cells.findIndex((cell) => within(cell).queryByRole("link", { name: "aws" }));
+    expect(cells[nameIndex + 1]).toHaveTextContent("—");
+  });
+
+  it("shows which tags restrict access, as a check or a dash", async () => {
+    renderPage();
+    const productionRow = (await screen.findByRole("link", { name: "production" })).closest("tr");
+    const awsRow = screen.getByRole("link", { name: "aws" }).closest("tr");
+    expect(within(productionRow as HTMLTableRowElement).getByText("✓")).toBeInTheDocument();
+    expect(within(awsRow as HTMLTableRowElement).queryByText("✓")).not.toBeInTheDocument();
+    // The preview chip carries the lock glyph for the access-controlled tag only.
+    expect(screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL })).toHaveLength(1);
   });
 
   it("hides the color name column by default", async () => {

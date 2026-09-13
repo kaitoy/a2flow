@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ShieldCheck, ShieldOff } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
-import { Chip } from "./chip";
+import { Chip, LOCKED_CHIP_LABEL } from "./chip";
 
 /**
  * Force `scrollWidth`/`clientWidth` for the duration of a test so the overflow
@@ -36,6 +36,17 @@ describe("Chip", () => {
   it("renders its label", () => {
     render(<Chip label="Gather sources" />);
     expect(screen.getByText("Gather sources")).toBeInTheDocument();
+  });
+
+  it("carries no lock glyph by default", () => {
+    render(<Chip label="Gather sources" />);
+    expect(screen.queryByRole("img", { name: LOCKED_CHIP_LABEL })).not.toBeInTheDocument();
+  });
+
+  it("carries a named lock glyph when locked, so the state is not conveyed by the icon alone", () => {
+    render(<Chip label="finance" locked />);
+    const lock = screen.getByRole("img", { name: LOCKED_CHIP_LABEL });
+    expect(lock.closest("span")).toHaveTextContent("finance");
   });
 
   it("keeps the neutral glass surface when no color is given", () => {

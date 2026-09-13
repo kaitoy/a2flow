@@ -68,6 +68,7 @@ export function tagsColumn<T>(
         label: byId.get(id)?.name ?? id,
         color: resolveTagColor(byId.get(id)?.color),
         description: byId.get(id)?.description ?? undefined,
+        locked: byId.get(id)?.accessControl,
       }));
       return <ChipRow items={items} title="Tags" />;
     },

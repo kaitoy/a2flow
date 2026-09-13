@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
+from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -80,11 +81,37 @@ class SqlAgentSkillRepository(TenantScopedRepository[AgentSkill]):
 
     model = AgentSkill
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str | None) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str | None,
+        access_tag_ids: frozenset[str] | None = None,
+    ) -> None:
+        """Store the session, the tenant scope, and the caller's access-control tags.
+
+        Args:
+            session: The SQLModel session to run queries on.
+            tenant_id: Tenant every query is filtered by, or ``None`` for a
+                platform-scoped read across every tenant.
+            access_tag_ids: The caller's group tags for access control, or
+                ``None`` for an unrestricted caller -- see
+                :class:`repositories.tags.TagLinks`. The workflow and
+                execution services resolve a run's skill through an instance
+                built without it (``AgentSkillLookupDep``), so a restricted
+                skill still powers the workflows derived from it.
+        """
         super().__init__(session, tenant_id=tenant_id)
-        self._tags = TagLinks(session, AgentSkillTag, tenant_id=tenant_id)
+        self._tags = TagLinks(
+            session, AgentSkillTag, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+        )
+
+    def _visibility_clause(self) -> ColumnElement[bool] | None:
+        """Hide skills gated by an access-control tag the caller does not hold."""
+        return self._tags.visibility_clause(col(AgentSkill.id))
 
     async def get(self, skill_id: str) -> AgentSkill | None:
+        """Return the AgentSkill with the given ID, or ``None`` if missing or hidden."""
         return await self._get_scoped(skill_id)
 
     async def list(

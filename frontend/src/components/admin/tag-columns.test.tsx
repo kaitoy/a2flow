@@ -1,5 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { LOCKED_CHIP_LABEL } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import type { Tag } from "@/lib/api";
 import { render, screen, within } from "@/test/test-utils";
@@ -17,6 +18,7 @@ const TAGS: Tag[] = [
     name: "production",
     color: "rose",
     description: "Live customer-facing environment.",
+    accessControl: true,
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     createdBy: "",
@@ -75,6 +77,13 @@ describe("tagsColumn", () => {
     renderTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
     expect(screen.getByText("production")).toBeInTheDocument();
     expect(screen.getByText("aws")).toBeInTheDocument();
+  });
+
+  it("marks an access-control tag's chip with the lock glyph, and only that chip", () => {
+    renderTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
+    const locks = screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL });
+    expect(locks).toHaveLength(1);
+    expect(locks[0].closest("span")).toHaveTextContent("production");
   });
 
   it("renders a dash for a record carrying no tags", () => {

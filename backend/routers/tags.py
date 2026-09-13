@@ -4,7 +4,9 @@ Tags are the label vocabulary shared by secrets, workflows, MCP servers, and
 agent skills. Writes are open to ``admin`` **or** ``developer``: secrets are
 administered by the former and the other three by the latter, so gating on
 either one alone would leave half the taggable resources with no way to mint a
-label for themselves.
+label for themselves. The one field a ``developer`` may not touch is the
+``accessControl`` flag -- setting or clearing it is ``admin`` work, enforced by
+:class:`services.tag.TagService` (403 ``FORBIDDEN``).
 
 Attaching a tag to a record is not here — that is a sub-resource of the record
 itself (``PUT /{resource}/{id}/tags``), gated by that resource's own write role.
@@ -16,7 +18,7 @@ hunting down its users first.
 
 from fastapi import APIRouter, Depends
 
-from dependencies.auth import CurrentUserIdDep
+from dependencies.auth import CurrentUserIdDep, EffectiveRolesDep
 from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
 from dependencies.service import TagServiceDep
@@ -40,9 +42,10 @@ async def create_tag(
     body: TagCreate,
     service: TagServiceDep,
     user_id: CurrentUserIdDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Tag]:
-    tag = await service.create(body, user_id=user_id)
+    tag = await service.create(body, user_id=user_id, caller_roles=caller_roles)
     return ApiResponse(meta=meta, data=tag)
 
 
@@ -83,9 +86,10 @@ async def update_tag(
     body: TagUpdate,
     service: TagServiceDep,
     user_id: CurrentUserIdDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[Tag]:
-    tag = await service.update(tag_id, body, user_id=user_id)
+    tag = await service.update(tag_id, body, user_id=user_id, caller_roles=caller_roles)
     return ApiResponse(meta=meta, data=tag)
 
 

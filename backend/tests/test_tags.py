@@ -1,10 +1,11 @@
 """Tests for the ``/tags`` endpoints and for attaching tags to records.
 
 Covers the tag CRUD surface, its tenant boundary, the ``PUT /{resource}/{id}/tags``
-sub-resource on all four taggable resources, the conjunctive ``?tag=`` list
-filter, and the two invariants the whole feature rests on: renaming a tag keeps
-every attachment, and deleting one detaches it everywhere rather than being
-blocked by the records carrying it.
+sub-resource on the taggable resources, the conjunctive ``?tag=`` list filter,
+the two invariants the whole feature rests on -- renaming a tag keeps every
+attachment, and deleting one detaches it everywhere rather than being blocked by
+the records carrying it -- and the access-control predicate an ``accessControl``
+tag adds on top (see :mod:`models.tag`).
 """
 
 from collections.abc import AsyncGenerator
@@ -29,6 +30,7 @@ from models.workflow import Workflow, WorkflowRead
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._workflow import create_published_workflow, create_skill
 from tests.conftest import _install_auth_overrides
 
 #: A second tenant used by the isolation tests.
@@ -793,3 +795,295 @@ def test_read_model_mirrors_every_filterable_column(
     missing = set(table.model_fields) - set(read.model_fields) - deliberately_hidden
     assert missing == set()
     assert "tag_ids" in read.model_fields
+
+
+# ---------- access control ----------
+
+#: Headers selecting a requester of the default tenant, for the workflow cases.
+REQUESTER: dict[str, str] = {"X-User-Id": "carol", "X-User-Roles": "requester"}
+
+
+async def _gate(
+    client: AsyncClient, collection: str, record_id: str, tag_ids: list[str]
+) -> None:
+    """Attach ``tag_ids`` to a record as the super admin, who is never locked out."""
+    response = await client.put(
+        f"/api/v1/{collection}/{record_id}/tags", json={"tagIds": tag_ids}
+    )
+    assert_ok(response)
+
+
+async def _create_member_group(
+    client: AsyncClient, name: str, member_ids: list[str], tag_ids: list[str]
+) -> dict[str, Any]:
+    """Create a group holding ``member_ids`` and carrying ``tag_ids``."""
+    response = await client.post(
+        "/api/v1/user-groups",
+        json={"name": name, "memberIds": member_ids},
+        headers=ADMIN,
+    )
+    group = assert_ok(response, 201)
+    return await _set_user_group_tags(client, group["id"], tag_ids)
+
+
+async def _listed_ids(
+    client: AsyncClient, collection: str, headers: dict[str, str]
+) -> set[str]:
+    """Return the ids of the records ``headers``' user sees in ``collection``."""
+    response = await client.get(f"/api/v1/{collection}", headers=headers)
+    return {record["id"] for record in assert_ok(response)}
+
+
+async def test_access_control_flag_defaults_off_and_round_trips(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    plain = await _create_tag(client, "plain")
+    assert plain["accessControl"] is False
+    gated = await _create_tag(client, "gated", accessControl=True)
+    assert gated["accessControl"] is True
+    fetched = assert_ok(await client.get(f"/api/v1/tags/{gated['id']}", headers=NOBODY))
+    assert fetched["accessControl"] is True
+    updated = assert_ok(
+        await client.patch(
+            f"/api/v1/tags/{gated['id']}", json={"accessControl": False}, headers=ADMIN
+        )
+    )
+    assert updated["accessControl"] is False
+
+
+async def test_a_developer_may_not_create_an_access_control_tag(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Only an admin may turn a tag into a gate; a developer's create is 403."""
+    client, _ = tag_env
+    response = await client.post(
+        "/api/v1/tags",
+        json={"name": "gated", "accessControl": True},
+        headers=DEVELOPER,
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_a_developer_may_not_flip_the_access_control_flag(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    plain = await _create_tag(client, "plain")
+    gated = await _create_tag(client, "gated", accessControl=True)
+    for tag, flag in ((plain, True), (gated, False)):
+        response = await client.patch(
+            f"/api/v1/tags/{tag['id']}", json={"accessControl": flag}, headers=DEVELOPER
+        )
+        assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_a_developer_may_echo_the_access_control_flag_unchanged(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The edit form always sends the flag, so an unchanged value must not 403."""
+    client, _ = tag_env
+    gated = await _create_tag(client, "gated", accessControl=True)
+    response = await client.patch(
+        f"/api/v1/tags/{gated['id']}",
+        json={"name": "renamed", "accessControl": True},
+        headers=DEVELOPER,
+    )
+    updated = assert_ok(response)
+    assert updated["name"] == "renamed"
+    assert updated["accessControl"] is True
+
+
+async def test_access_controlled_secret_is_hidden_from_a_non_member(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Every caller-facing route reads as 404, so existence is never confirmed."""
+    client, _ = tag_env
+    gated = await _create_tag(client, "gated", accessControl=True)
+    secret_id = (await _create_secret(client))["id"]
+    await _gate(client, "secrets", secret_id, [gated["id"]])
+
+    assert secret_id not in await _listed_ids(client, "secrets", DEVELOPER)
+    base = f"/api/v1/secrets/{secret_id}"
+    assert_err(await client.get(base, headers=DEVELOPER), "NOT_FOUND", 404)
+    assert_err(await client.get(f"{base}/keys", headers=DEVELOPER), "NOT_FOUND", 404)
+    assert_err(
+        await client.patch(base, json={"name": "renamed"}, headers=DEVELOPER),
+        "NOT_FOUND",
+        404,
+    )
+    assert_err(
+        await client.put(f"{base}/tags", json={"tagIds": []}, headers=DEVELOPER),
+        "NOT_FOUND",
+        404,
+    )
+    assert_err(await client.delete(base, headers=DEVELOPER), "NOT_FOUND", 404)
+    # Nothing above was applied.
+    assert assert_ok(await client.get(base))["name"] == "creds"
+
+
+async def test_member_whose_groups_cover_every_access_tag_sees_the_record(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Conjunctive over the record's tags; the caller's groups are taken together."""
+    client, _ = tag_env
+    finance = await _create_tag(client, "finance", accessControl=True)
+    audit = await _create_tag(client, "audit", accessControl=True)
+    secret_id = (await _create_secret(client))["id"]
+    await _gate(client, "secrets", secret_id, [finance["id"], audit["id"]])
+    base = f"/api/v1/secrets/{secret_id}"
+
+    # One of the two tags is not enough.
+    await _create_member_group(client, "finance-team", ["bob"], [finance["id"]])
+    assert secret_id not in await _listed_ids(client, "secrets", DEVELOPER)
+    assert_err(await client.get(base, headers=DEVELOPER), "NOT_FOUND", 404)
+
+    # A second group supplying the other tag completes the set.
+    await _create_member_group(client, "auditors", ["bob"], [audit["id"]])
+    assert secret_id in await _listed_ids(client, "secrets", DEVELOPER)
+    assert assert_ok(await client.get(base, headers=DEVELOPER))["id"] == secret_id
+
+
+async def test_plain_tags_never_restrict_and_super_admin_bypasses(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    plain = await _create_tag(client, "plain")
+    gated = await _create_tag(client, "gated", accessControl=True)
+    open_id = (await _create_secret(client, "open"))["id"]
+    gated_id = (await _create_secret(client, "gated"))["id"]
+    await _gate(client, "secrets", open_id, [plain["id"]])
+    await _gate(client, "secrets", gated_id, [plain["id"], gated["id"]])
+
+    # A plain tag on its own hides nothing, even from a role-less user.
+    assert open_id in await _listed_ids(client, "secrets", NOBODY)
+    assert gated_id not in await _listed_ids(client, "secrets", NOBODY)
+    # The super admin (the client's default identity) is never a group member
+    # and is exempt instead.
+    assert {open_id, gated_id} <= await _listed_ids(client, "secrets", {})
+    assert_ok(await client.get(f"/api/v1/secrets/{gated_id}"))
+
+
+async def test_attaching_an_unheld_access_tag_is_forbidden(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A caller cannot hide a record from themselves; membership unlocks the tag."""
+    client, _ = tag_env
+    plain = await _create_tag(client, "plain")
+    gated = await _create_tag(client, "gated", accessControl=True)
+    secret_id = (await _create_secret(client))["id"]
+    tags_url = f"/api/v1/secrets/{secret_id}/tags"
+
+    response = await client.put(
+        tags_url, json={"tagIds": [plain["id"], gated["id"]]}, headers=DEVELOPER
+    )
+    assert_err(response, "FORBIDDEN", 403)
+    # Refused as a whole: the plain tag was not attached either.
+    secret = assert_ok(
+        await client.get(f"/api/v1/secrets/{secret_id}", headers=DEVELOPER)
+    )
+    assert secret["tagIds"] == []
+
+    await _create_member_group(client, "holders", ["bob"], [gated["id"]])
+    updated = assert_ok(
+        await client.put(
+            tags_url, json={"tagIds": [plain["id"], gated["id"]]}, headers=DEVELOPER
+        )
+    )
+    assert set(updated["tagIds"]) == {plain["id"], gated["id"]}
+
+
+async def test_a_group_may_carry_an_access_tag_its_editor_does_not_hold(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Tagging a group is how an admin grants access, so it is never locked out."""
+    client, _ = tag_env
+    gated = await _create_tag(client, "gated", accessControl=True)
+    group = await _create_user_group(client)
+    # ``ADMIN`` is alice, who is not a member of the group and holds no tags.
+    updated = await _set_user_group_tags(client, group["id"], [gated["id"]])
+    assert updated["tagIds"] == [gated["id"]]
+
+
+@pytest.mark.parametrize(
+    ("collection", "body"),
+    [
+        ("mcp-servers", {"name": "srv", "url": "https://mcp.example.com/mcp"}),
+        ("agent-skills", {"name": "skill", "repoUrl": "https://github.com/x/y"}),
+        (
+            "mcp-tool-mocks",
+            {
+                "name": "mock",
+                "toolName": "request_approval",
+                "responses": [{"kind": "text", "value": "ok"}],
+            },
+        ),
+    ],
+)
+async def test_access_control_gates_every_taggable_collection(
+    workflow_client: AsyncClient, collection: str, body: dict[str, Any]
+) -> None:
+    """The same predicate guards each taggable repository, not just secrets."""
+    client = workflow_client
+    gated = await _create_tag(client, "gated", accessControl=True)
+    created = assert_ok(await client.post(f"/api/v1/{collection}", json=body), 201)
+    record_id = created["id"]
+    await _gate(client, collection, record_id, [gated["id"]])
+
+    assert record_id not in await _listed_ids(client, collection, DEVELOPER)
+    assert_err(
+        await client.get(f"/api/v1/{collection}/{record_id}", headers=DEVELOPER),
+        "NOT_FOUND",
+        404,
+    )
+
+    await _create_member_group(client, "holders", ["bob"], [gated["id"]])
+    assert record_id in await _listed_ids(client, collection, DEVELOPER)
+    assert_ok(await client.get(f"/api/v1/{collection}/{record_id}", headers=DEVELOPER))
+
+
+async def test_a_hidden_workflow_cannot_be_listed_read_or_executed(
+    workflow_client: AsyncClient,
+) -> None:
+    client = workflow_client
+    gated = await _create_tag(client, "gated", accessControl=True)
+    skill = await create_skill(client)
+    workflow_id = (await create_published_workflow(client, skill["id"]))["id"]
+    await _gate(client, "workflows", workflow_id, [gated["id"]])
+    execute_url = f"/api/v1/workflows/{workflow_id}/execute"
+
+    assert workflow_id not in await _listed_ids(client, "workflows", REQUESTER)
+    assert_err(
+        await client.get(f"/api/v1/workflows/{workflow_id}", headers=REQUESTER),
+        "NOT_FOUND",
+        404,
+    )
+    assert_err(await client.post(execute_url, headers=REQUESTER), "NOT_FOUND", 404)
+
+    await _create_member_group(client, "holders", ["carol"], [gated["id"]])
+    assert_ok(await client.post(execute_url, headers=REQUESTER), 201)
+
+
+async def test_executing_a_visible_workflow_resolves_its_hidden_skill(
+    workflow_client: AsyncClient,
+) -> None:
+    """Access control is a management-API rule: a run still uses the skill it came from."""
+    client = workflow_client
+    gated = await _create_tag(client, "gated", accessControl=True)
+    skill = await create_skill(client)
+    # Generate first: a new workflow copies its skill's tags, and this one must
+    # stay open.
+    workflow_id = (await create_published_workflow(client, skill["id"]))["id"]
+    await _gate(client, "agent-skills", skill["id"], [gated["id"]])
+
+    assert_err(
+        await client.get(f"/api/v1/agent-skills/{skill['id']}", headers=REQUESTER),
+        "NOT_FOUND",
+        404,
+    )
+    assert_ok(
+        await client.post(
+            f"/api/v1/workflows/{workflow_id}/execute", headers=REQUESTER
+        ),
+        201,
+    )

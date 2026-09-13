@@ -39,6 +39,8 @@ The initial seeded **`root`** user holds `super_admin` and is platform-scoped (n
 
 **Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role.
 
+The one exception is not a role at all: a record carrying an [access-control tag](../guides/tags.md#access-control-tags) is visible only to users whose groups, between them, carry every such tag on it — and a Super Admin. Everyone else sees neither the record nor any sign it exists.
+
 Roles are assigned from the [Users](../guides/users-and-groups.md#users) admin page, or in bulk from the [User Groups](../guides/users-and-groups.md#user-groups) page; only a Super Admin may grant or revoke `super_admin`. A rejected request returns HTTP 403 (`FORBIDDEN`).
 
 ### What the UI hides {#what-the-ui-hides}

@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 from typing import Protocol
 
+from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -86,11 +87,28 @@ class SqlMcpToolMockRepository(TenantScopedRepository[MCPToolMock]):
         server_repo: MCPServerRepository,
         *,
         tenant_id: str | None,
+        access_tag_ids: frozenset[str] | None = None,
     ) -> None:
-        """Store the session, the MCPServer repository, and the tenant scope."""
+        """Store the session, the MCPServer repository, the tenant scope, and the caller's tags.
+
+        Args:
+            session: The SQLModel session to run queries on.
+            server_repo: Repository used to validate ``mcp_server_id`` references.
+            tenant_id: Tenant every query is filtered by, or ``None`` for a
+                platform-scoped read across every tenant.
+            access_tag_ids: The caller's group tags for access control, or
+                ``None`` for an unrestricted caller -- see
+                :class:`repositories.tags.TagLinks`.
+        """
         super().__init__(session, tenant_id=tenant_id)
         self._servers = server_repo
-        self._tags = TagLinks(session, McpToolMockTag, tenant_id=tenant_id)
+        self._tags = TagLinks(
+            session, McpToolMockTag, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+        )
+
+    def _visibility_clause(self) -> ColumnElement[bool] | None:
+        """Hide mocks gated by an access-control tag the caller does not hold."""
+        return self._tags.visibility_clause(col(MCPToolMock.id))
 
     async def _assert_server(self, mcp_server_id: str | None) -> None:
         """Reject a mock whose ``mcp_server_id`` names no server of this tenant.

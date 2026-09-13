@@ -44,6 +44,7 @@ from services.workflow_task_template import WorkflowTaskTemplateService
 
 from .context import APP_NAME
 from .repository import (
+    AgentSkillLookupDep,
     AgentSkillRepositoryDep,
     ApprovalRepositoryDep,
     DBSessionDep,
@@ -316,7 +317,7 @@ UserAvatarServiceDep = Annotated[UserAvatarService, Depends(get_user_avatar_serv
 
 def get_workflow_service(
     workflows: WorkflowRepositoryDep,
-    skills: AgentSkillRepositoryDep,
+    skills: AgentSkillLookupDep,
     execution_repo: WorkflowExecutionRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
@@ -465,13 +466,18 @@ def get_workflow_execution_service(
     tasks: WorkflowTaskRepositoryDep,
     meta: MessageMetaRepositoryDep,
     invocations: McpToolInvocationRepositoryDep,
-    skills: AgentSkillRepositoryDep,
+    skills: AgentSkillLookupDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
     access: WorkflowExecutionAccessPolicyDep,
 ) -> WorkflowExecutionService:
-    """Create a WorkflowExecutionService wiring the repositories, skill store, agent registry, session store, and access policy."""
+    """Create a WorkflowExecutionService wiring the repositories, skill store, agent registry, session store, and access policy.
+
+    The skill repository is the unrestricted lookup: an execution's skill is
+    resolved on behalf of a run the caller is already authorized for, not as a
+    skill the caller manages -- see ``get_agent_skill_lookup``.
+    """
     return WorkflowExecutionService(
         execution_repo,
         tasks,

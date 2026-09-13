@@ -64,6 +64,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
         name: byId.get(id)?.name ?? id,
         color: resolveTagColor(byId.get(id)?.color),
         description: byId.get(id)?.description ?? undefined,
+        accessControl: byId.get(id)?.accessControl ?? false,
       })),
     [value, byId]
   );
@@ -77,6 +78,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
           <Chip
             key={tag.id}
             label={tag.name}
+            locked={tag.accessControl}
             color={tag.color}
             description={tag.description}
             onRemove={readOnly ? undefined : () => onChange(value.filter((id) => id !== tag.id))}

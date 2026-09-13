@@ -11,17 +11,23 @@ A resource repository composes this rather than inheriting it: it builds one
 ``TagLinks`` in its constructor and delegates. Nothing here commits — the
 owning repository's ``create``/``update`` does, so an attachment change and the
 row it belongs to land in the same transaction.
+
+It also owns both halves of tag-based **access control** (see
+:mod:`models.tag`): :meth:`TagLinks.visibility_clause` is the predicate the
+owning repository folds into every caller-facing query, and
+:meth:`TagLinks.validate` refuses to attach an access-control tag the caller
+does not hold, so nobody hides a record from themselves by accident.
 """
 
 from collections.abc import Sequence
 
-from sqlalchemy import Exists
+from sqlalchemy import ColumnElement, Exists
 from sqlalchemy.orm import Mapped
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.tag import Tag, TagLink
-from repositories.exceptions import ForeignKeyViolationError
+from repositories.exceptions import ForbiddenError, ForeignKeyViolationError
 
 #: The owning table's id column, as returned by :func:`sqlmodel.col`.
 _IdColumn = Mapped[str]
@@ -40,6 +46,14 @@ class TagLinks:
             is only ever reached through the owning repository's write
             methods, which guard against a ``None`` tenant before delegating
             here, so this is never actually ``None`` when it matters.
+        access_tag_ids: Ids of the tags the caller holds through their groups
+            (``AccessTagIdsDep``), or ``None`` when the caller is unrestricted
+            -- a ``super_admin``, or a job or agent tool acting on the
+            system's behalf rather than a user's. Drives
+            :meth:`visibility_clause` and the lock-out check in
+            :meth:`validate`; a ``TagLinks`` over ``UserGroupTag`` is built
+            without it, since attaching an access-control tag to a *group* is
+            how an admin grants access, not how a caller claims it.
     """
 
     def __init__(
@@ -48,11 +62,42 @@ class TagLinks:
         link_model: type[TagLink],
         *,
         tenant_id: str | None,
+        access_tag_ids: frozenset[str] | None = None,
     ) -> None:
-        """Store the session, the join model, and the tenant scope."""
+        """Store the session, the join model, the tenant scope, and the caller's tags."""
         self._db = session
         self._link = link_model
         self._tenant_id = tenant_id
+        self._access_tag_ids = access_tag_ids
+
+    def visibility_clause(self, owner_col: _IdColumn) -> ColumnElement[bool] | None:
+        """Build the predicate admitting only records the caller may act on.
+
+        A record passes when it carries **no** access-control tag outside the
+        caller's set: ``NOT EXISTS`` an attachment whose tag is flagged and
+        not held. Records with no access-control tags pass trivially, so plain
+        tags never restrict anything. With an empty caller set, every flagged
+        tag is "not held" and every access-controlled record is hidden.
+
+        Args:
+            owner_col: The owning table's id column, e.g. ``col(Secret.id)``.
+
+        Returns:
+            The predicate, or ``None`` when the caller is unrestricted and the
+            query needs no narrowing.
+        """
+        if self._access_tag_ids is None:
+            return None
+        return ~(
+            select(col(self._link.resource_id))
+            .join(Tag, onclause=col(Tag.id) == col(self._link.tag_id))
+            .where(
+                col(self._link.resource_id) == owner_col,
+                col(Tag.access_control).is_(True),
+                col(Tag.id).not_in(list(self._access_tag_ids)),
+            )
+            .exists()
+        )
 
     async def for_one(self, resource_id: str) -> list[str]:
         """Return the sorted tag ids attached to one record.
@@ -120,21 +165,35 @@ class TagLinks:
         than a forbidden one, so attaching never confirms that an id exists
         somewhere else.
 
+        A restricted caller is also refused any access-control tag their
+        groups do not carry: attaching one would hide the record from the very
+        person editing it, on the next request. An unrestricted caller (see
+        ``access_tag_ids`` in the class docstring) may attach any tag.
+
         Args:
             tag_ids: The proposed tag ids (deduplicated by the payload model).
 
         Raises:
             ForeignKeyViolationError: For the first id that does not qualify.
+            ForbiddenError: If any id names an access-control tag the caller
+                does not hold.
         """
         if not tag_ids:
             return
-        stmt = select(Tag.id).where(
+        stmt = select(Tag.id, Tag.access_control).where(
             col(Tag.id).in_(list(tag_ids)), Tag.tenant_id == self._tenant_id
         )
-        known = set((await self._db.exec(stmt)).all())
+        known = dict((await self._db.exec(stmt)).all())
         for tag_id in tag_ids:
             if tag_id not in known:
                 raise ForeignKeyViolationError("Tag", tag_id)
+        if self._access_tag_ids is None:
+            return
+        for tag_id in tag_ids:
+            if known[tag_id] and tag_id not in self._access_tag_ids:
+                raise ForbiddenError(
+                    "Cannot attach an access-control tag your groups do not carry"
+                )
 
     def filter_clauses(
         self, owner_col: _IdColumn, tag_ids: Sequence[str]

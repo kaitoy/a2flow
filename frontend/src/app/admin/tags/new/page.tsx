@@ -39,6 +39,9 @@ export default function NewTagPage() {
   const [color, setColor] = useState<TagColor>(DEFAULT_TAG_COLOR);
   const isSuperAdminViewer = useHasRole(Role.SUPER_ADMIN);
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
+  // Only an admin may turn a tag into an access-control gate; a developer sees
+  // the flag as a fixed "No" and the backend would 403 anything else.
+  const canSetAccessControl = useHasRole(Role.ADMIN);
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
   // A tenant-scoped viewer's own tenant is applied server-side regardless, so
   // only a super admin's app-bar selection is ever meaningful here.
@@ -95,7 +98,12 @@ export default function NewTagPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <TagFields register={register} errors={errors} showPlaceholders />
+          <TagFields
+            register={register}
+            errors={errors}
+            showPlaceholders
+            accessControlValue={canSetAccessControl ? undefined : false}
+          />
 
           <TagColorField value={color} onChange={setColor} previewLabel={watch("name")} />
 

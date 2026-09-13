@@ -24,27 +24,35 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
   built-in ``request_approval``, returning ``approved``,
 * two AgentSkills pointing at ``sample_skills/aws-ec2-launch`` and
   ``sample_skills/gke-pod-restart`` in this repository,
-* three Tags -- ``AWS`` (attached to the AWS secret, AWS MCP server, the
+* three Tags -- ``AWS`` (an **access-control** tag: visible, and its
+  attachments usable, only to ``Demo AWS Group`` members and ``admin``/
+  ``super_admin``; attached to the AWS secret, AWS MCP server, the
   EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks,
-  showing that one tag classifies across resource types), ``GCP`` (attached to
-  the Google Cloud secret, the GKE MCP server, and the pod-restart agent
+  showing that one tag classifies across resource types), ``GCP`` (also
+  access-control, gated the same way by ``Demo GCP Group``; attached to the
+  Google Cloud secret, the GKE MCP server, and the pod-restart agent
   skill -- GKE is a Google Cloud product, so the same provider tag still
-  applies), and ``Approval Required`` (attached to both agent skills, calling
-  out their approval gate),
-* five Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
-  either of whom the skill can ask for approval, two requesters,
-  ``demo-requester-1`` and ``demo-requester-2``, either of whom may run the
-  workflow, and a ``demo-developer`` (who may build and register the
-  workflow, MCP server, and agent skill in the first place) -- each holding
-  **no direct role at all**,
-* three UserGroups -- ``Demo Approvers``, ``Demo Requesters``, and
-  ``Demo Developers`` -- each granting one role to its members, so every demo
-  account gets its role purely by inheritance. ``Demo Approvers`` and
+  applies), and ``Approval Required`` (a plain, non-gating tag attached to
+  both agent skills, calling out their approval gate),
+* six Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
+  either of whom the skill can ask for approval, an AWS pair
+  (``demo-aws-developer``, ``demo-aws-requester``) who build and run the
+  EC2-launch workflow, and a GCP pair (``demo-gcp-developer``,
+  ``demo-gcp-requester``) who do the same for the GKE-pod-restart workflow --
+  each holding **no direct role at all**,
+* five UserGroups -- ``Demo Approvers``, ``Demo Requesters``, and
+  ``Demo Developers`` each grant one role to their members, so every demo
+  account gets its role purely by inheritance (``Demo Approvers`` and
   ``Demo Requesters`` each hold two accounts, showing that a group's
-  membership need not be a single user; ``Demo Developers`` holds its one
-  matching user alone. That makes the group feature visible in the demo
-  dataset itself: remove a user from their group and their access disappears
-  on the next request.
+  membership need not be a single user). ``Demo AWS Group`` and
+  ``Demo GCP Group`` grant no role at all -- they exist solely to hold the
+  matching access-control tag, so their members (the AWS or GCP developer and
+  requester, plus ``admin``) can see the AWS- or GCP-tagged records and
+  everyone else cannot. That makes both the role-inheritance and the
+  access-control side of the group feature visible in the demo dataset
+  itself: remove a user from their role group and their access disappears on
+  the next request; remove them from their AC group instead and the AWS/GCP
+  records disappear from what they can see.
 
 The Workflow itself is deliberately *not* seeded — these records are the
 ingredients an operator assembles one into. Every tag stays unattached to any
@@ -56,7 +64,12 @@ records exist, and leaving it unset (the default) guarantees they do not, so
 turning the option off and restarting removes whatever a previous run
 registered. Every record is identified by a fixed id constant rather than by
 name, which makes both directions exact and idempotent no matter how the rows
-were renamed in the admin UI in between.
+were renamed in the admin UI in between -- and it cuts the other way too for
+the handful of fields this module itself declares: an existing row (a demo
+user seeded under an older username, a tag seeded before it became
+access-control) is brought back in line with the current declaration on the
+next startup, the same way a demo account's direct roles are stripped back
+to none on every restart.
 
 Rows are built as table models directly, not through the ``...Create``
 validation models the API uses. That is deliberate: ``AgentSkillCreate``'s
@@ -88,6 +101,7 @@ from models.tag import (
     Tag,
     TagColor,
     TagLink,
+    UserGroupTag,
 )
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
@@ -100,20 +114,25 @@ logger = logging.getLogger(__name__)
 #: skill requests approval from).
 DEMO_APPROVER_USER_ID = "00000000-0000-0000-0000-00000000d001"
 
-#: Fixed identifier of the demo ``requester`` user (who executes the workflow).
-DEMO_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d002"
+#: Fixed identifier of the demo AWS ``requester`` user (who runs the
+#: EC2-launch workflow).
+DEMO_AWS_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d002"
 
-#: Fixed identifier of the demo ``developer`` user (who builds and registers
-#: the workflow, MCP server, and agent skill).
-DEMO_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d003"
+#: Fixed identifier of the demo AWS ``developer`` user (who builds and
+#: registers the EC2-launch workflow, MCP server, and agent skill).
+DEMO_AWS_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d003"
 
 #: Fixed identifier of the second demo ``approver`` user, showing that a
 #: ``Demo Approvers`` membership need not be a single account.
 DEMO_APPROVER_2_USER_ID = "00000000-0000-0000-0000-00000000d004"
 
-#: Fixed identifier of the second demo ``requester`` user, showing that a
-#: ``Demo Requesters`` membership need not be a single account.
-DEMO_REQUESTER_2_USER_ID = "00000000-0000-0000-0000-00000000d005"
+#: Fixed identifier of the demo GCP ``requester`` user (who runs the
+#: GKE-pod-restart workflow).
+DEMO_GCP_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d005"
+
+#: Fixed identifier of the demo GCP ``developer`` user (who builds and
+#: registers the GKE-pod-restart workflow, MCP server, and agent skill).
+DEMO_GCP_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d006"
 
 #: Fixed identifier of the demo ``Demo Approvers`` user group.
 DEMO_APPROVERS_GROUP_ID = "00000000-0000-0000-0000-00000000d401"
@@ -123,6 +142,14 @@ DEMO_REQUESTERS_GROUP_ID = "00000000-0000-0000-0000-00000000d402"
 
 #: Fixed identifier of the demo ``Demo Developers`` user group.
 DEMO_DEVELOPERS_GROUP_ID = "00000000-0000-0000-0000-00000000d403"
+
+#: Fixed identifier of the demo ``Demo AWS Group`` user group, which grants no
+#: role and exists solely to hold the access-control ``AWS`` tag.
+DEMO_AWS_GROUP_ID = "00000000-0000-0000-0000-00000000d404"
+
+#: Fixed identifier of the demo ``Demo GCP Group`` user group, which grants no
+#: role and exists solely to hold the access-control ``GCP`` tag.
+DEMO_GCP_GROUP_ID = "00000000-0000-0000-0000-00000000d405"
 
 #: Fixed identifier of the demo Secret holding the AWS credentials.
 DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
@@ -321,25 +348,29 @@ class _DemoUserSpec:
 
 @dataclass(frozen=True)
 class _DemoGroupSpec:
-    """One demo user group: a single role granted to one or more members.
+    """One demo user group: at most one role granted to one or more members.
 
     Attributes:
         id: Fixed primary key, so the group can be found again for removal.
         name: Group name shown in the admin UI, unique within the tenant.
         description: Sentence shown on the group list and detail pages.
-        role: The one role this group grants to its members.
+        role: The one role this group grants to its members, or ``None`` for
+            a group that grants no role at all -- used for a group whose only
+            purpose is to hold an access-control tag (see
+            :data:`DEMO_AWS_GROUP_ID` / :data:`DEMO_GCP_GROUP_ID`).
         member_ids: Ids of the demo users placed in the group.
     """
 
     id: str
     name: str
     description: str
-    role: Role
+    role: Role | None
     member_ids: tuple[str, ...]
 
 
 #: The demo accounts, in creation order. Each is created with an empty
-#: ``roles`` list and gets its role from :data:`_DEMO_GROUPS`.
+#: ``roles`` list and gets its role, and separately its access-control tag,
+#: from whichever entries of :data:`_DEMO_GROUPS` list it among their members.
 _DEMO_USERS = (
     _DemoUserSpec(
         id=DEMO_APPROVER_USER_ID,
@@ -348,14 +379,14 @@ _DEMO_USERS = (
         last_name="Anderson",
     ),
     _DemoUserSpec(
-        id=DEMO_REQUESTER_USER_ID,
-        username="demo-requester-1",
+        id=DEMO_AWS_REQUESTER_USER_ID,
+        username="demo-aws-requester",
         first_name="Bob",
         last_name="Martinez",
     ),
     _DemoUserSpec(
-        id=DEMO_DEVELOPER_USER_ID,
-        username="demo-developer",
+        id=DEMO_AWS_DEVELOPER_USER_ID,
+        username="demo-aws-developer",
         first_name="Carol",
         last_name="Bennett",
     ),
@@ -366,21 +397,35 @@ _DEMO_USERS = (
         last_name="Foster",
     ),
     _DemoUserSpec(
-        id=DEMO_REQUESTER_2_USER_ID,
-        username="demo-requester-2",
+        id=DEMO_GCP_REQUESTER_USER_ID,
+        username="demo-gcp-requester",
         first_name="Ethan",
         last_name="Cole",
     ),
+    _DemoUserSpec(
+        id=DEMO_GCP_DEVELOPER_USER_ID,
+        username="demo-gcp-developer",
+        first_name="Fiona",
+        last_name="Grant",
+    ),
 )
 
-#: The demo user groups, one per role. The sample skill looks for a user
-#: holding ``approver`` to route its approval request to; ``requester`` is the
-#: role that may execute a workflow; ``developer`` is the role that may build
-#: and register a workflow, MCP server, or agent skill. Granting each through
-#: a group rather than directly is what makes the demo exercise role
-#: inheritance. ``Demo Approvers`` and ``Demo Requesters`` each hold two
-#: members, demonstrating that a group's role reaches every one of its
-#: members, not just a single account.
+#: The demo user groups. ``Demo Approvers``, ``Demo Requesters``, and
+#: ``Demo Developers`` each grant one role to their members -- the sample
+#: skill looks for a user holding ``approver`` to route its approval request
+#: to; ``requester`` is the role that may execute a workflow; ``developer`` is
+#: the role that may build and register a workflow, MCP server, or agent
+#: skill. Granting each through a group rather than directly is what makes
+#: the demo exercise role inheritance; all three hold two members, showing
+#: that a group's role reaches every one of its members, not just a single
+#: account.
+#:
+#: ``Demo AWS Group`` and ``Demo GCP Group`` grant no role at all (``role=
+#: None``) -- their only purpose is to hold the matching access-control tag
+#: (see :func:`_seed_demo_tags`), so their members, and only their members,
+#: can see the AWS- or GCP-tagged records. Each demo developer/requester
+#: therefore belongs to two groups: one for their role, one for their
+#: provider's access.
 _DEMO_GROUPS = (
     _DemoGroupSpec(
         id=DEMO_APPROVERS_GROUP_ID,
@@ -394,14 +439,28 @@ _DEMO_GROUPS = (
         name="Demo Requesters",
         description="People who can run published workflows.",
         role=Role.requester,
-        member_ids=(DEMO_REQUESTER_USER_ID, DEMO_REQUESTER_2_USER_ID),
+        member_ids=(DEMO_AWS_REQUESTER_USER_ID, DEMO_GCP_REQUESTER_USER_ID),
     ),
     _DemoGroupSpec(
         id=DEMO_DEVELOPERS_GROUP_ID,
         name="Demo Developers",
         description="People who can build workflows, MCP servers, and agent skills.",
         role=Role.developer,
-        member_ids=(DEMO_DEVELOPER_USER_ID,),
+        member_ids=(DEMO_AWS_DEVELOPER_USER_ID, DEMO_GCP_DEVELOPER_USER_ID),
+    ),
+    _DemoGroupSpec(
+        id=DEMO_AWS_GROUP_ID,
+        name="Demo AWS Group",
+        description=("Holds the access-control 'AWS' tag; grants no role of its own."),
+        role=None,
+        member_ids=(DEMO_AWS_DEVELOPER_USER_ID, DEMO_AWS_REQUESTER_USER_ID),
+    ),
+    _DemoGroupSpec(
+        id=DEMO_GCP_GROUP_ID,
+        name="Demo GCP Group",
+        description=("Holds the access-control 'GCP' tag; grants no role of its own."),
+        role=None,
+        member_ids=(DEMO_GCP_DEVELOPER_USER_ID, DEMO_GCP_REQUESTER_USER_ID),
     ),
 )
 
@@ -716,6 +775,30 @@ async def _default_tenant_id(session: AsyncSession) -> str | None:
     return None if tenant is None else tenant.id
 
 
+async def _default_admin_user_id(session: AsyncSession, tenant_id: str) -> str | None:
+    """Return the id of the seeded ``Default`` tenant's ``admin`` user, or ``None``.
+
+    ``admin`` is seeded by :func:`infrastructure.bootstrap.seed_default_tenant_and_admin_user`,
+    not by this module, and gets an auto-generated UUID7 rather than a fixed
+    id, so it must be looked up by ``username`` scoped to the tenant rather
+    than referenced by a constant the way every other demo record is.
+
+    Args:
+        session: Database session used to read the user.
+        tenant_id: Id of the ``Default`` tenant the ``admin`` user belongs to.
+
+    Returns:
+        The user's id, or ``None`` when it has not been seeded yet.
+    """
+    stmt = (
+        select(User)
+        .where(col(User.username) == "admin", col(User.tenant_id) == tenant_id)
+        .limit(1)
+    )
+    admin = (await session.exec(stmt)).first()
+    return None if admin is None else admin.id
+
+
 async def _insert(session: AsyncSession, row: SQLModel, *, label: str) -> bool:
     """Insert one demo row, skipping it when it collides with existing data.
 
@@ -795,7 +878,7 @@ async def _seed_demo_users(session: AsyncSession, tenant_id: str) -> None:
         if existing is None:
             missing.append(spec)
         else:
-            await _revive_demo_user(session, existing)
+            await _revive_demo_user(session, existing, spec)
     if not missing:
         return
     password = resolve_seed_password(
@@ -824,7 +907,9 @@ async def _seed_demo_users(session: AsyncSession, tenant_id: str) -> None:
         )
 
 
-async def _revive_demo_user(session: AsyncSession, user: User) -> None:
+async def _revive_demo_user(
+    session: AsyncSession, user: User, spec: _DemoUserSpec
+) -> None:
     """Normalize an existing demo user back to this module's declared shape.
 
     Clears a soft delete, re-enables the account, and — for a database seeded
@@ -834,18 +919,46 @@ async def _revive_demo_user(session: AsyncSession, user: User) -> None:
     enabled would leave the role granted twice over, and removing a user from
     their demo group would visibly fail to revoke anything.
 
+    Also brings the account's identity fields back in line with ``spec``: a
+    row seeded under an older version of this module may still carry a
+    previous generation's username (e.g. ``demo-developer`` before this
+    module split it into a per-provider ``demo-aws-developer`` /
+    ``demo-gcp-developer`` pair), which would otherwise never be corrected by
+    a later restart.
+
     Args:
         session: Database session used to update the user.
         user: The existing demo user row.
+        spec: This account's current declared identity.
     """
-    if user.deleted_at is None and user.enabled and not user.roles:
+    if (
+        user.deleted_at is None
+        and user.enabled
+        and not user.roles
+        and user.username == spec.username
+        and user.first_name == spec.first_name
+        and user.last_name == spec.last_name
+    ):
         return
+    previous_username = user.username
     user.deleted_at = None
     user.enabled = True
     user.roles = []
+    user.username = spec.username
+    user.first_name = spec.first_name
+    user.last_name = spec.last_name
     user.updated_by = SYSTEM_USER_ID
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        logger.warning(
+            "Could not rename demo user %r to %r: the new username conflicts "
+            "with an existing record.",
+            previous_username,
+            spec.username,
+        )
 
 
 async def _delete_demo_user(session: AsyncSession, user_id: str) -> None:
@@ -877,6 +990,12 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
     Nothing needs recomputing afterwards: a member's inherited roles are
     resolved from these rows on every request rather than stored on the user.
 
+    Also places the tenant's ``admin`` user (seeded separately by
+    :func:`infrastructure.bootstrap.seed_default_tenant_and_admin_user`, so it
+    has no fixed id this module can put in :data:`_DEMO_GROUPS` directly) in
+    both :data:`DEMO_AWS_GROUP_ID` and :data:`DEMO_GCP_GROUP_ID`, so it can see
+    every AWS- and GCP-tagged demo record without needing a dedicated account.
+
     Args:
         session: Database session used to read and insert groups and members.
         tenant_id: Id of the ``Default`` tenant the groups belong to.
@@ -890,7 +1009,7 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
                     tenant_id=tenant_id,
                     name=spec.name,
                     description=spec.description,
-                    roles=[spec.role.value],
+                    roles=[spec.role.value] if spec.role is not None else [],
                     created_by=SYSTEM_USER_ID,
                     updated_by=SYSTEM_USER_ID,
                 ),
@@ -907,6 +1026,22 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
                     UserGroupMember(group_id=spec.id, user_id=member_id),
                     label=f"membership of user group '{spec.name}'",
                 )
+
+    admin_id = await _default_admin_user_id(session, tenant_id)
+    if admin_id is None:
+        return
+    for group_id, group_name in (
+        (DEMO_AWS_GROUP_ID, "Demo AWS Group"),
+        (DEMO_GCP_GROUP_ID, "Demo GCP Group"),
+    ):
+        if await session.get(UserGroup, group_id) is None:
+            continue
+        if await session.get(UserGroupMember, (group_id, admin_id)) is None:
+            await _insert(
+                session,
+                UserGroupMember(group_id=group_id, user_id=admin_id),
+                label=f"admin membership of user group '{group_name}'",
+            )
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
@@ -1201,15 +1336,18 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     ``AWS`` lands on the AWS secret, AWS MCP server, the EC2-launch agent skill,
     and the ``call_aws`` and ``run_script`` tool mocks; ``GCP`` lands on the
     Google Cloud secret, the GKE MCP server, and the pod-restart agent skill;
-    ``Approval Required`` lands on both agent skills.
+    ``Approval Required`` lands on both agent skills. ``AWS`` and ``GCP`` are
+    also each attached to their matching user group (``Demo AWS Group`` /
+    ``Demo GCP Group``) as access-control tags, which is what gates the
+    records above to that group's members.
 
     Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
     :func:`_seed_demo_gke_mcp_server`, :func:`_seed_demo_agent_skill`,
-    :func:`_seed_demo_gke_agent_skill`, and :func:`_seed_demo_tool_mocks`:
-    attaching a tag looks up the record it attaches to. The demo Workflow does
-    not exist — see the module docstring — so no tag is attached to one; an
-    operator is free to attach one once they build a workflow from these
-    records themselves.
+    :func:`_seed_demo_gke_agent_skill`, :func:`_seed_demo_tool_mocks`, and
+    :func:`_seed_demo_groups`: attaching a tag looks up the record it attaches
+    to, including the two user groups. The demo Workflow does not exist — see
+    the module docstring — so no tag is attached to one; an operator is free
+    to attach one once they build a workflow from these records themselves.
 
     Args:
         session: Database session used to read and insert tags and their
@@ -1223,6 +1361,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         DEMO_AWS_TAG_NAME,
         TagColor.cyan,
         _DEMO_AWS_TAG_DESCRIPTION,
+        access_control=True,
     ):
         await _link_tag(
             session,
@@ -1266,6 +1405,14 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
                 f"tag '{DEMO_AWS_TAG_NAME}' on tool mock '{DEMO_RUN_SCRIPT_MOCK_NAME}'"
             ),
         )
+        await _link_tag(
+            session,
+            UserGroupTag,
+            resource_model=UserGroup,
+            resource_id=DEMO_AWS_GROUP_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=f"tag '{DEMO_AWS_TAG_NAME}' on user group 'Demo AWS Group'",
+        )
     if await _ensure_demo_tag(
         session,
         tenant_id,
@@ -1273,6 +1420,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         DEMO_GCP_TAG_NAME,
         TagColor.indigo,
         _DEMO_GCP_TAG_DESCRIPTION,
+        access_control=True,
     ):
         await _link_tag(
             session,
@@ -1299,6 +1447,14 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             resource_id=DEMO_GKE_SKILL_ID,
             tag_id=DEMO_GCP_TAG_ID,
             label=(f"tag '{DEMO_GCP_TAG_NAME}' on agent skill '{DEMO_GKE_SKILL_NAME}'"),
+        )
+        await _link_tag(
+            session,
+            UserGroupTag,
+            resource_model=UserGroup,
+            resource_id=DEMO_GCP_GROUP_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=f"tag '{DEMO_GCP_TAG_NAME}' on user group 'Demo GCP Group'",
         )
     if await _ensure_demo_tag(
         session,
@@ -1338,8 +1494,16 @@ async def _ensure_demo_tag(
     name: str,
     color: TagColor,
     description: str,
+    *,
+    access_control: bool = False,
 ) -> bool:
     """Create one demo tag if missing, and report whether it now exists.
+
+    An existing row's ``access_control`` flag is reconciled with the
+    requested value on every call, the same way :func:`_revive_demo_user`
+    brings an existing user's identity fields back in line with its spec —
+    without this, a tag seeded by an older version of this module before it
+    became access-control would never pick up the flag on a later restart.
 
     Args:
         session: Database session used to read and insert the tag.
@@ -1348,13 +1512,21 @@ async def _ensure_demo_tag(
         name: Name shown in the admin UI.
         color: Palette slot the tag's chip is drawn in.
         description: Sentence shown on the tag in the admin UI.
+        access_control: Whether this tag should gate visibility of the
+            records it labels to only the user groups that hold it.
 
     Returns:
         ``True`` when the tag is present after this call (already existed or
         was just created), ``False`` when creation was skipped by a name
         collision with an operator's own tag.
     """
-    if await session.get(Tag, tag_id) is not None:
+    existing = await session.get(Tag, tag_id)
+    if existing is not None:
+        if existing.access_control != access_control:
+            existing.access_control = access_control
+            existing.updated_by = SYSTEM_USER_ID
+            session.add(existing)
+            await session.commit()
         return True
     return await _insert(
         session,
@@ -1364,6 +1536,7 @@ async def _ensure_demo_tag(
             name=name,
             color=color,
             description=description,
+            access_control=access_control,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
         ),

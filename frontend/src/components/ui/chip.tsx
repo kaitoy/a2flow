@@ -5,16 +5,25 @@
  */
 "use client";
 
-import { Check, type LucideIcon, X } from "lucide-react";
+import { Check, Lock, type LucideIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { TagColor } from "@/lib/api";
 import { TAG_COLOR_CLASS } from "@/lib/tag-palette";
 import { Tooltip } from "./tooltip";
 
+/** Accessible name of the lock glyph a {@link ChipProps.locked} chip carries. */
+export const LOCKED_CHIP_LABEL = "Access control";
+
 /** Props for {@link Chip}. */
 interface ChipProps {
   /** Text shown in the chip; clipped to one line and revealed in full on hover. */
   label: string;
+  /**
+   * Renders a leading lock glyph, for a tag that restricts access to the
+   * records it labels. The glyph carries {@link LOCKED_CHIP_LABEL} as its
+   * accessible name, so the state is conveyed by more than the icon alone.
+   */
+  locked?: boolean;
   /**
    * Palette slot to tint the chip with. Omit for the neutral `glass-panel`
    * chip every non-tag caller uses; pass a slot to render a tag, which draws
@@ -256,6 +265,7 @@ const TOGGLE_CLASS = [
  */
 export function Chip({
   label,
+  locked = false,
   color,
   description,
   onClick,
@@ -295,6 +305,15 @@ export function Chip({
         // `strokeWidth` is raised above the house 1.8 for the same reason the
         // remove icon raises it: at 14px the lighter stroke reads as a hairline.
         <Check size={14} strokeWidth={2} aria-hidden="true" className="-ml-0.5 mr-1 shrink-0" />
+      )}
+      {locked && (
+        <Lock
+          size={12}
+          strokeWidth={2}
+          role="img"
+          aria-label={LOCKED_CHIP_LABEL}
+          className="mr-1 shrink-0"
+        />
       )}
       <Tooltip label={description || label} disabled={!description && !overflowing}>
         <span ref={ref} className="min-w-0 truncate">

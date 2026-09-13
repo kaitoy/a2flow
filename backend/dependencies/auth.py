@@ -48,7 +48,7 @@ from fastapi import Depends, Request
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.database import get_session
-from models.user import User
+from models.user import User, has_any_role
 from repositories.auth_session import SqlAuthSessionRepository
 from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import CsrfError, ForbiddenError
@@ -205,6 +205,40 @@ async def get_effective_roles(
 
 
 EffectiveRolesDep = Annotated[frozenset[str], Depends(get_effective_roles)]
+
+
+async def get_access_tag_ids(
+    user: CurrentUserDep, roles: EffectiveRolesDep, db: _DbSessionDep
+) -> frozenset[str] | None:
+    """Return the tag ids the request's user holds through their groups, for access control.
+
+    A record labelled with access-control tags (:mod:`models.tag`) is visible
+    only when this set covers every one of them; the tenant-scoped repository
+    factories in :mod:`dependencies.repository` hand the set to each taggable
+    repository, which folds the predicate into its queries next to the tenant
+    one. ``None`` means "no restriction" -- returned for a ``super_admin``,
+    who is platform-scoped and therefore can never be a group member, and so
+    would otherwise be locked out of every access-controlled record. That
+    mirrors how ``CurrentTenantScopeDep`` uses ``None`` for the all-tenants
+    read.
+
+    Like :func:`get_effective_roles`, nothing is cached beyond the request,
+    so a membership or group-tag change takes effect on the next request.
+
+    Args:
+        user: The effective user resolved by :func:`get_current_user`.
+        roles: The user's effective roles, to detect the ``super_admin`` bypass.
+        db: Database session used to resolve group tags.
+
+    Returns:
+        The tag ids the user's groups carry, or ``None`` for a super admin.
+    """
+    if has_any_role(roles):
+        return None
+    return await SqlEffectiveRoleRepository(db).group_tag_ids_for_user(user.id)
+
+
+AccessTagIdsDep = Annotated[frozenset[str] | None, Depends(get_access_tag_ids)]
 
 
 async def get_actor_effective_roles(

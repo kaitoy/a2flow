@@ -1,7 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { ADMIN, REQUESTER } from "@/test/auth-state";
+import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
@@ -61,6 +61,60 @@ describe("TagDetailPage", () => {
     await waitFor(() => expect(body?.description).toBe("Live customer-facing environment."));
   });
 
+  it("loads the access-control flag and submits it untouched", async () => {
+    const user = userEvent.setup();
+    let body: { accessControl?: boolean } | undefined;
+    server.use(
+      http.patch(`${BASE}/api/v1/tags/:tagId`, async ({ request }) => {
+        body = (await request.json()) as { accessControl?: boolean };
+        return envelope({ id: "tag-1" });
+      })
+    );
+
+    render(<TagDetailPage />, { preloadedState: ADMIN });
+    expect(await screen.findByLabelText("Access control")).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(body?.accessControl).toBe(true));
+  });
+
+  it("submits the access-control flag cleared when unticked", async () => {
+    const user = userEvent.setup();
+    let body: { accessControl?: boolean } | undefined;
+    server.use(
+      http.patch(`${BASE}/api/v1/tags/:tagId`, async ({ request }) => {
+        body = (await request.json()) as { accessControl?: boolean };
+        return envelope({ id: "tag-1" });
+      })
+    );
+
+    render(<TagDetailPage />, { preloadedState: ADMIN });
+    await user.click(await screen.findByLabelText("Access control"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(body?.accessControl).toBe(false));
+  });
+
+  it("shows the access-control flag read-only to a developer and submits it unchanged", async () => {
+    const user = userEvent.setup();
+    let body: { name?: string; accessControl?: boolean } | undefined;
+    server.use(
+      http.patch(`${BASE}/api/v1/tags/:tagId`, async ({ request }) => {
+        body = (await request.json()) as { name?: string; accessControl?: boolean };
+        return envelope({ id: "tag-1" });
+      })
+    );
+
+    render(<TagDetailPage />, { preloadedState: DEVELOPER });
+    expect(await screen.findByText("Yes")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Access control" })).not.toBeInTheDocument();
+    await user.clear(screen.getByLabelText(/Name/));
+    await user.type(screen.getByLabelText(/Name/), "renamed");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(body).toMatchObject({ name: "renamed", accessControl: true }));
+  });
+
   it("keeps the loaded color in the submitted body", async () => {
     const user = userEvent.setup();
     let body: { color?: string } | undefined;
@@ -97,6 +151,9 @@ describe("TagDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.getByText("Live customer-facing environment.")).toBeInTheDocument();
+    // The flag reads as a value, not a checkbox.
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByText("Yes")).toBeInTheDocument();
   });
 
   it("shows the access-denied screen when the tag is forbidden", async () => {

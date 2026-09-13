@@ -189,6 +189,7 @@ export function TagPickerDialog({
               <Chip
                 key={tag.id}
                 label={tag.name}
+                locked={tag.accessControl}
                 color={resolveTagColor(tag.color)}
                 description={tag.description ?? undefined}
                 selected={draft.includes(tag.id)}

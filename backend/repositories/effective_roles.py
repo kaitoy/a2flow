@@ -30,6 +30,7 @@ from typing import Protocol
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.tag import UserGroupTag
 from models.user_group import UserGroup, UserGroupMember
 
 #: Maximum ids bound into a single ``IN (...)`` predicate. SQLite caps the
@@ -66,6 +67,8 @@ class EffectiveRoleRepository(Protocol):
     async def group_ids_for_users(
         self, user_ids: Collection[str]
     ) -> dict[str, list[str]]: ...
+
+    async def group_tag_ids_for_user(self, user_id: str) -> frozenset[str]: ...
 
 
 class SqlEffectiveRoleRepository:
@@ -153,6 +156,35 @@ class SqlEffectiveRoleRepository:
             for member_user_id, group_id in (await self._db.exec(stmt)).all():
                 out[member_user_id].add(group_id)
         return {uid: sorted(ids) for uid, ids in out.items()}
+
+    async def group_tag_ids_for_user(self, user_id: str) -> frozenset[str]:
+        """Return the ids of every tag carried by a group the user belongs to.
+
+        This is the caller's side of the access-control predicate (see
+        :mod:`models.tag`): a record labelled with access-control tags is
+        visible only when this set covers all of them. Resolved once per
+        request by ``dependencies.auth.get_access_tag_ids``, in the same way
+        :meth:`effective_roles_for_user` backs ``EffectiveRolesDep``. Not
+        tenant-scoped for the same reasons as the rest of this module — group
+        tags, like memberships, are tenant-validated when written
+        (:meth:`repositories.tags.TagLinks.validate`).
+
+        Args:
+            user_id: Identifier of the user to resolve.
+
+        Returns:
+            The union of the tag ids of the user's groups, empty when they
+            belong to none or their groups carry no tags.
+        """
+        stmt = (
+            select(UserGroupTag.tag_id)
+            .join(
+                UserGroupMember,
+                onclause=col(UserGroupMember.group_id) == UserGroupTag.resource_id,
+            )
+            .where(col(UserGroupMember.user_id) == user_id)
+        )
+        return frozenset((await self._db.exec(stmt)).all())
 
     async def effective_roles_for_user(
         self, user_id: str, direct_roles: Collection[str]

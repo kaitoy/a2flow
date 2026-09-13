@@ -23,7 +23,12 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { Chip } from "@/components/ui/chip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import {
+  BOOL_FILTER_OPTIONS,
+  boolCell,
+  type ColumnDef,
+  DataTable,
+} from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
@@ -66,7 +71,18 @@ function buildColumns(
       // The chip is what a tag looks like everywhere else, so the list shows the
       // real thing rather than naming a color the reader has to imagine.
       noTruncate: true,
-      cell: (tag) => <Chip label={tag.name} color={resolveTagColor(tag.color)} />,
+      cell: (tag) => (
+        <Chip label={tag.name} color={resolveTagColor(tag.color)} locked={tag.accessControl} />
+      ),
+    },
+    {
+      header: "Access control",
+      sortField: "accessControl",
+      filterField: "accessControl",
+      filterOp: "eq",
+      filterOptions: BOOL_FILTER_OPTIONS,
+      className: "text-center",
+      cell: (tag) => boolCell(tag.accessControl ?? false),
     },
     {
       header: "Color",

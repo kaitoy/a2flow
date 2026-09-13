@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
+import { LOCKED_CHIP_LABEL } from "@/components/ui/chip";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
@@ -43,7 +44,11 @@ describe("TagPicker", () => {
     const dialog = await openDialog(user);
 
     expect(within(dialog).getByRole("button", { name: "aws" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "production" })).toBeInTheDocument();
+    // `production` is access-controlled, so its lock glyph joins the toggle's
+    // accessible name.
+    expect(
+      within(dialog).getByRole("button", { name: `${LOCKED_CHIP_LABEL} production` })
+    ).toBeInTheDocument();
   });
 
   it("adds a tag to the selection when the dialog's choice is confirmed", async () => {

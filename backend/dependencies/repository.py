@@ -69,21 +69,47 @@ from repositories.workflow_task_template import (
     WorkflowTaskTemplateRepository,
 )
 
-from .auth import CurrentTenantIdDep, CurrentTenantScopeDep
+from .auth import AccessTagIdsDep, CurrentTenantIdDep, CurrentTenantScopeDep
 
 DBSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 def get_agent_skill_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep, access_tag_ids: AccessTagIdsDep
 ) -> AgentSkillRepository:
-    """Create an AgentSkillRepository backed by the current database session."""
-    return SqlAgentSkillRepository(db, tenant_id=tenant_id)
+    """Create an AgentSkillRepository backed by the current database session.
+
+    Restricted to the skills the caller may act on -- see
+    :func:`dependencies.auth.get_access_tag_ids`.
+    """
+    return SqlAgentSkillRepository(
+        db, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+    )
 
 
 AgentSkillRepositoryDep = Annotated[
     AgentSkillRepository, Depends(get_agent_skill_repository)
 ]
+
+
+def get_agent_skill_lookup(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> AgentSkillRepository:
+    """Create an AgentSkillRepository that ignores the caller's access-control tags.
+
+    For resolving a skill *on behalf of* a workflow or an execution -- running
+    a workflow, driving its design session, continuing a run's chat -- where the
+    caller has already been authorized against the workflow or execution
+    itself. Restricting the skill lookup there would break a run for a
+    requester or approver who merely lacks the skill's tag, which the
+    "management API only" rule of :mod:`models.tag` does not intend. Managing
+    the skill in its own right (its CRUD, sync, and generating a workflow from
+    it) keeps using the restricted :data:`AgentSkillRepositoryDep`.
+    """
+    return SqlAgentSkillRepository(db, tenant_id=tenant_id)
+
+
+AgentSkillLookupDep = Annotated[AgentSkillRepository, Depends(get_agent_skill_lookup)]
 
 
 def get_auth_session_repository(db: DBSessionDep) -> AuthSessionRepository:
@@ -97,10 +123,18 @@ AuthSessionRepositoryDep = Annotated[
 
 
 def get_mcp_server_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep, access_tag_ids: AccessTagIdsDep
 ) -> MCPServerRepository:
-    """Create an MCPServerRepository backed by the current database session."""
-    return SqlMCPServerRepository(db, tenant_id=tenant_id)
+    """Create an MCPServerRepository backed by the current database session.
+
+    Restricted to the servers the caller may act on -- see
+    :func:`dependencies.auth.get_access_tag_ids`. Collaborators that only
+    call ``exists`` on it (tool bindings, tool mocks) are unaffected, since
+    that check is tenant-only.
+    """
+    return SqlMCPServerRepository(
+        db, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+    )
 
 
 MCPServerRepositoryDep = Annotated[
@@ -112,9 +146,16 @@ def get_mcp_tool_mock_repository(
     db: DBSessionDep,
     servers: MCPServerRepositoryDep,
     tenant_id: CurrentTenantScopeDep,
+    access_tag_ids: AccessTagIdsDep,
 ) -> MCPToolMockRepository:
-    """Create an MCPToolMockRepository backed by the current database session."""
-    return SqlMcpToolMockRepository(db, servers, tenant_id=tenant_id)
+    """Create an MCPToolMockRepository backed by the current database session.
+
+    Restricted to the mocks the caller may act on -- see
+    :func:`dependencies.auth.get_access_tag_ids`.
+    """
+    return SqlMcpToolMockRepository(
+        db, servers, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+    )
 
 
 MCPToolMockRepositoryDep = Annotated[
@@ -220,10 +261,16 @@ McpCertificateAuthorityRepositoryDep = Annotated[
 
 
 def get_secret_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep, access_tag_ids: AccessTagIdsDep
 ) -> SecretRepository:
-    """Create a SecretRepository backed by the current database session."""
-    return SqlSecretRepository(db, tenant_id=tenant_id)
+    """Create a SecretRepository backed by the current database session.
+
+    Restricted to the secrets the caller may act on -- see
+    :func:`dependencies.auth.get_access_tag_ids`. ``get_by_name``, which the
+    request-scoped :class:`~infrastructure.secret_resolver.SecretResolver`
+    uses to expand ``${secret:...}`` placeholders, stays tenant-only.
+    """
+    return SqlSecretRepository(db, tenant_id=tenant_id, access_tag_ids=access_tag_ids)
 
 
 SecretRepositoryDep = Annotated[SecretRepository, Depends(get_secret_repository)]
@@ -318,9 +365,16 @@ def get_workflow_repository(
     db: DBSessionDep,
     skills: AgentSkillRepositoryDep,
     tenant_id: CurrentTenantScopeDep,
+    access_tag_ids: AccessTagIdsDep,
 ) -> WorkflowRepository:
-    """Create a WorkflowRepository backed by the current database session."""
-    return SqlWorkflowRepository(db, skills, tenant_id=tenant_id)
+    """Create a WorkflowRepository backed by the current database session.
+
+    Restricted to the workflows the caller may act on -- see
+    :func:`dependencies.auth.get_access_tag_ids`.
+    """
+    return SqlWorkflowRepository(
+        db, skills, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+    )
 
 
 WorkflowRepositoryDep = Annotated[WorkflowRepository, Depends(get_workflow_repository)]
