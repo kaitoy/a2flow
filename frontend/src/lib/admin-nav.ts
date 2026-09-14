@@ -42,10 +42,6 @@ export interface AdminNavItem {
  * (`app/admin/page.tsx`) so the two stay in sync.
  *
  * Entries carrying `roles` are filtered per user by {@link useVisibleAdminNavItems}.
- * Workflow Executions and Approvals carry no `roles` restriction — every
- * signed-in user may navigate there — because the backend scopes the list
- * itself: a super admin sees every record in the tenant, everyone else sees
- * only executions/approvals they initiated or were designated an approver of.
  */
 export const adminNavItems: AdminNavItem[] = [
   {
@@ -60,14 +56,14 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Users",
     icon: User,
     description: "Manage accounts and roles",
-    roles: [Role.ADMIN, Role.DEVELOPER],
+    roles: [Role.ADMIN, Role.DEVELOPER, Role.REVIEWER],
   },
   {
     href: "/admin/user-groups",
     label: "User Groups",
     icon: UsersRound,
     description: "Grant roles to several accounts at once",
-    roles: [Role.ADMIN, Role.DEVELOPER],
+    roles: [Role.ADMIN, Role.DEVELOPER, Role.REVIEWER],
   },
   {
     href: "/admin/tags",
@@ -88,7 +84,7 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Agent Skills",
     icon: Wand2,
     description: "Configure agent capabilities",
-    roles: [Role.DEVELOPER, Role.ADMIN],
+    roles: [Role.DEVELOPER, Role.ADMIN, Role.REVIEWER],
   },
   {
     href: "/admin/mcp-servers",
@@ -116,12 +112,14 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Workflow Executions",
     icon: ListChecks,
     description: "Track workflow runs",
+    roles: [Role.ADMIN, Role.DEVELOPER, Role.REQUESTER, Role.APPROVER],
   },
   {
     href: "/admin/approvals",
     label: "Approvals",
     icon: CheckCircle2,
     description: "Review pending approvals",
+    roles: [Role.ADMIN, Role.DEVELOPER, Role.REQUESTER, Role.APPROVER],
   },
   {
     href: "/admin/audit",

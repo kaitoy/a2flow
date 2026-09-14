@@ -64,10 +64,27 @@ describe("AdminPage (welcome)", () => {
     expect(screen.queryByRole("link", { name: /Users/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Secrets/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Agent Skills/ })).not.toBeInTheDocument();
-    // Ungated sections stay visible to everyone.
-    expect(screen.getByRole("link", { name: /Approvals/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Workflow Executions/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Approvals/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Workflow Executions/ })).not.toBeInTheDocument();
   });
+
+  it("shows the sections newly opened to reviewer, and hides Workflow Executions/Approvals from them", () => {
+    render(<AdminPage />, { preloadedState: authState(["reviewer"]) });
+    expect(screen.getByRole("link", { name: /Users/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /User Groups/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Agent Skills/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Workflow Executions/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Approvals/ })).not.toBeInTheDocument();
+  });
+
+  it.each(["admin", "developer", "requester", "approver"] as const)(
+    "keeps Workflow Executions and Approvals visible to a %s",
+    (role) => {
+      render(<AdminPage />, { preloadedState: authState([role]) });
+      expect(screen.getByRole("link", { name: /Workflow Executions/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Approvals/ })).toBeInTheDocument();
+    }
+  );
 
   it("shows only the sections a developer may act on", () => {
     render(<AdminPage />, { preloadedState: authState(["developer"]) });
