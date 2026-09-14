@@ -248,14 +248,11 @@ describe("DesignSessionPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides the chat actions menu for a non-developer", async () => {
-    mockMe(["requester"]);
-    render(<DesignSessionPage />, { preloadedState: authState(["requester"]) });
-    const chatInputMock = await screen.findByTestId("chat-input-mock");
+  it("hides the chat input for a reviewer", async () => {
+    mockMe(["reviewer"]);
+    render(<DesignSessionPage />, { preloadedState: authState(["reviewer"]) });
     await screen.findByRole("link", { name: "my-workflow" });
-    expect(
-      within(chatInputMock).queryByRole("button", { name: "Chat actions" })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("chat-input-mock")).not.toBeInTheDocument();
   });
 
   it("generates a description, shows a toast, and opens the diff preview", async () => {

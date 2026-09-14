@@ -53,7 +53,8 @@ const WORKFLOW_POLL_INTERVAL_MS = 2_000;
  * The design chat of a workflow's design session: the template
  * timeline on the left, the conversation with the design agent on the right.
  * The chat is shared by every developer in the tenant, so each message carries
- * its sender's avatar and the history is polled for their messages.
+ * its sender's avatar and the history is polled for their messages. A Reviewer
+ * may read this chat but not drive it, so no input renders for them at all.
  * Templates are re-fetched after every agent turn (and on an interval) so the
  * timeline follows the task templates the agent is editing. A developer can also open
  * the chat input's action menu to re-summarize the conversation into the
@@ -251,19 +252,19 @@ function DesignSessionView({
           onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}
         />
-        <ChatInput
-          onSend={sendMessage}
-          disabled={isRunning}
-          leading={
-            canEdit ? (
+        {canEdit && (
+          <ChatInput
+            onSend={sendMessage}
+            disabled={isRunning}
+            leading={
               <ChatInputMenu
                 onGenerateDescription={handleGenerateDescription}
                 disabled={workflow.status === "generating" || generateDescription.inFlight}
                 pending={generateDescription.inFlight}
               />
-            ) : undefined
-          }
-        />
+            }
+          />
+        )}
       </div>
       <DescriptionDiffDialog
         open={diffOpen}
