@@ -48,12 +48,14 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
   need not be a single user). ``Demo AWS Group`` and ``Demo GCP Group``
   grant no role at all -- they exist solely to hold the matching
   access-control tag, so their members (the AWS or GCP developer, reviewer,
-  and requester, plus ``admin``) can see the AWS- or GCP-tagged records and
-  everyone else cannot. That makes both the role-inheritance and the
-  access-control side of the group feature visible in the demo dataset
-  itself: remove a user from their role group and their access disappears on
-  the next request; remove them from their AC group instead and the AWS/GCP
-  records disappear from what they can see.
+  and requester) can see the AWS- or GCP-tagged records and everyone else
+  cannot -- except ``admin``/``super_admin``, who bypass access-control tags
+  entirely regardless of group membership (see
+  ``dependencies.auth.get_access_tag_ids``). That makes both the
+  role-inheritance and the access-control side of the group feature visible
+  in the demo dataset itself: remove a user from their role group and their
+  access disappears on the next request; remove one of the trio from their
+  AC group instead and the AWS/GCP records disappear from what they can see.
 
 The Workflow itself is deliberately *not* seeded — these records are the
 ingredients an operator assembles one into. Every tag stays unattached to any
@@ -815,30 +817,6 @@ async def _default_tenant_id(session: AsyncSession) -> str | None:
     return None if tenant is None else tenant.id
 
 
-async def _default_admin_user_id(session: AsyncSession, tenant_id: str) -> str | None:
-    """Return the id of the seeded ``Default`` tenant's ``admin`` user, or ``None``.
-
-    ``admin`` is seeded by :func:`infrastructure.bootstrap.seed_default_tenant_and_admin_user`,
-    not by this module, and gets an auto-generated UUID7 rather than a fixed
-    id, so it must be looked up by ``username`` scoped to the tenant rather
-    than referenced by a constant the way every other demo record is.
-
-    Args:
-        session: Database session used to read the user.
-        tenant_id: Id of the ``Default`` tenant the ``admin`` user belongs to.
-
-    Returns:
-        The user's id, or ``None`` when it has not been seeded yet.
-    """
-    stmt = (
-        select(User)
-        .where(col(User.username) == "admin", col(User.tenant_id) == tenant_id)
-        .limit(1)
-    )
-    admin = (await session.exec(stmt)).first()
-    return None if admin is None else admin.id
-
-
 async def _insert(session: AsyncSession, row: SQLModel, *, label: str) -> bool:
     """Insert one demo row, skipping it when it collides with existing data.
 
@@ -1030,12 +1008,6 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
     Nothing needs recomputing afterwards: a member's inherited roles are
     resolved from these rows on every request rather than stored on the user.
 
-    Also places the tenant's ``admin`` user (seeded separately by
-    :func:`infrastructure.bootstrap.seed_default_tenant_and_admin_user`, so it
-    has no fixed id this module can put in :data:`_DEMO_GROUPS` directly) in
-    both :data:`DEMO_AWS_GROUP_ID` and :data:`DEMO_GCP_GROUP_ID`, so it can see
-    every AWS- and GCP-tagged demo record without needing a dedicated account.
-
     Args:
         session: Database session used to read and insert groups and members.
         tenant_id: Id of the ``Default`` tenant the groups belong to.
@@ -1066,22 +1038,6 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
                     UserGroupMember(group_id=spec.id, user_id=member_id),
                     label=f"membership of user group '{spec.name}'",
                 )
-
-    admin_id = await _default_admin_user_id(session, tenant_id)
-    if admin_id is None:
-        return
-    for group_id, group_name in (
-        (DEMO_AWS_GROUP_ID, "Demo AWS Group"),
-        (DEMO_GCP_GROUP_ID, "Demo GCP Group"),
-    ):
-        if await session.get(UserGroup, group_id) is None:
-            continue
-        if await session.get(UserGroupMember, (group_id, admin_id)) is None:
-            await _insert(
-                session,
-                UserGroupMember(group_id=group_id, user_id=admin_id),
-                label=f"admin membership of user group '{group_name}'",
-            )
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:

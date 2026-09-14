@@ -460,36 +460,6 @@ async def test_demo_aws_and_gcp_groups_hold_their_access_control_tag(
     }
 
 
-async def test_admin_user_joins_both_access_control_groups(
-    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The tenant's admin, seeded separately from this module, still gets AC access."""
-    admin_id = "tenant-admin"
-    async with AsyncSession(engine) as session:
-        session.add(
-            User(
-                id=admin_id,
-                username="admin",
-                first_name="Admin",
-                last_name="User",
-                password="hash",
-                email="admin@example.com",
-                roles=[Role.admin.value],
-                tenant_id=TENANT_ID,
-                created_by=SYSTEM_USER_ID,
-                updated_by=SYSTEM_USER_ID,
-            )
-        )
-        await session.commit()
-    _enable(monkeypatch)
-    await _sync(engine)
-    members = {
-        (row.group_id, row.user_id) for row in await _rows(engine, UserGroupMember)
-    }
-    assert (DEMO_AWS_GROUP_ID, admin_id) in members
-    assert (DEMO_GCP_GROUP_ID, admin_id) in members
-
-
 async def test_reviving_an_older_demo_tag_gains_access_control(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:

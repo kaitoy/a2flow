@@ -48,7 +48,7 @@ DEMO_GCP_API_KEY=AIza...
 | `demo-gcp-requester` | `requester` | `Demo GCP Group` | Runs the GKE-pod-restart workflow |
 | `demo-approver-1`, `demo-approver-2` | `approver` | — | Approve the launch, or the pod restart |
 
-None of them holds its role directly: each inherits it from a [user group](../guides/users-and-groups.md#user-groups) — `Demo Developers`, `Demo Reviewers`, `Demo Requesters`, and `Demo Approvers`. The AWS and GCP trios each also belong to a second group, `Demo AWS Group` or `Demo GCP Group`, that grants no role of its own — its only purpose is holding the matching access-control tag, so that trio (and `admin`, who belongs to both groups) can see the AWS- or GCP-tagged records and everyone else cannot.
+None of them holds its role directly: each inherits it from a [user group](../guides/users-and-groups.md#user-groups) — `Demo Developers`, `Demo Reviewers`, `Demo Requesters`, and `Demo Approvers`. The AWS and GCP trios each also belong to a second group, `Demo AWS Group` or `Demo GCP Group`, that grants no role of its own — its only purpose is holding the matching access-control tag, so that trio can see the AWS- or GCP-tagged records and everyone else cannot, except `admin` (or a super admin), who [bypasses access-control tags](../guides/tags.md#access-control-tags) entirely and needs no group membership for it.
 
 ## Trying it out
 

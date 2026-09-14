@@ -7,7 +7,8 @@ MCP servers alike.
 
 A tag flagged ``access_control`` additionally **gates** the records it labels:
 such a record is visible only to a caller whose groups, taken together, carry
-every access-control tag the record has (a ``super_admin`` bypasses this).
+every access-control tag the record has (an ``admin`` or ``super_admin``
+bypasses this).
 The predicate is applied in the repository layer, next to tenant scoping — see
 :meth:`repositories.tags.TagLinks.visibility_clause` and the "Access-control
 tags" section of ``.claude/rules/backend-patterns.md``. Unflagged tags remain

@@ -944,7 +944,7 @@ async def test_member_whose_groups_cover_every_access_tag_sees_the_record(
     assert assert_ok(await client.get(base, headers=DEVELOPER))["id"] == secret_id
 
 
-async def test_plain_tags_never_restrict_and_super_admin_bypasses(
+async def test_plain_tags_never_restrict_and_admin_and_super_admin_bypass(
     tag_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, _ = tag_env
@@ -962,6 +962,9 @@ async def test_plain_tags_never_restrict_and_super_admin_bypasses(
     # and is exempt instead.
     assert {open_id, gated_id} <= await _listed_ids(client, "secrets", {})
     assert_ok(await client.get(f"/api/v1/secrets/{gated_id}"))
+    # An admin is exempt too, despite holding no group membership either.
+    assert {open_id, gated_id} <= await _listed_ids(client, "secrets", ADMIN)
+    assert_ok(await client.get(f"/api/v1/secrets/{gated_id}", headers=ADMIN))
 
 
 async def test_attaching_an_unheld_access_tag_is_forbidden(

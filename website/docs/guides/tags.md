@@ -41,12 +41,9 @@ Access is decided by your [user groups](./users-and-groups.md#user-groups): a gr
 | No access-control tag (only plain tags, or none) | Always — plain tags never restrict anything |
 | One or more access-control tags | Your groups, between them, carry **every** one of them |
 
-A record you may not see is simply absent: it is not in the list, and opening a direct link to it says it was not found. A Super Admin sees everything — that account is platform-wide and belongs to no group, so no other rule could reach it.
+A record you may not see is simply absent: it is not in the list, and opening a direct link to it says it was not found. An Admin or a Super Admin sees everything: an Admin is exempt from every access-control tag, and a Super Admin is additionally platform-wide and belongs to no group, so no other rule could reach it either.
 
-Two guard rails apply when tagging:
-
-- **You cannot attach an access-control tag your groups do not carry.** The save is rejected with an error, since it would hide the record from you on your next page load. Ask an admin to add you to a group carrying the tag first. Tagging a *user group* is exempt — that is how an admin grants access in the first place.
-- **Turning Access control on for a tag already in use restricts those records immediately**, including for the admin who ticked the box. Join a group carrying the tag first.
+One guard rail applies when tagging: **you cannot attach an access-control tag your groups do not carry.** The save is rejected with an error, since it would hide the record from you on your next page load. Ask an admin to add you to a group carrying the tag first. Tagging a *user group* is exempt — that is how an admin grants access in the first place.
 
 The restriction is about who can open, edit, run, or delete a record. What a record uses behind the scenes is untouched: a workflow still runs with the agent skill it was generated from and the secrets its MCP servers reference, even for a requester who could not open that skill or secret themselves.
 

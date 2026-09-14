@@ -48,7 +48,7 @@ DEMO_GCP_API_KEY=AIza...
 | `demo-gcp-requester` | `requester` | `Demo GCP Group` | GKE Pod 再起動ワークフローを実行する |
 | `demo-approver-1`、`demo-approver-2` | `approver` | — | 起動、または Pod の再起動を承認する |
 
-いずれもロールを直接は持ちません。それぞれ[ユーザーグループ](../guides/users-and-groups.md#user-groups) `Demo Developers`、`Demo Reviewers`、`Demo Requesters`、`Demo Approvers` から継承します。AWS と GCP の3人組はそれぞれ、もう一つのグループ `Demo AWS Group` または `Demo GCP Group` にも所属します。このグループはロールを一切付与せず、対応するアクセス制御タグを保持するためだけに存在するので、その3人組(と両方のグループに所属する `admin`)だけが AWS または GCP のタグ付きレコードを見られ、それ以外には見えません。
+いずれもロールを直接は持ちません。それぞれ[ユーザーグループ](../guides/users-and-groups.md#user-groups) `Demo Developers`、`Demo Reviewers`、`Demo Requesters`、`Demo Approvers` から継承します。AWS と GCP の3人組はそれぞれ、もう一つのグループ `Demo AWS Group` または `Demo GCP Group` にも所属します。このグループはロールを一切付与せず、対応するアクセス制御タグを保持するためだけに存在するので、その3人組だけが AWS または GCP のタグ付きレコードを見られ、それ以外には見えません。ただし `admin`(またはスーパー管理者)は例外で、[アクセス制御タグを完全に素通り](../guides/tags.md#access-control-tags)するため、グループに所属する必要すらありません。
 
 ## 試してみる {#trying-it-out}
 
