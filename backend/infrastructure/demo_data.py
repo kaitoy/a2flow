@@ -34,20 +34,21 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
   skill -- GKE is a Google Cloud product, so the same provider tag still
   applies), and ``Approval Required`` (a plain, non-gating tag attached to
   both agent skills, calling out their approval gate),
-* six Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
-  either of whom the skill can ask for approval, an AWS pair
-  (``demo-aws-developer``, ``demo-aws-requester``) who build and run the
-  EC2-launch workflow, and a GCP pair (``demo-gcp-developer``,
-  ``demo-gcp-requester``) who do the same for the GKE-pod-restart workflow --
-  each holding **no direct role at all**,
-* five UserGroups -- ``Demo Approvers``, ``Demo Requesters``, and
-  ``Demo Developers`` each grant one role to their members, so every demo
-  account gets its role purely by inheritance (``Demo Approvers`` and
-  ``Demo Requesters`` each hold two accounts, showing that a group's
-  membership need not be a single user). ``Demo AWS Group`` and
-  ``Demo GCP Group`` grant no role at all -- they exist solely to hold the
-  matching access-control tag, so their members (the AWS or GCP developer and
-  requester, plus ``admin``) can see the AWS- or GCP-tagged records and
+* eight Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
+  either of whom the skill can ask for approval, an AWS trio
+  (``demo-aws-developer``, ``demo-aws-reviewer``, ``demo-aws-requester``) who
+  build, publish, and run the EC2-launch workflow, and a GCP trio
+  (``demo-gcp-developer``, ``demo-gcp-reviewer``, ``demo-gcp-requester``) who
+  do the same for the GKE-pod-restart workflow -- each holding **no direct
+  role at all**,
+* six UserGroups -- ``Demo Approvers``, ``Demo Requesters``,
+  ``Demo Developers``, and ``Demo Reviewers`` each grant one role to their
+  members, so every demo account gets its role purely by inheritance
+  (each of the four holds two accounts, showing that a group's membership
+  need not be a single user). ``Demo AWS Group`` and ``Demo GCP Group``
+  grant no role at all -- they exist solely to hold the matching
+  access-control tag, so their members (the AWS or GCP developer, reviewer,
+  and requester, plus ``admin``) can see the AWS- or GCP-tagged records and
   everyone else cannot. That makes both the role-inheritance and the
   access-control side of the group feature visible in the demo dataset
   itself: remove a user from their role group and their access disappears on
@@ -134,6 +135,14 @@ DEMO_GCP_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d005"
 #: registers the GKE-pod-restart workflow, MCP server, and agent skill).
 DEMO_GCP_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d006"
 
+#: Fixed identifier of the demo AWS ``reviewer`` user (who publishes the
+#: EC2-launch workflow the AWS developer built).
+DEMO_AWS_REVIEWER_USER_ID = "00000000-0000-0000-0000-00000000d007"
+
+#: Fixed identifier of the demo GCP ``reviewer`` user (who publishes the
+#: GKE-pod-restart workflow the GCP developer built).
+DEMO_GCP_REVIEWER_USER_ID = "00000000-0000-0000-0000-00000000d008"
+
 #: Fixed identifier of the demo ``Demo Approvers`` user group.
 DEMO_APPROVERS_GROUP_ID = "00000000-0000-0000-0000-00000000d401"
 
@@ -150,6 +159,9 @@ DEMO_AWS_GROUP_ID = "00000000-0000-0000-0000-00000000d404"
 #: Fixed identifier of the demo ``Demo GCP Group`` user group, which grants no
 #: role and exists solely to hold the access-control ``GCP`` tag.
 DEMO_GCP_GROUP_ID = "00000000-0000-0000-0000-00000000d405"
+
+#: Fixed identifier of the demo ``Demo Reviewers`` user group.
+DEMO_REVIEWERS_GROUP_ID = "00000000-0000-0000-0000-00000000d406"
 
 #: Fixed identifier of the demo Secret holding the AWS credentials.
 DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
@@ -391,6 +403,12 @@ _DEMO_USERS = (
         last_name="Bennett",
     ),
     _DemoUserSpec(
+        id=DEMO_AWS_REVIEWER_USER_ID,
+        username="demo-aws-reviewer",
+        first_name="Grace",
+        last_name="Holloway",
+    ),
+    _DemoUserSpec(
         id=DEMO_APPROVER_2_USER_ID,
         username="demo-approver-2",
         first_name="Diana",
@@ -408,24 +426,31 @@ _DEMO_USERS = (
         first_name="Fiona",
         last_name="Grant",
     ),
+    _DemoUserSpec(
+        id=DEMO_GCP_REVIEWER_USER_ID,
+        username="demo-gcp-reviewer",
+        first_name="Henry",
+        last_name="Ito",
+    ),
 )
 
-#: The demo user groups. ``Demo Approvers``, ``Demo Requesters``, and
-#: ``Demo Developers`` each grant one role to their members -- the sample
-#: skill looks for a user holding ``approver`` to route its approval request
-#: to; ``requester`` is the role that may execute a workflow; ``developer`` is
-#: the role that may build and register a workflow, MCP server, or agent
-#: skill. Granting each through a group rather than directly is what makes
-#: the demo exercise role inheritance; all three hold two members, showing
-#: that a group's role reaches every one of its members, not just a single
-#: account.
+#: The demo user groups. ``Demo Approvers``, ``Demo Requesters``,
+#: ``Demo Developers``, and ``Demo Reviewers`` each grant one role to their
+#: members -- the sample skill looks for a user holding ``approver`` to route
+#: its approval request to; ``requester`` is the role that may execute a
+#: workflow; ``developer`` is the role that may build and register a
+#: workflow, MCP server, or agent skill; ``reviewer`` is the role that may
+#: publish or deactivate one. Granting each through a group rather than
+#: directly is what makes the demo exercise role inheritance; all four hold
+#: two members, showing that a group's role reaches every one of its
+#: members, not just a single account.
 #:
 #: ``Demo AWS Group`` and ``Demo GCP Group`` grant no role at all (``role=
 #: None``) -- their only purpose is to hold the matching access-control tag
 #: (see :func:`_seed_demo_tags`), so their members, and only their members,
-#: can see the AWS- or GCP-tagged records. Each demo developer/requester
-#: therefore belongs to two groups: one for their role, one for their
-#: provider's access.
+#: can see the AWS- or GCP-tagged records. Each demo developer/requester/
+#: reviewer therefore belongs to two groups: one for their role, one for
+#: their provider's access.
 _DEMO_GROUPS = (
     _DemoGroupSpec(
         id=DEMO_APPROVERS_GROUP_ID,
@@ -449,18 +474,33 @@ _DEMO_GROUPS = (
         member_ids=(DEMO_AWS_DEVELOPER_USER_ID, DEMO_GCP_DEVELOPER_USER_ID),
     ),
     _DemoGroupSpec(
+        id=DEMO_REVIEWERS_GROUP_ID,
+        name="Demo Reviewers",
+        description="People who can publish or deactivate a workflow.",
+        role=Role.reviewer,
+        member_ids=(DEMO_AWS_REVIEWER_USER_ID, DEMO_GCP_REVIEWER_USER_ID),
+    ),
+    _DemoGroupSpec(
         id=DEMO_AWS_GROUP_ID,
         name="Demo AWS Group",
         description=("Holds the access-control 'AWS' tag; grants no role of its own."),
         role=None,
-        member_ids=(DEMO_AWS_DEVELOPER_USER_ID, DEMO_AWS_REQUESTER_USER_ID),
+        member_ids=(
+            DEMO_AWS_DEVELOPER_USER_ID,
+            DEMO_AWS_REQUESTER_USER_ID,
+            DEMO_AWS_REVIEWER_USER_ID,
+        ),
     ),
     _DemoGroupSpec(
         id=DEMO_GCP_GROUP_ID,
         name="Demo GCP Group",
         description=("Holds the access-control 'GCP' tag; grants no role of its own."),
         role=None,
-        member_ids=(DEMO_GCP_DEVELOPER_USER_ID, DEMO_GCP_REQUESTER_USER_ID),
+        member_ids=(
+            DEMO_GCP_DEVELOPER_USER_ID,
+            DEMO_GCP_REQUESTER_USER_ID,
+            DEMO_GCP_REVIEWER_USER_ID,
+        ),
     ),
 )
 

@@ -31,6 +31,7 @@ from infrastructure.demo_data import (
     DEMO_AWS_DEVELOPER_USER_ID,
     DEMO_AWS_GROUP_ID,
     DEMO_AWS_REQUESTER_USER_ID,
+    DEMO_AWS_REVIEWER_USER_ID,
     DEMO_AWS_SECRET_ID,
     DEMO_AWS_SECRET_NAME,
     DEMO_AWS_TAG_ID,
@@ -42,6 +43,7 @@ from infrastructure.demo_data import (
     DEMO_GCP_DEVELOPER_USER_ID,
     DEMO_GCP_GROUP_ID,
     DEMO_GCP_REQUESTER_USER_ID,
+    DEMO_GCP_REVIEWER_USER_ID,
     DEMO_GCP_SECRET_ID,
     DEMO_GCP_SECRET_NAME,
     DEMO_GCP_TAG_ID,
@@ -54,6 +56,7 @@ from infrastructure.demo_data import (
     DEMO_MCP_SERVER_NAME,
     DEMO_REQUEST_APPROVAL_MOCK_ID,
     DEMO_REQUESTERS_GROUP_ID,
+    DEMO_REVIEWERS_GROUP_ID,
     DEMO_RUN_SCRIPT_MOCK_ID,
     DEMO_SECRET_KEY_ENTRY_KEY,
     sync_demo_data,
@@ -218,13 +221,13 @@ async def test_sync_demo_data_seeds_the_full_dataset(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 6
+    assert len(await _demo_users(engine)) == 8
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 4
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
-    assert len(await _rows(engine, UserGroup)) == 5
+    assert len(await _rows(engine, UserGroup)) == 6
 
 
 async def test_sync_demo_data_returns_the_new_skill_ids(
@@ -250,13 +253,13 @@ async def test_sync_demo_data_is_idempotent(
     _enable(monkeypatch)
     await _sync(engine)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 6
+    assert len(await _demo_users(engine)) == 8
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
     assert len(await _rows(engine, MCPToolMock)) == 4
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
-    assert len(await _rows(engine, UserGroup)) == 5
+    assert len(await _rows(engine, UserGroup)) == 6
     assert len(await _rows(engine, SecretTag)) == 2
     assert len(await _rows(engine, McpServerTag)) == 2
     assert len(await _rows(engine, AgentSkillTag)) == 4
@@ -316,8 +319,10 @@ async def test_demo_users_hold_no_direct_roles(
         approver_2,
         aws_developer,
         aws_requester,
+        aws_reviewer,
         gcp_developer,
         gcp_requester,
+        gcp_reviewer,
     ) = await _demo_users(engine)
     assert approver.id == DEMO_APPROVER_USER_ID
     assert approver.username == "demo-approver-1"
@@ -327,17 +332,23 @@ async def test_demo_users_hold_no_direct_roles(
     assert aws_developer.username == "demo-aws-developer"
     assert aws_requester.id == DEMO_AWS_REQUESTER_USER_ID
     assert aws_requester.username == "demo-aws-requester"
+    assert aws_reviewer.id == DEMO_AWS_REVIEWER_USER_ID
+    assert aws_reviewer.username == "demo-aws-reviewer"
     assert gcp_developer.id == DEMO_GCP_DEVELOPER_USER_ID
     assert gcp_developer.username == "demo-gcp-developer"
     assert gcp_requester.id == DEMO_GCP_REQUESTER_USER_ID
     assert gcp_requester.username == "demo-gcp-requester"
+    assert gcp_reviewer.id == DEMO_GCP_REVIEWER_USER_ID
+    assert gcp_reviewer.username == "demo-gcp-reviewer"
     for user in (
         approver,
         approver_2,
         aws_developer,
         aws_requester,
+        aws_reviewer,
         gcp_developer,
         gcp_requester,
+        gcp_reviewer,
     ):
         assert user.roles == []
         assert user.tenant_id == TENANT_ID
@@ -345,17 +356,18 @@ async def test_demo_users_hold_no_direct_roles(
         assert user.created_by == SYSTEM_USER_ID
 
 
-async def test_demo_groups_grant_the_approver_requester_and_developer_roles(
+async def test_demo_groups_grant_the_approver_requester_developer_and_reviewer_roles(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
     groups = {group.id: group for group in await _rows(engine, UserGroup)}
-    assert len(groups) == 5
+    assert len(groups) == 6
     expected: dict[str, tuple[str, Role | None]] = {
         DEMO_APPROVERS_GROUP_ID: ("Demo Approvers", Role.approver),
         DEMO_REQUESTERS_GROUP_ID: ("Demo Requesters", Role.requester),
         DEMO_DEVELOPERS_GROUP_ID: ("Demo Developers", Role.developer),
+        DEMO_REVIEWERS_GROUP_ID: ("Demo Reviewers", Role.reviewer),
         DEMO_AWS_GROUP_ID: ("Demo AWS Group", None),
         DEMO_GCP_GROUP_ID: ("Demo GCP Group", None),
     }
@@ -382,10 +394,14 @@ async def test_demo_groups_hold_their_expected_members(
         (DEMO_REQUESTERS_GROUP_ID, DEMO_GCP_REQUESTER_USER_ID),
         (DEMO_DEVELOPERS_GROUP_ID, DEMO_AWS_DEVELOPER_USER_ID),
         (DEMO_DEVELOPERS_GROUP_ID, DEMO_GCP_DEVELOPER_USER_ID),
+        (DEMO_REVIEWERS_GROUP_ID, DEMO_AWS_REVIEWER_USER_ID),
+        (DEMO_REVIEWERS_GROUP_ID, DEMO_GCP_REVIEWER_USER_ID),
         (DEMO_AWS_GROUP_ID, DEMO_AWS_DEVELOPER_USER_ID),
         (DEMO_AWS_GROUP_ID, DEMO_AWS_REQUESTER_USER_ID),
+        (DEMO_AWS_GROUP_ID, DEMO_AWS_REVIEWER_USER_ID),
         (DEMO_GCP_GROUP_ID, DEMO_GCP_DEVELOPER_USER_ID),
         (DEMO_GCP_GROUP_ID, DEMO_GCP_REQUESTER_USER_ID),
+        (DEMO_GCP_GROUP_ID, DEMO_GCP_REVIEWER_USER_ID),
     }
 
 
@@ -403,6 +419,8 @@ async def test_demo_users_effective_roles_come_from_their_group(
                 DEMO_GCP_REQUESTER_USER_ID,
                 DEMO_AWS_DEVELOPER_USER_ID,
                 DEMO_GCP_DEVELOPER_USER_ID,
+                DEMO_AWS_REVIEWER_USER_ID,
+                DEMO_GCP_REVIEWER_USER_ID,
             ]
         )
     assert inherited == {
@@ -412,6 +430,8 @@ async def test_demo_users_effective_roles_come_from_their_group(
         DEMO_GCP_REQUESTER_USER_ID: frozenset({Role.requester.value}),
         DEMO_AWS_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
         DEMO_GCP_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
+        DEMO_AWS_REVIEWER_USER_ID: frozenset({Role.reviewer.value}),
+        DEMO_GCP_REVIEWER_USER_ID: frozenset({Role.reviewer.value}),
     }
 
 

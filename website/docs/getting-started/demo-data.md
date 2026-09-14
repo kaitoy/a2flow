@@ -20,7 +20,7 @@ DEMO_AWS_REGION=us-east-1
 DEMO_GCP_API_KEY=AIza...
 ```
 
-- `DEMO_PASSWORD` is shared by all six demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
+- `DEMO_PASSWORD` is shared by all eight demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
 - The AWS credentials and the Google Cloud API key are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the [Secrets](../guides/secrets.md) page.
 - `DEMO_AWS_REGION` is the region the demo AWS MCP server's tools act on. It defaults to `us-east-1`.
 
@@ -40,13 +40,15 @@ DEMO_GCP_API_KEY=AIza...
 
 | User | Role | Access-control group | What they do |
 |---|---|---|---|
-| `demo-aws-developer` | `developer` | `Demo AWS Group` | Generates and publishes the EC2-launch workflow |
+| `demo-aws-developer` | `developer` | `Demo AWS Group` | Generates the EC2-launch workflow |
+| `demo-aws-reviewer` | `reviewer` | `Demo AWS Group` | Publishes the EC2-launch workflow |
 | `demo-aws-requester` | `requester` | `Demo AWS Group` | Runs the EC2-launch workflow |
-| `demo-gcp-developer` | `developer` | `Demo GCP Group` | Generates and publishes the GKE-pod-restart workflow |
+| `demo-gcp-developer` | `developer` | `Demo GCP Group` | Generates the GKE-pod-restart workflow |
+| `demo-gcp-reviewer` | `reviewer` | `Demo GCP Group` | Publishes the GKE-pod-restart workflow |
 | `demo-gcp-requester` | `requester` | `Demo GCP Group` | Runs the GKE-pod-restart workflow |
 | `demo-approver-1`, `demo-approver-2` | `approver` | — | Approve the launch, or the pod restart |
 
-None of them holds its role directly: each inherits it from a [user group](../guides/users-and-groups.md#user-groups) — `Demo Developers`, `Demo Requesters`, and `Demo Approvers`. The AWS and GCP pairs each also belong to a second group, `Demo AWS Group` or `Demo GCP Group`, that grants no role of its own — its only purpose is holding the matching access-control tag, so that pair (and `admin`, who belongs to both groups) can see the AWS- or GCP-tagged records and everyone else cannot.
+None of them holds its role directly: each inherits it from a [user group](../guides/users-and-groups.md#user-groups) — `Demo Developers`, `Demo Reviewers`, `Demo Requesters`, and `Demo Approvers`. The AWS and GCP trios each also belong to a second group, `Demo AWS Group` or `Demo GCP Group`, that grants no role of its own — its only purpose is holding the matching access-control tag, so that trio (and `admin`, who belongs to both groups) can see the AWS- or GCP-tagged records and everyone else cannot.
 
 ## Trying it out
 
@@ -54,11 +56,11 @@ Sign in with `DEMO_PASSWORD` as each account in turn:
 
 1. As **`demo-aws-developer`**, open [Agent Skills](../guides/agent-skills.md) and wait for `Demo AWS EC2 Launch` to finish cloning — **Generate workflow** stays disabled until it has.
 2. Use that row's **Generate workflow** action, describe the instance you want, and let the design agent build the task list ([Generating a workflow](../guides/workflows.md#generating-a-workflow)). The workflow lands in `draft`.
-3. Review the generated task templates on the workflow's detail page, then **Publish**.
+3. Sign in as **`demo-aws-reviewer`**, review the generated task templates on the workflow's detail page, then **Publish**.
 4. As **`demo-aws-requester`**, press **Run** on the workflow ([Running a workflow](../guides/workflows.md#running-a-workflow)). The run's chat opens and the agent starts working through the tasks.
 5. When the skill asks for approval, sign in as **`demo-approver-1`** and approve it ([Approvals](../guides/approvals.md)). The agent then launches the instance through the MCP tool.
 
-The same five steps work from **`Demo GKE Pod Restart`**, signed in as **`demo-gcp-developer`** and **`demo-gcp-requester`** instead: `Demo AWS Group` and `Demo GCP Group` each see only their own provider's records, so `demo-aws-developer` cannot open `Demo GKE Pod Restart` and `demo-gcp-developer` cannot open `Demo AWS EC2 Launch`. The approval covers the exact pod to delete rather than a launch, and the last step restarts a pod instead of creating anything; either approver account still works, since approval routing is unaffected by the AWS/GCP grouping. A real run there needs `DEMO_GCP_API_KEY` set to a key with permission to reach a real GKE cluster.
+The same five steps work from **`Demo GKE Pod Restart`**, signed in as **`demo-gcp-developer`**, **`demo-gcp-reviewer`**, and **`demo-gcp-requester`** instead: `Demo AWS Group` and `Demo GCP Group` each see only their own provider's records, so `demo-aws-developer` cannot open `Demo GKE Pod Restart` and `demo-gcp-developer` cannot open `Demo AWS EC2 Launch`. The approval covers the exact pod to delete rather than a launch, and the last step restarts a pod instead of creating anything; either approver account still works, since approval routing is unaffected by the AWS/GCP grouping. A real run there needs `DEMO_GCP_API_KEY` set to a key with permission to reach a real GKE cluster.
 
 **No AWS account or GKE cluster?** Skip step 3 and run the workflow while it is still `draft` — as a `developer`, `demo-aws-developer` (or `demo-gcp-developer` for the GKE story) may do that, and only a draft run's dialog offers the tenant's [tool mocks](../guides/tool-mocks.md). Under **Mock tools**, check the seeded stubs it lists (`aws___call_aws` or `aws___run_script` for the launch, `delete_k8s_resource` for the pod restart, and `request_approval`); the whole workflow then plays through without reaching AWS, a real GKE cluster, or waiting on a human.
 
