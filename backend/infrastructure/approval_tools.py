@@ -23,7 +23,12 @@ A request carries exactly one destination, and each has a discovery tool:
 the destination can resolve the request -- for a group that means any member
 holding the ``approver`` role, whose single decision settles it. Both discovery
 tools and the eligibility check share :func:`_is_eligible_approver`, so who a
-request may be *addressed* to and who may *act* on it never drift apart.
+request may be *addressed* to and who may *act* on it never drift apart. The
+same holds for the session's access-control tags (see :mod:`models.tag`):
+:func:`_execution_access_tag_ids` backs the check in :func:`request_approval`
+and the filtering in both discovery tools, so a destination missing a tag the
+session carries -- and who would therefore never be able to see the
+resulting approval -- is never even listed.
 
 A draft run may mock :func:`request_approval` (see
 :mod:`infrastructure.tool_mocks`). The destination is still validated -- a run
@@ -49,6 +54,7 @@ from typing import TYPE_CHECKING, Any
 
 from google.adk.tools.tool_context import ToolContext
 from pydantic import ValidationError
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure import database
@@ -68,6 +74,7 @@ from models.mcp_tool_mock import (
     MockResponseKind,
 )
 from models.notification import NotificationType
+from models.tag import Tag
 from models.user import Role, User, has_any_role
 from repositories.approval import ApprovalRepository, SqlApprovalRepository
 from repositories.effective_roles import (
@@ -261,6 +268,31 @@ async def _eligible_members(s: _Scope, member_ids: Sequence[str]) -> list[User]:
     users = await s.user_repo.get_many(list(member_ids))
     inherited = await s.effective_role_repo.group_roles_for_users([u.id for u in users])
     return _filter_eligible(users, inherited, tenant_id=s.tenant_id)
+
+
+async def _execution_access_tag_ids(s: _Scope) -> frozenset[str]:
+    """Return the current session's access-control-flagged tag ids.
+
+    A run carries every tag its workflow had when it started (see
+    :mod:`models.tag`), but only the ones flagged ``access_control`` restrict
+    who may be addressed as an approver -- a plain tag never does. Used by
+    :func:`request_approval`, :func:`list_users`, and :func:`list_user_groups`
+    to keep proposing and validating a destination in agreement.
+
+    Args:
+        s: The resolved per-call scope.
+
+    Returns:
+        The session's access-control tag ids, empty when it carries none (the
+        common case, and the callers above skip the rest of the check then).
+    """
+    tag_ids = await s.execution_repo.tag_ids_for(s.execution_id)
+    if not tag_ids:
+        return frozenset()
+    stmt = select(Tag.id).where(
+        col(Tag.id).in_(tag_ids), col(Tag.access_control).is_(True)
+    )
+    return frozenset((await s.db.exec(stmt)).all())
 
 
 #: Appended to every mocked approval result. The execution agent is cached per
@@ -578,16 +610,22 @@ async def request_approval(
             ``unconstrained_arguments`` yourself.
         approver: Id of the single user the request is addressed to. Mutually
             exclusive with ``approver_group_id``; it must match an existing,
-            enabled user holding the ``approver`` role.
+            enabled user holding the ``approver`` role. If the session carries
+            an access-control tag, one of the user's groups must carry it too
+            (an ``admin`` is exempt) -- otherwise they could never see or
+            resolve the request. Use ``list_users`` to discover who qualifies.
         approver_group_id: Id of the user group the request is addressed to.
             Mutually exclusive with ``approver``; the group must have at least
-            one member who can approve.
+            one member who can approve, and if the session carries an
+            access-control tag, the group itself must carry it too. Use
+            ``list_user_groups`` to discover which groups qualify.
         description: Optional longer explanation of the request.
 
     Returns:
         On success ``{"approval_id": <id>, "status": "pending"}``. On failure
         ``{"error": <message>}`` (no destination or both, unresolved session,
-        unknown task, unknown or ineligible approver or group, a declaration
+        unknown task, an approver or group that is ineligible or does not carry
+        the session's access-control tag(s), a declaration
         that is malformed, sets ``unconstrained_arguments``, or does not name
         exactly the tools the covered tasks bind that require input approval, or
         a persistence error). When
@@ -651,18 +689,18 @@ async def request_approval(
                 )
                 for server_id, tool_name in sorted(exempt)
             ]
+            required_ac_tags = await _execution_access_tag_ids(s)
             if approver:
                 candidate = await s.user_repo.get(approver)
+                effective_roles = (
+                    frozenset()
+                    if candidate is None
+                    else await s.effective_role_repo.effective_roles_for_user(
+                        candidate.id, candidate.roles or []
+                    )
+                )
                 if not _is_eligible_approver(
-                    candidate,
-                    tenant_id=s.tenant_id,
-                    effective_roles=(
-                        frozenset()
-                        if candidate is None
-                        else await s.effective_role_repo.effective_roles_for_user(
-                            candidate.id, candidate.roles or []
-                        )
-                    ),
+                    candidate, tenant_id=s.tenant_id, effective_roles=effective_roles
                 ):
                     return {
                         "error": f"User {approver!r} cannot be designated as an "
@@ -670,6 +708,24 @@ async def request_approval(
                         "approver role. Use list_users to discover eligible "
                         "approvers."
                     }
+                # An admin bypasses the session's access-control tags on every
+                # other read and write, so a tag mismatch would never actually
+                # leave them unable to see or resolve the approval -- unlike a
+                # non-admin, whose groups have to cover it or the record 404s
+                # for them the moment they try.
+                if required_ac_tags and not has_any_role(effective_roles, Role.admin):
+                    target_tags = await s.effective_role_repo.group_tag_ids_for_user(
+                        approver
+                    )
+                    if required_ac_tags - target_tags:
+                        return {
+                            "error": f"User {approver!r} cannot be designated as "
+                            "an approver: this session carries access-control "
+                            "tag(s) that none of the user's groups hold, so they "
+                            "could never see or resolve the request. Attach the "
+                            "same tag(s) to one of their groups, or address a "
+                            "user or group that already holds them."
+                        }
                 recipients = [approver]
             else:
                 assert approver_group_id is not None
@@ -690,6 +746,17 @@ async def request_approval(
                         "approve: at least one member must be enabled and hold the "
                         "approver role. Use list_user_groups to discover eligible "
                         "groups."
+                    }
+                # Unlike the individual case above, a group carries no role of
+                # its own to bypass this with -- an admin member could still
+                # resolve it, but the group itself must hold the tag.
+                if required_ac_tags - set(group.tag_ids):
+                    return {
+                        "error": f"User group {group.name!r} cannot be designated "
+                        "as an approver: this session carries access-control "
+                        "tag(s) the group does not hold, so it could never see or "
+                        "resolve the request. Attach the same tag(s) to the "
+                        "group, or address a different group."
                     }
                 recipients = [u.id for u in members]
             # Checked above, before this branch: a mock is meant to skip the
@@ -769,7 +836,10 @@ async def list_users(tool_context: ToolContext) -> dict[str, Any]:
     ``approver`` argument. Only enabled users holding the ``approver`` role (or
     ``super_admin``) *and* belonging to the current run's tenant are returned;
     soft-deleted accounts, other tenants' users, platform-scoped users, and the
-    internal system user are excluded.
+    internal system user are excluded. If the session carries an access-control
+    tag, a non-admin user is also excluded unless one of their groups carries
+    it too -- addressing them would produce a request they could never see or
+    resolve.
 
     Args:
         tool_context: Injected by ADK; identifies the current session. Not shown
@@ -792,18 +862,29 @@ async def list_users(tool_context: ToolContext) -> dict[str, Any]:
             inherited = await s.effective_role_repo.group_roles_for_users(
                 [u.id for u in users]
             )
-            return {
-                "users": [
-                    _user_to_dict(u)
-                    for u in users
-                    if _is_eligible_approver(
-                        u,
-                        tenant_id=s.tenant_id,
-                        effective_roles=set(u.roles or [])
-                        | inherited.get(u.id, frozenset()),
-                    )
-                ]
-            }
+            required_ac_tags = await _execution_access_tag_ids(s)
+            tag_ids_by_user = (
+                await s.effective_role_repo.group_tag_ids_for_users(
+                    [u.id for u in users]
+                )
+                if required_ac_tags
+                else {}
+            )
+            eligible = []
+            for u in users:
+                effective_roles = set(u.roles or []) | inherited.get(u.id, frozenset())
+                if not _is_eligible_approver(
+                    u, tenant_id=s.tenant_id, effective_roles=effective_roles
+                ):
+                    continue
+                if (
+                    required_ac_tags
+                    and not has_any_role(effective_roles, Role.admin)
+                    and required_ac_tags - tag_ids_by_user.get(u.id, frozenset())
+                ):
+                    continue
+                eligible.append(_user_to_dict(u))
+            return {"users": eligible}
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
 
@@ -820,7 +901,10 @@ async def list_user_groups(tool_context: ToolContext) -> dict[str, Any]:
     Only groups of the current run's tenant that have at least one member able
     to approve are returned -- a group with none could never resolve the
     request. ``eligible_approver_count`` says how many members that is, which
-    is worth mentioning to the user when it is 1.
+    is worth mentioning to the user when it is 1. If the session carries an
+    access-control tag, a group is also excluded unless it carries that tag
+    itself -- addressing it would produce a request nobody could see or
+    resolve.
 
     Args:
         tool_context: Injected by ADK; identifies the current session. Not shown
@@ -846,18 +930,22 @@ async def list_user_groups(tool_context: ToolContext) -> dict[str, Any]:
             eligible_ids = {
                 u.id for u in _filter_eligible(users, inherited, tenant_id=s.tenant_id)
             }
+            required_ac_tags = await _execution_access_tag_ids(s)
             out = []
             for group in groups:
                 count = sum(1 for mid in group.member_ids if mid in eligible_ids)
-                if count:
-                    out.append(
-                        {
-                            "id": group.id,
-                            "name": group.name,
-                            "description": group.description,
-                            "eligible_approver_count": count,
-                        }
-                    )
+                if not count:
+                    continue
+                if required_ac_tags - set(group.tag_ids):
+                    continue
+                out.append(
+                    {
+                        "id": group.id,
+                        "name": group.name,
+                        "description": group.description,
+                        "eligible_approver_count": count,
+                    }
+                )
             out.sort(key=lambda g: str(g["name"]))
             return {"groups": out}
     except NoTenantSessionError:

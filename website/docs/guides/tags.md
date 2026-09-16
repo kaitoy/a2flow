@@ -53,6 +53,8 @@ A [workflow execution](./workflow-executions.md) shows a **Tags** column and fie
 
 An access-control tag copied this way still gates the run and its approvals, exactly as it gates the workflow: if your groups no longer carry a tag the run copied, both the run and every approval under it disappear from your lists and your direct links — even if you started the run yourself or are its designated approver. The same applies to everything you could do inside the run: sending a message in its chat, opening its tasks, and approving or rejecting an approval under it all fail as if the run did not exist. Only an Admin or a Super Admin is exempt, as with any access-control tag. The tag has to be attached to the workflow *before* it runs; retagging the workflow afterwards never reaches runs already started, since the copy happens once, at the moment the run begins.
 
+An access-control tag copied to a run also decides who it may [ask for approval](./approvals.md#human-approval): addressing a person requires that one of their groups carry every such tag the run has, and addressing a [user group](./users-and-groups.md#user-groups) requires the group itself to carry them — otherwise the request is refused, since that person or group could never see it to decide it. An Admin is exempt as an individual destination, since an Admin bypasses these tags everywhere else too; a user group has no such exemption, even when an Admin is among its members.
+
 ## Renaming and deleting
 
 **Renaming is safe at any time.** Records reference a tag by identity, never by its name, so every record carrying it follows the new name with nothing to re-sync — which is the whole reason tags are registered up front instead of typed free-form on each record.

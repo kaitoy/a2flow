@@ -23,7 +23,7 @@ A request is addressed to **exactly one destination**, never both and never neit
 | **One user** | That person alone | That person alone |
 | **A [user group](./users-and-groups.md#user-groups)** | Every member holding the `approver` role, each with their own notification | Any of them — the **first** decision settles it |
 
-Addressing a group means an approval is not blocked on one person's availability. A group with no member who can approve is refused up front, since such a request could never be settled. Nothing dismisses the other members' notifications once someone decides; they simply stop being actionable. Whoever actually decided is recorded, because the group's name alone does not answer "who approved this?".
+Addressing a group means an approval is not blocked on one person's availability. A group with no member who can approve is refused up front, since such a request could never be settled — and so is a destination that does not carry every [access-control tag](./tags.md#execution-and-approval-tags) the run itself carries, since it could never see the request to decide it. Nothing dismisses the other members' notifications once someone decides; they simply stop being actionable. Whoever actually decided is recorded, because the group's name alone does not answer "who approved this?".
 
 The agent is instructed to prefer a group whenever any member of a team may decide, and to name a single person when the Skill calls for one.
 

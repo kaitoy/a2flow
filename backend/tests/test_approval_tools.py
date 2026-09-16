@@ -681,6 +681,201 @@ async def test_list_user_groups_excludes_other_tenants(engine: AsyncEngine) -> N
     assert result["groups"] == []
 
 
+# ---------- access-control tag matching ----------
+
+
+async def _tag(
+    eng: AsyncEngine, *, name: str = "secret", access_control: bool = True
+) -> str:
+    """Insert a Tag of the default test tenant and return its id."""
+    from models.tag import Tag
+
+    async with AsyncSession(eng) as db:
+        tag = Tag(
+            name=name,
+            access_control=access_control,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(tag)
+        await db.commit()
+        await db.refresh(tag)
+        return tag.id
+
+
+async def _tag_execution(
+    eng: AsyncEngine, execution_id: str, tag_ids: Sequence[str]
+) -> None:
+    """Attach ``tag_ids`` to a WorkflowExecution, mirroring the snapshot ``execute()`` takes."""
+    from models.tag import WorkflowExecutionTag
+
+    async with AsyncSession(eng) as db:
+        for tag_id in tag_ids:
+            db.add(WorkflowExecutionTag(resource_id=execution_id, tag_id=tag_id))
+        await db.commit()
+
+
+async def _tag_group(eng: AsyncEngine, group_id: str, tag_ids: Sequence[str]) -> None:
+    """Attach ``tag_ids`` to a UserGroup."""
+    from models.tag import UserGroupTag
+
+    async with AsyncSession(eng) as db:
+        for tag_id in tag_ids:
+            db.add(UserGroupTag(resource_id=group_id, tag_id=tag_id))
+        await db.commit()
+
+
+async def test_request_approval_rejects_approver_whose_groups_lack_the_sessions_tag(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine)
+    task_id = await _seed_task()
+    tag_id = await _tag(engine)
+    await _tag_execution(engine, execution_id, [tag_id])
+    # "alice" is a plain approver with no group, so no tag to cover it with.
+    result = await request_approval("Decide", _ctx(), task_id, approver="alice")
+    assert "error" in result
+    assert "access-control tag" in result["error"]
+
+
+async def test_request_approval_allows_admin_approver_despite_tag_mismatch(
+    engine: AsyncEngine,
+) -> None:
+    """An admin is exempt: rejecting them would only wedge the request pointlessly.
+
+    They bypass the session's access-control tags on every other read, so a
+    mismatch would never actually leave them unable to see or resolve the
+    approval.
+    """
+    execution_id = await _seed_session(engine)
+    task_id = await _seed_task()
+    tag_id = await _tag(engine)
+    await _tag_execution(engine, execution_id, [tag_id])
+    await seed_users(
+        engine,
+        ids=("root",),
+        roles=(Role.approver, Role.admin),
+        tenant_id=DEFAULT_TEST_TENANT_ID,
+    )
+    result = await request_approval("Decide", _ctx(), task_id, approver="root")
+    assert "error" not in result, result
+
+
+async def test_request_approval_allows_approver_whose_group_carries_the_sessions_tag(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine)
+    task_id = await _seed_task()
+    tag_id = await _tag(engine)
+    await _tag_execution(engine, execution_id, [tag_id])
+    await seed_users(
+        engine, ids=("grouped",), roles=(), tenant_id=DEFAULT_TEST_TENANT_ID
+    )
+    await _put_in_group(engine, user_id="grouped", roles=[Role.approver.value])
+    await _tag_group(engine, "group-1", [tag_id])
+    result = await request_approval("Decide", _ctx(), task_id, approver="grouped")
+    assert "error" not in result, result
+
+
+async def test_request_approval_rejects_a_group_lacking_the_sessions_tag(
+    engine: AsyncEngine,
+) -> None:
+    """A group destination has no admin bypass, unlike an individual approver.
+
+    An admin among its eligible members does not exempt the group itself from
+    carrying the tag.
+    """
+    execution_id = await _seed_session(engine)
+    task_id = await _seed_task()
+    tag_id = await _tag(engine)
+    await _tag_execution(engine, execution_id, [tag_id])
+    group_id = await _group_with_members(
+        engine,
+        members={"m1": [Role.admin.value]},
+        group_roles=[Role.approver.value],
+    )
+    result = await request_approval(
+        "Decide", _ctx(), task_id, approver_group_id=group_id
+    )
+    assert "error" in result
+    assert "access-control tag" in result["error"]
+
+
+async def test_request_approval_allows_a_group_carrying_the_sessions_tag(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine)
+    task_id = await _seed_task()
+    tag_id = await _tag(engine)
+    await _tag_execution(engine, execution_id, [tag_id])
+    group_id = await _group_with_members(
+        engine, members={"m1": []}, group_roles=[Role.approver.value]
+    )
+    await _tag_group(engine, group_id, [tag_id])
+    result = await request_approval(
+        "Decide", _ctx(), task_id, approver_group_id=group_id
+    )
+    assert "error" not in result, result
+
+
+async def test_list_users_excludes_candidates_lacking_the_sessions_tag(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine)
+    tag_id = await _tag(engine)
+    await _tag_execution(engine, execution_id, [tag_id])
+    await seed_users(
+        engine,
+        ids=("root",),
+        roles=(Role.approver, Role.admin),
+        tenant_id=DEFAULT_TEST_TENANT_ID,
+    )
+    result = await list_users(_ctx())
+    usernames = {u["username"] for u in result["users"]}
+    # No default actor's groups carry the tag, so they all drop out --
+    # except the admin, who is exempt.
+    assert usernames == {"root"}
+
+
+async def test_list_user_groups_excludes_groups_lacking_the_sessions_tag(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine)
+    tag_id = await _tag(engine)
+    await _tag_execution(engine, execution_id, [tag_id])
+    await _group_with_members(
+        engine,
+        members={"m1": []},
+        group_roles=[Role.approver.value],
+        group_id="team-untagged",
+        name="Untagged",
+    )
+    tagged_group_id = await _group_with_members(
+        engine,
+        members={"m2": []},
+        group_roles=[Role.approver.value],
+        group_id="team-tagged",
+        name="Tagged",
+    )
+    await _tag_group(engine, tagged_group_id, [tag_id])
+
+    result = await list_user_groups(_ctx())
+    assert {g["id"] for g in result["groups"]} == {"team-tagged"}
+
+
+async def test_a_plain_non_access_control_tag_never_restricts_a_destination(
+    engine: AsyncEngine,
+) -> None:
+    """A tag with ``access_control`` unset is a label, not a gate."""
+    execution_id = await _seed_session(engine)
+    task_id = await _seed_task()
+    tag_id = await _tag(engine, access_control=False)
+    await _tag_execution(engine, execution_id, [tag_id])
+    result = await request_approval("Decide", _ctx(), task_id, approver="alice")
+    assert "error" not in result, result
+
+
 # ---------- the tasks an approval authorizes ----------
 
 

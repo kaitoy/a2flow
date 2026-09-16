@@ -70,6 +70,10 @@ class EffectiveRoleRepository(Protocol):
 
     async def group_tag_ids_for_user(self, user_id: str) -> frozenset[str]: ...
 
+    async def group_tag_ids_for_users(
+        self, user_ids: Collection[str]
+    ) -> dict[str, frozenset[str]]: ...
+
 
 class SqlEffectiveRoleRepository:
     """SQLModel-backed implementation of EffectiveRoleRepository.
@@ -185,6 +189,43 @@ class SqlEffectiveRoleRepository:
             .where(col(UserGroupMember.user_id) == user_id)
         )
         return frozenset((await self._db.exec(stmt)).all())
+
+    async def group_tag_ids_for_users(
+        self, user_ids: Collection[str]
+    ) -> dict[str, frozenset[str]]:
+        """Return the group-inherited tag ids of many users in one pass.
+
+        The batched counterpart of :meth:`group_tag_ids_for_user`, used by
+        :func:`infrastructure.approval_tools.list_users` to filter a whole page
+        against a session's access-control tags with one query instead of one
+        per candidate.
+
+        Args:
+            user_ids: Identifiers of the users to resolve. Duplicates are
+                tolerated.
+
+        Returns:
+            A mapping of user id to the union of their groups' tag ids. Every
+            requested id is present; users in no group, or whose groups carry
+            no tags, map to an empty set.
+        """
+        unique_ids = list(dict.fromkeys(user_ids))
+        out: dict[str, set[str]] = {uid: set() for uid in unique_ids}
+        if not unique_ids:
+            return {}
+        for chunk in _chunked(unique_ids):
+            stmt = (
+                select(UserGroupMember.user_id, UserGroupTag.tag_id)
+                .join(
+                    UserGroupTag,
+                    onclause=col(UserGroupTag.resource_id) == UserGroupMember.group_id,
+                )
+                .where(col(UserGroupMember.user_id).in_(chunk))
+            )
+            result = await self._db.exec(stmt)
+            for member_user_id, tag_id in result.all():
+                out[member_user_id].add(tag_id)
+        return {uid: frozenset(tags) for uid, tags in out.items()}
 
     async def effective_roles_for_user(
         self, user_id: str, direct_roles: Collection[str]
