@@ -46,7 +46,7 @@ from models.response import ApiResponse
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 
-@router.get("", response_model=ApiResponse[list[Approval]])
+@router.get("", response_model=ApiResponse[list[ApprovalRead]])
 async def list_approvals(
     service: ApprovalServiceDep,
     caller: CurrentUserDep,
@@ -55,12 +55,15 @@ async def list_approvals(
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[Approval]]:
+) -> ApiResponse[list[ApprovalRead]]:
     """Return Approval records, defaulting to ``created_at`` descending.
 
     A super admin or admin sees every approval in the tenant; anyone else
     sees only approvals addressed to them or belonging to a
-    WorkflowExecution they initiated.
+    WorkflowExecution they initiated. Serialized through
+    :class:`~models.approval.ApprovalRead` (like ``GET /approvals/{id}``
+    below) so each row carries its ``tagIds`` -- the tags of the
+    WorkflowExecution it belongs to.
     """
     items = await service.list(
         limit=pagination.limit,
@@ -122,14 +125,14 @@ async def get_approval(
 ) -> ApiResponse[ApprovalRead]:
     """Return the Approval record for the given ID.
 
-    Serialized through :class:`~models.approval.ApprovalRead` rather than the
-    table class so ``approvedCalls`` keeps its typed shape: the column stores
-    plain dicts, and the approval UI renders the declaration from this response.
-    The list endpoint deliberately keeps the table class -- a declaration is
-    detail, and nothing filters or sorts on it.
+    Serialized through :class:`~models.approval.ApprovalRead` (like ``GET
+    /approvals`` above) rather than the table class, so ``approvedCalls``
+    keeps its typed shape (the column stores plain dicts, and the approval UI
+    renders the declaration from this response) and ``tagIds`` carries the
+    tags of the WorkflowExecution this approval belongs to.
     """
     approval = await service.get(approval_id)
-    return ApiResponse(meta=meta, data=ApprovalRead.model_validate(approval))
+    return ApiResponse(meta=meta, data=approval)
 
 
 @router.get(

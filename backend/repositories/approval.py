@@ -4,17 +4,19 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
-from sqlalchemy import or_
+from sqlalchemy import ColumnElement, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalCreate, ApprovalStatus, ApprovalUpdate
+from models.tag import WorkflowExecutionTag
 from models.user import User
 from models.workflow_execution import WorkflowExecution
 from repositories._integrity import commit_or_translate_user_fk
 from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import ForeignKeyViolationError, NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+from repositories.tags import TagLinks
 from repositories.user_group import UserGroupRepository
 from repositories.workflow_execution import WorkflowExecutionRepository
 
@@ -77,6 +79,7 @@ class SqlApprovalRepository(TenantScopedRepository[Approval]):
         group_repo: UserGroupRepository,
         *,
         tenant_id: str | None,
+        access_tag_ids: frozenset[str] | None = None,
     ) -> None:
         """Store the async session and the collaborator repositories.
 
@@ -87,10 +90,43 @@ class SqlApprovalRepository(TenantScopedRepository[Approval]):
         Both collaborators must be scoped to the same ``tenant_id`` as this
         repository -- a cross-tenant group then reads as a missing foreign key
         rather than a valid destination.
+
+        Args:
+            session: The SQLModel session to run queries on.
+            execution_repo: Repository used to validate ``workflow_execution_id``
+                references.
+            group_repo: Repository used to validate ``approver_group_id``
+                references.
+            tenant_id: Tenant every query is filtered by, or ``None`` for a
+                platform-scoped read across every tenant.
+            access_tag_ids: Ids of the tags the caller holds through their
+                groups, for access control -- see
+                :class:`repositories.tags.TagLinks`. An Approval has no tag
+                join table of its own; it is gated by the same
+                :class:`models.tag.WorkflowExecutionTag` rows as the
+                WorkflowExecution it belongs to, so this mirrors that
+                repository's own restriction rather than duplicating it --
+                see :meth:`_visibility_clause`.
         """
         super().__init__(session, tenant_id=tenant_id)
         self._execution_repo = execution_repo
         self._group_repo = group_repo
+        self._tags = TagLinks(
+            session,
+            WorkflowExecutionTag,
+            tenant_id=tenant_id,
+            access_tag_ids=access_tag_ids,
+        )
+
+    def _visibility_clause(self) -> ColumnElement[bool] | None:
+        """Hide approvals whose execution is gated by a tag the caller does not hold.
+
+        Correlates through ``workflow_execution_id`` rather than ``Approval.id``:
+        the join table this reads keys its attachments by WorkflowExecution id,
+        since that is where the tags actually live (see the module docstring on
+        :class:`__init__`'s ``access_tag_ids`` parameter).
+        """
+        return self._tags.visibility_clause(col(Approval.workflow_execution_id))
 
     async def get(self, approval_id: str) -> Approval | None:
         """Return the Approval with the given ID, or ``None`` if missing."""

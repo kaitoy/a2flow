@@ -47,6 +47,12 @@ One guard rail applies when tagging: **you cannot attach an access-control tag y
 
 The restriction is about who can open, edit, run, or delete a record. What a record uses behind the scenes is untouched: a workflow still runs with the agent skill it was generated from and the secrets its MCP servers reference, even for a requester who could not open that skill or secret themselves.
 
+## Workflow execution and approval tags {#execution-and-approval-tags}
+
+A [workflow execution](./workflow-executions.md) shows a **Tags** column and field too, and so does the [approval](./approvals.md) it belongs to — but read-only, and outside the six taggable registries above. When a run starts, it copies the tags its workflow carries at that moment; retagging the workflow afterwards, or deleting it, never changes what an already-started run shows. There is no **Tags** picker on these two screens and no tag filter on their lists — attaching and detaching tags stays on the workflow itself.
+
+An access-control tag copied this way still gates the run and its approvals, exactly as it gates the workflow: if your groups no longer carry a tag the run copied, both the run and every approval under it disappear from your lists and your direct links — even if you started the run yourself or are its designated approver. The same applies to everything you could do inside the run: sending a message in its chat, opening its tasks, and approving or rejecting an approval under it all fail as if the run did not exist. Only an Admin or a Super Admin is exempt, as with any access-control tag. The tag has to be attached to the workflow *before* it runs; retagging the workflow afterwards never reaches runs already started, since the copy happens once, at the moment the run begins.
+
 ## Renaming and deleting
 
 **Renaming is safe at any time.** Records reference a tag by identity, never by its name, so every record carrying it follows the new name with nothing to re-sync — which is the whole reason tags are registered up front instead of typed free-form on each record.

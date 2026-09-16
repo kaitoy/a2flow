@@ -7,7 +7,7 @@ so the router never repeats the null check.
 
 from collections.abc import Collection
 
-from models.approval import Approval, ApprovalStatus, ApprovalUpdate
+from models.approval import Approval, ApprovalRead, ApprovalStatus, ApprovalUpdate
 from models.user import Role, User, has_any_role
 from repositories.approval import ApprovalRepository
 from repositories.exceptions import (
@@ -16,6 +16,7 @@ from repositories.exceptions import (
     NotFoundError,
 )
 from repositories.query import FilterSpec, SortSpec
+from repositories.workflow_execution import WorkflowExecutionRepository
 from services.approver_groups import ApproverGroupResolver
 from services.mcp_tool_certificate import McpToolCertificateService
 
@@ -28,19 +29,32 @@ class ApprovalService:
         repo: ApprovalRepository,
         approver_groups: ApproverGroupResolver,
         certificates: McpToolCertificateService,
+        executions: WorkflowExecutionRepository,
     ) -> None:
         """Initialize the service.
 
         Args:
-            repo: Repository providing Approval persistence.
+            repo: Repository providing Approval persistence, restricted to
+                the approvals whose WorkflowExecution the caller's
+                access-control tags admit (see :mod:`models.tag`). Every
+                method here fetches through it first, so an approval under a
+                run gated by a tag the caller's groups no longer carry reads
+                as 404 -- whether browsing it or deciding it, and even for
+                its own designated approver -- before
+                :meth:`_assert_may_resolve` ever runs.
             approver_groups: Resolver for the groups the caller counts as an
                 eligible approver for, backing group-addressed approvals.
             certificates: Issues the certificate that carries a granted
                 approval's authority over the task's bound MCP tools.
+            executions: Repository providing WorkflowExecution persistence,
+                read here only for its tag attachments -- an approval has no
+                tag join table of its own (see :mod:`models.tag`) and carries
+                the same tags as the execution it belongs to.
         """
         self._repo = repo
         self._approver_groups = approver_groups
         self._certificates = certificates
+        self._executions = executions
 
     async def list(
         self,
@@ -51,7 +65,7 @@ class ApprovalService:
         caller_roles: Collection[str],
         sort: tuple[SortSpec, ...] | list[SortSpec] = (),
         filters: tuple[FilterSpec, ...] | list[FilterSpec] = (),
-    ) -> list[Approval]:
+    ) -> list[ApprovalRead]:
         """Return approvals visible to the caller, defaulting to ``created_at`` descending.
 
         A super admin or admin sees every approval in the tenant; anyone else
@@ -69,7 +83,11 @@ class ApprovalService:
             filters: Filter specifications.
 
         Returns:
-            The matching approvals.
+            The matching approvals, each with its execution's tag ids
+            attached. Excludes, in addition to the participant filter above,
+            any approval whose WorkflowExecution is gated by an
+            access-control tag the caller's groups do not hold -- see
+            :attr:`_repo`.
         """
         if has_any_role(caller_roles, Role.super_admin, Role.admin):
             visible_to_user_id: str | None = None
@@ -79,7 +97,7 @@ class ApprovalService:
             visible_to_group_ids = await self._approver_groups.group_ids_for(
                 caller, caller_roles
             )
-        return await self._repo.list(
+        approvals = await self._repo.list(
             limit=limit,
             offset=offset,
             sort=sort,
@@ -87,9 +105,21 @@ class ApprovalService:
             visible_to_user_id=visible_to_user_id,
             visible_to_group_ids=visible_to_group_ids,
         )
+        tags_by_execution = await self._executions.tag_ids_for_many(
+            [a.workflow_execution_id for a in approvals]
+        )
+        return [
+            ApprovalRead.from_approval(
+                a, tag_ids=tags_by_execution.get(a.workflow_execution_id, [])
+            )
+            for a in approvals
+        ]
 
-    async def get(self, approval_id: str) -> Approval:
-        """Return one approval.
+    async def _get(self, approval_id: str) -> Approval:
+        """Return one approval, without projecting its execution's tag ids.
+
+        Used internally by :meth:`resolve`, which needs the raw record for its
+        status/destination checks but not the tag projection.
 
         Args:
             approval_id: Identifier of the approval to fetch.
@@ -98,12 +128,30 @@ class ApprovalService:
             The matching approval.
 
         Raises:
-            NotFoundError: If the approval does not exist.
+            NotFoundError: If the approval does not exist, or it is hidden by
+                an access-control tag the caller's groups do not hold.
         """
         approval = await self._repo.get(approval_id)
         if approval is None:
             raise NotFoundError("Approval", approval_id)
         return approval
+
+    async def get(self, approval_id: str) -> ApprovalRead:
+        """Return one approval, with its execution's tag ids attached.
+
+        Args:
+            approval_id: Identifier of the approval to fetch.
+
+        Returns:
+            The matching approval.
+
+        Raises:
+            NotFoundError: If the approval does not exist, or it is hidden by
+                an access-control tag the caller's groups do not hold.
+        """
+        approval = await self._get(approval_id)
+        tag_ids = await self._executions.tag_ids_for(approval.workflow_execution_id)
+        return ApprovalRead.from_approval(approval, tag_ids=tag_ids)
 
     async def resolve(
         self, approval_id: str, data: ApprovalUpdate, *, acting_user: User
@@ -152,12 +200,13 @@ class ApprovalService:
             The updated approval.
 
         Raises:
-            NotFoundError: If the approval does not exist.
+            NotFoundError: If the approval does not exist, or it is hidden by
+                an access-control tag the caller's groups do not hold.
             ForbiddenError: If the acting user is not an eligible approver.
             ApprovalAlreadyResolvedError: If a decision is already recorded and
                 this request would change it.
         """
-        approval = await self.get(approval_id)
+        approval = await self._get(approval_id)
         await self._assert_may_resolve(approval, acting_user)
         if (
             data.status is not None

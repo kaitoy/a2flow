@@ -68,7 +68,7 @@ import type {
   UserRead as UserReadModel,
   UserUpdate,
   WorkflowDesignSource,
-  WorkflowExecution as WorkflowExecutionModel,
+  WorkflowExecutionRead as WorkflowExecutionModel,
   WorkflowExecutionStatus,
   WorkflowRead as WorkflowModel,
   WorkflowStatus,
@@ -302,12 +302,13 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
 export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Approval = WithAudit<ApprovalModel>;
 /**
- * One approval with its `approvedCalls` typed.
+ * One approval with its `approvedCalls` typed and its `tagIds` attached.
  *
- * `GET /approvals/{id}` serializes through the backend's `ApprovalRead`, which
- * restores the declaration's shape that the table class stores as plain JSON.
- * The list endpoint returns {@link Approval}, where `approvedCalls` is opaque —
- * a declaration is detail, and nothing filters or sorts on it.
+ * `GET /approvals/{id}` and `GET /approvals` both serialize through the
+ * backend's `ApprovalRead`, which restores the declaration's shape that the
+ * table class stores as plain JSON and adds `tagIds` — the tags of the
+ * `WorkflowExecution` the approval belongs to. `PATCH /approvals/{id}`
+ * (`resolveApproval`) still returns the plain {@link Approval} instead.
  */
 export type ApprovalDetail = WithAudit<ApprovalReadModel>;
 export type McpToolCertificate = WithAudit<McpToolCertificateRead>;
@@ -1645,9 +1646,9 @@ export async function deleteNotification(id: string): Promise<void> {
 }
 
 /** List approval requests (newest first) with optional pagination, sort, and filters. */
-export async function listApprovals(query: ListQuery = {}): Promise<Approval[]> {
+export async function listApprovals(query: ListQuery = {}): Promise<ApprovalDetail[]> {
   return unwrap(sdk.listApprovalsApiV1ApprovalsGet({ query: listQuery(query) })) as Promise<
-    Approval[]
+    ApprovalDetail[]
   >;
 }
 

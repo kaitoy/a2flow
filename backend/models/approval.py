@@ -328,6 +328,10 @@ class ApprovalRead(ApprovalCreate, TenantScoped, BaseEntity):
     the typed shape :class:`ApprovalCreate` declares. The table class stores
     plain dicts, which would otherwise reach the OpenAPI schema as untyped
     objects and leave the approval UI nothing to render the approved calls from.
+    Also adds ``tag_ids``: an approval has no tag join table of its own (see
+    :mod:`models.tag`) -- it carries the same tags as the
+    :class:`~models.workflow_execution.WorkflowExecution` it belongs to, read
+    through that execution's attachment.
 
     Used as the routes' ``response_model`` rather than replacing
     :class:`Approval` in the repository: filtering and sorting still resolve
@@ -338,6 +342,8 @@ class ApprovalRead(ApprovalCreate, TenantScoped, BaseEntity):
     model_config = _alias_config
     decided_at: datetime | None = None
     decided_by: str | None = None
+    #: Ids of the tags carried by this approval's WorkflowExecution.
+    tag_ids: list[str] = []
 
     @field_serializer("decided_at", when_used="json")
     def _serialize_decided_at(self, dt: datetime | None) -> str | None:
@@ -350,3 +356,16 @@ class ApprovalRead(ApprovalCreate, TenantScoped, BaseEntity):
             The ISO-8601 string with a ``Z`` suffix, or ``None``.
         """
         return iso_z_or_none(dt)
+
+    @classmethod
+    def from_approval(cls, approval: Approval, *, tag_ids: list[str]) -> "ApprovalRead":
+        """Build the read view of a stored approval with its execution's tags attached.
+
+        Args:
+            approval: The persisted approval to project.
+            tag_ids: Ids of the tags carried by ``approval``'s WorkflowExecution.
+
+        Returns:
+            A read view carrying the approval's columns plus its tags.
+        """
+        return cls(**approval.model_dump(), tag_ids=tag_ids)

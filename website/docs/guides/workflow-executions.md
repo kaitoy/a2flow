@@ -5,9 +5,9 @@ sidebar_position: 4
 
 # Workflow Executions
 
-A workflow execution is one run of a [workflow](./workflows.md). It holds its own copy of the workflow's name, description and tasks, so a run's history stays faithful to what actually ran even after the workflow it came from is edited or deleted.
+A workflow execution is one run of a [workflow](./workflows.md). It holds its own copy of the workflow's name, description, tasks and tags, so a run's history stays faithful to what actually ran even after the workflow it came from is edited or deleted.
 
-Open **Workflow Executions** in the admin sidebar to browse them. Unlike the other sections, a run is a history rather than a record to edit, so there is no edit form — its screens either show the run or let you join it.
+Open **Workflow Executions** in the admin sidebar to browse them. Unlike the other sections, a run is a history rather than a record to edit, so there is no edit form — its screens either show the run or let you join it. Its **Tags** column and field are read-only for the same reason — see [Workflow execution and approval tags](./tags.md#execution-and-approval-tags).
 
 | Screen | How to get there | What it shows |
 |---|---|---|

@@ -19,7 +19,7 @@ from infrastructure.skill_manager import SkillManager
 from models.mcp_tool_invocation import MCPToolInvocation
 from models.message_meta import MessageScope
 from models.user import Role, User, has_any_role
-from models.workflow_execution import WorkflowExecution
+from models.workflow_execution import WorkflowExecution, WorkflowExecutionRead
 from models.workflow_task import WorkflowTaskRead
 from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import NotFoundError, SkillNotReadyError
@@ -53,7 +53,16 @@ class WorkflowExecutionService:
         """Initialize the service.
 
         Args:
-            execution_repo: Repository providing WorkflowExecution persistence.
+            execution_repo: Repository providing WorkflowExecution persistence,
+                restricted to the runs the caller's access-control tags admit
+                (see :mod:`models.tag`). Every method here fetches through it
+                first, so a run that copied an access-control tag from its
+                workflow (see :meth:`services.workflow.WorkflowService.execute`)
+                reads as 404 to a caller whose groups no longer carry it --
+                even as the run's own initiator or a designated approver, and
+                whether they are browsing it, reading its tasks, or driving
+                its agent -- before the participant-based ``access`` policy
+                below ever runs.
             tasks: Repository providing WorkflowTask persistence.
             meta: Repository recording and reading per-message side-channel
                 metadata (sender attribution and task association) for the
@@ -97,26 +106,29 @@ class WorkflowExecutionService:
             The matching WorkflowExecution.
 
         Raises:
-            NotFoundError: If no execution exists with the given ID.
+            NotFoundError: If no execution exists with the given ID, or it is
+                hidden by an access-control tag the caller's groups do not hold.
         """
         execution = await self._execution_repo.get(execution_id)
         if execution is None:
             raise NotFoundError("WorkflowExecution", execution_id)
         return execution
 
-    async def get(
+    async def _get_authorized(
         self, execution_id: str, *, caller: User, caller_roles: Collection[str]
     ) -> WorkflowExecution:
-        """Return the WorkflowExecution with the given ID, authorizing the caller.
+        """Fetch a WorkflowExecution and authorize the caller for read access.
 
-        Read-only: also passes a plain ``admin`` in the caller's tenant. Do
-        not use this to authorize driving the execution's agent — see
-        :meth:`resolve_agent`, which stays on the stricter participant-only
-        check.
+        The fetch-then-authorize step shared by every read-only method below,
+        factored out so each one pays for exactly the data it needs — unlike
+        :meth:`get`, this returns the raw entity rather than the tag-ids
+        projection, since most callers here use it only for the existence and
+        access checks (see :meth:`list_tasks`, :meth:`list_tool_invocations`)
+        or need the raw entity for further work (see :meth:`get_messages`).
 
         Args:
             execution_id: Identifier of the execution to fetch.
-            caller: The authenticated user requesting the execution.
+            caller: The authenticated user requesting access.
             caller_roles: The caller's effective roles, including any
                 inherited from their groups.
 
@@ -135,6 +147,38 @@ class WorkflowExecutionService:
         )
         return execution
 
+    async def get(
+        self, execution_id: str, *, caller: User, caller_roles: Collection[str]
+    ) -> WorkflowExecutionRead:
+        """Return the WorkflowExecution with the given ID, authorizing the caller.
+
+        Read-only: also passes a plain ``admin`` in the caller's tenant. Do
+        not use this to authorize driving the execution's agent — see
+        :meth:`resolve_agent`, which stays on the stricter participant-only
+        check.
+
+        Args:
+            execution_id: Identifier of the execution to fetch.
+            caller: The authenticated user requesting the execution.
+            caller_roles: The caller's effective roles, including any
+                inherited from their groups.
+
+        Returns:
+            The matching execution, with its tag ids attached.
+
+        Raises:
+            NotFoundError: If no execution exists with the given ID, or it is
+                hidden by an access-control tag the caller's groups do not hold.
+            ForbiddenError: If the caller is neither the execution initiator,
+                a designated approver of the execution, nor holds ``admin``
+                or ``super_admin``.
+        """
+        execution = await self._get_authorized(
+            execution_id, caller=caller, caller_roles=caller_roles
+        )
+        tag_ids = await self._execution_repo.tag_ids_for(execution_id)
+        return WorkflowExecutionRead.from_execution(execution, tag_ids=tag_ids)
+
     async def list(
         self,
         *,
@@ -144,7 +188,7 @@ class WorkflowExecutionService:
         caller_roles: Collection[str],
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
-    ) -> builtins.list[WorkflowExecution]:
+    ) -> builtins.list[WorkflowExecutionRead]:
         """Return a page of WorkflowExecution records visible to the caller.
 
         A super admin or admin sees every execution in the tenant; anyone
@@ -162,7 +206,11 @@ class WorkflowExecutionService:
             filters: Field filters applied to the query.
 
         Returns:
-            The requested page of executions, newest first by default.
+            The requested page of executions, newest first by default, each
+            with its tag ids attached. Excludes, in addition to the
+            participant filter above, any execution gated by an
+            access-control tag the caller's groups do not hold -- see
+            :attr:`_execution_repo`.
         """
         if has_any_role(caller_roles, Role.super_admin, Role.admin):
             visible_to_user_id: str | None = None
@@ -172,7 +220,7 @@ class WorkflowExecutionService:
             visible_to_group_ids = await self._access.approver_group_ids(
                 caller, caller_roles
             )
-        return await self._execution_repo.list(
+        executions = await self._execution_repo.list(
             limit=limit,
             offset=offset,
             sort=sort,
@@ -180,6 +228,15 @@ class WorkflowExecutionService:
             visible_to_user_id=visible_to_user_id,
             visible_to_group_ids=visible_to_group_ids,
         )
+        tags_by_execution = await self._execution_repo.tag_ids_for_many(
+            [e.id for e in executions]
+        )
+        return [
+            WorkflowExecutionRead.from_execution(
+                e, tag_ids=tags_by_execution.get(e.id, [])
+            )
+            for e in executions
+        ]
 
     async def list_tasks(
         self,
@@ -215,7 +272,9 @@ class WorkflowExecutionService:
                 a designated approver of the execution, nor holds ``admin``
                 or ``super_admin``.
         """
-        await self.get(execution_id, caller=caller, caller_roles=caller_roles)
+        await self._get_authorized(
+            execution_id, caller=caller, caller_roles=caller_roles
+        )
         return await self._tasks.list(
             limit=limit,
             offset=offset,
@@ -263,7 +322,9 @@ class WorkflowExecutionService:
                 a designated approver of the execution, nor holds ``admin``
                 or ``super_admin``.
         """
-        await self.get(execution_id, caller=caller, caller_roles=caller_roles)
+        await self._get_authorized(
+            execution_id, caller=caller, caller_roles=caller_roles
+        )
         return await self._invocations.list_for_execution(
             execution_id, limit=limit, offset=offset, sort=sort, filters=filters
         )
@@ -380,7 +441,7 @@ class WorkflowExecutionService:
                 a designated approver of the execution, nor holds ``admin``
                 or ``super_admin``.
         """
-        execution = await self.get(
+        execution = await self._get_authorized(
             execution_id, caller=caller, caller_roles=caller_roles
         )
         session = await self._adk_session(execution)

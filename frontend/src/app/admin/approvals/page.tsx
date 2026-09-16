@@ -12,6 +12,7 @@ import { auditColumns, idColumn } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tagsColumn } from "@/components/admin/tag-columns";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
@@ -24,7 +25,8 @@ import {
   useWorkflowExecutionNames,
 } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { type Approval, listApprovals } from "@/lib/api";
+import { useTags } from "@/hooks/useTags";
+import { type ApprovalDetail, listApprovals } from "@/lib/api";
 
 const LIMIT = 20;
 
@@ -41,7 +43,7 @@ export default function ApprovalsPage() {
     setSort,
     setFilters,
     reload,
-  } = useTableQuery<Approval>(listApprovals, { limit: LIMIT });
+  } = useTableQuery<ApprovalDetail>(listApprovals, { limit: LIMIT });
 
   // Resolve approver, decider, and audit user IDs to display names
   // (best-effort, falling back to the raw ID), mirroring AuditMeta. An approval
@@ -57,11 +59,12 @@ export default function ApprovalsPage() {
   // through the super_admin-only tenants list, so asking for it as a plain
   // admin spends a request that can only come back 403 — and toasts.
   const tenantNames = useTenantNames(isAllTenantsView ? rows.map((a) => a.tenantId) : []);
+  const { byId: tagsById } = useTags();
 
-  const columns = useMemo<ColumnDef<Approval>[]>(
+  const columns = useMemo<ColumnDef<ApprovalDetail>[]>(
     () => [
-      ...(isAllTenantsView ? [tenantColumn<Approval>(tenantNames)] : []),
-      idColumn<Approval>(),
+      ...(isAllTenantsView ? [tenantColumn<ApprovalDetail>(tenantNames)] : []),
+      idColumn<ApprovalDetail>(),
       {
         header: "Title",
         sortField: "title",
@@ -137,7 +140,8 @@ export default function ApprovalsPage() {
         cell: (a) =>
           a.decidedAt ? <DateTime value={a.decidedAt} className="text-on-surface-variant" /> : "—",
       },
-      ...auditColumns<Approval>(names),
+      ...auditColumns<ApprovalDetail>(names),
+      tagsColumn<ApprovalDetail>((a) => a.tagIds, tagsById),
       {
         header: "Actions",
         noTruncate: true,
@@ -153,7 +157,7 @@ export default function ApprovalsPage() {
         ),
       },
     ],
-    [names, groupNames, executionNames, tenantNames, isAllTenantsView]
+    [names, groupNames, executionNames, tenantNames, isAllTenantsView, tagsById]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(

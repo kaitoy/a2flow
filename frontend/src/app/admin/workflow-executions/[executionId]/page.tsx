@@ -17,10 +17,12 @@ import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execut
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ChipRow, type ChipRowItem } from "@/components/ui/chip-row";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useWorkflowNames } from "@/hooks/useNames";
+import { useTags } from "@/hooks/useTags";
 import {
   deleteWorkflowExecution,
   getUserNames,
@@ -31,6 +33,7 @@ import {
 } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 import { Role, useHasRole } from "@/lib/roles";
+import { resolveTagColor } from "@/lib/tag-palette";
 
 /**
  * Read-only detail page for a single executed `WorkflowExecution`: the workflow
@@ -40,7 +43,9 @@ import { Role, useHasRole } from "@/lib/roles";
  * The `Name` field is the run's own snapshot name, fixed when it started, and is
  * shown as plain text. The separate `Workflow` field resolves the parent
  * workflow's *current* name and links to it, mirroring the list's Workflow
- * column.
+ * column. `Tags` is a snapshot too -- the workflow's tags at the moment this
+ * run started, copied server-side and unaffected by any retagging of the
+ * workflow (or its deletion) since.
  *
  * Nothing here is editable: a session is a record of a run, not an
  * author-managed entity. The header offers quick jumps to the session's task
@@ -63,6 +68,7 @@ export default function WorkflowExecutionDetailPage() {
   // Resolve the parent workflow's *current* name for the Workflow field, the
   // same way the workflow-executions list's Workflow column does.
   const workflowNames = useWorkflowNames(session?.workflowId ? [session.workflowId] : []);
+  const { byId: tagsById } = useTags();
 
   useEffect(() => {
     let active = true;
@@ -240,6 +246,21 @@ export default function WorkflowExecutionDetailPage() {
                   {userName ?? session.initiatorId}
                 </Link>
               }
+            />
+            <DetailItem
+              label="Tags"
+              value={(() => {
+                const ids = session.tagIds ?? [];
+                if (ids.length === 0) return EMPTY_VALUE;
+                const items: ChipRowItem[] = ids.map((id) => ({
+                  key: id,
+                  label: tagsById.get(id)?.name ?? id,
+                  color: resolveTagColor(tagsById.get(id)?.color),
+                  description: tagsById.get(id)?.description ?? undefined,
+                  locked: tagsById.get(id)?.accessControl,
+                }));
+                return <ChipRow items={items} title="Tags" />;
+              })()}
             />
           </DetailList>
 

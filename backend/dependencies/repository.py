@@ -394,10 +394,25 @@ WorkflowPublishedVersionRepositoryDep = Annotated[
 
 
 def get_workflow_execution_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+    db: DBSessionDep,
+    tenant_id: CurrentTenantScopeDep,
+    access_tag_ids: AccessTagIdsDep,
 ) -> WorkflowExecutionRepository:
-    """Create a WorkflowExecutionRepository backed by the current database session."""
-    return SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
+    """Create a WorkflowExecutionRepository backed by the current database session.
+
+    Restricted to the runs the caller may act on -- see
+    :func:`dependencies.auth.get_access_tag_ids`. A run copies its workflow's
+    access-control tags when it starts (see :mod:`models.tag`), and this is the
+    one factory every execution-scoped service composes, so a caller whose
+    groups have since lost such a tag gets a 404 from driving the run's agent,
+    reading its tasks, or deciding its approvals alike -- before the
+    participant-based
+    :class:`services.workflow_execution_access.WorkflowExecutionAccessPolicy`
+    ever runs.
+    """
+    return SqlWorkflowExecutionRepository(
+        db, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+    )
 
 
 WorkflowExecutionRepositoryDep = Annotated[
@@ -476,6 +491,7 @@ def get_approval_repository(
     execution_repo: WorkflowExecutionRepositoryDep,
     group_repo: UserGroupRepositoryDep,
     tenant_id: CurrentTenantScopeDep,
+    access_tag_ids: AccessTagIdsDep,
 ) -> ApprovalRepository:
     """Create an ApprovalRepository backed by the current database session.
 
@@ -483,8 +499,20 @@ def get_approval_repository(
     session exists when creating an approval, and the UserGroupRepository that a
     group destination exists. Both arrive from the same request-cached factories
     as this one, so all three share the acting ``tenant_id``.
+
+    Restricted to the approvals whose WorkflowExecution the caller may act on
+    -- see :func:`get_workflow_execution_repository`: an approval carries no
+    tags of its own and is gated by its execution's, so deciding one (``PATCH
+    /approvals/{id}``) 404s for a caller who has lost the tag just as browsing
+    it does.
     """
-    return SqlApprovalRepository(db, execution_repo, group_repo, tenant_id=tenant_id)
+    return SqlApprovalRepository(
+        db,
+        execution_repo,
+        group_repo,
+        tenant_id=tenant_id,
+        access_tag_ids=access_tag_ids,
+    )
 
 
 ApprovalRepositoryDep = Annotated[ApprovalRepository, Depends(get_approval_repository)]

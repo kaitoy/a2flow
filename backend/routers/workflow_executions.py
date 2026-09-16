@@ -58,7 +58,7 @@ from models.metrics import (
 from models.response import ApiResponse
 from models.session_file import SessionFileRead
 from models.user import Role
-from models.workflow_execution import WorkflowExecution
+from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task import WorkflowTaskRead
 from repositories.exceptions import SessionRunInProgressError
 from services.metrics import MetricsWindow
@@ -70,7 +70,7 @@ router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 _requires_admin = [Depends(require_roles(Role.admin))]
 
 
-@router.get("", response_model=ApiResponse[list[WorkflowExecution]])
+@router.get("", response_model=ApiResponse[list[WorkflowExecutionRead]])
 async def list_workflow_executions(
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
@@ -79,7 +79,7 @@ async def list_workflow_executions(
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[WorkflowExecution]]:
+) -> ApiResponse[list[WorkflowExecutionRead]]:
     """Return WorkflowExecution records, defaulting to ``created_at`` descending.
 
     A super admin or admin sees every execution in the tenant; anyone else
@@ -154,14 +154,14 @@ async def list_failed_workflow_executions(
     return ApiResponse(meta=meta, data=entries)
 
 
-@router.get("/{execution_id}", response_model=ApiResponse[WorkflowExecution])
+@router.get("/{execution_id}", response_model=ApiResponse[WorkflowExecutionRead])
 async def get_workflow_execution(
     execution_id: str,
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
-) -> ApiResponse[WorkflowExecution]:
+) -> ApiResponse[WorkflowExecutionRead]:
     """Return the WorkflowExecution record for the given ID.
 
     Only the execution's initiator, a designated approver of the execution,

@@ -47,7 +47,7 @@ from models.workflow import (
     WorkflowStatus,
     WorkflowUpdate,
 )
-from models.workflow_execution import WorkflowExecution, WorkflowExecutionCreate
+from models.workflow_execution import WorkflowExecutionCreate, WorkflowExecutionRead
 from models.workflow_published_version import (
     WorkflowPublishedVersion,
     WorkflowPublishedVersionTemplate,
@@ -773,14 +773,17 @@ class WorkflowService:
         caller_roles: Collection[str],
         tool_mock_ids: Sequence[str] = (),
         design_source: WorkflowDesignSource = WorkflowDesignSource.published,
-    ) -> WorkflowExecution:
+    ) -> WorkflowExecutionRead:
         """Start a workflow run by creating a WorkflowExecution with its tasks.
 
         Resolves the workflow and its skill, records a new WorkflowExecution
-        pinned to the skill's currently published revision, and copies the
+        pinned to the skill's currently published revision, copies the
         workflow's task templates into the session as ``pending``
         WorkflowTasks (dependency edges and tool bindings included), so later
-        template edits never affect this run. The ADK session is created
+        template edits never affect this run, and copies the workflow's
+        current tag ids onto the execution as a one-time snapshot (see
+        :mod:`models.tag`) — later retagging the workflow, or deleting it,
+        never changes what this run shows. The ADK session is created
         lazily on the first agent call, which starts executing immediately —
         the tasks were approved by publishing the workflow (or, for a
         ``developer``/``super_admin`` caller, is still being tested pre-publish).
@@ -832,7 +835,7 @@ class WorkflowService:
                 see :class:`~models.workflow.WorkflowDesignSource`.
 
         Returns:
-            The created WorkflowExecution.
+            The created execution, with its tag ids attached.
 
         Raises:
             NotFoundError: If the workflow or its skill does not exist.
@@ -889,6 +892,12 @@ class WorkflowService:
         user = caller.id or "user"
         session_id = str(uuid.uuid4())
 
+        # Read before `execution_repo.create` below commits: that commit expires
+        # every object on the shared session, and `workflow` is not re-read
+        # afterward the way `execution` is (see the re-read below), so touching
+        # `workflow.id` again after it would need a synchronous refresh outside
+        # the request's greenlet context.
+        workflow_tag_ids = await self._workflows.tag_ids_for(workflow.id)
         execution_create = WorkflowExecutionCreate(
             session_id=session_id,
             name=self._generate_execution_name(name),
@@ -907,7 +916,10 @@ class WorkflowService:
             is_draft=is_draft,
             tool_mocks=tool_mocks,
         )
+        # Captured before set_tags commits (which expires `execution`, per the
+        # note on the re-read below) rather than read off `execution` again.
         execution_id = execution.id
+        await self._execution_repo.set_tags(execution_id, workflow_tag_ids)
 
         # Copy the task templates in dependency order, remapping template ids to the
         # freshly created task ids so the edges land on the copies.
@@ -935,7 +947,7 @@ class WorkflowService:
         created = await self._execution_repo.get(execution_id)
         if created is None:  # pragma: no cover - just created above
             raise NotFoundError("WorkflowExecution", execution_id)
-        return created
+        return WorkflowExecutionRead.from_execution(created, tag_ids=workflow_tag_ids)
 
     def _generate_execution_name(self, name: str) -> str:
         """Build a WorkflowExecution name from the workflow name plus a random suffix.

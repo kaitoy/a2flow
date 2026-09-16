@@ -559,9 +559,14 @@ def get_approval_service(
     repo: ApprovalRepositoryDep,
     approver_groups: ApproverGroupResolverDep,
     certificates: McpToolCertificateServiceDep,
+    executions: WorkflowExecutionRepositoryDep,
 ) -> ApprovalService:
-    """Create an ApprovalService backed by the request's repository."""
-    return ApprovalService(repo, approver_groups, certificates)
+    """Create an ApprovalService backed by the request's repositories.
+
+    ``executions`` is read only for its tag attachments -- see
+    ``ApprovalService.__init__``.
+    """
+    return ApprovalService(repo, approver_groups, certificates, executions)
 
 
 ApprovalServiceDep = Annotated[ApprovalService, Depends(get_approval_service)]

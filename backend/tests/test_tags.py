@@ -5,7 +5,11 @@ sub-resource on the taggable resources, the conjunctive ``?tag=`` list filter,
 the two invariants the whole feature rests on -- renaming a tag keeps every
 attachment, and deleting one detaches it everywhere rather than being blocked by
 the records carrying it -- and the access-control predicate an ``accessControl``
-tag adds on top (see :mod:`models.tag`).
+tag adds on top (see :mod:`models.tag`). Also covers the derived case: a
+WorkflowExecution copies its workflow's tags at execute time, and an Approval
+carries no tags of its own but is gated by its execution's -- so losing the
+group that holds an access-control tag hides both, even from a run's own
+initiator or a designated approver.
 """
 
 from collections.abc import AsyncGenerator
@@ -20,6 +24,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
 from models.agent_skill import AgentSkill, AgentSkillRead
+from models.approval import Approval
 from models.mcp_server import MCPServer, McpServerRead
 from models.mcp_tool_mock import MCPToolMock, McpToolMockRead
 from models.secret import Secret, SecretRead
@@ -30,7 +35,7 @@ from models.workflow import Workflow, WorkflowRead
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
-from tests._workflow import create_published_workflow, create_skill
+from tests._workflow import create_published_workflow, create_skill, execute_workflow
 from tests.conftest import _install_auth_overrides
 
 #: A second tenant used by the isolation tests.
@@ -1090,3 +1095,125 @@ async def test_executing_a_visible_workflow_resolves_its_hidden_skill(
         ),
         201,
     )
+
+
+async def _insert_approval(
+    eng: AsyncEngine, *, workflow_execution_id: str, approver: str = "carol"
+) -> str:
+    """Insert an Approval addressed to ``approver`` and return its id."""
+    async with AsyncSession(eng) as db:
+        approval = Approval(
+            workflow_execution_id=workflow_execution_id,
+            title="Approve me",
+            approver=approver,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(approval)
+        await db.commit()
+        await db.refresh(approval)
+        return approval.id
+
+
+async def test_a_workflow_executions_copied_access_tag_hides_it_from_a_former_group_member(
+    workflow_client: AsyncClient,
+) -> None:
+    """A run copies its workflow's tags at execute time, access-control ones
+
+    included, so losing the group that holds one hides the run too -- even from
+    the person who started it, and not just on the browsing pages: its tasks,
+    its chat history, and driving its agent all 404 alike.
+    """
+    client = workflow_client
+    gated = await _create_tag(client, "gated", accessControl=True)
+    skill = await create_skill(client)
+    workflow_id = (await create_published_workflow(client, skill["id"]))["id"]
+    await _gate(client, "workflows", workflow_id, [gated["id"]])
+    group = await _create_member_group(client, "holders", ["carol"], [gated["id"]])
+
+    execution = await execute_workflow(client, workflow_id, headers=REQUESTER)
+    execution_id = execution["id"]
+    assert execution["tagIds"] == [gated["id"]]
+    detail_url = f"/api/v1/workflow-executions/{execution_id}"
+    tasks_url = f"{detail_url}/workflow-tasks"
+    messages_url = f"{detail_url}/messages"
+    agent_url = f"{detail_url}/agent"
+    run_input = {
+        "threadId": execution["sessionId"],
+        "runId": "run-001",
+        "state": {},
+        "messages": [],
+        "tools": [],
+        "context": [],
+        "forwardedProps": {},
+    }
+
+    # carol (REQUESTER) is the run's own initiator and still holds the tag.
+    assert execution_id in await _listed_ids(client, "workflow-executions", REQUESTER)
+    assert_ok(await client.get(detail_url, headers=REQUESTER))
+    assert_ok(await client.get(tasks_url, headers=REQUESTER))
+    agent_response = await client.post(agent_url, json=run_input, headers=REQUESTER)
+    assert agent_response.status_code == 200
+
+    # She leaves the only group holding the tag.
+    assert_ok(
+        await client.patch(
+            f"/api/v1/user-groups/{group['id']}", json={"memberIds": []}, headers=ADMIN
+        )
+    )
+    assert execution_id not in await _listed_ids(
+        client, "workflow-executions", REQUESTER
+    )
+    assert_err(await client.get(detail_url, headers=REQUESTER), "NOT_FOUND", 404)
+    assert_err(await client.get(tasks_url, headers=REQUESTER), "NOT_FOUND", 404)
+    assert_err(await client.get(messages_url, headers=REQUESTER), "NOT_FOUND", 404)
+    assert_err(
+        await client.post(agent_url, json=run_input, headers=REQUESTER),
+        "NOT_FOUND",
+        404,
+    )
+
+    # An admin and the super admin (the client's default identity) still see it.
+    assert_ok(await client.get(detail_url, headers=ADMIN))
+    assert_ok(await client.get(detail_url))
+
+
+async def test_an_approvals_execution_access_tag_hides_it_from_its_approver(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """An approval carries no tags of its own; it inherits its execution's gate.
+
+    Losing the group that holds the tag hides the approval too, even from its
+    own designated approver -- who can then no longer decide it either.
+    """
+    client, engine = workflow_client_with_engine
+    gated = await _create_tag(client, "gated", accessControl=True)
+    skill = await create_skill(client)
+    workflow_id = (await create_published_workflow(client, skill["id"]))["id"]
+    await _gate(client, "workflows", workflow_id, [gated["id"]])
+    group = await _create_member_group(client, "holders", ["carol"], [gated["id"]])
+
+    execution = await execute_workflow(client, workflow_id, headers=REQUESTER)
+    approval_id = await _insert_approval(
+        engine, workflow_execution_id=execution["id"], approver="carol"
+    )
+    detail_url = f"/api/v1/approvals/{approval_id}"
+
+    assert approval_id in await _listed_ids(client, "approvals", REQUESTER)
+    assert_ok(await client.get(detail_url, headers=REQUESTER))
+
+    assert_ok(
+        await client.patch(
+            f"/api/v1/user-groups/{group['id']}", json={"memberIds": []}, headers=ADMIN
+        )
+    )
+    assert approval_id not in await _listed_ids(client, "approvals", REQUESTER)
+    assert_err(await client.get(detail_url, headers=REQUESTER), "NOT_FOUND", 404)
+    # The tag gate fires before the designated-approver check would let her in.
+    assert_err(
+        await client.patch(detail_url, json={"status": "approved"}, headers=REQUESTER),
+        "NOT_FOUND",
+        404,
+    )
+    assert_ok(await client.get(detail_url, headers=ADMIN))

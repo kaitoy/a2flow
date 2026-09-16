@@ -58,7 +58,7 @@ from models.workflow import (
     WorkflowRead,
     WorkflowUpdate,
 )
-from models.workflow_execution import WorkflowExecution
+from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task_template import WorkflowTaskTemplateRead
 from repositories.exceptions import SessionRunInProgressError
 
@@ -432,7 +432,7 @@ async def deactivate_workflow(
 
 @router.post(
     "/{workflow_id}/execute",
-    response_model=ApiResponse[WorkflowExecution],
+    response_model=ApiResponse[WorkflowExecutionRead],
     status_code=201,
     dependencies=_requires_execute,
 )
@@ -443,7 +443,7 @@ async def execute_workflow(
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
     body: ExecuteWorkflowRequest | None = None,
-) -> ApiResponse[WorkflowExecution]:
+) -> ApiResponse[WorkflowExecutionRead]:
     """Create a WorkflowExecution pre-filled with the workflow's task templates.
 
     ``published`` workflows can be executed by any caller who reaches this

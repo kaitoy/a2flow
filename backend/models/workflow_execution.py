@@ -17,11 +17,15 @@ from enum import StrEnum
 from typing import Any
 
 from pydantic import field_serializer
+from pydantic.alias_generators import to_camel
 from sqlalchemy import Column, ForeignKeyConstraint, Index
 from sqlmodel import Field, SQLModel
+from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn, TZDateTime, iso_z_or_none
 from models.tenant_scoped import TenantScoped
+
+_alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
 
 class WorkflowExecutionStatus(StrEnum):
@@ -152,3 +156,60 @@ class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table
             The ISO-8601 string with a ``Z`` suffix, or ``None``.
         """
         return iso_z_or_none(dt)
+
+
+class WorkflowExecutionRead(BaseEntity):
+    """Read view of a WorkflowExecution returned by the API, including its tags.
+
+    Mirrors every column of :class:`WorkflowExecution` and adds ``tag_ids``,
+    the ids copied from the workflow's own tags when the run started (see
+    :mod:`models.tag`) — they live in :class:`models.tag.WorkflowExecutionTag`
+    rather than on this row.
+    """
+
+    model_config = _alias_config
+    tenant_id: str
+    session_id: str
+    name: str
+    description: str | None = None
+    agent_skill_id: str
+    agent_skill_name: str
+    agent_skill_repo_url: str
+    agent_skill_repo_path: str
+    agent_skill_commit_sha: str | None = None
+    initiator_id: str
+    workflow_id: str | None = None
+    is_draft: bool = False
+    tool_mocks: list[dict[str, Any]] = []
+    tool_mock_calls: dict[str, int] = {}
+    status: WorkflowExecutionStatus = WorkflowExecutionStatus.running
+    finished_at: datetime | None = None
+    #: Ids of the tags this run's workflow carried when it started.
+    tag_ids: list[str] = []
+
+    @field_serializer("finished_at", when_used="json")
+    def _serialize_finished_at(self, dt: datetime | None) -> str | None:
+        """Serialize ``finished_at`` as ISO-8601 with a ``Z`` suffix, or ``None``.
+
+        Args:
+            dt: The completion timestamp, or ``None`` while the run is active.
+
+        Returns:
+            The ISO-8601 string with a ``Z`` suffix, or ``None``.
+        """
+        return iso_z_or_none(dt)
+
+    @classmethod
+    def from_execution(
+        cls, execution: WorkflowExecution, *, tag_ids: list[str]
+    ) -> "WorkflowExecutionRead":
+        """Build the read view of a stored execution with its tags attached.
+
+        Args:
+            execution: The persisted execution to project.
+            tag_ids: Ids of the tags attached to ``execution``.
+
+        Returns:
+            A read view carrying the execution's columns plus its tags.
+        """
+        return cls(**execution.model_dump(), tag_ids=tag_ids)

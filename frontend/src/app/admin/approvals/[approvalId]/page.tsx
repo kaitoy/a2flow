@@ -17,8 +17,10 @@ import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { StatusCard } from "@/components/admin/status-card";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
+import { ChipRow, type ChipRowItem } from "@/components/ui/chip-row";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useTags } from "@/hooks/useTags";
 import {
   type ApprovalDetail,
   getApproval,
@@ -34,10 +36,13 @@ import {
   SUPPRESS_FORBIDDEN_TOAST,
 } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
+import { resolveTagColor } from "@/lib/tag-palette";
 
 /**
  * Read-only detail page for a single `Approval` request: its status, the
  * approver's decision and comment, and the workflow execution it belongs to.
+ * `Tags` carries that execution's tags -- the tags its workflow had when the
+ * run started, since an approval has no tag attachment of its own.
  *
  * Approve/reject is deliberately not offered here — resolving an approval
  * stays in the in-chat flow (`ApprovalControls`), the only place the backend
@@ -61,6 +66,7 @@ export default function ApprovalDetailPage() {
   const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
   const [coveredTaskTitles, setCoveredTaskTitles] = useState<Map<string, string>>(new Map());
   const isAllTenantsView = useIsAllTenantsView();
+  const { byId: tagsById } = useTags();
 
   useEffect(() => {
     let active = true;
@@ -271,6 +277,21 @@ export default function ApprovalDetailPage() {
                   EMPTY_VALUE
                 )
               }
+            />
+            <DetailItem
+              label="Tags"
+              value={(() => {
+                const ids = approval.tagIds ?? [];
+                if (ids.length === 0) return EMPTY_VALUE;
+                const items: ChipRowItem[] = ids.map((id) => ({
+                  key: id,
+                  label: tagsById.get(id)?.name ?? id,
+                  color: resolveTagColor(tagsById.get(id)?.color),
+                  description: tagsById.get(id)?.description ?? undefined,
+                  locked: tagsById.get(id)?.accessControl,
+                }));
+                return <ChipRow items={items} title="Tags" />;
+              })()}
             />
           </DetailList>
 

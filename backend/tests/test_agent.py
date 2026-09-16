@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import json
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -97,10 +98,18 @@ async def test_agent_endpoint_rejects_a_concurrent_run_of_the_same_thread(
         await streaming.wait()
         return await client.post("/api/v1/agent", json=_make_run_agent_input())
 
-    first, second = await asyncio.gather(
-        client.post("/api/v1/agent", json=_make_run_agent_input()),
-        _second_run(),
-    )
+    # The second request has roughly 250 ms (the 0.3 s stream minus the 0.05 s
+    # lock wait) to reach the lock; a full garbage collection can pause the
+    # event loop longer than that and turn the expected 409 into a 200, so
+    # keep automatic collection out of the window.
+    gc.disable()
+    try:
+        first, second = await asyncio.gather(
+            client.post("/api/v1/agent", json=_make_run_agent_input()),
+            _second_run(),
+        )
+    finally:
+        gc.enable()
 
     assert first.status_code == 200
     assert second.status_code == 409

@@ -114,6 +114,7 @@ Open **Approvals** in the admin sidebar to browse every approval request. This v
 |---|---|
 | Title, status (`pending` / `approved` / `rejected` / `returned`), description, created time | Yes |
 | Workflow execution — a link to the run it came from | Yes |
+| Tags — read-only, the tags of the workflow execution it belongs to (see [Workflow execution and approval tags](./tags.md#execution-and-approval-tags)) | Yes |
 | Decided By — the user or the approver group's name, linked to its page | Through the column picker |
 | The approver's comment, and the decision time | Through the column picker |
 

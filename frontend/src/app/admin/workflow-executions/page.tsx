@@ -12,6 +12,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { tagsColumn } from "@/components/admin/tag-columns";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { WorkflowExecutionStatusLabel } from "@/components/admin/workflow-execution-status";
 import { Badge } from "@/components/ui/badge";
@@ -27,17 +28,24 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames, useWorkflowNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useTags } from "@/hooks/useTags";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
-import { deleteWorkflowExecution, listWorkflowExecutions, type WorkflowExecution } from "@/lib/api";
+import {
+  deleteWorkflowExecution,
+  listWorkflowExecutions,
+  type Tag,
+  type WorkflowExecution,
+} from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
 const LIMIT = 20;
 
 /**
  * Build the table columns, resolving user ids to display names via `userMap`,
- * workflow ids to their current names via `workflowMap`, and wiring the Actions
- * column's Delete button to `onDelete`. The Delete button only renders when
- * `isAdmin` is true — the backend restricts deletion to admins and super admins.
+ * workflow ids to their current names via `workflowMap`, and tag ids to their
+ * chips via `tagsById`, and wiring the Actions column's Delete button to
+ * `onDelete`. The Delete button only renders when `isAdmin` is true — the
+ * backend restricts deletion to admins and super admins.
  */
 function buildColumns(
   userMap: Map<string, string>,
@@ -45,7 +53,8 @@ function buildColumns(
   onDelete: (id: string, name: string) => void,
   isAdmin: boolean,
   tenantNames: Map<string, string>,
-  isAllTenantsView: boolean
+  isAllTenantsView: boolean,
+  tagsById: Map<string, Tag>
 ): ColumnDef<WorkflowExecution>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<WorkflowExecution>(tenantNames)] : []),
@@ -183,6 +192,7 @@ function buildColumns(
       cell: (s) => formatRevision(s.agentSkillCommitSha),
     },
     ...auditColumns<WorkflowExecution>(userMap),
+    tagsColumn<WorkflowExecution>((s) => s.tagIds, tagsById),
     {
       header: "Actions",
       noTruncate: true,
@@ -248,10 +258,19 @@ export default function WorkflowExecutionsPage() {
   // through the super_admin-only tenants list, so asking for it as a plain
   // admin spends a request that can only come back 403 — and toasts.
   const tenantNames = useTenantNames(isAllTenantsView ? rows.map((s) => s.tenantId) : []);
+  const { byId: tagsById } = useTags();
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowExecutions",
-    buildColumns(userMap, workflowMap, handleDelete, isAdmin, tenantNames, isAllTenantsView)
+    buildColumns(
+      userMap,
+      workflowMap,
+      handleDelete,
+      isAdmin,
+      tenantNames,
+      isAllTenantsView,
+      tagsById
+    )
   );
 
   return (

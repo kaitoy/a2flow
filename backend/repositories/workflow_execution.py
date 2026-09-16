@@ -4,10 +4,12 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
-from sqlalchemy import or_
+from sqlalchemy import ColumnElement, or_
 from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval
+from models.tag import WorkflowExecutionTag
 from models.workflow_execution import (
     WorkflowExecution,
     WorkflowExecutionCreate,
@@ -17,6 +19,9 @@ from repositories._integrity import commit_or_translate_user_fk
 from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import NotFoundError
 from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+from repositories.tags import TagLinks
+
+_StrList = list[str]
 
 
 class WorkflowExecutionRepository(Protocol):
@@ -25,6 +30,14 @@ class WorkflowExecutionRepository(Protocol):
     async def get(self, execution_id: str) -> WorkflowExecution | None: ...
 
     async def get_by_session_id(self, session_id: str) -> WorkflowExecution | None: ...
+
+    async def tag_ids_for(self, execution_id: str) -> _StrList: ...
+
+    async def tag_ids_for_many(
+        self, execution_ids: Sequence[str]
+    ) -> dict[str, _StrList]: ...
+
+    async def set_tags(self, execution_id: str, tag_ids: Sequence[str]) -> None: ...
 
     async def list(
         self,
@@ -66,6 +79,71 @@ class SqlWorkflowExecutionRepository(TenantScopedRepository[WorkflowExecution]):
     """SQLModel-backed implementation of WorkflowExecutionRepository."""
 
     model = WorkflowExecution
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str | None,
+        access_tag_ids: frozenset[str] | None = None,
+    ) -> None:
+        """Store the session, the tenant scope, and the tag-attachment helper.
+
+        Args:
+            session: The SQLModel session to run queries on.
+            tenant_id: Tenant every query is filtered by, or ``None`` for a
+                platform-scoped read across every tenant.
+            access_tag_ids: Ids of the tags the caller holds through their
+                groups, for access control -- see
+                :class:`repositories.tags.TagLinks`. An execution copies its
+                workflow's tags verbatim, access-control ones included, so a
+                caller who has since lost the group carrying one loses the
+                execution too -- every read and write here goes through
+                :meth:`_get_scoped`, so driving its agent or reading its
+                tasks 404s the same way browsing it does, even for its
+                initiator or a designated approver -- see
+                :meth:`_visibility_clause`.
+        """
+        super().__init__(session, tenant_id=tenant_id)
+        self._tags = TagLinks(
+            session,
+            WorkflowExecutionTag,
+            tenant_id=tenant_id,
+            access_tag_ids=access_tag_ids,
+        )
+
+    def _visibility_clause(self) -> ColumnElement[bool] | None:
+        """Hide executions gated by an access-control tag the caller does not hold."""
+        return self._tags.visibility_clause(col(WorkflowExecution.id))
+
+    async def tag_ids_for(self, execution_id: str) -> _StrList:
+        """Return the sorted ids of the tags attached to one WorkflowExecution."""
+        return await self._tags.for_one(execution_id)
+
+    async def tag_ids_for_many(
+        self, execution_ids: Sequence[str]
+    ) -> dict[str, _StrList]:
+        """Return each WorkflowExecution's sorted tag ids, in one query."""
+        return await self._tags.for_many(execution_ids)
+
+    async def set_tags(self, execution_id: str, tag_ids: Sequence[str]) -> None:
+        """Replace a WorkflowExecution's tag attachments wholesale.
+
+        Called exactly once, by :meth:`services.workflow.WorkflowService.execute`,
+        to copy the ids of the tags its workflow carried at the moment the run
+        started (see :mod:`models.tag`). There is no user-facing endpoint that
+        calls this afterwards -- a run's tags are a snapshot, not something a
+        caller edits directly, so unlike
+        :meth:`repositories.workflow.SqlWorkflowRepository.set_tags` this skips
+        :meth:`repositories.tags.TagLinks.validate`: the ids already came from
+        a workflow's own validated attachments.
+
+        Args:
+            execution_id: Id of the execution whose attachments are replaced.
+            tag_ids: Ids of the tags it should carry.
+        """
+        await self._tags.replace(execution_id, tag_ids)
+        await self._db.commit()
 
     async def get(self, execution_id: str) -> WorkflowExecution | None:
         """Return the WorkflowExecution with the given ID, or ``None`` if missing."""
