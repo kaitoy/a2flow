@@ -264,7 +264,7 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _rows(engine, McpServerTag)) == 2
     assert len(await _rows(engine, AgentSkillTag)) == 4
     assert len(await _rows(engine, McpToolMockTag)) == 2
-    assert len(await _rows(engine, UserGroupTag)) == 2
+    assert len(await _rows(engine, UserGroupTag)) == 4
 
 
 async def test_demo_tags_classify_records_across_four_taggable_kinds(
@@ -446,9 +446,12 @@ async def test_demo_aws_and_gcp_tags_are_access_control(
     assert tags[DEMO_APPROVAL_TAG_ID].access_control is False
 
 
-async def test_demo_aws_and_gcp_groups_hold_their_access_control_tag(
+async def test_demo_access_control_tag_groups_hold_their_tags(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """AWS/GCP Group hold their matching tag; Demo Approvers holds both, so
+    either demo approver is an eligible destination regardless of which demo
+    skill's workflow requested the approval."""
     _enable(monkeypatch)
     await _sync(engine)
     group_tags = {
@@ -457,6 +460,8 @@ async def test_demo_aws_and_gcp_groups_hold_their_access_control_tag(
     assert group_tags == {
         (DEMO_AWS_GROUP_ID, DEMO_AWS_TAG_ID),
         (DEMO_GCP_GROUP_ID, DEMO_GCP_TAG_ID),
+        (DEMO_APPROVERS_GROUP_ID, DEMO_AWS_TAG_ID),
+        (DEMO_APPROVERS_GROUP_ID, DEMO_GCP_TAG_ID),
     }
 
 

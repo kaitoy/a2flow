@@ -46,9 +46,9 @@ DEMO_GCP_API_KEY=AIza...
 | `demo-gcp-developer` | `developer` | `Demo GCP Group` | GKE Pod 再起動ワークフローを生成する |
 | `demo-gcp-reviewer` | `reviewer` | `Demo GCP Group` | GKE Pod 再起動ワークフローを公開する |
 | `demo-gcp-requester` | `requester` | `Demo GCP Group` | GKE Pod 再起動ワークフローを実行する |
-| `demo-approver-1`、`demo-approver-2` | `approver` | — | 起動、または Pod の再起動を承認する |
+| `demo-approver-1`、`demo-approver-2` | `approver` | `Demo Approvers`(両方のタグ) | 起動、または Pod の再起動を承認する |
 
-いずれもロールを直接は持ちません。それぞれ[ユーザーグループ](../guides/users-and-groups.md#user-groups) `Demo Developers`、`Demo Reviewers`、`Demo Requesters`、`Demo Approvers` から継承します。AWS と GCP の3人組はそれぞれ、もう一つのグループ `Demo AWS Group` または `Demo GCP Group` にも所属します。このグループはロールを一切付与せず、対応するアクセス制御タグを保持するためだけに存在するので、その3人組だけが AWS または GCP のタグ付きレコードを見られ、それ以外には見えません。ただし `admin`(またはスーパー管理者)は例外で、[アクセス制御タグを完全に素通り](../guides/tags.md#access-control-tags)するため、グループに所属する必要すらありません。
+いずれもロールを直接は持ちません。それぞれ[ユーザーグループ](../guides/users-and-groups.md#user-groups) `Demo Developers`、`Demo Reviewers`、`Demo Requesters`、`Demo Approvers` から継承します。AWS と GCP の3人組はそれぞれ、もう一つのグループ `Demo AWS Group` または `Demo GCP Group` にも所属します。このグループはロールを一切付与せず、対応するアクセス制御タグを保持するためだけに存在するので、その3人組だけが AWS または GCP のタグ付きレコードを見られ、それ以外には見えません。ただし `admin`(またはスーパー管理者)は例外で、[アクセス制御タグを完全に素通り](../guides/tags.md#access-control-tags)するため、グループに所属する必要すらありません。`Demo Approvers` 自体は `AWS` と `GCP` 両方のアクセス制御タグを直接持ちます。承認者は特定のプロバイダに縛られる立場ではないためで、これによりどちらのデモワークフローから来た承認依頼でも、デモ承認者のどちらかを宛先にできます。
 
 ## 試してみる {#trying-it-out}
 
@@ -60,7 +60,7 @@ DEMO_GCP_API_KEY=AIza...
 4. **`demo-aws-requester`** でワークフローの **Run** を押します([ワークフローを実行する](../guides/workflows.md#running-a-workflow))。実行のチャットが開き、エージェントがタスクを順に進めます。
 5. スキルが承認を求めてきたら、**`demo-approver-1`** でサインインして承認します([承認](../guides/approvals.md))。エージェントはそのあと MCP ツールでインスタンスを起動します。
 
-同じ 5 ステップは **`Demo GKE Pod Restart`** でも、**`demo-gcp-developer`**、**`demo-gcp-reviewer`**、**`demo-gcp-requester`** でサインインすれば実行できます。`Demo AWS Group` と `Demo GCP Group` はそれぞれ自分のプロバイダのレコードしか見えないため、`demo-aws-developer` は `Demo GKE Pod Restart` を開けず、`demo-gcp-developer` は `Demo AWS EC2 Launch` を開けません。承認は起動ではなく削除する Pod そのものを対象にし、最後のステップは何かを作る代わりに Pod を再起動します。承認のルーティングは AWS/GCP のグループ分けの影響を受けないので、どちらの承認者アカウントでも構いません。ここで実際に動かすには、実際の GKE クラスタに届く権限を持つキーを `DEMO_GCP_API_KEY` に設定しておく必要があります。
+同じ 5 ステップは **`Demo GKE Pod Restart`** でも、**`demo-gcp-developer`**、**`demo-gcp-reviewer`**、**`demo-gcp-requester`** でサインインすれば実行できます。`Demo AWS Group` と `Demo GCP Group` はそれぞれ自分のプロバイダのレコードしか見えないため、`demo-aws-developer` は `Demo GKE Pod Restart` を開けず、`demo-gcp-developer` は `Demo AWS EC2 Launch` を開けません。承認は起動ではなく削除する Pod そのものを対象にし、最後のステップは何かを作る代わりに Pod を再起動します。`Demo Approvers` は `AWS` と `GCP` 両方のアクセス制御タグを直接持っているので、承認のルーティングは AWS/GCP のグループ分けの影響を受けず、どちらの承認者アカウントでも構いません。ここで実際に動かすには、実際の GKE クラスタに届く権限を持つキーを `DEMO_GCP_API_KEY` に設定しておく必要があります。
 
 **AWS アカウントも GKE クラスタもない場合。** 手順 3 を飛ばし、`draft` のまま実行してください。`developer` である `demo-aws-developer`(GKE の例なら `demo-gcp-developer`)はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script`、Pod 再起動用の `delete_k8s_resource`、`request_approval`)にチェックを入れれば、AWS や実際の GKE クラスタに届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
 

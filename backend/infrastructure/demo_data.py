@@ -1335,7 +1335,10 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     ``Approval Required`` lands on both agent skills. ``AWS`` and ``GCP`` are
     also each attached to their matching user group (``Demo AWS Group`` /
     ``Demo GCP Group``) as access-control tags, which is what gates the
-    records above to that group's members.
+    records above to that group's members. Both are additionally attached to
+    ``Demo Approvers`` directly, so either demo approver is an eligible
+    destination for a request_approval call whose session carries either
+    tag, regardless of which of the two demo skills the workflow came from.
 
     Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
     :func:`_seed_demo_gke_mcp_server`, :func:`_seed_demo_agent_skill`,
@@ -1409,6 +1412,14 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             tag_id=DEMO_AWS_TAG_ID,
             label=f"tag '{DEMO_AWS_TAG_NAME}' on user group 'Demo AWS Group'",
         )
+        await _link_tag(
+            session,
+            UserGroupTag,
+            resource_model=UserGroup,
+            resource_id=DEMO_APPROVERS_GROUP_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=f"tag '{DEMO_AWS_TAG_NAME}' on user group 'Demo Approvers'",
+        )
     if await _ensure_demo_tag(
         session,
         tenant_id,
@@ -1451,6 +1462,14 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             resource_id=DEMO_GCP_GROUP_ID,
             tag_id=DEMO_GCP_TAG_ID,
             label=f"tag '{DEMO_GCP_TAG_NAME}' on user group 'Demo GCP Group'",
+        )
+        await _link_tag(
+            session,
+            UserGroupTag,
+            resource_model=UserGroup,
+            resource_id=DEMO_APPROVERS_GROUP_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=f"tag '{DEMO_GCP_TAG_NAME}' on user group 'Demo Approvers'",
         )
     if await _ensure_demo_tag(
         session,
