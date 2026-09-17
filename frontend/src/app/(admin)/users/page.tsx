@@ -8,7 +8,7 @@
  */
 "use client";
 
-import { UserCog, User as UsersIcon } from "lucide-react";
+import { Ban, UserCog, User as UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -51,6 +51,10 @@ const LIMIT = 20;
  * page, which the picker dialog never does — Name and Email are shared with
  * {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}. Takes
  * `names` (rather than being a static array) because the audit columns need it.
+ *
+ * Enabled is an optional column: a disabled account is already called out by a
+ * badge on its avatar (which is always shown) and by its muted row, so the
+ * column can be hidden without losing the signal.
  */
 function buildColumns(
   names: Map<string, string>,
@@ -64,7 +68,20 @@ function buildColumns(
       header: "",
       noTruncate: true,
       visibility: "always",
-      cell: (u) => <Avatar user={u} size={28} />,
+      cell: (u) => (
+        <span className="relative inline-flex">
+          <Avatar user={u} size={28} />
+          {!u.enabled && (
+            <span
+              title="Disabled"
+              className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-error text-on-error ring-2 ring-surface"
+            >
+              <Ban size={9} strokeWidth={2.5} aria-hidden="true" />
+              <span className="sr-only">Disabled</span>
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       header: "Username",
@@ -114,6 +131,7 @@ function buildColumns(
       filterOp: "eq",
       filterOptions: BOOL_FILTER_OPTIONS,
       className: "text-center",
+      visibility: "optional",
       cell: (u) => boolCell(u.enabled),
     },
     {
@@ -268,6 +286,9 @@ export default function UsersPage() {
         emptyMessage="No users registered yet."
         emptyIcon={UsersIcon}
         getRowKey={(user) => user.id}
+        // A disabled account reads as inactive at a glance: the whole row is
+        // muted on top of the avatar badge, which alone is small at 28px.
+        rowClassName={(user) => !user.enabled && "opacity-60"}
         sort={sort}
         onSortChange={setSort}
         filters={filters}

@@ -125,6 +125,11 @@ interface DataTableProps<T> {
    * chip points at. No row is highlighted when null or omitted.
    */
   highlightedRowKey?: string | null;
+  /**
+   * Extra classes merged onto a row's `<tr>`, e.g. to mute a row whose record
+   * is inactive. Return a falsy value for rows that need nothing.
+   */
+  rowClassName?: (row: T) => string | undefined | false;
 }
 
 /** Per-column skeleton widths cycle through this list for a natural, uneven look. */
@@ -346,6 +351,7 @@ export function DataTable<T>({
   tagIds,
   onTagIdsChange,
   highlightedRowKey = null,
+  rowClassName,
 }: DataTableProps<T>) {
   const colSpan = columns.length;
 
@@ -641,6 +647,7 @@ export function DataTable<T>({
                   highlightedRowKey === getRowKey(row)
                     ? "bg-accent-soft/40! ring-2 ring-inset ring-accent/50"
                     : "",
+                  rowClassName?.(row),
                 ]
                   .filter(Boolean)
                   .join(" ")}

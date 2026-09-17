@@ -103,6 +103,53 @@ describe("UsersPage", () => {
     await waitFor(() => expect(screen.getByText("Super Admin")).toBeInTheDocument());
   });
 
+  it("marks a disabled user with an avatar badge and a muted row", async () => {
+    routerMock();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users", () =>
+        envelope([
+          {
+            id: "user-1",
+            username: "alice",
+            firstName: "Alice",
+            lastName: "Smith",
+            email: "alice@example.com",
+            enabled: true,
+            emailVerified: false,
+            roles: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+          {
+            id: "user-2",
+            username: "bob",
+            firstName: "Bob",
+            lastName: "Jones",
+            email: "bob@example.com",
+            enabled: false,
+            emailVerified: false,
+            roles: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "",
+            updatedBy: "",
+          },
+        ])
+      )
+    );
+    render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByText("bob"));
+    const badges = screen.getAllByTitle("Disabled");
+    expect(badges).toHaveLength(1);
+    expect(badges[0].closest("tr")).toHaveTextContent("bob");
+    expect(badges[0].closest("tr")).toHaveClass("opacity-60");
+    const aliceRow = screen.getByText("alice").closest("tr");
+    expect(aliceRow).not.toHaveTextContent("Disabled");
+    expect(aliceRow).not.toHaveClass("opacity-60");
+  });
+
   it("does not show a Super Admin badge for a regular user", async () => {
     routerMock();
     render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });
