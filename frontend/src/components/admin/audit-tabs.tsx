@@ -1,5 +1,5 @@
 /**
- * @module audit-tabs — the tab bar shared by the four `/admin/audit` lists.
+ * @module audit-tabs — the tab bar shared by the four `/audit` lists.
  *
  * The audit section is one sidebar entry rather than four, so the switch between
  * its lists lives here instead. Every list page renders this directly under its
@@ -42,7 +42,7 @@ export function AuditTabs({ active }: AuditTabsProps) {
     <SegmentedControl
       options={AUDIT_TABS}
       value={active}
-      onChange={(tab) => router.push(`/admin/audit/${tab}`)}
+      onChange={(tab) => router.push(`/audit/${tab}`)}
       aria-label="Audit log"
       className="mb-4"
     />

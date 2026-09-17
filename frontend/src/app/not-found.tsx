@@ -16,7 +16,7 @@ export default function NotFound() {
         title="Page not found"
         description="The page you're looking for doesn't exist."
       />
-      <Button variant="secondary" href="/admin">
+      <Button variant="secondary" href="/">
         Go to Home
       </Button>
     </div>

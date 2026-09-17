@@ -11,6 +11,6 @@ describe("NotFound", () => {
 
   it("links to home", () => {
     render(<NotFound />);
-    expect(screen.getByRole("link", { name: "Go to Home" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Go to Home" })).toHaveAttribute("href", "/");
   });
 });

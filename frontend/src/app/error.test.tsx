@@ -14,6 +14,6 @@ describe("RouteError", () => {
 
   it("links to home", () => {
     render(<RouteError error={new Error("boom")} reset={vi.fn()} />);
-    expect(screen.getByRole("link", { name: "Go to Home" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Go to Home" })).toHaveAttribute("href", "/");
   });
 });

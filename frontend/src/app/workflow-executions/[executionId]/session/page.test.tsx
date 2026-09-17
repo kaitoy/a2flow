@@ -90,7 +90,7 @@ describe("WorkflowSessionPage", () => {
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByRole("link", { name: "My Workflow" })).toHaveAttribute(
       "href",
-      "/admin/workflow-executions/execution-1"
+      "/workflow-executions/execution-1"
     );
     expect(within(nav).getByText("Session")).toHaveAttribute("aria-current", "page");
   });
@@ -105,7 +105,7 @@ describe("WorkflowSessionPage", () => {
     const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(within(nav).getByRole("link", { name: "My Workflow" })).toHaveAttribute(
       "href",
-      "/admin/workflow-executions/execution-1"
+      "/workflow-executions/execution-1"
     );
   });
 

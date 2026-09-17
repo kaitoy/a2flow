@@ -37,7 +37,7 @@ export function tenantColumn<T extends TenantScoped>(
       if (!id) return EMPTY_VALUE;
       return (
         <Link
-          href={`/admin/tenants/${id}`}
+          href={`/tenants/${id}`}
           className="font-medium text-accent transition-colors hover:underline"
         >
           {tenantNameById.get(id) ?? id}

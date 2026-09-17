@@ -38,98 +38,98 @@ export interface AdminNavItem {
 
 /**
  * Admin section destinations shared between the sidebar navigation
- * (`app/admin/layout.tsx`) and the welcome page quick-action cards
- * (`app/admin/page.tsx`) so the two stay in sync.
+ * (`app/(admin)/layout.tsx`) and the welcome page quick-action cards
+ * (`app/(admin)/page.tsx`) so the two stay in sync.
  *
  * Entries carrying `roles` are filtered per user by {@link useVisibleAdminNavItems}.
  */
 export const adminNavItems: AdminNavItem[] = [
   {
-    href: "/admin/tenants",
+    href: "/tenants",
     label: "Tenants",
     icon: Building2,
     description: "Manage tenant organizations",
     roles: [Role.SUPER_ADMIN],
   },
   {
-    href: "/admin/users",
+    href: "/users",
     label: "Users",
     icon: User,
     description: "Manage accounts and roles",
     roles: [Role.ADMIN, Role.DEVELOPER, Role.REVIEWER],
   },
   {
-    href: "/admin/user-groups",
+    href: "/user-groups",
     label: "User Groups",
     icon: UsersRound,
     description: "Grant roles to several accounts at once",
     roles: [Role.ADMIN, Role.DEVELOPER, Role.REVIEWER],
   },
   {
-    href: "/admin/tags",
+    href: "/tags",
     label: "Tags",
     icon: Tags,
     description: "Curate the labels records are classified by",
     roles: [Role.ADMIN, Role.DEVELOPER],
   },
   {
-    href: "/admin/secrets",
+    href: "/secrets",
     label: "Secrets",
     icon: KeyRound,
     description: "Store credentials for tools and repos",
     roles: [Role.ADMIN, Role.DEVELOPER],
   },
   {
-    href: "/admin/agent-skills",
+    href: "/agent-skills",
     label: "Agent Skills",
     icon: Wand2,
     description: "Configure agent capabilities",
     roles: [Role.DEVELOPER, Role.ADMIN, Role.REVIEWER],
   },
   {
-    href: "/admin/mcp-servers",
+    href: "/mcp-servers",
     label: "MCP Servers",
     icon: Server,
     description: "Register tool servers",
     roles: [Role.DEVELOPER, Role.ADMIN],
   },
   {
-    href: "/admin/mcp-tool-mocks",
+    href: "/mcp-tool-mocks",
     label: "Tool Mocks",
     icon: FlaskConical,
     description: "Stub tools for draft workflow runs",
     roles: [Role.DEVELOPER, Role.ADMIN],
   },
   {
-    href: "/admin/workflows",
+    href: "/workflows",
     label: "Workflows",
     icon: Workflow,
     description: "Design multi-step flows",
     roles: [Role.DEVELOPER, Role.REVIEWER, Role.REQUESTER, Role.ADMIN],
   },
   {
-    href: "/admin/workflow-executions",
+    href: "/workflow-executions",
     label: "Workflow Executions",
     icon: ListChecks,
     description: "Track workflow runs",
     roles: [Role.ADMIN, Role.DEVELOPER, Role.REQUESTER, Role.APPROVER],
   },
   {
-    href: "/admin/approvals",
+    href: "/approvals",
     label: "Approvals",
     icon: CheckCircle2,
     description: "Review pending approvals",
     roles: [Role.ADMIN, Role.DEVELOPER, Role.REQUESTER, Role.APPROVER],
   },
   {
-    href: "/admin/audit",
+    href: "/audit",
     label: "Audit Logs",
     icon: ScrollText,
     description: "Trace tool calls, impersonation, certificates, and mail",
     roles: [Role.ADMIN],
   },
   {
-    href: "/admin/system-settings",
+    href: "/system-settings",
     label: "System Settings",
     icon: Settings2,
     description: "Configure the mail server notifications are sent through",

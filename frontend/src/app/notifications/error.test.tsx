@@ -14,9 +14,6 @@ describe("Notifications RouteError", () => {
 
   it("links back to the admin dashboard", () => {
     render(<RouteError error={new Error("boom")} reset={vi.fn()} />);
-    expect(screen.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
-      "href",
-      "/admin"
-    );
+    expect(screen.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute("href", "/");
   });
 });

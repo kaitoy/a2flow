@@ -179,7 +179,7 @@ describe("McpToolField", () => {
     expect(await screen.findByText(/No MCP servers are registered/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Register one" })).toHaveAttribute(
       "href",
-      "/admin/mcp-servers"
+      "/mcp-servers"
     );
   });
 

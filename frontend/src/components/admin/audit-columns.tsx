@@ -69,7 +69,7 @@ export function auditColumns<T extends Audited>(
   const nameOf = (id: string) => userNameById?.get(id) ?? id;
   const userLink = (id: string) => (
     <Link
-      href={`/admin/users/${id}`}
+      href={`/users/${id}`}
       className="font-medium text-accent transition-colors hover:underline"
     >
       {nameOf(id)}

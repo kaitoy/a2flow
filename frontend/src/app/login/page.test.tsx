@@ -52,7 +52,7 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => expect(loginSpy).toHaveBeenCalled());
-    expect(replaceMock).toHaveBeenCalledWith("/admin");
+    expect(replaceMock).toHaveBeenCalledWith("/");
   });
 
   it("submits the typed tenant name in the request body", async () => {

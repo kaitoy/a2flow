@@ -47,9 +47,9 @@ describe("auditColumns", () => {
     renderTable([ROW]);
     expect(screen.getByText("row-1")).toBeInTheDocument();
     const createdByLink = screen.getByRole("link", { name: "user-1" });
-    expect(createdByLink).toHaveAttribute("href", "/admin/users/user-1");
+    expect(createdByLink).toHaveAttribute("href", "/users/user-1");
     const updatedByLink = screen.getByRole("link", { name: "user-2" });
-    expect(updatedByLink).toHaveAttribute("href", "/admin/users/user-2");
+    expect(updatedByLink).toHaveAttribute("href", "/users/user-2");
   });
 
   it("resolves created-by/updated-by to display names when a name map is given", () => {
@@ -59,21 +59,15 @@ describe("auditColumns", () => {
     ]);
     renderTable([ROW], names);
     const createdByLink = screen.getByRole("link", { name: "Alice" });
-    expect(createdByLink).toHaveAttribute("href", "/admin/users/user-1");
+    expect(createdByLink).toHaveAttribute("href", "/users/user-1");
     const updatedByLink = screen.getByRole("link", { name: "Bob" });
-    expect(updatedByLink).toHaveAttribute("href", "/admin/users/user-2");
+    expect(updatedByLink).toHaveAttribute("href", "/users/user-2");
   });
 
   it("falls back to the raw id label for an id missing from the name map, still linked", () => {
     renderTable([ROW], new Map([["user-1", "Alice"]]));
-    expect(screen.getByRole("link", { name: "Alice" })).toHaveAttribute(
-      "href",
-      "/admin/users/user-1"
-    );
-    expect(screen.getByRole("link", { name: "user-2" })).toHaveAttribute(
-      "href",
-      "/admin/users/user-2"
-    );
+    expect(screen.getByRole("link", { name: "Alice" })).toHaveAttribute("href", "/users/user-1");
+    expect(screen.getByRole("link", { name: "user-2" })).toHaveAttribute("href", "/users/user-2");
   });
 
   it("exposes exactly the three expected headers", () => {

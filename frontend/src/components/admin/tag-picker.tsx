@@ -107,7 +107,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
         // nothing to pick, so opening one would be a dead end.
         <p className="rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant">
           No tags are registered yet.{" "}
-          <Link href="/admin/tags" className="text-accent transition-colors hover:underline">
+          <Link href="/tags" className="text-accent transition-colors hover:underline">
             Create one
           </Link>{" "}
           to start classifying records.

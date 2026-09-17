@@ -20,7 +20,5 @@ export default function RouteError({
     console.error("uncaught render error", error);
   }, [error]);
 
-  return (
-    <RouteErrorFallback reset={reset} fill="screen" homeHref="/admin" homeLabel="Go to Home" />
-  );
+  return <RouteErrorFallback reset={reset} fill="screen" homeHref="/" homeLabel="Go to Home" />;
 }

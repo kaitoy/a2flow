@@ -113,7 +113,7 @@ describe("TagPicker", () => {
 
     expect(await screen.findByRole("link", { name: "Create one" })).toHaveAttribute(
       "href",
-      "/admin/tags"
+      "/tags"
     );
     expect(screen.queryByRole("button", { name: "Select tags…" })).not.toBeInTheDocument();
   });

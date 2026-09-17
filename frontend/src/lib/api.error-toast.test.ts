@@ -15,7 +15,7 @@ const assignMock = vi.fn();
 beforeEach(() => {
   assignMock.mockClear();
   Object.defineProperty(window, "location", {
-    value: { ...window.location, assign: assignMock, pathname: "/admin/agent-skills" },
+    value: { ...window.location, assign: assignMock, pathname: "/agent-skills" },
     writable: true,
     configurable: true,
   });

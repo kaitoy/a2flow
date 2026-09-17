@@ -39,7 +39,7 @@ describe("proxy", () => {
     request.cookies.set("a2flow_session", "abc");
     const res = proxy(request);
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe("http://localhost:3000/admin");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/");
   });
 
   it("passes through authenticated requests to non-login pages", () => {

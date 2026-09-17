@@ -305,7 +305,7 @@ describe("McpToolPicker", () => {
     expect(await screen.findByText(/No MCP servers are registered/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Register one" })).toHaveAttribute(
       "href",
-      "/admin/mcp-servers"
+      "/mcp-servers"
     );
     expect(screen.queryByRole("button", { name: "Select MCP server…" })).not.toBeInTheDocument();
   });

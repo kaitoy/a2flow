@@ -38,7 +38,7 @@ export function ImpersonationIndicator() {
       persistImpersonatedUserId(null);
     } finally {
       setPending(false);
-      router.push("/admin");
+      router.push("/");
     }
   }
 

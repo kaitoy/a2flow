@@ -33,6 +33,6 @@ describe("AuditTabs", () => {
     push.mockClear();
     render(<AuditTabs active="tool-invocations" />);
     await userEvent.click(screen.getByRole("tab", { name: "Emails" }));
-    expect(push).toHaveBeenCalledWith("/admin/audit/outbound-emails");
+    expect(push).toHaveBeenCalledWith("/audit/outbound-emails");
   });
 });

@@ -79,7 +79,7 @@ export function GenerateWorkflowDialog({
           prompt: values.prompt,
         });
         dispatch(showToast({ message: "Workflow generation started" }));
-        router.push(`/admin/workflows/${workflow.id}`);
+        router.push(`/workflows/${workflow.id}`);
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.

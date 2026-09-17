@@ -253,12 +253,12 @@ async def test_body_deep_links_an_approval_request_to_the_session_chat(
         (
             NotificationType.workflow_draft_ready,
             "workflow_id",
-            "/admin/workflows/wf-1",
+            "/workflows/wf-1",
         ),
         (
             NotificationType.workflow_generation_failed,
             "workflow_id",
-            "/admin/workflows/wf-1",
+            "/workflows/wf-1",
         ),
     ],
 )

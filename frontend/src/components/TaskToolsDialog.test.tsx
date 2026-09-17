@@ -112,20 +112,18 @@ describe("TaskToolsDialog", () => {
   it("marks a tool whose input needs no approval", async () => {
     const user = userEvent.setup();
     render(
-      <>
-        <TaskToolsDialog
-          task={{
-            title: "Gather sources",
-            toolBindings: [
-              { mcpServerId: "mcp-1", toolName: "list_files", requiresInputApproval: false },
-              { mcpServerId: "mcp-2", toolName: "ocr_scan" },
-            ],
-          }}
-          serverNames={SERVER_NAMES}
-          serverNamesLoading={false}
-          onClose={vi.fn()}
-        />
-      </>
+      <TaskToolsDialog
+        task={{
+          title: "Gather sources",
+          toolBindings: [
+            { mcpServerId: "mcp-1", toolName: "list_files", requiresInputApproval: false },
+            { mcpServerId: "mcp-2", toolName: "ocr_scan" },
+          ],
+        }}
+        serverNames={SERVER_NAMES}
+        serverNamesLoading={false}
+        onClose={vi.fn()}
+      />
     );
 
     const dialog = await screen.findByRole("dialog");

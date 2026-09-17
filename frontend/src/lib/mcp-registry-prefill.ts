@@ -34,7 +34,7 @@ export interface McpServerPrefill {
 }
 
 /** Route of the create form the prefill targets. */
-const NEW_SERVER_PATH = "/admin/mcp-servers/new";
+const NEW_SERVER_PATH = "/mcp-servers/new";
 
 /**
  * Build the create-form href that pre-fills the connection details from a

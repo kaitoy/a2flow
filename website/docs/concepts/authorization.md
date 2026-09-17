@@ -52,7 +52,7 @@ The admin UI hides the actions and nav entries a user's roles do not allow, so a
 |---|---|
 | **List page** | The Add button and the per-row Actions column are hidden — Delete, and MCP Servers' "Browse registry", which only leads to the create form |
 | **Detail page** | Renders **read-only**: every field shows as a recessed value instead of an input, Save and Delete are absent, and Cancel becomes Back |
-| **Create form** (`/admin/<section>/new`) | An access-denied screen — reaching it means a deep link, since the Add button that leads there is already hidden |
+| **Create form** (`/<section>/new`) | An access-denied screen — reaching it means a deep link, since the Add button that leads there is already hidden |
 
 Because reads stay open, a detail page can be opened by someone who may not write it: agent skills, MCP servers, tool mocks, secrets, tenants, users, workflows, and task templates all take the read-only rendering above. A secret's entries then list their keys alone (values are never returned anyway), and the password field on a user is omitted entirely. Fields that are immutable for *everyone* — a tenant's `name`, a user's `username` — render the same way regardless of role. The create forms have no read-only reading, which is why they answer with a screen rather than a form.
 

@@ -1,0 +1,280 @@
+import userEvent from "@testing-library/user-event";
+import { http } from "msw";
+import { describe, expect, it, vi } from "vitest";
+import type { User } from "@/lib/api";
+import type { Role } from "@/lib/roles";
+import type { RootState } from "@/store";
+import { store as appStore } from "@/store";
+import { ALL_TENANTS_SENTINEL } from "@/store/authSlice";
+import { envelope, envelopeErr } from "@/test/msw/envelope";
+import { server } from "@/test/msw/server";
+import { act, render, screen, waitFor, within } from "@/test/test-utils";
+import AgentSkillsPage from "./page";
+
+vi.mock("next/link", () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+
+/** Build a preloaded auth slice for a signed-in user holding the given roles. */
+function authState(roles: Role[]): Partial<RootState> {
+  return {
+    auth: {
+      user: { id: "u1", roles } as User,
+      status: "authenticated",
+      selectedTenantId: null,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
+  };
+}
+
+/** Roles granting every agent-skill action (create, edit, delete, pull). */
+const FULL_ACCESS = authState(["developer"]);
+/** A signed-in user with no role granting agent-skill writes. */
+const READ_ONLY = authState(["requester"]);
+/**
+ * A Super Admin browsing every tenant at once. Must be a `super_admin`: it is the
+ * only role that resolves tenant names (`GET /tenants` is gated to it).
+ */
+const SUPER_ADMIN = authState(["super_admin"]);
+const ALL_TENANTS: Partial<RootState> = {
+  ...SUPER_ADMIN,
+  auth: { ...SUPER_ADMIN.auth, selectedTenantId: ALL_TENANTS_SENTINEL } as RootState["auth"],
+};
+
+const SKILL_URL = "http://localhost:8000/api/v1/agent-skills";
+
+/** Matches the page's own poll interval. */
+const POLL_INTERVAL_MS = 2000;
+
+/** A skill whose clone is still running, so the page starts polling for it. */
+const CLONING_SKILL = {
+  id: "skill-1",
+  tenantId: "tenant-1",
+  name: "my-skill",
+  repoUrl: "https://github.com/example/repo",
+  repoPath: "",
+  description: null,
+  syncStatus: "pending",
+  syncError: null,
+  commitSha: null,
+  syncedAt: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+/** The same skill once its clone has landed. */
+const CLONED_SKILL = {
+  ...CLONING_SKILL,
+  syncStatus: "ready",
+  commitSha: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  syncedAt: "2026-01-01T00:00:00Z",
+};
+
+describe("AgentSkillsPage", () => {
+  it("shows loading state initially", () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it("renders skill row after load", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => expect(screen.getByText("my-skill")).toBeInTheDocument());
+  });
+
+  it("name links to the edit page", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByRole("link", { name: "my-skill" })).toHaveAttribute(
+      "href",
+      "/agent-skills/skill-1"
+    );
+  });
+
+  it("shows the sync status", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByText("ready")).toBeInTheDocument();
+  });
+
+  it("shows a still-cloning skill's sync status", async () => {
+    server.use(http.get(SKILL_URL, () => envelope([CLONING_SKILL])));
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByText("Cloning")).toBeInTheDocument();
+  });
+
+  it("shows the tenant column and name only while browsing all tenants", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.queryByText("Tenant")).not.toBeInTheDocument();
+    expect(screen.queryByText("Acme Corp")).not.toBeInTheDocument();
+  });
+
+  it("shows the tenant column and resolved name while browsing all tenants", async () => {
+    render(<AgentSkillsPage />, { preloadedState: ALL_TENANTS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByText("Tenant")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Acme Corp")).toBeInTheDocument());
+  });
+
+  it("puts the tenant column first while browsing all tenants", async () => {
+    render(<AgentSkillsPage />, { preloadedState: ALL_TENANTS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getAllByRole("columnheader")[0]).toHaveTextContent("Tenant");
+  });
+
+  it("hides the revision column by default", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.queryByText("a1b2c3d")).not.toBeInTheDocument();
+  });
+
+  it("shows the short revision once the column is shown", async () => {
+    const user = userEvent.setup();
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Revision" }));
+
+    expect(screen.getByText("a1b2c3d")).toBeInTheDocument();
+  });
+
+  it("shows an em dash as the revision of a skill that has never published one", async () => {
+    const user = userEvent.setup();
+    server.use(http.get(SKILL_URL, () => envelope([CLONING_SKILL])));
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Revision" }));
+
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("shows empty state when no skills", async () => {
+    server.use(http.get(SKILL_URL, () => envelope([])));
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() =>
+      expect(screen.getByText("No agent skills registered yet.")).toBeInTheDocument()
+    );
+  });
+
+  it("shows an error toast on api failure", async () => {
+    server.use(
+      http.get(SKILL_URL, () => envelopeErr("INTERNAL_ERROR", "Internal server error", 500))
+    );
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() =>
+      expect(appStore.getState().toast.items.at(-1)).toMatchObject({
+        message: "Internal server error",
+        variant: "error",
+      })
+    );
+  });
+
+  it("add skill link is present", async () => {
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByRole("link", { name: /add skill/i })).toHaveAttribute(
+      "href",
+      "/agent-skills/new"
+    );
+  });
+
+  it("calls delete api after confirm", async () => {
+    const user = userEvent.setup();
+    const deleteSpy = vi.fn(() => envelope(null));
+    server.use(http.delete(`${SKILL_URL}/:id`, deleteSpy));
+
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
+    expect(deleteSpy).toHaveBeenCalled();
+  });
+
+  it("opens the generate-workflow dialog seeded with the skill name", async () => {
+    const user = userEvent.setup();
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    await user.click(screen.getByRole("button", { name: "Generate workflow" }));
+
+    const dialog = await screen.findByRole("dialog", { name: /generate workflow/i });
+    expect(within(dialog).getByLabelText(/workflow name/i)).toHaveValue("my-skill");
+
+    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("disables Generate workflow while the skill has no published revision", async () => {
+    server.use(http.get(SKILL_URL, () => envelope([CLONING_SKILL])));
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.getByRole("button", { name: "Generate workflow" })).toBeDisabled();
+  });
+
+  it("calls the pull api", async () => {
+    const user = userEvent.setup();
+    const pullSpy = vi.fn(() => envelope({ id: "skill-1" }, 202));
+    server.use(http.post(`${SKILL_URL}/:id/pull`, pullSpy));
+
+    render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+    await waitFor(() => screen.getByText("my-skill"));
+    await user.click(screen.getByRole("button", { name: "Pull" }));
+    await waitFor(() => expect(pullSpy).toHaveBeenCalled());
+  });
+
+  it("keeps the cloning row on screen while the poll refetches it", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let resolvePoll!: () => void;
+      const pollReached = new Promise<void>((r) => {
+        resolvePoll = r;
+      });
+      let calls = 0;
+      server.use(
+        http.get(SKILL_URL, async () => {
+          calls += 1;
+          if (calls === 1) return envelope([CLONING_SKILL]);
+          // Hold the poll's response open so we can assert on the page while
+          // the refetch is still in flight.
+          await pollReached;
+          return envelope([CLONED_SKILL]);
+        })
+      );
+
+      render(<AgentSkillsPage />, { preloadedState: FULL_ACCESS });
+      await waitFor(() => expect(screen.getByText("Cloning")).toBeInTheDocument());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+      });
+      await waitFor(() => expect(calls).toBe(2));
+
+      // Mid-poll: the row stays put instead of flashing back to the skeleton.
+      expect(screen.getByText("my-skill")).toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+      resolvePoll();
+      await waitFor(() => expect(screen.getByText("ready")).toBeInTheDocument());
+      expect(screen.getByText("my-skill")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hides write actions from a user without the developer role", async () => {
+    render(<AgentSkillsPage />, { preloadedState: READ_ONLY });
+    await waitFor(() => screen.getByText("my-skill"));
+    expect(screen.queryByRole("button", { name: "Pull" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /add skill/i })).not.toBeInTheDocument();
+  });
+});

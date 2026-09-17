@@ -32,7 +32,7 @@ describe("buildPrefillHref", () => {
   it("encodes title, url, and header keys into the create form href", () => {
     const href = buildPrefillHref(ENTRY);
     const url = new URL(href, "http://localhost");
-    expect(url.pathname).toBe("/admin/mcp-servers/new");
+    expect(url.pathname).toBe("/mcp-servers/new");
     expect(url.searchParams.get("name")).toBe("Weather");
     expect(url.searchParams.get("transport")).toBe("streamable_http");
     expect(url.searchParams.get("url")).toBe("https://mcp.example.com/weather");

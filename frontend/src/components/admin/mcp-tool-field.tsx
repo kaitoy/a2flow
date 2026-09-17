@@ -226,10 +226,7 @@ export function McpToolField({
         (registry.names.size === 0 && mcpServerId === "" ? (
           <p className="rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant">
             No MCP servers are registered.{" "}
-            <Link
-              href="/admin/mcp-servers"
-              className="text-accent transition-colors hover:underline"
-            >
+            <Link href="/mcp-servers" className="text-accent transition-colors hover:underline">
               Register one
             </Link>{" "}
             to point this mock at one of its tools.

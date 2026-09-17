@@ -37,13 +37,8 @@ describe("RouteErrorFallback", () => {
 
   it("renders a home link when homeHref and homeLabel are both provided", () => {
     render(
-      <RouteErrorFallback
-        reset={vi.fn()}
-        fill="screen"
-        homeHref="/admin"
-        homeLabel="Go to dashboard"
-      />
+      <RouteErrorFallback reset={vi.fn()} fill="screen" homeHref="/" homeLabel="Go to dashboard" />
     );
-    expect(screen.getByRole("link", { name: "Go to dashboard" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Go to dashboard" })).toHaveAttribute("href", "/");
   });
 });

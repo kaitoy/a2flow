@@ -433,7 +433,7 @@ One row gates one task: a task carrying several `Approval` rows (a rejection fol
 
 ### Audit read APIs
 
-Three admin-gated, read-only surfaces back the frontend's `/admin/audit` section. All of them use `require_roles(Role.admin)` (so `super_admin` passes through `has_role`'s bypass) on **every** route, reads included — unlike most resource routers, which leave `GET` open to any authenticated caller. Each spans every record in the acting tenant, so the participant-level access that gates the narrower per-record views is not sufficient here.
+Three admin-gated, read-only surfaces back the frontend's `/audit` section. All of them use `require_roles(Role.admin)` (so `super_admin` passes through `has_role`'s bypass) on **every** route, reads included — unlike most resource routers, which leave `GET` open to any authenticated caller. Each spans every record in the acting tenant, so the participant-level access that gates the narrower per-record views is not sufficient here.
 
 | Routes | Returns | Repository |
 |---|---|---|

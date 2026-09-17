@@ -10,17 +10,14 @@ describe("AdminLoading", () => {
         crumbs={[{ label: "Tags" }]}
         icon={Tags}
         title="Tags"
-        addHref="/admin/tags/new"
+        addHref="/tags/new"
         addLabel="+ Add tag"
         columns={["Name", "Created At"]}
       />
     );
-    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "+ Add tag" })).toHaveAttribute(
-      "href",
-      "/admin/tags/new"
-    );
+    expect(screen.getByRole("link", { name: "+ Add tag" })).toHaveAttribute("href", "/tags/new");
     expect(screen.getByText("Name")).toBeInTheDocument();
     expect(screen.getByText("Created At")).toBeInTheDocument();
   });
@@ -28,12 +25,12 @@ describe("AdminLoading", () => {
   it("renders a form skeleton when given a field count", () => {
     const { container } = render(
       <AdminLoading
-        crumbs={[{ label: "Tags", href: "/admin/tags" }, { label: "…" }]}
+        crumbs={[{ label: "Tags", href: "/tags" }, { label: "…" }]}
         icon={Tags}
         fields={3}
       />
     );
-    expect(screen.getByRole("link", { name: "Tags" })).toHaveAttribute("href", "/admin/tags");
+    expect(screen.getByRole("link", { name: "Tags" })).toHaveAttribute("href", "/tags");
     expect(container.querySelector("table")).toBeNull();
   });
 });

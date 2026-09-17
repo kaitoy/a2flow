@@ -22,9 +22,9 @@ describe("AppHeader", () => {
     expect(screen.getByTestId("theme-toggle-mock")).toBeInTheDocument();
   });
 
-  it("links the logo to the /admin welcome page", () => {
+  it("links the logo to the welcome page", () => {
     render(<AppHeader />);
-    expect(screen.getByRole("link", { name: "A2Flow home" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "A2Flow home" })).toHaveAttribute("href", "/");
   });
 
   it("does not render the tenant switcher for a non-super-admin viewer", () => {

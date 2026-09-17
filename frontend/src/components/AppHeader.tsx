@@ -50,7 +50,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
           </button>
         )}
         <Link
-          href="/admin"
+          href="/"
           aria-label="A2Flow home"
           className={[
             "flex items-center gap-3 rounded-xl",

@@ -81,7 +81,7 @@ describe("GenerateWorkflowDialog", () => {
     await user.click(screen.getByRole("button", { name: /generate/i }));
 
     await waitFor(() => expect(receivedBody).toEqual({ name: "my-flow", prompt: "Do the thing" }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows/new-wf-id"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows/new-wf-id"));
   });
 
   it("lights the dialog edge while the generation request is in flight", async () => {

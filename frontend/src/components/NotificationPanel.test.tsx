@@ -132,7 +132,7 @@ describe("NotificationPanel", () => {
               title: "Workflow draft ready",
               workflowExecutionId: null,
               workflowId: "wf-1",
-              link: "/admin/workflows/wf-1",
+              link: "/workflows/wf-1",
             }),
           ],
           unreadCount: 1,
@@ -143,7 +143,7 @@ describe("NotificationPanel", () => {
     await waitFor(() => screen.getByText("Workflow draft ready"));
     await screen.getByText("Workflow draft ready").click();
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/workflows/wf-1"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows/wf-1"));
     expect(onClose).toHaveBeenCalled();
   });
 

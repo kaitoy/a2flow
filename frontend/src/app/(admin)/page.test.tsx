@@ -1,0 +1,128 @@
+import { describe, expect, it, vi } from "vitest";
+import type { User } from "@/lib/api";
+import type { Role } from "@/lib/roles";
+import type { RootState } from "@/store";
+import { render, screen } from "@/test/test-utils";
+import AdminPage from "./page";
+
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
+/** Build a preloaded auth slice for a signed-in user holding the given roles. */
+function authState(roles: Role[]): Partial<RootState> {
+  return {
+    auth: {
+      user: { id: "u1", roles } as User,
+      status: "authenticated",
+      selectedTenantId: null,
+      impersonatedUserId: null,
+      impersonatedBy: null,
+    },
+  };
+}
+
+describe("AdminPage (welcome)", () => {
+  it("renders the greeting heading", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
+    expect(screen.getByRole("heading", { name: "Welcome to A2Flow" })).toBeInTheDocument();
+  });
+
+  it("renders a chat card linking to /sessions/new for a super admin", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
+    expect(screen.getByRole("link", { name: /Start chat/ })).toHaveAttribute(
+      "href",
+      "/sessions/new"
+    );
+  });
+
+  it("hides the chat card from a non-super-admin", () => {
+    render(<AdminPage />, { preloadedState: authState([]) });
+    expect(screen.queryByRole("link", { name: /Start chat/ })).not.toBeInTheDocument();
+  });
+
+  it("renders cards linking to admin sections for a super admin", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
+    expect(screen.getByRole("link", { name: /Agent Skills/ })).toHaveAttribute(
+      "href",
+      "/agent-skills"
+    );
+    expect(screen.getByRole("link", { name: /Users/ })).toHaveAttribute("href", "/users");
+  });
+
+  it("never renders an API Docs card (it's a sidebar-only footer link, not an adminNavItems entry)", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
+    expect(screen.queryByRole("link", { name: /API Docs/ })).not.toBeInTheDocument();
+  });
+
+  it("hides role-gated cards from a user without those roles", () => {
+    render(<AdminPage />, { preloadedState: authState([]) });
+    expect(screen.queryByRole("link", { name: /Users/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Secrets/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Agent Skills/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Approvals/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Workflow Executions/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the sections newly opened to reviewer, and hides Workflow Executions/Approvals from them", () => {
+    render(<AdminPage />, { preloadedState: authState(["reviewer"]) });
+    expect(screen.getByRole("link", { name: /Users/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /User Groups/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Agent Skills/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Workflow Executions/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Approvals/ })).not.toBeInTheDocument();
+  });
+
+  it.each(["admin", "developer", "requester", "approver"] as const)(
+    "keeps Workflow Executions and Approvals visible to a %s",
+    (role) => {
+      render(<AdminPage />, { preloadedState: authState([role]) });
+      expect(screen.getByRole("link", { name: /Workflow Executions/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Approvals/ })).toBeInTheDocument();
+    }
+  );
+
+  it("shows only the sections a developer may act on", () => {
+    render(<AdminPage />, { preloadedState: authState(["developer"]) });
+    expect(screen.getByRole("link", { name: /Agent Skills/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /MCP Servers/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Workflows/ })).toBeInTheDocument();
+  });
+
+  it("shows the sections newly opened to developer (read-only), alongside the ones developer can edit", () => {
+    render(<AdminPage />, { preloadedState: authState(["developer"]) });
+    expect(screen.getByRole("link", { name: /Users/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /User Groups/ })).toBeInTheDocument();
+    // Tenants stays super_admin-only.
+    expect(screen.queryByRole("link", { name: /Tenants/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the sections newly opened to admin (read-only), alongside the ones admin can edit", () => {
+    render(<AdminPage />, { preloadedState: authState(["admin"]) });
+    expect(screen.getByRole("link", { name: /Agent Skills/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /MCP Servers/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Workflows/ })).toBeInTheDocument();
+    // Tenants stays super_admin-only.
+    expect(screen.queryByRole("link", { name: /Tenants/ })).not.toBeInTheDocument();
+  });
+
+  it("renders a System Settings card for a super admin only", () => {
+    render(<AdminPage />, { preloadedState: authState(["super_admin"]) });
+    expect(screen.getByRole("link", { name: /System Settings/ })).toHaveAttribute(
+      "href",
+      "/system-settings"
+    );
+  });
+
+  it.each([["admin"], ["developer"], ["requester"]] as const)(
+    "hides the System Settings card from a %s",
+    (role) => {
+      render(<AdminPage />, { preloadedState: authState([role]) });
+      expect(screen.queryByRole("link", { name: /System Settings/ })).not.toBeInTheDocument();
+    }
+  );
+});

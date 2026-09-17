@@ -218,9 +218,9 @@ function DesignSessionView({
         <div className="shrink-0 px-4 pt-3 sm:px-6">
           <Breadcrumbs
             items={[
-              { label: "Admin", href: "/admin" },
-              { label: "Workflows", href: "/admin/workflows" },
-              { label: workflow.name, href: `/admin/workflows/${encodeURIComponent(workflow.id)}` },
+              { label: "Admin", href: "/" },
+              { label: "Workflows", href: "/workflows" },
+              { label: workflow.name, href: `/workflows/${encodeURIComponent(workflow.id)}` },
               { label: "Design Session" },
             ]}
           />

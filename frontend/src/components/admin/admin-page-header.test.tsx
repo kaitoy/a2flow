@@ -15,9 +15,9 @@ describe("AdminPageHeader", () => {
   });
 
   it("renders the Add link when addHref and addLabel are provided", () => {
-    render(<AdminPageHeader title="Users" addHref="/admin/users/new" addLabel="+ Add user" />);
+    render(<AdminPageHeader title="Users" addHref="/users/new" addLabel="+ Add user" />);
     const link = screen.getByRole("link", { name: "+ Add user" });
-    expect(link).toHaveAttribute("href", "/admin/users/new");
+    expect(link).toHaveAttribute("href", "/users/new");
   });
 
   it("does not render a refresh button without onRefresh", () => {
@@ -46,7 +46,7 @@ describe("AdminPageHeader", () => {
         onRefresh={vi.fn()}
         columnPicker={<button type="button">Columns</button>}
         secondaryAction={<button type="button">Browse registry</button>}
-        addHref="/admin/mcp-servers/new"
+        addHref="/mcp-servers/new"
         addLabel="+ Add server"
       />
     );

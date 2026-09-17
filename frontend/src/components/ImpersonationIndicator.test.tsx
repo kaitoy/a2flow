@@ -76,7 +76,7 @@ describe("ImpersonationIndicator", () => {
     expect(screen.getByRole("button", { name: "Stop impersonating" })).toBeInTheDocument();
   });
 
-  it("stops impersonating and navigates to /admin on click", async () => {
+  it("stops impersonating and navigates to / on click", async () => {
     const push = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push, replace: vi.fn() } as never);
     const stopSpy = vi.fn(() => envelope({ user: ACTOR, impersonatedBy: null }));
@@ -91,6 +91,6 @@ describe("ImpersonationIndicator", () => {
 
     await waitFor(() => expect(stopSpy).toHaveBeenCalled());
     await waitFor(() => expect(store.getState().auth.impersonatedBy).toBeNull());
-    expect(push).toHaveBeenCalledWith("/admin");
+    expect(push).toHaveBeenCalledWith("/");
   });
 });

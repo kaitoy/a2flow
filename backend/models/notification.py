@@ -145,5 +145,5 @@ def build_notification_link(
     if notification_type in _EXECUTION_KINDS and workflow_execution_id:
         return f"/workflow-executions/{workflow_execution_id}/session"
     if notification_type in _WORKFLOW_KINDS and workflow_id:
-        return f"/admin/workflows/{workflow_id}"
+        return f"/workflows/{workflow_id}"
     return None
