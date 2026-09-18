@@ -3,6 +3,7 @@ import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
+import { TAG_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import TagDetailPage from "./page";
@@ -95,24 +96,29 @@ describe("TagDetailPage", () => {
     await waitFor(() => expect(body?.accessControl).toBe(false));
   });
 
-  it("shows the access-control flag read-only to a developer and submits it unchanged", async () => {
+  it("renders fully read-only for a developer viewing an access-control tag", async () => {
+    render(<TagDetailPage />, { preloadedState: DEVELOPER });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "production" })).toBeVisible());
+    expect(screen.queryByLabelText(/Name/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByText("Yes")).toBeInTheDocument();
+  });
+
+  it("lets a developer edit a plain (non-access-control) tag", async () => {
     const user = userEvent.setup();
-    let body: { name?: string; accessControl?: boolean } | undefined;
     server.use(
-      http.patch(`${BASE}/api/v1/tags/:tagId`, async ({ request }) => {
-        body = (await request.json()) as { name?: string; accessControl?: boolean };
-        return envelope({ id: "tag-1" });
-      })
+      http.get(`${BASE}/api/v1/tags/:tagId`, () => envelope({ ...TAG_1, accessControl: false }))
     );
 
     render(<TagDetailPage />, { preloadedState: DEVELOPER });
-    expect(await screen.findByText("Yes")).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: "Access control" })).not.toBeInTheDocument();
-    await user.clear(screen.getByLabelText(/Name/));
-    await user.type(screen.getByLabelText(/Name/), "renamed");
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    await waitFor(() => expect(body).toMatchObject({ name: "renamed", accessControl: true }));
+    const name = await screen.findByLabelText(/Name/);
+    await user.clear(name);
+    await user.type(name, "renamed");
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
   it("keeps the loaded color in the submitted body", async () => {

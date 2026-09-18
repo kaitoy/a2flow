@@ -4,8 +4,9 @@ Tags are the label vocabulary shared by secrets, workflows, MCP servers, and
 agent skills. Writes are open to ``admin`` **or** ``developer``: secrets are
 administered by the former and the other three by the latter, so gating on
 either one alone would leave half the taggable resources with no way to mint a
-label for themselves. The one field a ``developer`` may not touch is the
-``accessControl`` flag -- setting or clearing it is ``admin`` work, enforced by
+label for themselves. A ``developer`` may not, however, create, edit, or
+delete a tag that is -- or that an edit would turn into -- an access-control
+gate (``accessControl``); that is ``admin`` work, enforced by
 :class:`services.tag.TagService` (403 ``FORBIDDEN``).
 
 Attaching a tag to a record is not here — that is a sub-resource of the record
@@ -101,7 +102,8 @@ async def update_tag(
 async def delete_tag(
     tag_id: str,
     service: TagServiceDep,
+    caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
-    await service.delete(tag_id)
+    await service.delete(tag_id, caller_roles=caller_roles)
     return ApiResponse(meta=meta, data=None)

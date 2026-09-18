@@ -120,6 +120,19 @@ describe("TagsPage", () => {
     expect(screen.queryByRole("button", { name: /Delete/ })).not.toBeInTheDocument();
   });
 
+  it("hides the delete action from a developer for an access-control tag but keeps it for a plain one", async () => {
+    renderPage(DEVELOPER);
+    const productionRow = (await screen.findByRole("link", { name: "production" })).closest("tr");
+    const awsRow = screen.getByRole("link", { name: "aws" }).closest("tr");
+
+    expect(
+      within(productionRow as HTMLTableRowElement).queryByRole("button", { name: /Delete/ })
+    ).not.toBeInTheDocument();
+    expect(
+      within(awsRow as HTMLTableRowElement).getByRole("button", { name: /Delete/ })
+    ).toBeInTheDocument();
+  });
+
   it("warns that deleting detaches the tag everywhere", async () => {
     const user = userEvent.setup();
     renderPage();

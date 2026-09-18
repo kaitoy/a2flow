@@ -47,17 +47,18 @@ import { showToast } from "@/store/toastSlice";
  *
  * A viewer holding neither `admin` nor `developer` gets a read-only rendering —
  * reads are open to every authenticated user, but every tag write needs one of
- * those roles — so the fields show as plain values and Save/Delete are hidden
- * rather than left to fail with a 403 on click.
+ * those roles. A `developer` gets the same read-only rendering for a tag whose
+ * **Access control** flag is on: editing or deleting one is `admin`-only, so
+ * the fields show as plain values and Save/Delete are hidden rather than left
+ * to fail with a 403 on click.
  */
 export default function TagDetailPage() {
   const { tagId } = useParams<{ tagId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
-  // Only an admin may set or clear the access-control flag; a developer sees
-  // the stored value and the form echoes it back unchanged, which the backend
-  // accepts (it 403s only a change).
+  const canEditRole = useHasRole(Role.ADMIN, Role.DEVELOPER);
+  // Only an admin may set or clear the access-control flag, and only an admin
+  // may write to a tag that already has it set.
   const canSetAccessControl = useHasRole(Role.ADMIN);
   const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
@@ -68,6 +69,10 @@ export default function TagDetailPage() {
   // heading names the saved record rather than following every keystroke.
   const [name, setName] = useState("");
   const [color, setColor] = useState<TagColor>(DEFAULT_TAG_COLOR);
+  // The persisted access-control flag, checked outside the form so a developer
+  // can't edit or delete a gated tag by leaving the flag untouched.
+  const [accessControl, setAccessControl] = useState(false);
+  const canEdit = canEditRole && (canSetAccessControl || !accessControl);
 
   const save = useAsyncAction({ showDone: false });
   const {
@@ -88,6 +93,7 @@ export default function TagDetailPage() {
       .then((tag) => {
         setName(tag.name);
         setColor(resolveTagColor(tag.color));
+        setAccessControl(tag.accessControl ?? false);
         reset({
           name: tag.name,
           description: tag.description ?? "",
@@ -176,9 +182,7 @@ export default function TagDetailPage() {
             <TagFields
               register={register}
               errors={errors}
-              accessControlValue={
-                canSetAccessControl ? undefined : (getValues("accessControl") ?? false)
-              }
+              accessControlValue={canSetAccessControl ? undefined : false}
             />
           ) : (
             <TagFields readOnly values={getValues()} />

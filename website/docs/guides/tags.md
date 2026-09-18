@@ -12,7 +12,7 @@ Tags are the labels records are classified by. One vocabulary is shared by all s
 
 Open **Tags** in the admin sidebar to curate the vocabulary. Each tag has a **Name**, unique within the tenant, an optional **Description**, a **color** picked from a fixed eight-slot palette — an arbitrary color value is refused — and an **Access control** checkbox, off by default, that turns the tag from a plain label into a gate (see [Access-control tags](#access-control-tags)).
 
-Creating a tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the six taggable resources, so a tag can always be minted by whoever is about to need it. The one exception is the **Access control** checkbox: only an Admin (or Super Admin) can tick or untick it. A Developer sees the flag as a fixed value on the form and can still create the tag or edit its other fields. Reads stay open like every other section.
+Creating or editing a plain tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the six taggable resources, so a tag can always be minted by whoever is about to need it. A tag with **Access control** ticked is different: only an Admin (or Super Admin) can create one, edit any of its fields, or delete it. A Developer sees an existing access-control tag entirely read-only — the checkbox as a fixed value, the other fields as plain text, and no Save or Delete button — and can still create or edit a plain tag as before. Reads stay open like every other section.
 
 ## Attaching tags to a record
 
@@ -59,4 +59,4 @@ An access-control tag copied to a run also decides who it may [ask for approval]
 
 **Renaming is safe at any time.** Records reference a tag by identity, never by its name, so every record carrying it follows the new name with nothing to re-sync — which is the whole reason tags are registered up front instead of typed free-form on each record.
 
-**Deleting** a tag works the other way round: rather than being blocked by the records that carry it, it is removed from all of them. The confirmation says so.
+**Deleting** a tag works the other way round: rather than being blocked by the records that carry it, it is removed from all of them. The confirmation says so. Deleting a tag with **Access control** ticked requires an Admin or Super Admin, same as editing one; deleting a plain tag stays open to a Developer.

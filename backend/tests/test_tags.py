@@ -883,10 +883,10 @@ async def test_a_developer_may_not_flip_the_access_control_flag(
         assert_err(response, "FORBIDDEN", 403)
 
 
-async def test_a_developer_may_echo_the_access_control_flag_unchanged(
+async def test_a_developer_may_not_edit_an_access_control_tag_at_all(
     tag_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """The edit form always sends the flag, so an unchanged value must not 403."""
+    """Editing a gated tag is admin-only for every field, not just the flag."""
     client, _ = tag_env
     gated = await _create_tag(client, "gated", accessControl=True)
     response = await client.patch(
@@ -894,9 +894,46 @@ async def test_a_developer_may_echo_the_access_control_flag_unchanged(
         json={"name": "renamed", "accessControl": True},
         headers=DEVELOPER,
     )
-    updated = assert_ok(response)
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_an_admin_may_edit_an_access_control_tags_other_fields(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    gated = await _create_tag(client, "gated", accessControl=True)
+    updated = assert_ok(
+        await client.patch(
+            f"/api/v1/tags/{gated['id']}", json={"name": "renamed"}, headers=ADMIN
+        )
+    )
     assert updated["name"] == "renamed"
     assert updated["accessControl"] is True
+
+
+async def test_a_developer_may_not_delete_an_access_control_tag(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    gated = await _create_tag(client, "gated", accessControl=True)
+    response = await client.delete(f"/api/v1/tags/{gated['id']}", headers=DEVELOPER)
+    assert_err(response, "FORBIDDEN", 403)
+
+
+async def test_a_developer_may_delete_a_plain_tag(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    plain = await _create_tag(client, "plain")
+    assert_ok(await client.delete(f"/api/v1/tags/{plain['id']}", headers=DEVELOPER))
+
+
+async def test_an_admin_may_delete_an_access_control_tag(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = tag_env
+    gated = await _create_tag(client, "gated", accessControl=True)
+    assert_ok(await client.delete(f"/api/v1/tags/{gated['id']}", headers=ADMIN))
 
 
 async def test_access_controlled_secret_is_hidden_from_a_non_member(

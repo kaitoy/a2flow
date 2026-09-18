@@ -6,7 +6,9 @@
  * record. Writes need `admin` or `developer` (secrets are administered by the
  * former, MCP servers / skills / workflows by the latter, and both need to be
  * able to mint a label); reads stay open, so a viewer with neither role sees
- * the list but neither the Add button nor the per-row Delete.
+ * the list but neither the Add button nor the per-row Delete. A tag whose
+ * **Access control** flag is on is `admin`-only to delete too, so a
+ * developer's per-row Delete is hidden for those rows specifically.
  */
 "use client";
 
@@ -105,6 +107,7 @@ function buildColumns(
 
 export default function TagsPage() {
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
+  const isAdmin = useHasRole(Role.ADMIN);
   const {
     rows,
     loading,
@@ -147,9 +150,11 @@ export default function TagsPage() {
             visibility: "always" as const,
             cell: (tag: Tag) => (
               <div className="flex justify-center gap-2">
-                <DeleteIconButton
-                  onClick={() => setConfirmTarget({ id: tag.id, name: tag.name })}
-                />
+                {(isAdmin || !tag.accessControl) && (
+                  <DeleteIconButton
+                    onClick={() => setConfirmTarget({ id: tag.id, name: tag.name })}
+                  />
+                )}
               </div>
             ),
           },
