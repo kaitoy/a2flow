@@ -81,6 +81,7 @@ function buildColumns(
       filterField: "accessControl",
       filterOp: "eq",
       filterOptions: BOOL_FILTER_OPTIONS,
+      visibility: "optional",
       className: "text-center",
       cell: (tag) => boolCell(tag.accessControl ?? false),
     },

@@ -43,7 +43,7 @@ describe("TagsPage", () => {
     renderPage();
     expect(await screen.findByText("Live customer-facing environment.")).toBeInTheDocument();
     // `aws` has no description; its row's Description cell is the dash right
-    // after its name link (the Access control column has a dash of its own).
+    // after its name link.
     const awsRow = screen.getByRole("link", { name: "aws" }).closest("tr");
     expect(awsRow).not.toBeNull();
     const cells = within(awsRow as HTMLTableRowElement).getAllByRole("cell");
@@ -51,14 +51,26 @@ describe("TagsPage", () => {
     expect(cells[nameIndex + 1]).toHaveTextContent("—");
   });
 
-  it("shows which tags restrict access, as a check or a dash", async () => {
+  it("hides the access control column by default", async () => {
+    renderPage();
+    await screen.findByRole("link", { name: "production" });
+    expect(screen.queryByText("Access control")).not.toBeInTheDocument();
+    // The preview chip still carries the lock glyph for the access-controlled
+    // tag even while the column itself is hidden.
+    expect(screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL })).toHaveLength(1);
+  });
+
+  it("shows which tags restrict access, as a check or a dash, once the column is shown", async () => {
+    const user = userEvent.setup();
     renderPage();
     const productionRow = (await screen.findByRole("link", { name: "production" })).closest("tr");
     const awsRow = screen.getByRole("link", { name: "aws" }).closest("tr");
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Access control" }));
+
     expect(within(productionRow as HTMLTableRowElement).getByText("✓")).toBeInTheDocument();
     expect(within(awsRow as HTMLTableRowElement).queryByText("✓")).not.toBeInTheDocument();
-    // The preview chip carries the lock glyph for the access-controlled tag only.
-    expect(screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL })).toHaveLength(1);
   });
 
   it("hides the color name column by default", async () => {
