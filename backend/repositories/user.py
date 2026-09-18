@@ -10,6 +10,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.user import SYSTEM_USER_ID, User, UserCreate, UserRead, UserUpdate
+from models.user_group import UserGroupMember
 from repositories._integrity import is_foreign_key_error
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -47,6 +48,7 @@ class UserRepository(Protocol):
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         visible_tenant_id: str | None = None,
+        group_ids: Sequence[str] = (),
     ) -> list[User]: ...
 
     async def create(self, data: UserCreate, *, user_id: str) -> User: ...
@@ -137,6 +139,7 @@ class SqlUserRepository:
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
         visible_tenant_id: str | None = None,
+        group_ids: Sequence[str] = (),
     ) -> list[User]:
         """List users, optionally OR-scoped to a tenant plus every super_admin.
 
@@ -156,6 +159,11 @@ class SqlUserRepository:
             filters: Field filters applied to the query (AND-combined).
             visible_tenant_id: When set, OR-scopes the result to this tenant
                 plus every super_admin, regardless of ``filters``.
+            group_ids: Ids of the groups a user must belong to (AND-combined,
+                mirroring the taggable resources' ``tag`` filter). One
+                correlated ``EXISTS`` subquery per group, since membership
+                lives in :class:`~models.user_group.UserGroupMember` rather
+                than a column of ``users``.
 
         Returns:
             The requested page of users.
@@ -168,6 +176,15 @@ class SqlUserRepository:
         if visible_tenant_id is not None:
             stmt = stmt.where(
                 or_(col(User.tenant_id) == visible_tenant_id, _IS_SUPER_ADMIN)
+            )
+        for group_id in group_ids:
+            stmt = stmt.where(
+                select(col(UserGroupMember.user_id))
+                .where(
+                    col(UserGroupMember.user_id) == col(User.id),
+                    col(UserGroupMember.group_id) == group_id,
+                )
+                .exists()
             )
         stmt = apply_filters(stmt, User, filters, readable=UserRead)
         stmt = apply_sort(

@@ -13,6 +13,7 @@ from fastapi import Depends, Query, Request
 
 from models.response import ApiMeta
 from models.tag import MAX_RECORD_TAGS
+from models.user_group import MAX_GROUP_FILTERS
 from repositories.exceptions import QueryValidationError
 from repositories.query import FILTER_OPERATORS, FilterSpec, SortSpec
 
@@ -288,3 +289,49 @@ def parse_tags(
 
 
 TagFilterDep = Annotated[TagFilterParams, Depends(parse_tags)]
+
+
+@dataclass
+class GroupFilterParams:
+    """Parsed group filter for ``GET /users``.
+
+    Carries the group ids extracted from the repeatable ``group`` query
+    parameter. A user must belong to **every** one of them to match, so
+    repeating the parameter narrows the result rather than widening it.
+    """
+
+    group_ids: list[str] = field(default_factory=list)
+
+
+def parse_groups(
+    group: Annotated[
+        list[str] | None,
+        Query(
+            description=(
+                "Group id a user must belong to. Repeatable; a user must "
+                "belong to every group listed to match."
+            ),
+        ),
+    ] = None,
+) -> GroupFilterParams:
+    """Parse the repeatable ``group`` query parameter into a :class:`GroupFilterParams`.
+
+    Mirrors :func:`parse_tags`: group membership is not a column of ``users``,
+    so it cannot be resolved against the model the way ``field:op:value``
+    terms are and is kept as its own parameter instead.
+
+    Raises:
+        QueryValidationError: If more groups are requested than a user could
+            ever belong to, since each one adds a subquery to the statement.
+    """
+    if not group:
+        return GroupFilterParams()
+    group_ids = list(dict.fromkeys(group))
+    if len(group_ids) > MAX_GROUP_FILTERS:
+        raise QueryValidationError(
+            f"At most {MAX_GROUP_FILTERS} group filters are allowed"
+        )
+    return GroupFilterParams(group_ids=group_ids)
+
+
+GroupFilterDep = Annotated[GroupFilterParams, Depends(parse_groups)]

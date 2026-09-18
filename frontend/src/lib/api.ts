@@ -427,6 +427,13 @@ export interface ListQuery {
    * `field:op:value` grammar cannot express them.
    */
   tagIds?: string[];
+  /**
+   * Group ids a user must belong to. A user must belong to every id listed,
+   * so adding one narrows the result. Serialized as a repeated `group`
+   * parameter, separate from `filters` for the same reason as `tagIds`.
+   * Only `listUsers` acts on it; every other list call ignores it.
+   */
+  groupIds?: string[];
 }
 
 /**
@@ -439,6 +446,7 @@ function listQuery({
   sort = null,
   filters = [],
   tagIds = [],
+  groupIds = [],
 }: ListQuery = {}) {
   return {
     limit,
@@ -446,6 +454,7 @@ function listQuery({
     s: sort ? `${sort.descending ? "-" : ""}${sort.field}` : undefined,
     q: filters.length > 0 ? filters.map((f) => `${f.field}:${f.op}:${f.value}`) : undefined,
     tag: tagIds.length > 0 ? tagIds : undefined,
+    group: groupIds.length > 0 ? groupIds : undefined,
   };
 }
 

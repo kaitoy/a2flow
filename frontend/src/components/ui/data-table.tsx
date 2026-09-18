@@ -48,17 +48,23 @@ export interface ColumnDef<T> {
   /** When set, the filter renders a select of these options (use with `filterOp: "eq"`). */
   filterOptions?: FilterOption[];
   /**
-   * Marks the column as filtered by tag rather than by a field of the record.
+   * Marks the column as filtered by tag or group membership rather than by a
+   * field of the record.
    *
-   * Tags are a separate axis from `filters`: they are not a column of any
-   * resource, so the API takes them as their own repeatable parameter. Such a
-   * column reads its state from {@link DataTableProps.tagIds} and writes it
-   * through {@link DataTableProps.onTagIdsChange}, and offers a multi-select
-   * whose selections are ANDed. It has no `filterField` and cannot be sorted.
+   * Tags and groups are both axes separate from `filters`: neither is a
+   * column of any resource, so the API takes each as its own repeatable
+   * parameter. A `"tags"` column reads its state from
+   * {@link DataTableProps.tagIds} and writes it through
+   * {@link DataTableProps.onTagIdsChange}; a `"groups"` column reads
+   * {@link DataTableProps.groupIds} and writes through
+   * {@link DataTableProps.onGroupIdsChange}. Either offers a multi-select
+   * whose selections are ANDed, has no `filterField`, and cannot be sorted.
    */
-  filterKind?: "tags";
+  filterKind?: "tags" | "groups";
   /** Tag options offered by a `filterKind: "tags"` column, with their palette swatches. */
   tagOptions?: CheckboxOption[];
+  /** Group options offered by a `filterKind: "groups"` column. */
+  groupOptions?: CheckboxOption[];
   /** Optional fixed initial width in pixels; otherwise the natural width is measured. */
   width?: number;
   /**
@@ -120,6 +126,10 @@ interface DataTableProps<T> {
   tagIds?: string[];
   /** Called when the user changes the tag selection. Required to enable the tag filter UI. */
   onTagIdsChange?: (tagIds: string[]) => void;
+  /** Group ids the list is narrowed by (controlled). Omit to disable the group filter UI. */
+  groupIds?: string[];
+  /** Called when the user changes the group selection. Required to enable the group filter UI. */
+  onGroupIdsChange?: (groupIds: string[]) => void;
   /**
    * `getRowKey` value of the row to call out, e.g. the task a hovered dependency
    * chip points at. No row is highlighted when null or omitted.
@@ -186,7 +196,9 @@ interface HeaderControls {
   sortable: boolean;
   /** The header filters by tag rather than by a field of the record. */
   tagFilterable: boolean;
-  /** The header offers a filter of either kind. */
+  /** The header filters by group membership rather than by a field of the record. */
+  groupFilterable: boolean;
+  /** The header offers a filter of any kind. */
   filterable: boolean;
   /** The header renders a {@link TableHeaderMenu} rather than plain text. */
   interactive: boolean;
@@ -205,18 +217,27 @@ interface HeaderControls {
  * @param onSortChange The table's sort handler, if sorting is enabled.
  * @param onFilterChange The table's filter handler, if filtering is enabled.
  * @param onTagIdsChange The table's tag handler, if the tag filter is enabled.
+ * @param onGroupIdsChange The table's group handler, if the group filter is enabled.
  * @returns The controls that column's header renders.
  */
 function headerControls<T>(
   col: ColumnDef<T>,
   onSortChange?: DataTableProps<T>["onSortChange"],
   onFilterChange?: DataTableProps<T>["onFilterChange"],
-  onTagIdsChange?: DataTableProps<T>["onTagIdsChange"]
+  onTagIdsChange?: DataTableProps<T>["onTagIdsChange"],
+  onGroupIdsChange?: DataTableProps<T>["onGroupIdsChange"]
 ): HeaderControls {
   const sortable = !!col.sortField && !!onSortChange;
   const tagFilterable = col.filterKind === "tags" && !!onTagIdsChange;
-  const filterable = (!!col.filterField && !!onFilterChange) || tagFilterable;
-  return { sortable, tagFilterable, filterable, interactive: sortable || filterable };
+  const groupFilterable = col.filterKind === "groups" && !!onGroupIdsChange;
+  const filterable = (!!col.filterField && !!onFilterChange) || tagFilterable || groupFilterable;
+  return {
+    sortable,
+    tagFilterable,
+    groupFilterable,
+    filterable,
+    interactive: sortable || filterable,
+  };
 }
 
 /**
@@ -350,6 +371,8 @@ export function DataTable<T>({
   onFilterChange,
   tagIds,
   onTagIdsChange,
+  groupIds,
+  onGroupIdsChange,
   highlightedRowKey = null,
   rowClassName,
 }: DataTableProps<T>) {
@@ -417,12 +440,29 @@ export function DataTable<T>({
       const kept = filters.filter((f) => current.some((col) => col.filterField === f.field));
       if (kept.length !== filters.length) onFilterChange(kept);
     }
-    // Tags live outside `filters`, so the sweep above cannot reach them; clear
-    // them here for the same reason it clears the rest.
+    // Tags and groups live outside `filters`, so the sweep above cannot reach
+    // them; clear each here for the same reason it clears the rest.
     if (onTagIdsChange && tagIds?.length && !current.some((col) => col.filterKind === "tags")) {
       onTagIdsChange([]);
     }
-  }, [columnsKey, sort, filters, onSortChange, onFilterChange, tagIds, onTagIdsChange]);
+    if (
+      onGroupIdsChange &&
+      groupIds?.length &&
+      !current.some((col) => col.filterKind === "groups")
+    ) {
+      onGroupIdsChange([]);
+    }
+  }, [
+    columnsKey,
+    sort,
+    filters,
+    onSortChange,
+    onFilterChange,
+    tagIds,
+    onTagIdsChange,
+    groupIds,
+    onGroupIdsChange,
+  ]);
 
   // Measure natural column widths once real rows have painted, then fit them to
   // the panel. Header-only widths (while loading, or an empty table rendering a
@@ -443,7 +483,13 @@ export function DataTable<T>({
         const el = thRefs.current.get(col.header);
         if (el) measured[col.header] = col.width ?? el.offsetWidth;
       }
-      const { interactive } = headerControls(col, onSortChange, onFilterChange, onTagIdsChange);
+      const { interactive } = headerControls(
+        col,
+        onSortChange,
+        onFilterChange,
+        onTagIdsChange,
+        onGroupIdsChange
+      );
       headerMin[col.header] =
         Math.ceil(sizerRefs.current.get(col.header)?.offsetWidth ?? 0) +
         TH_PADDING_X +
@@ -456,7 +502,16 @@ export function DataTable<T>({
     naturalRef.current = measured;
     headerMinRef.current = headerMin;
     setWidths(fitColumnWidths(columns, measured, wrapperRef.current?.clientWidth ?? 0, headerMin));
-  }, [columns, widths, loading, rows.length, onSortChange, onFilterChange, onTagIdsChange]);
+  }, [
+    columns,
+    widths,
+    loading,
+    rows.length,
+    onSortChange,
+    onFilterChange,
+    onTagIdsChange,
+    onGroupIdsChange,
+  ]);
 
   // Refit when the panel resizes (window, sidebar) so the columns give ground
   // instead of the rightmost one falling off the edge.
@@ -537,12 +592,9 @@ export function DataTable<T>({
         <thead className="bg-glass-strong/70 backdrop-blur-md">
           <tr>
             {columns.map((col) => {
-              const { sortable, tagFilterable, filterable, interactive } = headerControls(
-                col,
-                onSortChange,
-                onFilterChange,
-                onTagIdsChange
-              );
+              const { sortable, tagFilterable, groupFilterable, filterable, interactive } =
+                headerControls(col, onSortChange, onFilterChange, onTagIdsChange, onGroupIdsChange);
+              const chipFilterable = tagFilterable || groupFilterable;
               const direction =
                 col.sortField && sort?.field === col.sortField
                   ? sort.descending
@@ -566,20 +618,38 @@ export function DataTable<T>({
                         sortable ? (dir) => setColumnSort(col.sortField as string, dir) : undefined
                       }
                       filterValue={
-                        filterable && !tagFilterable
+                        filterable && !chipFilterable
                           ? (filters?.find((f) => f.field === col.filterField)?.value ?? "")
                           : undefined
                       }
                       onFilterChange={
-                        filterable && !tagFilterable
+                        filterable && !chipFilterable
                           ? (v) =>
                               setColumnFilter(col.filterField as string, col.filterOp ?? "like", v)
                           : undefined
                       }
-                      filterOptions={tagFilterable ? undefined : col.filterOptions}
-                      filterValues={tagFilterable ? (tagIds ?? []) : undefined}
-                      onFilterValuesChange={tagFilterable ? onTagIdsChange : undefined}
-                      filterCheckboxOptions={tagFilterable ? col.tagOptions : undefined}
+                      filterOptions={chipFilterable ? undefined : col.filterOptions}
+                      filterValues={
+                        tagFilterable
+                          ? (tagIds ?? [])
+                          : groupFilterable
+                            ? (groupIds ?? [])
+                            : undefined
+                      }
+                      onFilterValuesChange={
+                        tagFilterable
+                          ? onTagIdsChange
+                          : groupFilterable
+                            ? onGroupIdsChange
+                            : undefined
+                      }
+                      filterCheckboxOptions={
+                        tagFilterable
+                          ? col.tagOptions
+                          : groupFilterable
+                            ? col.groupOptions
+                            : undefined
+                      }
                     />
                   ) : (
                     <span className="block truncate">{col.header}</span>

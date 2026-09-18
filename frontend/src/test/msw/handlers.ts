@@ -31,7 +31,7 @@ const USER_1 = {
   tenantId: "tenant-1",
   roles: [],
   groupRoles: [],
-  groupIds: [],
+  groupIds: ["group-1"],
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",

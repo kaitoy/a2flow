@@ -43,6 +43,7 @@ describe("useTableQuery", () => {
       sort: null,
       filters: [],
       tagIds: [],
+      groupIds: [],
     });
   });
 

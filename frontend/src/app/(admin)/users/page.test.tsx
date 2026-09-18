@@ -63,6 +63,17 @@ describe("UsersPage", () => {
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
   });
 
+  it("shows a Groups badge for the user's group, with its description on hover", async () => {
+    routerMock();
+    const user = userEvent.setup();
+    render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByText("alice"));
+    await user.hover(screen.getByText("Developers"));
+    expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+      "People who build workflows"
+    );
+  });
+
   it("username links to the edit page", async () => {
     routerMock();
     render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });

@@ -60,6 +60,11 @@ _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 #: :data:`models.user.MAX_RESOLVE_NAME_IDS` so a full page of users always fits.
 MAX_GROUP_MEMBERS = 1000
 
+#: Upper bound on the ``group`` query parameters a single list request may
+#: repeat. Mirrors :data:`models.tag.MAX_RECORD_TAGS` -- each one adds an
+#: ``EXISTS`` subquery to the statement.
+MAX_GROUP_FILTERS = 50
+
 
 class UserGroupUpdate(SQLModel):
     """Partial update payload for a UserGroup — every field is optional.

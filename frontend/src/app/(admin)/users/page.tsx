@@ -19,6 +19,7 @@ import { auditColumns, idColumn } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
+import { groupsColumn } from "@/components/admin/group-columns";
 import { InheritedRoles } from "@/components/admin/inherited-roles";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { tenantColumn } from "@/components/admin/tenant-columns";
@@ -34,10 +35,11 @@ import {
 } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
+import { useGroups } from "@/hooks/useGroups";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { deleteUser, listUsers, startImpersonation, type User } from "@/lib/api";
+import { deleteUser, listUsers, startImpersonation, type User, type UserGroup } from "@/lib/api";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
 import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
 import { setMe } from "@/store/authSlice";
@@ -46,11 +48,12 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 const LIMIT = 20;
 
 /**
- * Columns of the list table. Avatar, Username, Roles, Enabled, Verified, and
- * Created At are local to this page — Username links off to the user's detail
- * page, which the picker dialog never does — Name and Email are shared with
- * {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}. Takes
- * `names` (rather than being a static array) because the audit columns need it.
+ * Columns of the list table. Avatar, Username, Roles, Groups, Enabled,
+ * Verified, and Created At are local to this page — Username links off to the
+ * user's detail page, which the picker dialog never does — Name and Email are
+ * shared with {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}.
+ * Takes `names` (rather than being a static array) because the audit columns
+ * need it.
  *
  * Enabled is an optional column: a disabled account is already called out by a
  * badge on its avatar (which is always shown) and by its muted row, so the
@@ -59,6 +62,7 @@ const LIMIT = 20;
 function buildColumns(
   names: Map<string, string>,
   tenantNames: Map<string, string>,
+  groupsById: Map<string, UserGroup>,
   isAllTenantsView: boolean
 ): ColumnDef<User>[] {
   return [
@@ -124,6 +128,7 @@ function buildColumns(
         );
       },
     },
+    groupsColumn<User>((u) => u.groupIds, groupsById),
     {
       header: "Enabled",
       sortField: "enabled",
@@ -168,12 +173,15 @@ export default function UsersPage() {
     offset,
     sort,
     filters,
+    groupIds,
     setOffset,
     setSort,
     setFilters,
+    setGroupIds,
     reload,
   } = useTableQuery<User>(listUsers, { limit: LIMIT });
   const names = useUserNames(rows.flatMap((u) => [u.createdBy, u.updatedBy]));
+  const { byId: groupsById } = useGroups();
   const isAllTenantsView = useIsAllTenantsView();
   // Only resolved when the Tenant column is actually rendered: the lookup goes
   // through the super_admin-only tenants list, so asking for it as a plain
@@ -227,7 +235,7 @@ export default function UsersPage() {
   }
 
   const columns: ColumnDef<User>[] = [
-    ...buildColumns(names, tenantNames, isAllTenantsView),
+    ...buildColumns(names, tenantNames, groupsById, isAllTenantsView),
     // Both actions in this column need the admin role — deleting a user
     // outright, and `canImpersonate`, which already answers false without it —
     // so the whole column goes for a viewer who only holds a read role.
@@ -293,6 +301,8 @@ export default function UsersPage() {
         onSortChange={setSort}
         filters={filters}
         onFilterChange={setFilters}
+        groupIds={groupIds}
+        onGroupIdsChange={setGroupIds}
       />
       <PaginationControls
         offset={offset}

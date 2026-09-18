@@ -14,6 +14,7 @@ Every collection endpoint (`GET /agent-skills`, `GET /workflows`, `GET /workflow
 | `s` | Sort | Comma-separated fields; prefix `-` for descending | `?s=-createdAt,name` |
 | `q` | Filter (repeatable) | `field:op:value` | `?q=name:like:foo&q=status:eq:pending` |
 | `tag` | Tag filter (repeatable) | tag id | `?tag=<id>&tag=<id>` |
+| `group` | Group filter (repeatable, `GET /users` only) | group id | `?group=<id>&group=<id>` |
 
 Filter operators (`op`):
 
@@ -31,5 +32,7 @@ The ordered filter operators (`lt` / `lte` / `gt` / `gte`) use that same order, 
 When `s` is omitted, each endpoint falls back to its default ordering (`createdAt` descending; workflow tasks and task templates order by `createdAt` then `id` ascending; tags order by `name` ascending; impersonation events order by `startedAt` descending, since that table has no `createdAt` column).
 
 `tag` is accepted only by the six taggable collections (`GET /secrets`, `/workflows`, `/mcp-servers`, `/agent-skills`, `/mcp-tool-mocks`, `/user-groups`) and is **conjunctive**: a record must carry every tag listed, so repeating the parameter narrows the result rather than widening it. It is a parameter of its own rather than a `q` term because tags are not a column of any record — `apply_filters`/`apply_sort` resolve field names against the model, so `q=tagIds:eq:…` and `s=tagIds` are rejected as unknown fields, which is the intended behavior.
+
+`group` follows the same shape for `GET /users`: a user must belong to every group listed (conjunctive), it is its own parameter rather than a `q` term because group membership lives in `UserGroupMember`, not a column of `users` (so `q=groupIds:eq:…` is rejected the same way), and each id adds one correlated `EXISTS` subquery (`SqlUserRepository.list`) rather than a single `IN`.
 
 Independently of any `tag` filter, a record labelled with an **access-control** tag (`accessControl: true` on the tag) is absent from the collection — and reads as 404 by id — for every caller whose groups do not, between them, carry all of that record's access-control tags; an `admin` or `super_admin` is exempt. The list is filtered before the page window, so `limit`/`offset` count only visible rows. See "Access-control tags in the Repository Layer" in [backend-patterns.md](backend-patterns.md).

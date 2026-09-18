@@ -10,7 +10,13 @@ from fastapi import APIRouter, Depends, File, Response, UploadFile
 
 from dependencies.auth import CurrentTenantScopeDep, CurrentUserDep, EffectiveRolesDep
 from dependencies.authz import require_roles
-from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
+from dependencies.context import (
+    ApiMetaDep,
+    FilterDep,
+    GroupFilterDep,
+    PaginationDep,
+    SortDep,
+)
 from dependencies.service import (
     UserAvatarServiceDep,
     UserGroupServiceDep,
@@ -99,6 +105,7 @@ async def list_users(
     pagination: PaginationDep,
     sort: SortDep,
     filters: FilterDep,
+    groups: GroupFilterDep,
     acting_user: CurrentUserDep,
     acting_tenant_id: CurrentTenantScopeDep,
     meta: ApiMetaDep,
@@ -116,6 +123,7 @@ async def list_users(
         offset=pagination.offset,
         sort=sort.sort,
         filters=filters.filters,
+        group_ids=groups.group_ids,
         acting_user=acting_user,
         acting_tenant_id=acting_tenant_id,
     )

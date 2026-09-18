@@ -7,6 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
 from models.user import SYSTEM_USER_ID
+from models.user_group import MAX_GROUP_FILTERS
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant
@@ -195,6 +196,76 @@ async def test_list_users_respects_limit_param(user_client: AsyncClient) -> None
         )
     response = await user_client.get("/api/v1/users", params={"limit": 2})
     assert len(assert_ok(response)) == 2
+
+
+# ---------- group filter ----------
+
+
+async def test_list_users_filter_by_group_is_conjunctive(
+    user_client: AsyncClient,
+) -> None:
+    alice = assert_ok(
+        await user_client.post("/api/v1/users", json=_CREATE_BODY), status=201
+    )
+    bob = assert_ok(
+        await user_client.post(
+            "/api/v1/users",
+            json={**_CREATE_BODY, "username": "bob", "email": "bob@x.com"},
+        ),
+        status=201,
+    )
+    developers = assert_ok(
+        await user_client.post(
+            "/api/v1/user-groups", json={"name": "Developers", "roles": []}
+        ),
+        status=201,
+    )
+    approvers = assert_ok(
+        await user_client.post(
+            "/api/v1/user-groups", json={"name": "Approvers", "roles": []}
+        ),
+        status=201,
+    )
+    await user_client.put(
+        f"/api/v1/users/{alice['id']}/groups",
+        json={"groupIds": [developers["id"], approvers["id"]]},
+    )
+    await user_client.put(
+        f"/api/v1/users/{bob['id']}/groups", json={"groupIds": [developers["id"]]}
+    )
+
+    one = assert_ok(
+        await user_client.get("/api/v1/users", params={"group": developers["id"]})
+    )
+    assert {u["username"] for u in one} == {"alice", "bob"}
+
+    two = assert_ok(
+        await user_client.get(
+            "/api/v1/users",
+            params=[("group", developers["id"]), ("group", approvers["id"])],
+        )
+    )
+    assert {u["username"] for u in two} == {"alice"}
+
+
+async def test_an_unknown_group_id_matches_nothing(user_client: AsyncClient) -> None:
+    await user_client.post("/api/v1/users", json=_CREATE_BODY)
+    response = await user_client.get("/api/v1/users", params={"group": "nope"})
+    assert assert_ok(response) == []
+
+
+async def test_too_many_group_filters_are_rejected(user_client: AsyncClient) -> None:
+    query = "&".join(f"group=g{i}" for i in range(MAX_GROUP_FILTERS + 1))
+    response = await user_client.get(f"/api/v1/users?{query}")
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_groups_are_not_a_filterable_field(user_client: AsyncClient) -> None:
+    """``groupIds`` is a separate axis, not a pseudo-column of the ``q`` grammar."""
+    response = await user_client.get(
+        "/api/v1/users", params={"q": "groupIds:eq:whatever"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
 
 
 # ---------- hidden field query exposure (regression) ----------
