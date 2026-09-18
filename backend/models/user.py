@@ -375,6 +375,12 @@ class UserRead(BaseEntity):
     #: whether the signed-in user may act on an approval addressed to a group;
     #: without it every rendered approval would cost a membership request.
     group_ids: list[str] = []
+    #: Ids of the tags the user inherits from the groups they belong to (see
+    #: :mod:`models.tag`, :mod:`models.user_group`). Read-only and derived,
+    #: like :attr:`group_roles` and :attr:`group_ids`, and populated by the
+    #: same :meth:`from_user` call — a user carries no tags of its own, only
+    #: the union of its groups' tags.
+    group_tag_ids: list[str] = []
     deleted_at: datetime | None = None
     #: ISO-8601 timestamp of the last custom-avatar change, or ``None`` when the
     #: user has no uploaded avatar (the client then renders a generated default).
@@ -392,15 +398,19 @@ class UserRead(BaseEntity):
         *,
         group_roles: Iterable[str] = (),
         group_ids: Iterable[str] = (),
+        group_tag_ids: Iterable[str] = (),
     ) -> "UserRead":
         """Build the read view of a stored user, attaching their group context.
 
-        Neither ``group_roles`` nor ``group_ids`` is a column of ``users``:
-        both are derived from the
-        user's group memberships (see :mod:`models.user_group`) and must be
-        resolved by the caller — normally through
-        :meth:`services.user.UserService.group_roles_for`, which batches the
-        lookup so a list endpoint issues one query rather than one per row.
+        None of ``group_roles``, ``group_ids``, nor ``group_tag_ids`` is a
+        column of ``users``: all three are derived from the user's group
+        memberships (see :mod:`models.user_group`) and must be resolved by
+        the caller — normally through
+        :meth:`services.user.UserService.group_roles_for`,
+        :meth:`~services.user.UserService.group_ids_for`, and
+        :meth:`~services.user.UserService.group_tag_ids_for`, which batch the
+        lookup so a list endpoint issues one query per kind rather than one
+        per row.
 
         Args:
             user: The persisted user to project.
@@ -408,6 +418,8 @@ class UserRead(BaseEntity):
                 empty, for callers with no membership context to report.
             group_ids: Ids of the groups the user belongs to. Defaults to empty,
                 same as ``group_roles``.
+            group_tag_ids: Ids of the tags the user inherits from their
+                groups. Defaults to empty, same as ``group_roles``.
 
         Returns:
             A read view carrying the user's fields plus their group context,
@@ -417,6 +429,7 @@ class UserRead(BaseEntity):
             **user.model_dump(exclude={"password"}),
             group_roles=sorted(group_roles),
             group_ids=sorted(group_ids),
+            group_tag_ids=sorted(group_tag_ids),
         )
 
     @field_serializer("deleted_at", "avatar_updated_at", when_used="json")

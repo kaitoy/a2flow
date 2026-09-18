@@ -4,7 +4,7 @@ import { LOCKED_CHIP_LABEL } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import type { Tag } from "@/lib/api";
 import { render, screen, within } from "@/test/test-utils";
-import { tagFilterOptions, tagsColumn } from "./tag-columns";
+import { inheritedTagsColumn, tagFilterOptions, tagsColumn } from "./tag-columns";
 
 interface Row {
   id: string;
@@ -181,6 +181,70 @@ describe("tagsColumn", () => {
 
     await user.click(screen.getByRole("button", { name: /Tags/ }));
     await screen.findByText("Filter (all of)");
+    expect(screen.queryByRole("button", { name: "Sort ascending" })).not.toBeInTheDocument();
+  });
+});
+
+function renderInheritedTable(rows: Row[]) {
+  render(
+    <DataTable<Row>
+      columns={[
+        { header: "Id", cell: (row) => row.id },
+        inheritedTagsColumn<Row>((row) => row.tagIds, BY_ID),
+      ]}
+      rows={rows}
+      getRowKey={(row) => row.id}
+    />
+  );
+}
+
+describe("inheritedTagsColumn", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLSpanElement.prototype, "offsetWidth");
+    Reflect.deleteProperty(HTMLDivElement.prototype, "clientWidth");
+  });
+
+  it("renders one chip per inherited tag, named by the tag", () => {
+    renderInheritedTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
+    expect(screen.getByText("production")).toBeInTheDocument();
+    expect(screen.getByText("aws")).toBeInTheDocument();
+  });
+
+  it("marks an access-control tag's chip with the lock glyph", () => {
+    renderInheritedTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
+    expect(screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL })).toHaveLength(1);
+  });
+
+  it("renders a dash for a record carrying no inherited tags", () => {
+    renderInheritedTable([{ id: "r1", tagIds: [] }]);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("falls back to the raw id when the tag is not in the lookup", () => {
+    renderInheritedTable([{ id: "r1", tagIds: ["tag-gone"] }]);
+    expect(screen.getByText("tag-gone")).toBeInTheDocument();
+  });
+
+  it("folds tags that overflow two lines into a counted chip", () => {
+    Object.defineProperty(HTMLSpanElement.prototype, "offsetWidth", {
+      configurable: true,
+      get: () => 100,
+    });
+    Object.defineProperty(HTMLDivElement.prototype, "clientWidth", {
+      configurable: true,
+      get: () => 200,
+    });
+    renderInheritedTable([{ id: "r1", tagIds: ["tag-1", "tag-2", "tag-3"] }]);
+    expect(screen.getByText("+1")).toBeInTheDocument();
+  });
+
+  it("offers no filter menu — there is no axis to filter an inherited tag on", () => {
+    renderInheritedTable([{ id: "r1", tagIds: ["tag-1"] }]);
+    expect(screen.queryByRole("button", { name: /Tags/ })).not.toBeInTheDocument();
+  });
+
+  it("is not sortable — a set has no order", () => {
+    renderInheritedTable([{ id: "r1", tagIds: ["tag-1"] }]);
     expect(screen.queryByRole("button", { name: "Sort ascending" })).not.toBeInTheDocument();
   });
 });

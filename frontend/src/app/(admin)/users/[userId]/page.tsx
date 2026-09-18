@@ -25,6 +25,7 @@ import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { GroupPicker } from "@/components/admin/group-picker";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { InheritedRolesField } from "@/components/admin/inherited-roles";
+import { InheritedTagsField } from "@/components/admin/inherited-tags";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RolesField } from "@/components/admin/roles-field";
@@ -39,6 +40,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useTags } from "@/hooks/useTags";
 import {
   type AvatarConfig,
   deleteUser,
@@ -113,6 +115,10 @@ export default function UserDetailPage() {
   // Roles inherited from the user's groups. Read-only here: only editing the
   // groups (below, or from the group page) can change them.
   const [groupRoles, setGroupRoles] = useState<Role[]>([]);
+  // Tags inherited from the user's groups — a user carries no tags of its
+  // own. Read-only here for the same reason as groupRoles.
+  const [groupTagIds, setGroupTagIds] = useState<string[]>([]);
+  const { byId: tagsById } = useTags();
   // Group membership, edited from this side as well as from the group detail
   // page. `savedGroupIds` remembers what the server has, so an unchanged
   // selection skips the extra request; `groupOptions` hands the picker the
@@ -184,6 +190,7 @@ export default function UserDetailPage() {
         setAvatarConfig(user.avatarConfig ?? null);
         setRoles(user.roles ?? []);
         setGroupRoles(user.groupRoles ?? []);
+        setGroupTagIds(user.groupTagIds ?? []);
         setOriginalTenantId(user.tenantId ?? null);
         reset({
           firstName: user.firstName,
@@ -404,6 +411,8 @@ export default function UserDetailPage() {
           <RolesField value={roles} onChange={setRoles} readOnly={!canEdit} />
 
           <InheritedRolesField roles={groupRoles} />
+
+          <InheritedTagsField tagIds={groupTagIds} byId={tagsById} />
 
           {canJoinGroups && (
             <GroupPicker

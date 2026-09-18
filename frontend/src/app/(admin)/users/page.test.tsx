@@ -74,6 +74,18 @@ describe("UsersPage", () => {
     );
   });
 
+  it("shows a Tags badge for a tag inherited from the user's group", async () => {
+    routerMock();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users", () =>
+        envelope([{ ...USER_WITH_TENANT("tenant-1"), groupTagIds: ["tag-1"] }])
+      )
+    );
+    render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByText("alice"));
+    expect(screen.getByText("production")).toBeInTheDocument();
+  });
+
   it("username links to the edit page", async () => {
     routerMock();
     render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });

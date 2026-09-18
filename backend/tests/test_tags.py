@@ -1217,3 +1217,26 @@ async def test_an_approvals_execution_access_tag_hides_it_from_its_approver(
         404,
     )
     assert_ok(await client.get(detail_url, headers=ADMIN))
+
+
+# ---------- users ----------
+
+
+async def test_user_read_reports_group_inherited_tag_ids(
+    tag_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A user's ``groupTagIds`` is the union of its groups' tags, access-control
+    tags included -- that filter gates *other* resources, not a user's own
+    projection of its own group tags."""
+    client, _ = tag_env
+    plain = await _create_tag(client, "plain")
+    gated = await _create_tag(client, "gated", accessControl=True)
+    await _create_member_group(client, "devs", ["bob"], [plain["id"], gated["id"]])
+
+    user = assert_ok(await client.get("/api/v1/users/bob", headers=ADMIN))
+    assert sorted(user["groupTagIds"]) == sorted([plain["id"], gated["id"]])
+
+    users = assert_ok(await client.get("/api/v1/users", headers=ADMIN))
+    by_id = {u["id"]: u for u in users}
+    assert sorted(by_id["bob"]["groupTagIds"]) == sorted([plain["id"], gated["id"]])
+    assert by_id["carol"]["groupTagIds"] == []

@@ -44,27 +44,32 @@ _requires_admin = [Depends(require_roles(Role.admin))]
 
 
 async def _to_read(service: UserService, user: User) -> UserRead:
-    """Project one user into its read view, resolving its inherited roles.
+    """Project one user into its read view, resolving its inherited roles and tags.
 
     Args:
-        service: The user service, used to resolve group-inherited roles.
+        service: The user service, used to resolve group-inherited roles and tags.
         user: The user to project.
 
     Returns:
-        The read view, carrying both direct and group-inherited roles.
+        The read view, carrying both direct and group-inherited roles, plus
+        group-inherited tags.
     """
     group_roles = await service.group_roles_for([user])
     group_ids = await service.group_ids_for([user])
+    group_tag_ids = await service.group_tag_ids_for([user])
     return UserRead.from_user(
-        user, group_roles=group_roles[user.id], group_ids=group_ids[user.id]
+        user,
+        group_roles=group_roles[user.id],
+        group_ids=group_ids[user.id],
+        group_tag_ids=group_tag_ids[user.id],
     )
 
 
 async def _to_read_many(service: UserService, users: list[User]) -> list[UserRead]:
-    """Project a page of users into read views with one membership query.
+    """Project a page of users into read views with one membership query per kind.
 
     Args:
-        service: The user service, used to resolve group-inherited roles.
+        service: The user service, used to resolve group-inherited roles and tags.
         users: The users to project.
 
     Returns:
@@ -72,8 +77,14 @@ async def _to_read_many(service: UserService, users: list[User]) -> list[UserRea
     """
     group_roles = await service.group_roles_for(users)
     group_ids = await service.group_ids_for(users)
+    group_tag_ids = await service.group_tag_ids_for(users)
     return [
-        UserRead.from_user(u, group_roles=group_roles[u.id], group_ids=group_ids[u.id])
+        UserRead.from_user(
+            u,
+            group_roles=group_roles[u.id],
+            group_ids=group_ids[u.id],
+            group_tag_ids=group_tag_ids[u.id],
+        )
         for u in users
     ]
 

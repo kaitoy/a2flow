@@ -575,6 +575,17 @@ describe("UserDetailPage group membership", () => {
     expect(screen.getByText(/Granted by group membership/)).toBeInTheDocument();
   });
 
+  it("shows the tags inherited from the user's groups", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, tenantId: "tenant-1", groupTagIds: ["tag-1"] })
+      )
+    );
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Tags from groups")).toBeInTheDocument());
+    expect(screen.getByText("production")).toBeInTheDocument();
+  });
+
   it("shows a chip for each group the user already belongs to", async () => {
     renderPage();
     expect(await screen.findByText("Developers")).toBeInTheDocument();

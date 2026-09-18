@@ -206,8 +206,9 @@ class UserService:
 
         Args:
             repo: Repository providing User persistence.
-            effective_roles: Repository resolving the roles users inherit from
-                their groups, used to populate :attr:`UserRead.group_roles`.
+            effective_roles: Repository resolving the roles and tags users
+                inherit from their groups, used to populate
+                :attr:`UserRead.group_roles` and :attr:`UserRead.group_tag_ids`.
                 Deliberately not tenant-scoped — see
                 :mod:`repositories.effective_roles`.
         """
@@ -251,6 +252,26 @@ class UserService:
             [user.id for user in users]
         )
         return {user.id: memberships.get(user.id, []) for user in users}
+
+    async def group_tag_ids_for(self, users: Sequence[User]) -> dict[str, list[str]]:
+        """Return the group-inherited tag ids of each user, resolved in one query.
+
+        The tag counterpart of :meth:`group_ids_for`, feeding
+        :attr:`models.user.UserRead.group_tag_ids`. Batched the same way, so a
+        list endpoint stays at one query per page rather than one per row.
+
+        Args:
+            users: The users about to be serialized.
+
+        Returns:
+            A mapping of user id to their sorted group-inherited tag ids.
+            Every id in ``users`` is present; a user in no group, or whose
+            groups carry no tags, maps to an empty list.
+        """
+        inherited = await self._effective_roles.group_tag_ids_for_users(
+            [user.id for user in users]
+        )
+        return {user.id: sorted(inherited.get(user.id, frozenset())) for user in users}
 
     async def get(self, user_id: str, *, acting_user: User) -> User:
         """Return the User with the given ID.

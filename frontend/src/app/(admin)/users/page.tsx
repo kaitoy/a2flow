@@ -22,6 +22,7 @@ import { DeleteIconButton } from "@/components/admin/delete-icon-button";
 import { groupsColumn } from "@/components/admin/group-columns";
 import { InheritedRoles } from "@/components/admin/inherited-roles";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { inheritedTagsColumn } from "@/components/admin/tag-columns";
 import { tenantColumn } from "@/components/admin/tenant-columns";
 import { USER_SHARED_COLUMNS } from "@/components/admin/user-columns";
 import { Avatar } from "@/components/ui/avatar";
@@ -39,7 +40,15 @@ import { useGroups } from "@/hooks/useGroups";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
-import { deleteUser, listUsers, startImpersonation, type User, type UserGroup } from "@/lib/api";
+import { useTags } from "@/hooks/useTags";
+import {
+  deleteUser,
+  listUsers,
+  startImpersonation,
+  type Tag,
+  type User,
+  type UserGroup,
+} from "@/lib/api";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
 import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
 import { setMe } from "@/store/authSlice";
@@ -48,12 +57,16 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 const LIMIT = 20;
 
 /**
- * Columns of the list table. Avatar, Username, Roles, Groups, Enabled,
+ * Columns of the list table. Avatar, Username, Roles, Groups, Tags, Enabled,
  * Verified, and Created At are local to this page — Username links off to the
  * user's detail page, which the picker dialog never does — Name and Email are
  * shared with {@link UserPicker}'s dialog table via {@link USER_SHARED_COLUMNS}.
  * Takes `names` (rather than being a static array) because the audit columns
  * need it.
+ *
+ * Tags shows the union of the user's groups' tags — a user carries no tags
+ * directly — display-only, since there is no list-API parameter to filter
+ * users by an inherited tag.
  *
  * Enabled is an optional column: a disabled account is already called out by a
  * badge on its avatar (which is always shown) and by its muted row, so the
@@ -63,6 +76,7 @@ function buildColumns(
   names: Map<string, string>,
   tenantNames: Map<string, string>,
   groupsById: Map<string, UserGroup>,
+  tagsById: Map<string, Tag>,
   isAllTenantsView: boolean
 ): ColumnDef<User>[] {
   return [
@@ -129,6 +143,7 @@ function buildColumns(
       },
     },
     groupsColumn<User>((u) => u.groupIds, groupsById),
+    inheritedTagsColumn<User>((u) => u.groupTagIds, tagsById),
     {
       header: "Enabled",
       sortField: "enabled",
@@ -182,6 +197,7 @@ export default function UsersPage() {
   } = useTableQuery<User>(listUsers, { limit: LIMIT });
   const names = useUserNames(rows.flatMap((u) => [u.createdBy, u.updatedBy]));
   const { byId: groupsById } = useGroups();
+  const { byId: tagsById } = useTags();
   const isAllTenantsView = useIsAllTenantsView();
   // Only resolved when the Tenant column is actually rendered: the lookup goes
   // through the super_admin-only tenants list, so asking for it as a plain
@@ -235,7 +251,7 @@ export default function UsersPage() {
   }
 
   const columns: ColumnDef<User>[] = [
-    ...buildColumns(names, tenantNames, groupsById, isAllTenantsView),
+    ...buildColumns(names, tenantNames, groupsById, tagsById, isAllTenantsView),
     // Both actions in this column need the admin role — deleting a user
     // outright, and `canImpersonate`, which already answers false without it —
     // so the whole column goes for a viewer who only holds a read role.

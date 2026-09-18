@@ -16,6 +16,28 @@ import { EMPTY_VALUE } from "@/lib/read-only-display";
 import { resolveTagColor } from "@/lib/tag-palette";
 
 /**
+ * Map tag ids to the chip data every Tags column/field renders identically.
+ *
+ * Shared by {@link tagsColumn}, {@link inheritedTagsColumn}, and the
+ * group-inherited tag display on the user detail page, so a chip looks the
+ * same everywhere a tag id turns into a chip.
+ *
+ * @param ids - The tag ids to resolve.
+ * @param byId - The tenant's tags keyed by id, from `useTags`.
+ * @returns One {@link ChipRowItem} per id; a stale id falls back to itself as
+ *   the label instead of vanishing.
+ */
+export function tagChipItems(ids: string[], byId: Map<string, Tag>): ChipRowItem[] {
+  return ids.map((id) => ({
+    key: id,
+    label: byId.get(id)?.name ?? id,
+    color: resolveTagColor(byId.get(id)?.color),
+    description: byId.get(id)?.description ?? undefined,
+    locked: byId.get(id)?.accessControl,
+  }));
+}
+
+/**
  * Build the Tags column for a list of records carrying `tagIds`.
  *
  * The column is filterable but not sortable: a record holds a *set* of tags,
@@ -63,14 +85,38 @@ export function tagsColumn<T>(
     cell: (row) => {
       const ids = getTagIds(row) ?? [];
       if (ids.length === 0) return EMPTY_VALUE;
-      const items: ChipRowItem[] = ids.map((id) => ({
-        key: id,
-        label: byId.get(id)?.name ?? id,
-        color: resolveTagColor(byId.get(id)?.color),
-        description: byId.get(id)?.description ?? undefined,
-        locked: byId.get(id)?.accessControl,
-      }));
-      return <ChipRow items={items} title="Tags" />;
+      return <ChipRow items={tagChipItems(ids, byId)} title="Tags" />;
+    },
+  };
+}
+
+/**
+ * Build a display-only Tags column for a list of records carrying tag ids
+ * inherited from elsewhere (e.g. group membership) rather than tags the
+ * record carries directly.
+ *
+ * Renders identically to {@link tagsColumn} (chips, tooltip, two-line fold,
+ * lock glyph), but offers no filter menu: an inherited value has no
+ * `tagIds` / `onTagIdsChange` axis on the table to filter through, since the
+ * list API has no parameter for "carries a tag via group membership".
+ *
+ * @param getTagIds - Reads the inherited tag ids off a row.
+ * @param byId - The tenant's tags keyed by id, from `useTags`.
+ * @returns The column definition, ready to drop into a list's `columns` array.
+ */
+export function inheritedTagsColumn<T>(
+  getTagIds: (row: T) => string[] | undefined,
+  byId: Map<string, Tag>
+): ColumnDef<T> {
+  return {
+    header: "Tags",
+    noTruncate: true,
+    shrinkable: true,
+    className: "py-1! align-middle",
+    cell: (row) => {
+      const ids = getTagIds(row) ?? [];
+      if (ids.length === 0) return EMPTY_VALUE;
+      return <ChipRow items={tagChipItems(ids, byId)} title="Tags" />;
     },
   };
 }
