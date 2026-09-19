@@ -273,12 +273,12 @@ _DESIGN_REGISTRATION_RULES = (
     "Express the steps "
     "as a DAG and register them in ONE call to `register_task_templates`, using "
     "each task's `key` and `depends_on` to encode ordering.\n\n"
-    "Title each task as a terse imperative label: 2 to 4 words, at most 30 "
+    "Title each task as a terse imperative label: 2 to 4 words, at most 50 "
     'characters (e.g. "Gather sources", "Validate schema", "Publish report"). '
     "Titles are listed as chips next to every task that depends on them, so "
     "anything longer is clipped — never write a sentence, and drop articles and "
     "qualifiers rather than spending words on them. Put the detail in "
-    "`description` instead, which has room for it. Titles over 30 characters "
+    "`description` instead, which has room for it. Titles over 50 characters "
     "are rejected."
 )
 

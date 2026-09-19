@@ -78,7 +78,7 @@ _NO_SESSION = (
 #: taken from ``ShortText`` (200 chars, :mod:`models.constraints`) — that limit
 #: guards the column, this one guards the *list UI*, where a title is rendered
 #: as a chip beside every task depending on it and a long one is clipped to an
-#: ellipsis. It matches the 30-character budget the agent's instructions ask for
+#: ellipsis. It matches the 50-character budget the agent's instructions ask for
 #: (see ``_DESIGN_REGISTRATION_RULES`` in :mod:`infrastructure.agent`), so an
 #: agent that follows them never trips it, and one that drifts into writing
 #: sentences gets a correctable ``{"error": ...}`` back instead of quietly
@@ -86,7 +86,7 @@ _NO_SESSION = (
 #:
 #: It binds only the agent tools. A human editing a template through the REST
 #: API or the admin form is still held to ``ShortText`` alone.
-_TITLE_MAX_LENGTH = 30
+_TITLE_MAX_LENGTH = 50
 
 
 def _title_too_long_error(label: str, title: str) -> str:
@@ -210,7 +210,7 @@ async def register_task_templates(
 
         {
           "key": "t1",                 # required, unique within this batch
-          "title": "Gather sources",   # required, 2-4 words, max 30 characters
+          "title": "Gather sources",   # required, 2-4 words, max 50 characters
           "description": "...",        # optional, where the detail belongs
           "depends_on": ["t0"],        # optional, other entries' "key" values
           "tools": [                   # optional MCP tools this task will use
@@ -220,7 +220,7 @@ async def register_task_templates(
         }
 
     A ``title`` is a terse imperative label, not a sentence: 2 to 4 words and at
-    most 30 characters (e.g. "Gather sources", "Validate schema"), which is
+    most 50 characters (e.g. "Gather sources", "Validate schema"), which is
     enforced — a longer one is rejected. It is listed as a chip next to every
     task that depends on it, so a long one is clipped. Anything that does not fit
     belongs in ``description``.
@@ -361,7 +361,7 @@ async def create_task_template(
 
     Args:
         title: The task title (required). A terse imperative label, not a
-            sentence: 2 to 4 words, at most 30 characters (e.g. "Gather
+            sentence: 2 to 4 words, at most 50 characters (e.g. "Gather
             sources") — a longer one is rejected. It is listed as a chip next to
             every task that depends on it, so a long one is clipped — put the
             detail in ``description``.
@@ -476,7 +476,7 @@ async def update_task_template(
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
         title: New title, if changing. A terse imperative label, not a sentence:
-            2 to 4 words, at most 30 characters (e.g. "Gather sources") — a
+            2 to 4 words, at most 50 characters (e.g. "Gather sources") — a
             longer one is rejected. It is listed as a chip next to every task
             that depends on it, so a long one is clipped — put the detail in
             ``description``.

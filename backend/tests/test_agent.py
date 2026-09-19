@@ -689,7 +689,7 @@ def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None
     assert "you MUST use a `ChoicePicker`" in rendered
     assert "do not invent a `ChoicePicker` for it" in rendered
     # Titles are listed as chips, so the shared rules ask for short ones.
-    assert "at most 30 characters" in rendered
+    assert "at most 50 characters" in rendered
     # Reply suggestions are a workflow-session feature; the design chat has none.
     assert "suggest_replies" not in rendered
 
@@ -707,7 +707,7 @@ def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
     assert "register_task_templates" in agent.instruction
     assert "unattended" in agent.instruction
     assert "register that ask as a task of its own" in agent.instruction
-    assert "at most 30 characters" in agent.instruction
+    assert "at most 50 characters" in agent.instruction
     assert not any(isinstance(t, AGUIToolset) for t in agent.tools)
 
 

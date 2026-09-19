@@ -231,7 +231,7 @@ async def test_register_rejects_overlong_title(engine: AsyncEngine) -> None:
 
 async def test_register_accepts_a_title_at_the_limit(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    at_limit = "T" * 30
+    at_limit = "T" * 50
     result = await register_task_templates([{"key": "a", "title": at_limit}], _ctx())
     assert "error" not in result
     listed = await list_task_templates(_ctx())
@@ -240,7 +240,7 @@ async def test_register_accepts_a_title_at_the_limit(engine: AsyncEngine) -> Non
 
 async def test_create_rejects_overlong_title(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
-    result = await create_task_template("T" * 31, _ctx())
+    result = await create_task_template("T" * 51, _ctx())
     assert "error" in result
     listed = await list_task_templates(_ctx())
     assert listed["tasks"] == []
@@ -249,7 +249,7 @@ async def test_create_rejects_overlong_title(engine: AsyncEngine) -> None:
 async def test_update_rejects_overlong_title(engine: AsyncEngine) -> None:
     await _seed_design_session(engine)
     created = await create_task_template("Original", _ctx())
-    result = await update_task_template(created["id"], _ctx(), title="T" * 31)
+    result = await update_task_template(created["id"], _ctx(), title="T" * 51)
     assert "error" in result
     unchanged = await get_task_template(created["id"], _ctx())
     assert unchanged["title"] == "Original"
