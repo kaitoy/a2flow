@@ -81,8 +81,8 @@ const POLL_INTERVAL_MS = 2000;
 // address it regardless of role.
 const schema = z.object({
   name: zGenerateWorkflowRequest.shape.name,
-  description: z.string().max(2000),
-  generatedDescription: z.string().max(2000),
+  description: z.string().max(10000),
+  generatedDescription: z.string().max(10000),
 });
 
 type FormValues = z.infer<typeof schema>;

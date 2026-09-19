@@ -29,7 +29,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
-from models.constraints import DescText, EntityName, PromptText
+from models.constraints import EntityName, PromptText, WorkflowDescText
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -135,8 +135,8 @@ class WorkflowUpdate(SQLModel):
 
     model_config = _alias_config
     name: EntityName | None = None
-    description: DescText | None = None
-    generated_description: DescText | None = None
+    description: WorkflowDescText | None = None
+    generated_description: WorkflowDescText | None = None
 
 
 class WorkflowCreate(WorkflowUpdate):

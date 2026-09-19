@@ -301,6 +301,12 @@ ShortText = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 #: Free-text description: up to 2000 characters.
 DescText = Annotated[str, StringConstraints(max_length=2000)]
 
+#: Free-text description for a Workflow's ``description`` /
+#: ``generated_description`` fields: up to 10000 characters. A workflow's
+#: description can summarize an entire design conversation, which runs longer
+#: than the other entities sharing :data:`DescText`.
+WorkflowDescText = Annotated[str, StringConstraints(max_length=10000)]
+
 #: Notification body text: up to 4000 characters.
 BodyText = Annotated[str, StringConstraints(max_length=4000)]
 

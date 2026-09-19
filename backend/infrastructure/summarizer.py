@@ -80,19 +80,21 @@ def build_llm() -> BaseLlm:
     return LLMRegistry.new_llm(model)
 
 
-async def summarize_design_transcript(transcript: str, *, max_chars: int = 2000) -> str:
+async def summarize_design_transcript(
+    transcript: str, *, max_chars: int = 10000
+) -> str:
     """Summarize a design-session transcript into a workflow description.
 
     Sends a single user turn to the configured LLM and concatenates the text
     parts of its response. The transcript is truncated to
     :data:`_TRANSCRIPT_MAX_CHARS` before sending, and the result is hard-cut to
-    ``max_chars`` so it always fits the ``DescText`` column constraint.
+    ``max_chars`` so it always fits the ``WorkflowDescText`` column constraint.
 
     Args:
         transcript: The design conversation as plain text (one line per
             message, speaker-prefixed).
         max_chars: Upper bound on the returned summary length; defaults to the
-            ``DescText`` maximum.
+            ``WorkflowDescText`` maximum.
 
     Returns:
         The summary text.
