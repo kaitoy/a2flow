@@ -648,6 +648,51 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
+        "session_files",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "workflow_execution_id",
+            sqlmodel.sql.sqltypes.AutoString(),
+            nullable=False,
+        ),
+        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("content_type", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("size_bytes", sa.Integer(), nullable=False),
+        sa.Column(
+            "origin",
+            sa.Enum("user", "agent", name="sessionfileorigin"),
+            nullable=False,
+        ),
+        sa.Column("data", sa.LargeBinary(), nullable=False),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
+            name="fk_session_files_workflow_execution_id",
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "workflow_execution_id", "name", name="uq_session_files_execution_name"
+        ),
+    )
+    op.create_index(
+        "ix_session_files_tenant_id", "session_files", ["tenant_id"], unique=False
+    )
+    op.create_index(
+        "ix_session_files_workflow_execution_id",
+        "session_files",
+        ["workflow_execution_id"],
+        unique=False,
+    )
+    op.create_table(
         "notifications",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -1152,6 +1197,7 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
+        sa.Column("access_control", sa.Boolean(), nullable=False),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
@@ -1171,6 +1217,7 @@ def upgrade() -> None:
         ("agent_skill_tags", "agent_skills"),
         ("mcp_tool_mock_tags", "mcp_tool_mocks"),
         ("user_group_tags", "user_groups"),
+        ("workflow_execution_tags", "workflow_executions"),
     ):
         op.create_table(
             link_table,
@@ -1400,6 +1447,7 @@ def downgrade() -> None:
     )
     op.drop_table("mcp_tool_certificates")
     for link_table in (
+        "workflow_execution_tags",
         "user_group_tags",
         "mcp_tool_mock_tags",
         "agent_skill_tags",
@@ -1482,6 +1530,9 @@ def downgrade() -> None:
     op.drop_index("ix_notifications_user_id", table_name="notifications")
     op.drop_index("ix_notifications_tenant_id", table_name="notifications")
     op.drop_table("notifications")
+    op.drop_index("ix_session_files_workflow_execution_id", table_name="session_files")
+    op.drop_index("ix_session_files_tenant_id", table_name="session_files")
+    op.drop_table("session_files")
     op.drop_index("ix_workflow_executions_session_id", table_name="workflow_executions")
     op.drop_index("ix_workflow_executions_tenant_id", table_name="workflow_executions")
     op.drop_index(
