@@ -123,6 +123,7 @@ export function MessageList({
   onAction,
   onApprovalResolved,
   pendingRenderCalls,
+  canActOnSurfaces,
 }: {
   messages: RenderedMessage[];
   isStreaming?: boolean;
@@ -166,6 +167,13 @@ export function MessageList({
    * derivation below.
    */
   pendingRenderCalls?: PendingRenderCall[];
+  /**
+   * Whether the signed-in viewer may submit the still-pending A2UI surfaces.
+   * The workflow session passes `false` for everyone but the run's initiator,
+   * which renders those surfaces inert with a waiting note; omitted (true) for
+   * the single-user chat and the design session.
+   */
+  canActOnSurfaces?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Wraps the message column itself (unlike scrollRef, which is clipped by
@@ -345,6 +353,7 @@ export function MessageList({
       onApprovalResolved={onApprovalResolved}
       pendingToolCallIds={pendingToolCallIds}
       toolResultContentByCallId={toolResultContentByCallId}
+      canActOnSurfaces={canActOnSurfaces}
     />
   );
 

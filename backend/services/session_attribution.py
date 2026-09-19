@@ -31,8 +31,10 @@ from repositories.message_meta import MessageMetaRepository
 #: acknowledgement (``RENDER_ACK_CONTENT`` in ``frontend/src/lib/a2uiAction.ts``,
 #: mirroring the ``@ag-ui/a2ui-middleware`` convention). Such a response merely
 #: unblocks the long-running render call for a surface nobody acted on, so it
-#: must not be attributed to the user whose run happened to flush it.
-_RENDER_ACK_RESPONSE = {"status": "rendered"}
+#: must not be attributed to the user whose run happened to flush it -- nor
+#: does sending one count as acting on the surface (see
+#: :func:`services.workflow_execution_access.assert_may_answer_surfaces`).
+RENDER_ACK_RESPONSE = {"status": "rendered"}
 
 
 def attributable_keys(session: Session | None) -> set[str]:
@@ -79,7 +81,7 @@ async def record_new_senders(
     key not in ``prior_keys`` was produced by the current user, so it is
     recorded (idempotently) -- new ``"user"`` events by their event id, and new
     tool-response events (including A2UI action acknowledgements) by their
-    tool_call_id. Tool responses matching :data:`_RENDER_ACK_RESPONSE` are
+    tool_call_id. Tool responses matching :data:`RENDER_ACK_RESPONSE` are
     skipped: they are the no-op acknowledgements the frontend flushes for every
     still-pending render call on the user's next run, not actions the user
     performed, and attributing them would paint the user's avatar onto surfaces
@@ -105,7 +107,7 @@ async def record_new_senders(
                 sender_user_id=sender_user_id,
             )
         for fr in event.get_function_responses():
-            if fr.response == _RENDER_ACK_RESPONSE:
+            if fr.response == RENDER_ACK_RESPONSE:
                 continue
             if fr.id and fr.id not in prior_keys:
                 await meta.set_sender(

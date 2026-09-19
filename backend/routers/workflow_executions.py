@@ -63,6 +63,7 @@ from models.workflow_task import WorkflowTaskRead
 from repositories.exceptions import SessionRunInProgressError
 from services.metrics import MetricsWindow
 from services.session_file import describe_session_files
+from services.workflow_execution_access import assert_may_answer_surfaces
 
 router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 
@@ -361,7 +362,9 @@ async def workflow_session_agent(
 
     Restricted to the execution's initiator, its designated approvers, and
     super admins -- deliberately excluding plain admins, who may view this
-    execution (``GET`` above) but not drive its agent. The skill and skill
+    execution (``GET`` above) but not drive its agent. Submitting a form the
+    agent rendered (a ``render_a2ui`` action result) is narrower still: the
+    initiator only, see ``assert_may_answer_surfaces``. The skill and skill
     directory are resolved from the WorkflowExecution record so the correct
     ADK tools are loaded regardless of the global agent state. SystemMessages
     are stripped to prevent prompt
@@ -392,6 +395,9 @@ async def workflow_session_agent(
     current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
+    assert_may_answer_surfaces(
+        filtered, caller_id=caller.id, initiator_id=execution.initiator_id
+    )
     # The context feeds the system instruction (via CONTEXT_STATE_KEY), so the
     # client-sent one is stripped to the A2UI entries the frontend middleware
     # injects — the LLM has no other source for the component catalog or the

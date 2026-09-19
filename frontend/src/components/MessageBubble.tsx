@@ -20,9 +20,10 @@ import { UserMessageBubble } from "./UserMessageBubble";
  * `AssistantMessageBubble`, since the agent is always on the left.
  * `isThinking` is likewise forwarded to `ActivityMessageBubble`, which uses it
  * only for the reasoning branch (live edge while the agent is still
- * reasoning). `pendingToolCallIds` and `toolResultContentByCallId` are
- * forwarded to `ActivityMessageBubble` for its A2UI branch, which uses them to
- * lock and pre-fill an already-answered surface; other activity types ignore them.
+ * reasoning). `pendingToolCallIds`, `toolResultContentByCallId`, and
+ * `canActOnSurfaces` are forwarded to `ActivityMessageBubble` for its A2UI
+ * branch, which uses them to lock and pre-fill an already-answered surface and
+ * to lock a pending one the viewer may not submit; other activity types ignore them.
  */
 export function MessageBubble({
   message,
@@ -34,6 +35,7 @@ export function MessageBubble({
   onApprovalResolved,
   pendingToolCallIds,
   toolResultContentByCallId,
+  canActOnSurfaces,
 }: {
   message: Message;
   isStreaming?: boolean;
@@ -45,6 +47,8 @@ export function MessageBubble({
   onApprovalResolved?: (toolCallId: string, decision: "approved" | "rejected" | "returned") => void;
   pendingToolCallIds?: Set<string>;
   toolResultContentByCallId?: Map<string, string>;
+  /** Whether the signed-in viewer may submit the pending A2UI surfaces; defaults to true. */
+  canActOnSurfaces?: boolean;
 }) {
   if (message.role === "user")
     return <UserMessageBubble message={message} avatar={avatar} isOwn={isOwn} />;
@@ -61,6 +65,7 @@ export function MessageBubble({
         onApprovalResolved={onApprovalResolved}
         pendingToolCallIds={pendingToolCallIds}
         toolResultContentByCallId={toolResultContentByCallId}
+        canActOnSurfaces={canActOnSurfaces}
       />
     );
   return null;

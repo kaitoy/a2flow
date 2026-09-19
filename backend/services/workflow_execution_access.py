@@ -51,14 +51,74 @@ initiator-or-designated-approver-or-super-admin-or-admin rule (also against
 effective roles) to the collection endpoints (``GET /workflow-executions``,
 ``GET /approvals``), so a caller never sees a record in a list that
 :meth:`assert_read_access` would then reject on the single-record read.
+
+Passing :meth:`assert_access` admits a caller to the chat, not to every task in
+it. A designated approver's part is their approval; the input forms the agent
+renders for the other steps are the initiator's to fill in, so
+:func:`assert_may_answer_surfaces` rejects an A2UI form submission from anyone
+else -- super admins included, matching ``ApprovalService.resolve``.
 """
 
-from collections.abc import Collection
+import json
+from collections.abc import Collection, Sequence
+
+from ag_ui.core import Message, ToolMessage
 
 from models.user import Role, User, has_any_role
 from repositories.approval import ApprovalRepository
 from repositories.exceptions import ForbiddenError
 from services.approver_groups import ApproverGroupResolver
+from services.session_attribution import RENDER_ACK_RESPONSE
+
+#: The ``render_approval`` results the frontend sends. The decision itself is
+#: recorded through ``PATCH /approvals/{id}``, which has its own approver check;
+#: this result only tells the agent to carry on.
+_APPROVAL_DECISIONS = frozenset({"approved", "rejected", "returned"})
+
+
+def _is_render_ack(content: str) -> bool:
+    """Return whether a tool result is the no-op ``render_a2ui`` acknowledgement."""
+    try:
+        return bool(json.loads(content) == RENDER_ACK_RESPONSE)
+    except ValueError:
+        return False
+
+
+def assert_may_answer_surfaces(
+    messages: Sequence[Message], *, caller_id: str, initiator_id: str
+) -> None:
+    """Reject A2UI form submissions from anyone but the execution initiator.
+
+    A non-initiator's run may carry only two kinds of tool result: the no-op
+    render acknowledgement every run flushes for the still-pending surfaces,
+    and a ``render_approval`` decision. Anything else answering a client tool
+    call is the ``{"status": "action", ...}`` payload of a submitted form.
+
+    The check is by content rather than by matching ``tool_call_id`` against
+    the session's ``render_a2ui`` calls: ADK can hand a long-running client
+    tool a different id in the persisted event than in the streamed one, so
+    the id the frontend echoes back is not reliably in the session.
+
+    Args:
+        messages: The run's incoming messages, system messages already stripped.
+        caller_id: The authenticated user driving the run.
+        initiator_id: ``WorkflowExecution.initiator_id``.
+
+    Raises:
+        ForbiddenError: If ``caller_id`` is not the initiator and ``messages``
+            contain a tool result that is neither a render acknowledgement nor
+            an approval decision.
+    """
+    if caller_id == initiator_id:
+        return
+    for message in messages:
+        if not isinstance(message, ToolMessage):
+            continue
+        if message.content in _APPROVAL_DECISIONS or _is_render_ack(message.content):
+            continue
+        raise ForbiddenError(
+            "Only the execution initiator can submit a form the agent rendered"
+        )
 
 
 class WorkflowExecutionAccessPolicy:

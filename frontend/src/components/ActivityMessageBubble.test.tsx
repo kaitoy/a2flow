@@ -335,6 +335,43 @@ describe("ActivityMessageBubble", () => {
     expect(el).toHaveAttribute("data-has-action", "false");
   });
 
+  it("renders a pending A2UI surface inert with a waiting note when the viewer cannot act on it", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { [A2UI_OPERATIONS_KEY]: [], [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
+        }}
+        onAction={vi.fn()}
+        pendingToolCallIds={new Set(["tc-1"])}
+        canActOnSurfaces={false}
+      />
+    );
+    const el = screen.getByTestId("a2ui-renderer-mock");
+    expect(el).toHaveAttribute("data-resolved", "true");
+    expect(el).toHaveAttribute("data-has-action", "false");
+    expect(screen.getByText("Waiting for the initiator to respond.")).toBeInTheDocument();
+  });
+
+  it("shows no waiting note on a resolved surface even when the viewer cannot act", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "1",
+          role: "activity",
+          activityType: A2UIActivityType,
+          content: { [A2UI_OPERATIONS_KEY]: [], [A2UI_SOURCE_TOOL_CALL_ID_KEY]: "tc-1" },
+        }}
+        onAction={vi.fn()}
+        pendingToolCallIds={new Set()}
+        canActOnSurfaces={false}
+      />
+    );
+    expect(screen.queryByText("Waiting for the initiator to respond.")).not.toBeInTheDocument();
+  });
+
   it("pre-fills a resolved surface with the data model the user submitted", () => {
     const payload = [
       { version: "v0.9", createSurface: { surfaceId: "s1" } },

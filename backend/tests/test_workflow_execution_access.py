@@ -515,6 +515,105 @@ async def test_approver_can_stream_agent(
     assert res.status_code == 200
 
 
+def _tool_result_messages(
+    name: str, tool_call_id: str, content: str
+) -> list[dict[str, Any]]:
+    """Build the carrier + tool-result pair the frontend sends to answer a client tool call."""
+    return [
+        {
+            "id": f"carrier-{tool_call_id}",
+            "role": "assistant",
+            "toolCalls": [
+                {
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {"name": name, "arguments": "{}"},
+                }
+            ],
+        },
+        {
+            "id": f"result-{tool_call_id}",
+            "role": "tool",
+            "toolCallId": tool_call_id,
+            "content": content,
+        },
+    ]
+
+
+#: The tool result of a ``render_a2ui`` call the user submitted a form on.
+_A2UI_ACTION = '{"status":"action","name":"submit","surfaceId":"s1","context":{},"values":{"region":"x"}}'
+
+
+def _a2ui_action_input() -> dict[str, Any]:
+    """RunAgentInput carrying one A2UI form submission."""
+    return {
+        **_run_agent_input(),
+        "messages": _tool_result_messages("render_a2ui", "tc-1", _A2UI_ACTION),
+    }
+
+
+async def test_approver_cannot_submit_a2ui_action(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A designated approver may drive the chat but not submit a form the agent rendered."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_approval(eng, workflow_execution_id=execution_id)
+    res = await client.post(
+        f"/api/v1/workflow-executions/{execution_id}/agent",
+        json=_a2ui_action_input(),
+        headers=APPROVER,
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_super_admin_cannot_submit_a2ui_action(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    res = await client.post(
+        f"/api/v1/workflow-executions/{execution_id}/agent",
+        json=_a2ui_action_input(),
+        headers=SUPER_ADMIN,
+    )
+    assert_err(res, "FORBIDDEN", 403)
+
+
+async def test_owner_can_submit_a2ui_action(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    res = await client.post(
+        f"/api/v1/workflow-executions/{execution_id}/agent",
+        json=_a2ui_action_input(),
+        headers=OWNER,
+    )
+    assert res.status_code == 200
+
+
+async def test_approver_can_send_render_ack_and_decision(
+    access_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The no-op render ack and the approval decision are not form submissions."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    await _insert_approval(eng, workflow_execution_id=execution_id)
+    res = await client.post(
+        f"/api/v1/workflow-executions/{execution_id}/agent",
+        json={
+            **_run_agent_input(),
+            "messages": [
+                *_tool_result_messages("render_a2ui", "tc-1", '{"status": "rendered"}'),
+                *_tool_result_messages("render_approval", "tc-2", "approved"),
+            ],
+        },
+        headers=APPROVER,
+    )
+    assert res.status_code == 200
+
+
 # ---------- task status update ----------
 
 

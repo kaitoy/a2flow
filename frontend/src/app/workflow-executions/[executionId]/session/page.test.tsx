@@ -42,7 +42,9 @@ vi.mock("@/hooks/useWorkflowSessionChat", () => ({
 }));
 
 vi.mock("@/components/MessageList", () => ({
-  MessageList: () => <div data-testid="message-list-mock" />,
+  MessageList: ({ canActOnSurfaces }: { canActOnSurfaces?: boolean }) => (
+    <div data-testid="message-list-mock" data-can-act={String(canActOnSurfaces)} />
+  ),
 }));
 
 vi.mock("@/components/ChatInput", () => ({
@@ -149,5 +151,26 @@ describe("WorkflowSessionPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByTestId("message-list-mock")).not.toBeInTheDocument());
+  });
+
+  it("lets the initiator act on the A2UI surfaces", async () => {
+    // AuthProvider replaces the preloaded user with the `/auth/me` payload (USER_1).
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id", () =>
+        envelope({ ...WORKFLOW_EXECUTION_1, initiatorId: "user-1" })
+      )
+    );
+    render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+    expect(await screen.findByTestId("message-list-mock")).toHaveAttribute("data-can-act", "true");
+  });
+
+  it("locks the A2UI surfaces for a viewer who is not the initiator", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id", () =>
+        envelope({ ...WORKFLOW_EXECUTION_1, initiatorId: "someone-else" })
+      )
+    );
+    render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+    expect(await screen.findByTestId("message-list-mock")).toHaveAttribute("data-can-act", "false");
   });
 });

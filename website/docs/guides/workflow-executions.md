@@ -43,7 +43,7 @@ A run's chat is **shared by its participants**, not private to whoever started i
 | Who | What they get |
 |---|---|
 | The **initiator** who started the run | The full conversation, and the chat input |
-| A **designated approver** of one of its [approvals](./approvals.md) | The same conversation and state — approving resumes the original run rather than starting a fresh, empty one |
+| A **designated approver** of one of its [approvals](./approvals.md) | The same conversation and state — approving resumes the original run rather than starting a fresh, empty one. Their approval is the one thing that is theirs to act on: an input form the agent renders for any other step is read-only for them, with a "Waiting for the initiator to respond." note beneath it |
 | An **Admin** of the tenant | Read-only visibility |
 | Anyone else | No access |
 

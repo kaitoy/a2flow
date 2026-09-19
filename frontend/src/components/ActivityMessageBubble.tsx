@@ -56,7 +56,10 @@ function surfaceRowClass(avatar: ReactNode, isOwn: boolean): string {
  * `render_a2ui` call id is absent from `pendingToolCallIds` is already resolved and
  * renders inert (see {@link A2uiRenderer}'s `resolved` prop), pre-filled with the
  * data model the resolving tool message recorded — so a reloaded session shows the
- * values the user submitted rather than the agent's defaults.
+ * values the user submitted rather than the agent's defaults. A pending surface
+ * also renders inert when `canActOnSurfaces` is false — the viewer shares the chat
+ * but the form is someone else's to fill in — with a waiting note in place of the
+ * action, mirroring what {@link ApprovalControls} shows a non-approver.
  */
 export function ActivityMessageBubble({
   message,
@@ -67,6 +70,7 @@ export function ActivityMessageBubble({
   onApprovalResolved,
   pendingToolCallIds,
   toolResultContentByCallId,
+  canActOnSurfaces = true,
 }: {
   message: ActivityMessage;
   avatar?: ReactNode;
@@ -77,6 +81,8 @@ export function ActivityMessageBubble({
   onApprovalResolved?: (toolCallId: string, decision: Decision) => void;
   pendingToolCallIds?: Set<string>;
   toolResultContentByCallId?: Map<string, string>;
+  /** Whether the signed-in viewer may submit the pending A2UI surfaces (the run's initiator). */
+  canActOnSurfaces?: boolean;
 }) {
   // A2UI branch data, computed unconditionally (hooks can't follow the early
   // returns below) but only meaningful when activityType === A2UIActivityType.
@@ -125,15 +131,21 @@ export function ActivityMessageBubble({
     // The middleware also emits lifecycle snapshots (e.g. { status: "building" })
     // under the same activity type; only snapshots carrying operations are renderable.
     if (payload == null) return null;
+    const interactive = !isResolved && canActOnSurfaces;
     return (
       <div className={surfaceRowClass(avatar, isOwn)}>
         {!isOwn && avatar}
         <div className="max-w-[85%] w-full">
           <A2uiRenderer
             payload={displayPayload}
-            onAction={isResolved ? undefined : onAction}
-            resolved={isResolved}
+            onAction={interactive ? onAction : undefined}
+            resolved={!interactive}
           />
+          {!isResolved && !canActOnSurfaces && (
+            <p className="mt-3 text-sm text-on-surface-variant">
+              Waiting for the initiator to respond.
+            </p>
+          )}
         </div>
         {isOwn && avatar}
       </div>

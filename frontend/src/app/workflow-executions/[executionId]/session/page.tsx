@@ -100,6 +100,11 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     currentUser,
   });
 
+  // An approver shares the chat but only their approval is theirs to act on;
+  // the forms the agent renders for the other steps belong to the initiator.
+  // The backend rejects anyone else's submission, so this only keeps the UI honest.
+  const canActOnSurfaces = currentUser?.id === execution.initiatorId;
+
   if (chatForbidden) {
     return <AccessDeniedState fill="screen" />;
   }
@@ -173,6 +178,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
           onAction={sendA2uiAction}
           onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}
+          canActOnSurfaces={canActOnSurfaces}
         />
         <ChatInput
           onSend={sendMessage}
