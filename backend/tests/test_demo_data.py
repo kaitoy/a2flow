@@ -54,6 +54,7 @@ from infrastructure.demo_data import (
     DEMO_GKE_SKILL_NAME,
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
+    DEMO_PATCH_WORKLOAD_MOCK_ID,
     DEMO_REQUEST_APPROVAL_MOCK_ID,
     DEMO_REQUESTERS_GROUP_ID,
     DEMO_REVIEWERS_GROUP_ID,
@@ -224,7 +225,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     assert len(await _demo_users(engine)) == 8
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
-    assert len(await _rows(engine, MCPToolMock)) == 4
+    assert len(await _rows(engine, MCPToolMock)) == 5
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
     assert len(await _rows(engine, UserGroup)) == 6
@@ -256,7 +257,7 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _demo_users(engine)) == 8
     assert len(await _rows(engine, Secret)) == 2
     assert len(await _rows(engine, MCPServer)) == 2
-    assert len(await _rows(engine, MCPToolMock)) == 4
+    assert len(await _rows(engine, MCPToolMock)) == 5
     assert len(await _rows(engine, AgentSkill)) == 2
     assert len(await _rows(engine, Tag)) == 3
     assert len(await _rows(engine, UserGroup)) == 6
@@ -1012,6 +1013,7 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     assert set(mocks) == {
         DEMO_CALL_AWS_MOCK_ID,
         DEMO_RUN_SCRIPT_MOCK_ID,
+        DEMO_PATCH_WORKLOAD_MOCK_ID,
         DEMO_DELETE_POD_MOCK_ID,
         DEMO_REQUEST_APPROVAL_MOCK_ID,
     }
@@ -1019,6 +1021,7 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     assert targets == {
         (DEMO_MCP_SERVER_ID, "aws___call_aws"),
         (DEMO_MCP_SERVER_ID, "aws___run_script"),
+        (DEMO_GKE_MCP_SERVER_ID, "patch_k8s_resource"),
         (DEMO_GKE_MCP_SERVER_ID, "delete_k8s_resource"),
         (None, "request_approval"),
     }
@@ -1032,6 +1035,8 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     assert approval.responses[0]["value"] == {"status": "approved"}
     launch = mocks[DEMO_CALL_AWS_MOCK_ID]
     assert launch.responses[0]["value"]["Instances"][0]["InstanceId"].startswith("i-")
+    workload_restart = mocks[DEMO_PATCH_WORKLOAD_MOCK_ID]
+    assert workload_restart.responses[0]["value"]["status"] == "patched"
     pod_restart = mocks[DEMO_DELETE_POD_MOCK_ID]
     assert pod_restart.responses[0]["value"]["status"] == "deleted"
 

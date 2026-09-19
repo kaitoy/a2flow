@@ -16,11 +16,12 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
   Kubernetes Engine) remote MCP server, sending the Google Cloud API key as
   its ``x-goog-api-key`` header via the same ``${secret:NAME/KEY}``
   placeholder, both described,
-* four MCPToolMocks that stub the demo run's side-effecting tools so a
+* five MCPToolMocks that stub the demo run's side-effecting tools so a
   ``draft`` workflow run plays through without reaching AWS, a real GKE
   cluster, or waiting on a human -- ``call_aws`` and ``run_script`` on the AWS
-  MCP server, each returning a successful EC2 launch, ``delete_k8s_resource``
-  on the GKE MCP server, returning a successful pod deletion, and the
+  MCP server, each returning a successful EC2 launch, ``patch_k8s_resource``
+  and ``delete_k8s_resource`` on the GKE MCP server, returning a successful
+  rolling restart and a successful pod deletion respectively, and the
   built-in ``request_approval``, returning ``approved``,
 * two AgentSkills pointing at ``sample_skills/aws-ec2-launch`` and
   ``sample_skills/gke-pod-restart`` in this repository,
@@ -204,6 +205,9 @@ DEMO_REQUEST_APPROVAL_MOCK_ID = "00000000-0000-0000-0000-00000000d603"
 #: Fixed identifier of the demo ``delete_k8s_resource`` tool mock (GKE MCP server).
 DEMO_DELETE_POD_MOCK_ID = "00000000-0000-0000-0000-00000000d604"
 
+#: Fixed identifier of the demo ``patch_k8s_resource`` tool mock (GKE MCP server).
+DEMO_PATCH_WORKLOAD_MOCK_ID = "00000000-0000-0000-0000-00000000d605"
+
 #: Name of the demo tag shared by the secret, MCP server, and agent skill.
 DEMO_AWS_TAG_NAME = "AWS"
 
@@ -255,6 +259,9 @@ DEMO_REQUEST_APPROVAL_MOCK_NAME = "Demo request_approval (always approved)"
 
 #: Name of the demo ``delete_k8s_resource`` tool mock as shown in the admin UI.
 DEMO_DELETE_POD_MOCK_NAME = "Demo GKE delete_k8s_resource (pod restart success)"
+
+#: Name of the demo ``patch_k8s_resource`` tool mock as shown in the admin UI.
+DEMO_PATCH_WORKLOAD_MOCK_NAME = "Demo GKE patch_k8s_resource (rolling restart success)"
 
 #: Proxy package the demo MCP server is launched from. Pinned to an exact
 #: version rather than ``@latest``, which is what the upstream migration guide
@@ -316,7 +323,8 @@ _DEMO_MCP_SERVER_DESCRIPTION = (
 _DEMO_GKE_MCP_SERVER_DESCRIPTION = (
     "Google-managed GKE (Google Kubernetes Engine) remote MCP server, "
     "providing tools to manage GKE clusters and their Kubernetes resources -- "
-    "including mutating tools such as deleting a pod."
+    "including mutating tools such as rolling-restarting a workload or "
+    "deleting a pod."
 )
 
 #: Description shown on the demo ``AWS`` tag in the admin UI.
@@ -512,11 +520,18 @@ _DEMO_CALL_AWS_TOOL = "aws___call_aws"
 #: The tool of the demo AWS MCP server that runs a script (AWS CLI + boto3).
 _DEMO_RUN_SCRIPT_TOOL = "aws___run_script"
 
-#: The tool of the demo GKE MCP server that deletes a Kubernetes resource.
-#: Connected directly over ``streamable_http`` with no proxy in between, so
-#: the tool carries the bare name the Google-managed server itself declares,
-#: unlike the AWS tools above (bridged, and namespaced, through
+#: The tool of the demo GKE MCP server that patches a Kubernetes resource --
+#: used here to trigger a rolling restart of a Deployment/StatefulSet by
+#: bumping a restart-timestamp annotation on its pod template. Connected
+#: directly over ``streamable_http`` with no proxy in between, so the tool
+#: carries the bare name the Google-managed server itself declares, unlike
+#: the AWS tools above (bridged, and namespaced, through
 #: ``mcp-proxy-for-aws``).
+_DEMO_PATCH_WORKLOAD_TOOL = "patch_k8s_resource"
+
+#: The tool of the demo GKE MCP server that deletes a Kubernetes resource --
+#: used here as the single-pod fallback restart path. Connected the same way
+#: as :data:`_DEMO_PATCH_WORKLOAD_TOOL`.
 _DEMO_DELETE_POD_TOOL = "delete_k8s_resource"
 
 #: Instance id shared by the ``call_aws`` and ``run_script`` mock results, so a
@@ -563,10 +578,27 @@ _DEMO_RUN_SCRIPT_RESULT: dict[str, Any] = {
     },
 }
 
-#: Pod identity shared by the demo ``delete_k8s_resource`` mock's request and
-#: result, so the story it tells is self-consistent.
+#: Workload and pod identity shared by the demo GKE mocks' requests and
+#: results, so the story they tell is self-consistent: the pod belongs to the
+#: Deployment.
+_DEMO_MOCK_WORKLOAD_KIND = "Deployment"
+_DEMO_MOCK_WORKLOAD_NAME = "api"
 _DEMO_MOCK_POD_NAME = "api-7d4f8-abc12"
 _DEMO_MOCK_POD_NAMESPACE = "prod"
+
+#: Structured result of the demo ``patch_k8s_resource`` mock: the workload
+#: identity and rollout status a real pod-template patch against the GKE MCP
+#: server would report back.
+_DEMO_PATCH_WORKLOAD_RESULT: dict[str, Any] = {
+    "kind": _DEMO_MOCK_WORKLOAD_KIND,
+    "name": _DEMO_MOCK_WORKLOAD_NAME,
+    "namespace": _DEMO_MOCK_POD_NAMESPACE,
+    "status": "patched",
+    "message": (
+        f"{_DEMO_MOCK_WORKLOAD_KIND} {_DEMO_MOCK_WORKLOAD_NAME} pod template "
+        "patched; rolling restart in progress (3/3 pods replaced)."
+    ),
+}
 
 #: Structured result of the demo ``delete_k8s_resource`` mock: the pod
 #: identity and status a real deletion call against the GKE MCP server would
@@ -601,11 +633,19 @@ _DEMO_REQUEST_APPROVAL_MOCK_DESCRIPTION = (
     "the demo workflow plays through without waiting on a manager's decision."
 )
 
+#: Description shown on the demo ``patch_k8s_resource`` tool mock in the admin UI.
+_DEMO_PATCH_WORKLOAD_MOCK_DESCRIPTION = (
+    "Stubs the GKE MCP Server's patch_k8s_resource tool with a successful "
+    "rolling restart, so a draft run of the demo workflow completes its "
+    "restart step without reaching a real GKE cluster."
+)
+
 #: Description shown on the demo ``delete_k8s_resource`` tool mock in the admin UI.
 _DEMO_DELETE_POD_MOCK_DESCRIPTION = (
     "Stubs the GKE MCP Server's delete_k8s_resource tool with a successful "
-    "pod deletion, so a draft run of the demo workflow completes its restart "
-    "step without reaching a real GKE cluster."
+    "pod deletion, so a draft run of the demo workflow can still complete "
+    "the single-pod fallback restart path without reaching a real GKE "
+    "cluster."
 )
 
 
@@ -634,11 +674,12 @@ class _DemoToolMockSpec:
 
 #: The demo tool mocks, all in the seeded ``Default`` tenant. The first two stub
 #: tools of the demo AWS MCP server (see :func:`_seed_demo_mcp_server`); the
-#: third stubs the demo GKE MCP server's tool (see
-#: :func:`_seed_demo_gke_mcp_server`); the fourth stubs the built-in
-#: :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`. Checked in a draft
-#: run's Run dialog, together they let either sample workflow -- "launch an
-#: EC2 instance" or "restart a GKE pod" -- run end to end without reaching
+#: third and fourth stub the demo GKE MCP server's tools (see
+#: :func:`_seed_demo_gke_mcp_server`) -- rolling-restarting a Deployment/
+#: StatefulSet, and, as a fallback, deleting a single pod; the fifth stubs the
+#: built-in :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`. Checked in a
+#: draft run's Run dialog, together they let either sample workflow -- "launch
+#: an EC2 instance" or "restart a GKE pod" -- run end to end without reaching
 #: AWS, a real GKE cluster, or an approver.
 _DEMO_TOOL_MOCKS = (
     _DemoToolMockSpec(
@@ -656,6 +697,14 @@ _DEMO_TOOL_MOCKS = (
         mcp_server_id=DEMO_MCP_SERVER_ID,
         tool_name=_DEMO_RUN_SCRIPT_TOOL,
         response={"kind": "structured", "value": _DEMO_RUN_SCRIPT_RESULT},
+    ),
+    _DemoToolMockSpec(
+        id=DEMO_PATCH_WORKLOAD_MOCK_ID,
+        name=DEMO_PATCH_WORKLOAD_MOCK_NAME,
+        description=_DEMO_PATCH_WORKLOAD_MOCK_DESCRIPTION,
+        mcp_server_id=DEMO_GKE_MCP_SERVER_ID,
+        tool_name=_DEMO_PATCH_WORKLOAD_TOOL,
+        response={"kind": "structured", "value": _DEMO_PATCH_WORKLOAD_RESULT},
     ),
     _DemoToolMockSpec(
         id=DEMO_DELETE_POD_MOCK_ID,
@@ -1173,8 +1222,8 @@ async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> No
     header; the value is a ``${secret:NAME/KEY}`` placeholder resolved at
     connection time by :class:`infrastructure.secret_resolver.SecretResolver`,
     so the key never lands in the ``mcp_servers`` row. Like the AWS demo
-    server, its tools can mutate real infrastructure -- deleting a Pod, in
-    particular.
+    server, its tools can mutate real infrastructure -- rolling-restarting a
+    workload or deleting a Pod, in particular.
 
     Args:
         session: Database session used to read and insert the server.
@@ -1206,17 +1255,18 @@ async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> No
 async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo tool mocks that let a draft run play through unattended.
 
-    Four stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
+    Five stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
     ``run_script`` on the demo AWS MCP server, each returning a successful EC2
-    launch, ``delete_k8s_resource`` on the demo GKE MCP server, returning a
-    successful pod deletion, and the built-in
+    launch, ``patch_k8s_resource`` and ``delete_k8s_resource`` on the demo GKE
+    MCP server, returning a successful rolling restart and a successful pod
+    deletion respectively, and the built-in
     :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`, returning ``approved``.
     Selected in a draft run's Run dialog, they let either sample workflow --
     "launch an EC2 instance" or "restart a GKE pod" -- run end to end without
     reaching AWS, a real GKE cluster, or waiting on an approver.
 
     Must run after :func:`_seed_demo_mcp_server` and
-    :func:`_seed_demo_gke_mcp_server`: the first three mocks reference
+    :func:`_seed_demo_gke_mcp_server`: the first four mocks reference
     ``mcp_servers.id``. Each mock defines a single response, so it behaves as a
     constant however many times the run calls the tool. ``responses`` is stored
     as plain ``{"kind", "value"}`` dicts because the table column cannot carry
@@ -1288,12 +1338,12 @@ async def _seed_demo_gke_agent_skill(
 ) -> str | None:
     """Create the demo agent skill pointing at the ``gke-pod-restart`` sample.
 
-    A second sample skill, this one restarting a Kubernetes Pod on a GKE
-    cluster: it deletes a specific pod through the GKE MCP server so its
-    owning controller recreates it, gated by a manager's explicit approval of
-    exactly which pod. Registered exactly like :func:`_seed_demo_agent_skill`
-    -- built as a table model directly, left ``pending`` for the caller to
-    clone.
+    A second sample skill, this one restarting workloads on a GKE cluster: by
+    default it rolling-restarts a Deployment or StatefulSet through the GKE
+    MCP server, falling back to deleting a single named pod when that is what
+    the user wants gone, gated by a manager's explicit approval of the exact
+    target. Registered exactly like :func:`_seed_demo_agent_skill` -- built as
+    a table model directly, left ``pending`` for the caller to clone.
 
     Args:
         session: Database session used to read and insert the skill.
@@ -1313,10 +1363,10 @@ async def _seed_demo_gke_agent_skill(
             repo_url=_DEMO_SKILL_REPO_URL,
             repo_path=_DEMO_GKE_SKILL_REPO_PATH,
             description=(
-                "Restart a specific Kubernetes Pod on a GKE cluster by "
-                "deleting it through the GKE MCP server so its owning "
-                "controller recreates it, gated by a manager's explicit "
-                "approval of exactly which pod."
+                "Rolling-restart a Deployment or StatefulSet on a GKE "
+                "cluster through the GKE MCP server -- or, when only one "
+                "pod should go, delete that pod -- gated by a manager's "
+                "explicit approval of the exact target."
             ),
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
