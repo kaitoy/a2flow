@@ -138,7 +138,9 @@ async def test_list_session_files_isolates_sessions(engine: AsyncEngine) -> None
     assert (await list_session_files(_ctx("sess-b")))["files"] == []
 
 
-async def test_list_session_files_without_a_session_returns_an_error() -> None:
+async def test_list_session_files_without_a_session_returns_an_error(
+    engine: AsyncEngine,
+) -> None:
     result = await list_session_files(_ctx("unknown-session"))
     assert "error" in result
 
