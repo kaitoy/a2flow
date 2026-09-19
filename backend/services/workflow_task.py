@@ -4,8 +4,9 @@ Wraps the :class:`WorkflowTaskRepository` with the business rules the router
 needs: raising :class:`NotFoundError` when a task is missing and authorizing
 every operation against the task's parent workflow execution. A run's task list
 is fixed at execute time (copied from the workflow's published templates), so
-this service exposes only ``get`` and ``update`` -- there is no create or delete
-path, and ``update`` touches only ``status`` / ``error_kind`` / ``error_message``
+this service exposes only ``get``, ``list``, and ``update`` -- there is no
+create or delete path, and ``update`` touches only ``status`` / ``error_kind`` /
+``error_message``
 (titles, descriptions, dependency edges and tool bindings are immutable once a
 task exists). Reading a task (``get``) is open to the execution's initiator, a
 designated approver of it, a super admin, or a plain admin (read-only,
@@ -31,7 +32,7 @@ for the same reason: a task started from here has to end up able to call its
 tools, exactly as one the agent started does.
 """
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 
 from infrastructure.approval_scope import (
     active_approval_by_task,
@@ -48,6 +49,7 @@ from repositories.exceptions import (
     ForbiddenError,
     NotFoundError,
 )
+from repositories.query import FilterSpec, SortSpec
 from repositories.workflow_execution import WorkflowExecutionRepository
 from repositories.workflow_task import WorkflowTaskRepository
 from services.approver_groups import ApproverGroupResolver
@@ -274,6 +276,35 @@ class WorkflowTaskService:
             task.workflow_execution_id, caller, caller_roles
         )
         return task
+
+    async def list(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[WorkflowTaskRead]:
+        """Return WorkflowTasks across every execution in the acting tenant.
+
+        No per-row ownership check: reserved for the ``admin``-gated flat
+        ``GET /workflow-tasks`` route, which authorizes by role alone (see
+        ``McpToolInvocationService.list``) rather than the per-execution
+        participant check :meth:`get` applies -- a plain admin cannot reach
+        this method through any other route.
+
+        Args:
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            sort: Sort fields, defaulting to ``created_at`` then ``id``.
+            filters: Filter predicates, e.g. ``id:in:`` for name resolution.
+
+        Returns:
+            The matching WorkflowTasks.
+        """
+        return await self._repo.list(
+            limit=limit, offset=offset, sort=sort, filters=filters
+        )
 
     async def update(
         self, task_id: str, data: WorkflowTaskUpdate, *, caller: User

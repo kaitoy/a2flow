@@ -2,9 +2,15 @@
 
 A WorkflowTask is a single actionable item belonging to a WorkflowExecution.
 Listing the tasks of a particular execution is exposed on the WorkflowExecution
-router as ``GET /workflow-executions/{session_id}/workflow-tasks``; this router
-focuses on acting on a single task (enforced by
-:class:`~services.workflow_task.WorkflowTaskService`).
+router as ``GET /workflow-executions/{session_id}/workflow-tasks``; most of
+this router focuses on acting on a single task (enforced by
+:class:`~services.workflow_task.WorkflowTaskService`). The exception is the
+flat ``GET /workflow-tasks`` below, an ``admin``-gated surface spanning every
+execution in the tenant -- it exists so the tenant-wide MCP audit trails
+(``GET /mcp-tool-invocations``, ``GET /mcp-tool-certificates``) can resolve a
+row's ``workflowTaskId`` to its ``title`` with one batched ``id:in:`` lookup,
+the same way ``GET /workflow-executions`` and ``GET /approvals`` already let
+those trails resolve their own execution/approval ids.
 
 A run's task list is fixed at execute time (copied from the workflow's
 published templates), so there is no create or delete endpoint here, and
@@ -19,18 +25,54 @@ task has a linked Approval: only the execution initiator or that Approval's
 designated approver may do so.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from dependencies.auth import CurrentUserDep, EffectiveRolesDep
-from dependencies.context import ApiMetaDep
+from dependencies.authz import require_roles
+from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
 from dependencies.service import WorkflowTaskServiceDep
 from models.response import ApiResponse
+from models.user import Role
 from models.workflow_task import (
     WorkflowTaskRead,
     WorkflowTaskUpdate,
 )
 
 router = APIRouter(prefix="/workflow-tasks", tags=["workflow-tasks"])
+
+#: Route dependency gating the tenant-wide flat list behind the ``admin`` role.
+_requires_admin = [Depends(require_roles(Role.admin))]
+
+
+@router.get(
+    "",
+    response_model=ApiResponse[list[WorkflowTaskRead]],
+    dependencies=_requires_admin,
+)
+async def list_workflow_tasks(
+    service: WorkflowTaskServiceDep,
+    pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[WorkflowTaskRead]]:
+    """Return WorkflowTask records across every execution in the acting tenant.
+
+    Unlike ``GET /{task_id}`` below, this does not check per-execution
+    participant access -- it authorizes by role alone, admin or super admin,
+    matching the other tenant-wide MCP audit surfaces. A platform-scoped
+    super admin may select ``X-Tenant-Id: __all__`` to list across every
+    tenant at once. Defaults to ``createdAt`` then ``id`` ascending; the
+    typical caller filters with ``q=id:in:<comma-separated ids>`` to resolve a
+    batch of task ids to their titles.
+    """
+    items = await service.list(
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort=sort.sort,
+        filters=filters.filters,
+    )
+    return ApiResponse(meta=meta, data=items)
 
 
 @router.get("/{task_id}", response_model=ApiResponse[WorkflowTaskRead])

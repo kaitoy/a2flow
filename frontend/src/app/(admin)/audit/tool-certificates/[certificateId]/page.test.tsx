@@ -60,6 +60,12 @@ describe("AuditToolCertificateDetailPage", () => {
     expect(screen.queryByRole("link", { name: "appr-1" })).not.toBeInTheDocument();
   });
 
+  it("shows the workflow task's resolved title, linked to its detail page", async () => {
+    render(<AuditToolCertificateDetailPage />);
+    const link = await screen.findByRole("link", { name: "Step 1" });
+    expect(link).toHaveAttribute("href", "/workflow-executions/execution-1/workflow-tasks/task-1");
+  });
+
   it("shows a revoked certificate with its reason", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/mcp-tool-certificates/:id", () =>

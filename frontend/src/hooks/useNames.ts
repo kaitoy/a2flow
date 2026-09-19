@@ -13,6 +13,8 @@ import { useEffect, useState } from "react";
 import {
   getUserNames,
   type ListQuery,
+  listAllWorkflowTasks,
+  listApprovals,
   listTenants,
   listUserGroups,
   listWorkflowExecutions,
@@ -87,6 +89,8 @@ const groupNames = byList(listUserGroups, (group) => group.name);
 const workflowNames = byList(listWorkflows, (workflow) => workflow.name);
 const executionNames = byList(listWorkflowExecutions, (execution) => execution.name);
 const tenantNames = byList(listTenants, (tenant) => tenant.displayName);
+const taskNames = byList(listAllWorkflowTasks, (task) => task.title);
+const approvalNames = byList(listApprovals, (approval) => approval.title);
 
 /**
  * Resolve user ids to display names through `POST /users/resolve-names`, which
@@ -129,6 +133,29 @@ export function useWorkflowExecutionNames(
   ids: Iterable<string | null | undefined>
 ): Map<string, string> {
   return useNames(ids, executionNames);
+}
+
+/**
+ * Resolve workflow task ids to their `title`, across every execution in the
+ * tenant (`GET /workflow-tasks`, admin-only).
+ *
+ * @param ids - Workflow task ids.
+ * @returns Map from task id to its title.
+ */
+export function useWorkflowTaskNames(
+  ids: Iterable<string | null | undefined>
+): Map<string, string> {
+  return useNames(ids, taskNames);
+}
+
+/**
+ * Resolve approval ids to their `title`.
+ *
+ * @param ids - Approval ids.
+ * @returns Map from approval id to its title.
+ */
+export function useApprovalNames(ids: Iterable<string | null | undefined>): Map<string, string> {
+  return useNames(ids, approvalNames);
 }
 
 /**

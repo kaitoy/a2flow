@@ -18,7 +18,13 @@ import { DateTime } from "@/components/ui/date-time";
 import { StatusDot } from "@/components/ui/status-dot";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
-import { useTenantNames, useUserNames } from "@/hooks/useNames";
+import {
+  useApprovalNames,
+  useTenantNames,
+  useUserNames,
+  useWorkflowExecutionNames,
+  useWorkflowTaskNames,
+} from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { listMcpServers, listMcpToolCertificates, type McpToolCertificate } from "@/lib/api";
 import { CERTIFICATE_GRANT_DOT_CLASS, CERTIFICATE_GRANT_LABEL } from "@/lib/certificate-grant";
@@ -66,6 +72,9 @@ export default function AuditToolCertificatesPage() {
   }, []);
 
   const names = useUserNames(rows.flatMap((c) => [c.grantedBy, c.createdBy, c.updatedBy]));
+  const executionNames = useWorkflowExecutionNames(rows.map((c) => c.workflowExecutionId));
+  const taskNames = useWorkflowTaskNames(rows.map((c) => c.workflowTaskId));
+  const approvalNames = useApprovalNames(rows.map((c) => c.approvalId));
   const isAllTenantsView = useIsAllTenantsView();
   // Only resolved when the Tenant column is actually rendered: the lookup goes
   // through the super_admin-only tenants list, so asking for it as a plain
@@ -116,7 +125,7 @@ export default function AuditToolCertificatesPage() {
               href={`/approvals/${c.approvalId}`}
               className="font-medium text-accent transition-colors hover:underline"
             >
-              {`${c.approvalId.slice(0, 8)}…`}
+              {approvalNames.get(c.approvalId) ?? c.approvalId}
             </Link>
           ) : (
             EMPTY_VALUE
@@ -190,18 +199,25 @@ export default function AuditToolCertificatesPage() {
             href={`/workflow-executions/${c.workflowExecutionId}`}
             className="font-medium text-accent transition-colors hover:underline"
           >
-            {`${c.workflowExecutionId.slice(0, 8)}…`}
+            {executionNames.get(c.workflowExecutionId) ?? c.workflowExecutionId}
           </Link>
         ),
       },
       {
         header: "Workflow Task",
         visibility: "optional",
-        cell: (c) => `${c.workflowTaskId.slice(0, 8)}…`,
+        cell: (c) => (
+          <Link
+            href={`/workflow-executions/${c.workflowExecutionId}/workflow-tasks/${c.workflowTaskId}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {taskNames.get(c.workflowTaskId) ?? c.workflowTaskId}
+          </Link>
+        ),
       },
       ...auditColumns<McpToolCertificate>(names),
     ],
-    [serverNameById, names, tenantNames, isAllTenantsView]
+    [serverNameById, names, executionNames, taskNames, approvalNames, tenantNames, isAllTenantsView]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(

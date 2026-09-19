@@ -575,6 +575,8 @@ export const handlers = [
     }
   ),
 
+  http.get(`${BASE}/api/v1/workflow-tasks`, () => envelope([WORKFLOW_TASK_1])),
+
   http.get(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),
 
   http.patch(`${BASE}/api/v1/workflow-tasks/:taskId`, () => envelope(WORKFLOW_TASK_1)),

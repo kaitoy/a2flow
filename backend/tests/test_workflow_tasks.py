@@ -374,6 +374,45 @@ async def test_list_session_tasks_invalid_filter_value_returns_400(
     assert_err(response, code="INVALID_QUERY", status=400)
 
 
+# ---------- flat tenant-wide list ----------
+
+
+async def test_list_tasks_spans_every_execution_in_the_tenant(
+    workflow_client: AsyncClient,
+) -> None:
+    execution_a = await _create_workflow_execution(workflow_client)
+    execution_b = await _create_workflow_execution(workflow_client)
+    task_a = await _create_task(workflow_client, execution_a["id"], title="A")
+    task_b = await _create_task(workflow_client, execution_b["id"], title="B")
+    rows = assert_ok(await workflow_client.get("/api/v1/workflow-tasks"))
+    assert {row["id"] for row in rows} >= {task_a["id"], task_b["id"]}
+
+
+async def test_list_tasks_filters_by_id_in(workflow_client: AsyncClient) -> None:
+    execution = await _create_workflow_execution(workflow_client)
+    wanted = await _create_task(workflow_client, execution["id"], title="wanted")
+    await _create_task(workflow_client, execution["id"], title="unwanted")
+    rows = assert_ok(
+        await workflow_client.get(
+            "/api/v1/workflow-tasks", params={"q": f"id:in:{wanted['id']}"}
+        )
+    )
+    assert [row["id"] for row in rows] == [wanted["id"]]
+
+
+async def test_list_tasks_is_forbidden_for_a_non_admin(
+    workflow_client: AsyncClient,
+) -> None:
+    assert_err(
+        await workflow_client.get(
+            "/api/v1/workflow-tasks",
+            headers={"X-User-Id": "bob", "X-User-Roles": ""},
+        ),
+        code="FORBIDDEN",
+        status=403,
+    )
+
+
 # ---------- get ----------
 
 

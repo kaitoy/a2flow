@@ -17,6 +17,11 @@ import { Badge } from "@/components/ui/badge";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import {
+  useApprovalNames,
+  useWorkflowExecutionNames,
+  useWorkflowTaskNames,
+} from "@/hooks/useNames";
+import {
   getMcpToolInvocation,
   isForbiddenError,
   listMcpServers,
@@ -42,6 +47,11 @@ export default function AuditToolInvocationDetailPage() {
   const [forbidden, setForbidden] = useState(false);
   const [invocation, setInvocation] = useState<McpToolInvocation | null>(null);
   const [serverNameById, setServerNameById] = useState<Map<string, string>>(new Map());
+  const executionNames = useWorkflowExecutionNames(
+    invocation ? [invocation.workflowExecutionId] : []
+  );
+  const taskNames = useWorkflowTaskNames(invocation ? [invocation.workflowTaskId] : []);
+  const approvalNames = useApprovalNames(invocation ? [invocation.approvalId] : []);
 
   useEffect(() => {
     let active = true;
@@ -130,14 +140,33 @@ export default function AuditToolInvocationDetailPage() {
                     href={`/workflow-executions/${invocation.workflowExecutionId}`}
                     className="text-accent transition-colors hover:underline"
                   >
-                    {invocation.workflowExecutionId}
+                    {executionNames.get(invocation.workflowExecutionId) ??
+                      invocation.workflowExecutionId}
                   </Link>
                 ) : (
                   EMPTY_VALUE
                 )
               }
             />
-            <DetailItem label="Workflow Task" value={invocation.workflowTaskId || EMPTY_VALUE} />
+            <DetailItem
+              label="Workflow Task"
+              value={
+                invocation.workflowTaskId ? (
+                  invocation.workflowExecutionId ? (
+                    <Link
+                      href={`/workflow-executions/${invocation.workflowExecutionId}/workflow-tasks/${invocation.workflowTaskId}`}
+                      className="text-accent transition-colors hover:underline"
+                    >
+                      {taskNames.get(invocation.workflowTaskId) ?? invocation.workflowTaskId}
+                    </Link>
+                  ) : (
+                    (taskNames.get(invocation.workflowTaskId) ?? invocation.workflowTaskId)
+                  )
+                ) : (
+                  EMPTY_VALUE
+                )
+              }
+            />
             <DetailItem
               label="Approval"
               value={
@@ -146,7 +175,7 @@ export default function AuditToolInvocationDetailPage() {
                     href={`/approvals/${invocation.approvalId}`}
                     className="text-accent transition-colors hover:underline"
                   >
-                    {invocation.approvalId}
+                    {approvalNames.get(invocation.approvalId) ?? invocation.approvalId}
                   </Link>
                 ) : (
                   EMPTY_VALUE

@@ -17,7 +17,12 @@ import { Chip } from "@/components/ui/chip";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { StatusDot } from "@/components/ui/status-dot";
-import { useUserNames } from "@/hooks/useNames";
+import {
+  useApprovalNames,
+  useUserNames,
+  useWorkflowExecutionNames,
+  useWorkflowTaskNames,
+} from "@/hooks/useNames";
 import {
   getMcpToolCertificateById,
   isForbiddenError,
@@ -49,6 +54,11 @@ export default function AuditToolCertificateDetailPage() {
   // claim of the certificate, not one of the record's audit fields.
   const grantorNames = useUserNames(certificate ? [certificate.grantedBy] : []);
   const grantorName = certificate ? grantorNames.get(certificate.grantedBy) : undefined;
+  const executionNames = useWorkflowExecutionNames(
+    certificate ? [certificate.workflowExecutionId] : []
+  );
+  const taskNames = useWorkflowTaskNames(certificate ? [certificate.workflowTaskId] : []);
+  const approvalNames = useApprovalNames(certificate ? [certificate.approvalId] : []);
 
   useEffect(() => {
     let active = true;
@@ -167,7 +177,7 @@ export default function AuditToolCertificateDetailPage() {
                     href={`/approvals/${certificate.approvalId}`}
                     className="text-accent transition-colors hover:underline"
                   >
-                    {certificate.approvalId}
+                    {approvalNames.get(certificate.approvalId) ?? certificate.approvalId}
                   </Link>
                 ) : (
                   // No approval record exists for a grant the run's initiator
@@ -183,11 +193,22 @@ export default function AuditToolCertificateDetailPage() {
                   href={`/workflow-executions/${certificate.workflowExecutionId}`}
                   className="text-accent transition-colors hover:underline"
                 >
-                  {certificate.workflowExecutionId}
+                  {executionNames.get(certificate.workflowExecutionId) ??
+                    certificate.workflowExecutionId}
                 </Link>
               }
             />
-            <DetailItem label="Workflow Task" value={certificate.workflowTaskId} />
+            <DetailItem
+              label="Workflow Task"
+              value={
+                <Link
+                  href={`/workflow-executions/${certificate.workflowExecutionId}/workflow-tasks/${certificate.workflowTaskId}`}
+                  className="text-accent transition-colors hover:underline"
+                >
+                  {taskNames.get(certificate.workflowTaskId) ?? certificate.workflowTaskId}
+                </Link>
+              }
+            />
             <DetailItem label="Not Before" value={<DateTime value={certificate.notBefore} />} />
             <DetailItem label="Not After" value={<DateTime value={certificate.notAfter} />} />
             <DetailItem

@@ -17,7 +17,13 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
-import { useTenantNames, useUserNames } from "@/hooks/useNames";
+import {
+  useApprovalNames,
+  useTenantNames,
+  useUserNames,
+  useWorkflowExecutionNames,
+  useWorkflowTaskNames,
+} from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { listMcpServers, listMcpToolInvocations, type McpToolInvocation } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
@@ -72,6 +78,9 @@ export default function AuditToolInvocationsPage() {
   }, []);
 
   const names = useUserNames(rows.flatMap((r) => [r.createdBy, r.updatedBy]));
+  const executionNames = useWorkflowExecutionNames(rows.map((r) => r.workflowExecutionId));
+  const taskNames = useWorkflowTaskNames(rows.map((r) => r.workflowTaskId));
+  const approvalNames = useApprovalNames(rows.map((r) => r.approvalId));
   const isAllTenantsView = useIsAllTenantsView();
   // Only resolved when the Tenant column is actually rendered: the lookup goes
   // through the super_admin-only tenants list, so asking for it as a plain
@@ -124,7 +133,7 @@ export default function AuditToolInvocationsPage() {
               href={`/workflow-executions/${r.workflowExecutionId}`}
               className="font-medium text-accent transition-colors hover:underline"
             >
-              {`${r.workflowExecutionId.slice(0, 8)}…`}
+              {executionNames.get(r.workflowExecutionId) ?? r.workflowExecutionId}
             </Link>
           ) : (
             EMPTY_VALUE
@@ -145,7 +154,23 @@ export default function AuditToolInvocationsPage() {
       {
         header: "Task",
         visibility: "optional",
-        cell: (r) => (r.workflowTaskId ? `${r.workflowTaskId.slice(0, 8)}…` : EMPTY_VALUE),
+        cell: (r) => {
+          if (!r.workflowTaskId) return EMPTY_VALUE;
+          const label = taskNames.get(r.workflowTaskId) ?? r.workflowTaskId;
+          // The invocation's execution/task ids are recorded independently (no
+          // real FK between them), so a task id can show up without its
+          // execution id — fall back to a plain label when that happens.
+          return r.workflowExecutionId ? (
+            <Link
+              href={`/workflow-executions/${r.workflowExecutionId}/workflow-tasks/${r.workflowTaskId}`}
+              className="font-medium text-accent transition-colors hover:underline"
+            >
+              {label}
+            </Link>
+          ) : (
+            label
+          );
+        },
       },
       {
         header: "Approval",
@@ -156,7 +181,7 @@ export default function AuditToolInvocationsPage() {
               href={`/approvals/${r.approvalId}`}
               className="font-medium text-accent transition-colors hover:underline"
             >
-              {`${r.approvalId.slice(0, 8)}…`}
+              {approvalNames.get(r.approvalId) ?? r.approvalId}
             </Link>
           ) : (
             EMPTY_VALUE
@@ -181,7 +206,7 @@ export default function AuditToolInvocationsPage() {
       },
       ...auditColumns<McpToolInvocation>(names),
     ],
-    [serverNameById, names, tenantNames, isAllTenantsView]
+    [serverNameById, names, executionNames, taskNames, approvalNames, tenantNames, isAllTenantsView]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(

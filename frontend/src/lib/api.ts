@@ -1582,6 +1582,18 @@ export async function listWorkflowTasks(
   ) as Promise<WorkflowTask[]>;
 }
 
+/**
+ * List WorkflowTask records across every execution in the acting tenant
+ * (admin-only), for name resolution — e.g. `q=id:in:<ids>` to resolve a batch
+ * of task ids to their titles. See {@link listWorkflowTasks} for the
+ * execution-scoped list most callers want instead.
+ */
+export async function listAllWorkflowTasks(query: ListQuery = {}): Promise<WorkflowTask[]> {
+  return unwrap(sdk.listWorkflowTasksApiV1WorkflowTasksGet({ query: listQuery(query) })) as Promise<
+    WorkflowTask[]
+  >;
+}
+
 /** Fetch a single WorkflowTask by ID. */
 export async function getWorkflowTask(
   taskId: string,

@@ -55,6 +55,24 @@ describe("AuditToolInvocationDetailPage", () => {
     await waitFor(() => expect(screen.getByText(/access/i)).toBeInTheDocument());
   });
 
+  it("shows the workflow task as plain text, unlinked, when the execution id is missing", async () => {
+    // The invocation's execution/task ids are recorded independently (no real
+    // FK between them), so a task id can show up without its execution id.
+    server.use(
+      http.get("http://localhost:8000/api/v1/mcp-tool-invocations/:id", () =>
+        envelope({
+          ...MCP_TOOL_INVOCATION_1,
+          workflowExecutionId: null,
+          workflowTaskId: "task-1",
+        })
+      ),
+      http.get("http://localhost:8000/api/v1/workflow-tasks", () => envelope([]))
+    );
+    render(<AuditToolInvocationDetailPage />);
+    await waitFor(() => expect(screen.getByText("task-1")).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "task-1" })).not.toBeInTheDocument();
+  });
+
   it("shows the denial reason for a refused call", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/mcp-tool-invocations/:id", () =>
