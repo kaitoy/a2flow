@@ -23,7 +23,7 @@ The MCP proxy itself scales on its own terms: it keeps nothing between calls, so
 
 Writes to one conversation are already safe across replicas: the session service takes `SELECT ... FOR UPDATE` on the row it appends to for the whole transaction, so appends are serialized and neither the conversation's state nor its event rows can be lost.
 
-Reads are the part that needs help. The ADK `Runner` holds one in-memory session for the length of an invocation, so events another replica appends during that window never reach it, and the rest of the run reasons over a conversation that is missing them. Serializing writes cannot repair that — only keeping a session to one driver at a time can.
+Reads are the part that needs help. The agent runtime holds one in-memory session for the length of an invocation, so events another replica appends during that window never reach it, and the rest of the run reasons over a conversation that is missing them. Serializing writes cannot repair that — only keeping a session to one driver at a time can.
 
 So each agent run (`POST /api/v1/workflow-executions/{id}/agent`, `POST /api/v1/workflows/{id}/agent`) takes a **PostgreSQL session-level advisory lock** and holds it for the whole SSE stream:
 

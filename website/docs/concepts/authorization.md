@@ -102,7 +102,7 @@ A run's **task list is fixed when the workflow is executed** — the tasks are c
 
 The status row and the resolve row are the **ownership-layer exceptions to the Super Admin bypass** promised at the top of this page: only the designated approver may resolve an approval, and a task's status may be changed only by the initiator or by an approver an approval **covering that task** is addressed to — not merely any approver of the execution, and (once an approval covers the task) not a Super Admin or Admin either. An approver may advance a task only within the scope of what they were asked to approve — the task an approval names and the steps after it up to the next approval — which is what lets a decision resume the run without letting an approver push unrelated steps forward. Otherwise, flipping a task straight to `completed` would let anyone stand in for the addressee (see [Human approval](../guides/approvals.md#human-approval)). The rule is the same whether the change is made by hand or asked of the execution agent in the workflow session's chat: the agent refuses a status change its driver could not make directly.
 
-**Deleting** an execution is the opposite shape: it is a plain role gate with no ownership component at all, so an Admin may delete any execution in the tenant while a non-Admin initiator may not delete their own. Deleting removes the run's tasks and its ADK session with it.
+**Deleting** an execution is the opposite shape: it is a plain role gate with no ownership component at all, so an Admin may delete any execution in the tenant while a non-Admin initiator may not delete their own. Deleting removes the run's tasks and its workflow session with it.
 
 ## Platform-wide sections {#platform-wide-sections}
 

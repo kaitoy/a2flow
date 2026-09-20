@@ -21,7 +21,7 @@ An approval addressed to a group brings in every member holding `approver`, so t
 ![Sequence diagram of one chat turn: the user's message travels from Frontend to Backend to the Model, the model's streamed reply and any render_a2ui surface flow back, and the user's filled-in surface makes the same round trip again.](./img/sessions-turn-flow.svg#gh-light-mode-only)
 ![Sequence diagram of one chat turn: the user's message travels from Frontend to Backend to the Model, the model's streamed reply and any render_a2ui surface flow back, and the user's filled-in surface makes the same round trip again.](./img/sessions-turn-flow-dark.svg#gh-dark-mode-only)
 
-The backend bridges the AG-UI protocol to a Google ADK agent: it translates events both ways, keeps the conversation in step, and streams events back to the browser as they arrive, so text appears incrementally rather than in one block at the end. Conversation state is kept under the chat's id, so reopening it continues where it left off.
+The backend bridges the AG-UI protocol to the agent: it translates events both ways, keeps the conversation in step, and streams events back to the browser as they arrive, so text appears incrementally rather than in one block at the end. Conversation state is kept under the chat's id, so reopening it continues where it left off.
 
 ## Interactive surfaces
 

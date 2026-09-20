@@ -190,9 +190,10 @@ export default function Home(): ReactNode {
                 <a className="btn btn-ghost" href="#how"><Translate id="home.hero.cta.how">{'See how it works'}</Translate></a>
               </div>
               <div className="hero-tags">
-                <span className="tag">Google ADK</span>
                 <span className="tag">AG-UI protocol</span>
+                <span className="tag">A2UI</span>
                 <span className="tag">MCP tools</span>
+                <span className="tag">Agent Skills</span>
                 <span className="tag">Self-hosted</span>
               </div>
             </div>
@@ -573,21 +574,21 @@ export default function Home(): ReactNode {
               <span className="eyebrow"><Translate id="home.architecture.eyebrow">{'Under the hood'}</Translate></span>
               <h2><Translate id="home.architecture.title" values={{stack: <span className="grad-text"><Translate id="home.architecture.title.stack">{'stack'}</Translate></span>}}>{'An open-protocol {stack}'}</Translate></h2>
               <p>
-                <Translate id="home.architecture.lead">{'A Next.js chat UI streams AG-UI events from a FastAPI backend that hosts a Google ADK agent. Skills come from Git, tools come from MCP servers, and one relational database holds it all.'}</Translate>
+                <Translate id="home.architecture.lead">{'The chat UI streams AG-UI events from a FastAPI backend, and the agent draws A2UI surfaces into the chat. Agent Skills come from Git, tools come from MCP servers, and one relational database holds it all.'}</Translate>
               </p>
             </div>
             <div className="arch glass reveal">
               <div className="arch-flow">
                 <div className="arch-node glass-strong">
-                  <b>Next.js 16 chat UI</b>
-                  <span>React 19 · A2UI renderer</span>
+                  <b>Chat UI</b>
+                  <span>A2UI renderer</span>
                 </div>
                 <div className="arch-link">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
                   AG-UI · SSE
                 </div>
                 <div className="arch-node glass-strong">
-                  <b>FastAPI + Google ADK</b>
+                  <b>FastAPI + Google ADK + LiteLLM</b>
                   <span>plan-then-execute agent</span>
                 </div>
                 <div className="arch-link">
@@ -600,7 +601,7 @@ export default function Home(): ReactNode {
                     <span>streamable HTTP</span>
                   </div>
                   <div className="arch-node glass-strong">
-                    <b>Skills in Git</b>
+                    <b>Agent Skills in Git</b>
                     <span>SKILL.md repos</span>
                   </div>
                   <div className="arch-node glass-strong">
@@ -610,15 +611,13 @@ export default function Home(): ReactNode {
                 </div>
               </div>
               <div className="stack-chips">
-                <span className="tag">Next.js 16</span>
-                <span className="tag">React 19</span>
-                <span className="tag">Tailwind CSS 4</span>
+                <span className="tag">AG-UI</span>
+                <span className="tag">A2UI</span>
+                <span className="tag">MCP</span>
+                <span className="tag">Agent Skills</span>
                 <span className="tag">FastAPI</span>
-                <span className="tag">Google ADK</span>
-                <span className="tag">ag-ui-adk</span>
                 <span className="tag">LiteLLM</span>
-                <span className="tag">SQLModel</span>
-                <span className="tag">Docker Compose</span>
+                <span className="tag">PostgreSQL</span>
               </div>
             </div>
           </div>

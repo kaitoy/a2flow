@@ -647,7 +647,7 @@
     "message": "スタック"
   },
   "home.architecture.lead": {
-    "message": "Next.js のチャット UI が、Google ADK のエージェントを載せた FastAPI のバックエンドから AG-UI のイベントを受け取ります。スキルは Git から、ツールは MCP サーバーから来て、1 つのリレーショナルデータベースがすべてを保持します。"
+    "message": "チャット UI は FastAPI のバックエンドから AG-UI のイベントを受け取り、エージェントは A2UI のサーフェスをチャットに描きます。Agent Skills は Git から、ツールは MCP サーバーから来て、1 つのリレーショナルデータベースがすべてを保持します。"
   },
   "home.cta.eyebrow": {
     "message": "はじめる"
