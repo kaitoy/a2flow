@@ -27,11 +27,23 @@ Switching an existing server's transport clears the other transport's fields, an
 | Placeholder | Where it works | Example |
 |---|---|---|
 | `${secret:name/key}` | Any header value or environment variable value | `Authorization: Bearer ${secret:github/token}`<br/>`AWS_ACCESS_KEY_ID: ${secret:aws-credentials/AWS_ACCESS_KEY_ID}` |
+| `${gcp-token:name/key}` | Same as `${secret:…}`, for an entry holding a Google Cloud credential JSON | `Authorization: Bearer ${gcp-token:gcp-credentials/GOOGLE_CREDENTIALS_JSON}` |
 | `${env:NAME}` | An **Arguments** entry, naming one of this server's own environment variables | `--token ${env:API_KEY}` |
 
 Placeholders are expanded only at connect time, so the credential never appears in the stored record.
 
 `${env:NAME}` is expanded after that environment variable's own `${secret:…}`, which lets a secret-backed value be reused as a command-line flag — for a launcher that expects it as an argument rather than reading it from the process environment. `NAME` must be a key of **Environment Variables**; a reference to a key that is not there, including one left behind by removing that key, is refused when saving.
+
+### Google Cloud MCP servers
+
+Google's managed MCP servers — GKE's, for one — do not accept API keys. Every request must carry an OAuth 2.0 access token for a Google Cloud identity, and a token only lives an hour, so it cannot be pasted into a secret either. `${gcp-token:name/key}` solves this: rather than the entry's value, it expands to a **fresh access token minted from it**, refreshed automatically as it expires. The entry holds the credential JSON, in one of two shapes:
+
+| Credential | How to get it | Token scope |
+|---|---|---|
+| A **service account key** | Create a service account, grant it **MCP Tool User** plus whatever its tools need, and download a JSON key | `cloud-platform` |
+| An **OAuth client ID and secret** | Create an OAuth client (Desktop app), download its JSON, then run `gcloud auth application-default login --client-id-file=<that JSON> --scopes=https://www.googleapis.com/auth/cloud-platform` once on your own machine and sign in. Paste the contents of the resulting `application_default_credentials.json` | Whatever you consented to |
+
+Either way, paste the whole JSON as one entry of a [secret](./secrets.md) and reference it from the server's `Authorization` header as in the example above. Every tool call runs as that one identity, whoever started the workflow. A malformed credential, or one Google no longer accepts, fails the connection the same way a dangling `${secret:…}` reference does.
 
 ## Registering from the MCP registry
 

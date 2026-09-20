@@ -169,13 +169,19 @@ export type McpServerFieldsProps =
   | ({ readOnly?: false } & McpServerEditableFieldsProps)
   | McpServerReadOnlyFieldsProps;
 
-/** Note shown under the header and environment editors about secret references. */
+/**
+ * Note shown under the header and environment editors about secret references,
+ * including the Google-token variant a Google Cloud MCP server needs.
+ */
 function SecretReferenceHint() {
   return (
     <p className="mt-1 text-xs text-on-surface-variant">
       Values may reference one entry of a registered secret as{" "}
       {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
-      {"${secret:name/key}"}, resolved when connecting.
+      {"${secret:name/key}"}, resolved when connecting. For a Google Cloud MCP server, write{" "}
+      {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
+      {"${gcp-token:name/key}"} instead to send a Google access token minted from the credential
+      JSON that entry holds.
     </p>
   );
 }

@@ -27,11 +27,23 @@ sidebar_position: 7
 | プレースホルダー | 使える場所 | 例 |
 |---|---|---|
 | `${secret:name/key}` | ヘッダーの値、環境変数の値 | `Authorization: Bearer ${secret:github/token}`<br/>`AWS_ACCESS_KEY_ID: ${secret:aws-credentials/AWS_ACCESS_KEY_ID}` |
+| `${gcp-token:name/key}` | `${secret:…}` と同じ。エントリには Google Cloud の認証情報 JSON を入れておきます | `Authorization: Bearer ${gcp-token:gcp-credentials/GOOGLE_CREDENTIALS_JSON}` |
 | `${env:NAME}` | **Arguments** の要素。このサーバー自身の環境変数を名前で参照します | `--token ${env:API_KEY}` |
 
 プレースホルダーが展開されるのは接続のときだけなので、資格情報が保存されたレコードに現れることはありません。
 
 `${env:NAME}` は、その環境変数自身の `${secret:…}` が展開されたあとに展開されます。おかげで、シークレット由来の値をコマンドラインのフラグとして使い回せます。プロセスの環境変数から読むのではなく、引数として受け取るランチャー向けです。`NAME` は **Environment Variables** のキーでなければならず、存在しないキーへの参照は — そのキーを消したせいで残った参照も含めて — 保存時に拒否されます。
+
+### Google Cloud の MCP サーバー {#google-cloud-mcp-servers}
+
+Google のマネージド MCP サーバー（GKE のものなど）は API キーを受け付けません。すべてのリクエストに Google Cloud の身元に対する OAuth 2.0 アクセストークンが要り、しかもトークンは 1 時間で失効するので、シークレットに貼っておくこともできません。そこで `${gcp-token:name/key}` を使います。エントリの値そのものではなく、その値から**発行したばかりのアクセストークン**に展開され、期限が切れれば自動で更新されます。エントリに入れる認証情報 JSON は次の 2 種類のどちらかです。
+
+| 認証情報 | 入手方法 | トークンのスコープ |
+|---|---|---|
+| **サービスアカウントの鍵** | サービスアカウントを作り、**MCP Tool User** とツールが必要とするロールを付与して、JSON 鍵をダウンロードします | `cloud-platform` |
+| **OAuth クライアント ID とシークレット** | OAuth クライアント（デスクトップアプリ）を作って JSON をダウンロードし、自分のマシンで一度だけ `gcloud auth application-default login --client-id-file=<その JSON> --scopes=https://www.googleapis.com/auth/cloud-platform` を実行してサインインします。できあがった `application_default_credentials.json` の中身を貼ります | 同意したスコープ |
+
+どちらの場合も、JSON 全体を[シークレット](./secrets.md)の 1 エントリとして貼り、上の例のようにサーバーの `Authorization` ヘッダーから参照します。ワークフローを誰が始めても、ツール呼び出しはその 1 つの身元で実行されます。壊れた認証情報や Google が受け付けなくなった認証情報は、宙に浮いた `${secret:…}` 参照と同じ形で接続を失敗させます。
 
 ## MCP レジストリから登録する {#registering-from-the-mcp-registry}
 

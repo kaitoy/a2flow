@@ -188,10 +188,12 @@ class Settings(BaseSettings):
             when unset.
         demo_aws_region: AWS region the demo MCP server's tools act on, passed
             to it as ``--metadata AWS_REGION=...``.
-        demo_gcp_api_key: Google Cloud API key stored in the demo
-            ``demo-gcp-credentials`` secret and sent by the demo GKE MCP
-            server as its ``x-goog-api-key`` header; a placeholder is
-            stored when unset.
+        demo_gcp_credentials_json: Google Cloud credential JSON (a service
+            account key, or the authorized-user JSON ``gcloud auth
+            application-default login`` writes), on one line, stored in the
+            demo ``demo-gcp-credentials`` secret; the demo GKE MCP server
+            mints its bearer token from it. A placeholder is stored when
+            unset.
         secret_encryption_key: Fernet key for encrypting local secrets
             (first in the resolution precedence handled by ``secret_cipher.py``).
         secret_key_file: Path to the on-disk Fernet key file (second in that
@@ -300,7 +302,7 @@ class Settings(BaseSettings):
     demo_aws_access_key_id: str | None = None
     demo_aws_secret_access_key: str | None = None
     demo_aws_region: str = "us-east-1"
-    demo_gcp_api_key: str | None = None
+    demo_gcp_credentials_json: str | None = None
 
     secret_encryption_key: str | None = None
     secret_key_file: Path | None = None

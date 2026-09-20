@@ -72,6 +72,11 @@ describe("McpServerFields", () => {
     expect(screen.getByText(/\$\{env:NAME\}/)).toBeInTheDocument();
   });
 
+  it("shows a hint that a header may mint a Google access token from a secret", () => {
+    render(<Host />);
+    expect(screen.getByText(/\$\{gcp-token:name\/key\}/)).toBeInTheDocument();
+  });
+
   describe("readOnly", () => {
     it("renders a remote server's url and headers as values", () => {
       render(

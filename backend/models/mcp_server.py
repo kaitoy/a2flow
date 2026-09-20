@@ -18,9 +18,11 @@ Two transports exist, discriminated by ``transport``:
   ``args`` is passed as a list and never through a shell.
 
 ``headers`` and ``env`` values may embed ``${secret:NAME/KEY}`` placeholders,
-resolved at connection time (see :mod:`infrastructure.secret_resolver`);
-anything else is stored in plaintext, which is acceptable for this app's
-local, single-operator deployment model.
+resolved at connection time (see :mod:`infrastructure.secret_resolver`), or
+``${gcp-token:NAME/KEY}`` placeholders, which mint a Google OAuth 2.0 access
+token from the credential JSON that entry holds (see
+:mod:`infrastructure.google_token`); anything else is stored in plaintext,
+which is acceptable for this app's local, single-operator deployment model.
 
 A stdio server's ``args`` entries may additionally embed ``${env:NAME}``,
 referencing a key of that same server's ``env`` map — useful for a launcher

@@ -7,6 +7,7 @@ transport, which runs in the MCP proxy container.
 
 import pytest
 
+from infrastructure import google_token
 from infrastructure.mcp_client import HttpConnection, StdioConnection
 from infrastructure.mcp_connection import resolve_connection
 from infrastructure.secret_resolver import SecretResolver
@@ -68,6 +69,35 @@ async def test_resolve_connection_builds_http_connection_with_resolved_headers()
     )
     assert connection == HttpConnection(
         url="https://mcp.example.com/mcp", headers={"Authorization": "TOKEN"}
+    )
+
+
+async def test_resolve_connection_mints_a_gcp_token_into_the_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``${gcp-token:NAME/KEY}`` becomes a bearer token before the secret pass."""
+    monkeypatch.setattr(google_token, "_access_token", lambda info_json: "ya29.tok")
+
+    class _Resolver(_StubResolver):
+        async def resolve_value(self, name: str, key: str) -> str:
+            assert (name, key) == ("gcp-creds", "GOOGLE_CREDENTIALS_JSON")
+            return '{"type": "authorized_user"}'
+
+    resolver: SecretResolver = _Resolver()  # type: ignore[assignment]
+    connection = await resolve_connection(
+        _server(
+            url="https://container.googleapis.com/mcp",
+            headers={
+                "Authorization": (
+                    "Bearer ${gcp-token:gcp-creds/GOOGLE_CREDENTIALS_JSON}"
+                )
+            },
+        ),
+        resolver,
+    )
+    assert connection == HttpConnection(
+        url="https://container.googleapis.com/mcp",
+        headers={"Authorization": "BEARER YA29.TOK"},
     )
 
 

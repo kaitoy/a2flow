@@ -39,7 +39,7 @@ from infrastructure.demo_data import (
     DEMO_CALL_AWS_MOCK_ID,
     DEMO_DELETE_POD_MOCK_ID,
     DEMO_DEVELOPERS_GROUP_ID,
-    DEMO_GCP_API_KEY_ENTRY_KEY,
+    DEMO_GCP_CREDENTIALS_ENTRY_KEY,
     DEMO_GCP_DEVELOPER_USER_ID,
     DEMO_GCP_GROUP_ID,
     DEMO_GCP_REQUESTER_USER_ID,
@@ -142,7 +142,7 @@ def _demo_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "DEMO_AWS_ACCESS_KEY_ID",
         "DEMO_AWS_SECRET_ACCESS_KEY",
         "DEMO_AWS_REGION",
-        "DEMO_GCP_API_KEY",
+        "DEMO_GCP_CREDENTIALS_JSON",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -634,11 +634,12 @@ async def test_demo_secrets_fall_back_to_a_placeholder(
     assert decrypted == "REPLACE_ME"
 
 
-async def test_demo_gcp_secret_stores_the_configured_key_encrypted(
+async def test_demo_gcp_secret_stores_the_configured_credential_encrypted(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    credential = '{"type": "service_account", "client_email": "demo@example"}'
     _enable(monkeypatch)
-    monkeypatch.setenv("DEMO_GCP_API_KEY", "AIzaEXAMPLE")
+    monkeypatch.setenv("DEMO_GCP_CREDENTIALS_JSON", credential)
     await _sync(engine)
     async with AsyncSession(engine) as session:
         secret = await session.get(Secret, DEMO_GCP_SECRET_ID)
@@ -647,10 +648,10 @@ async def test_demo_gcp_secret_stores_the_configured_key_encrypted(
     assert secret.description
     assert secret.type is SecretType.local
     assert secret.tenant_id == TENANT_ID
-    assert sorted(secret.entries) == [DEMO_GCP_API_KEY_ENTRY_KEY]
-    ciphertext = secret.entries[DEMO_GCP_API_KEY_ENTRY_KEY]
-    assert ciphertext != "AIzaEXAMPLE"  # stored as ciphertext
-    assert get_secret_cipher().decrypt(ciphertext) == "AIzaEXAMPLE"
+    assert sorted(secret.entries) == [DEMO_GCP_CREDENTIALS_ENTRY_KEY]
+    ciphertext = secret.entries[DEMO_GCP_CREDENTIALS_ENTRY_KEY]
+    assert ciphertext != credential  # stored as ciphertext
+    assert get_secret_cipher().decrypt(ciphertext) == credential
 
 
 async def test_demo_gcp_secret_falls_back_to_a_placeholder(
@@ -661,7 +662,9 @@ async def test_demo_gcp_secret_falls_back_to_a_placeholder(
     async with AsyncSession(engine) as session:
         secret = await session.get(Secret, DEMO_GCP_SECRET_ID)
     assert secret is not None
-    decrypted = get_secret_cipher().decrypt(secret.entries[DEMO_GCP_API_KEY_ENTRY_KEY])
+    decrypted = get_secret_cipher().decrypt(
+        secret.entries[DEMO_GCP_CREDENTIALS_ENTRY_KEY]
+    )
     assert decrypted == "REPLACE_ME"
 
 
@@ -712,7 +715,7 @@ async def test_demo_mcp_server_defaults_the_region(
     assert server.env["AWS_REGION"] == "us-east-1"
 
 
-async def test_demo_gke_mcp_server_uses_an_api_key_header(
+async def test_demo_gke_mcp_server_uses_a_gcp_token_bearer_header(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -729,8 +732,9 @@ async def test_demo_gke_mcp_server_uses_an_api_key_header(
     assert server.args == []
     assert server.env == {}
     assert server.headers == {
-        "x-goog-api-key": (
-            f"${{secret:{DEMO_GCP_SECRET_NAME}/{DEMO_GCP_API_KEY_ENTRY_KEY}}}"
+        "Authorization": (
+            "Bearer "
+            f"${{gcp-token:{DEMO_GCP_SECRET_NAME}/{DEMO_GCP_CREDENTIALS_ENTRY_KEY}}}"
         )
     }
 

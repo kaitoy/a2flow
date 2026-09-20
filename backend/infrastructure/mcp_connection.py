@@ -1,8 +1,9 @@
 """Turning a registered MCP server row into a connection spec.
 
 The half of talking to an MCP server that needs A2Flow's own world: the
-``mcp_servers`` row, the ``${secret:NAME/KEY}`` placeholders in its headers or
-environment, and the resolver that expands them. What comes out is an
+``mcp_servers`` row, the ``${secret:NAME/KEY}`` and ``${gcp-token:NAME/KEY}``
+placeholders in its headers or environment, and the resolver that expands
+them (the latter via :mod:`infrastructure.google_token`). What comes out is an
 :data:`infrastructure.mcp_client.McpConnection` -- a plain value carrying
 everything the transport needs and nothing it does not.
 
@@ -21,6 +22,7 @@ nor Vault credentials.
 
 import re
 
+from infrastructure.google_token import resolve_gcp_tokens
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
 from infrastructure.secret_resolver import SecretResolver
 from models.mcp_server import ENV_ARG_PLACEHOLDER_PATTERN, MCPServer, McpTransport
@@ -65,8 +67,9 @@ async def resolve_connection(
 
     Args:
         server: The registered MCP server row.
-        resolver: Resolver expanding ``${secret:NAME/KEY}`` placeholders in the
-            server's header (remote) or environment (stdio) values.
+        resolver: Resolver expanding ``${secret:NAME/KEY}`` and
+            ``${gcp-token:NAME/KEY}`` placeholders in the server's header
+            (remote) or environment (stdio) values.
 
     Returns:
         An :data:`infrastructure.mcp_client.McpConnection` ready to hand to an
@@ -79,12 +82,13 @@ async def resolve_connection(
             reachable for a row written outside the API, since create and
             update validate the per-transport shape and env references.
         repositories.exceptions.SecretResolutionError: If a referenced secret
-            cannot be resolved.
+            cannot be resolved, or a ``${gcp-token:NAME/KEY}`` credential
+            cannot mint a token.
     """
     if server.transport is McpTransport.stdio:
         if not server.command:
             raise McpConnectionError(server.name, "stdio server has no command")
-        resolved_env = await resolver.resolve_mapping(server.env)
+        resolved_env = await _resolve_values(server.env, resolver)
         return StdioConnection(
             command=server.command,
             args=_expand_env_args(list(server.args), resolved_env, server.name),
@@ -95,5 +99,28 @@ async def resolve_connection(
         raise McpConnectionError(server.name, "streamable_http server has no url")
     return HttpConnection(
         url=server.url,
-        headers=await resolver.resolve_mapping(server.headers),
+        headers=await _resolve_values(server.headers, resolver),
     )
+
+
+async def _resolve_values(
+    values: dict[str, str], resolver: SecretResolver
+) -> dict[str, str]:
+    """Expand both placeholder kinds in a header or env mapping.
+
+    ``${gcp-token:NAME/KEY}`` goes first: it names its secret entry directly,
+    so it does not depend on the ``${secret:NAME/KEY}`` pass, and a minted
+    token never contains a placeholder for that pass to misread.
+
+    Args:
+        values: The raw header or env mapping off the row.
+        resolver: Resolver backing both expansions.
+
+    Returns:
+        The mapping with every placeholder replaced.
+
+    Raises:
+        repositories.exceptions.SecretResolutionError: If any placeholder
+            fails to resolve.
+    """
+    return await resolver.resolve_mapping(await resolve_gcp_tokens(values, resolver))

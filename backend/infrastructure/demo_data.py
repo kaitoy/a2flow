@@ -7,15 +7,16 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
 :mod:`infrastructure.bootstrap`):
 
 * two Secrets -- one holding the AWS access key id and secret access key as
-  two entries, and one holding a Google Cloud API key as a single entry, both
-  described for the admin UI,
+  two entries, and one holding a Google Cloud credential JSON (a service
+  account key, or the authorized-user JSON ``gcloud`` writes) as a single
+  entry, both described for the admin UI,
 * two MCPServers -- one stdio server reaching the managed AWS MCP Server
   through the ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing
   the AWS entries from its ``env`` via ``${secret:NAME/KEY}``, and one
   ``streamable_http`` server reaching the Google-managed GKE (Google
-  Kubernetes Engine) remote MCP server, sending the Google Cloud API key as
-  its ``x-goog-api-key`` header via the same ``${secret:NAME/KEY}``
-  placeholder, both described,
+  Kubernetes Engine) remote MCP server, sending an OAuth 2.0 access token
+  minted from that credential as its ``Authorization: Bearer`` header via a
+  ``${gcp-token:NAME/KEY}`` placeholder, both described,
 * five MCPToolMocks that stub the demo run's side-effecting tools so a
   ``draft`` workflow run plays through without reaching AWS, a real GKE
   cluster, or waiting on a human -- ``call_aws`` and ``run_script`` on the AWS
@@ -228,13 +229,14 @@ DEMO_ACCESS_KEY_ENTRY_KEY = "AWS_ACCESS_KEY_ID"
 #: Entry key of the AWS secret access key within :data:`DEMO_AWS_SECRET_NAME`.
 DEMO_SECRET_KEY_ENTRY_KEY = "AWS_SECRET_ACCESS_KEY"
 
-#: Name of the demo Secret holding the Google Cloud API key. Its single entry
-#: is embedded in the demo GKE MCP server's ``headers`` as a
-#: ``${secret:NAME/KEY}`` placeholder.
+#: Name of the demo Secret holding the Google Cloud credential JSON. Its
+#: single entry is referenced from the demo GKE MCP server's ``headers`` by a
+#: ``${gcp-token:NAME/KEY}`` placeholder, which mints an access token from it.
 DEMO_GCP_SECRET_NAME = "demo-gcp-credentials"
 
-#: Entry key of the Google Cloud API key within :data:`DEMO_GCP_SECRET_NAME`.
-DEMO_GCP_API_KEY_ENTRY_KEY = "GOOGLE_API_KEY"
+#: Entry key of the Google Cloud credential JSON within
+#: :data:`DEMO_GCP_SECRET_NAME`.
+DEMO_GCP_CREDENTIALS_ENTRY_KEY = "GOOGLE_CREDENTIALS_JSON"
 
 #: Name of the demo MCP server as shown in the admin UI.
 DEMO_MCP_SERVER_NAME = "AWS MCP Server"
@@ -285,10 +287,11 @@ _DEMO_MCP_ENDPOINT_REGION = "us-east-1"
 #: as ``delete_k8s_resource``.
 _DEMO_GKE_MCP_ENDPOINT = "https://container.googleapis.com/mcp"
 
-#: Request header the demo GKE MCP server sends its Google Cloud API key in.
-#: Its value is a ``${secret:NAME/KEY}`` placeholder resolved at connection
-#: time, so the key never lands in the ``mcp_servers`` row.
-_DEMO_GCP_API_KEY_HEADER = "x-goog-api-key"
+#: Request header the demo GKE MCP server sends its OAuth 2.0 access token
+#: in. Its value is ``Bearer`` plus a ``${gcp-token:NAME/KEY}`` placeholder
+#: resolved at connection time (see :mod:`infrastructure.google_token`), so
+#: neither the credential nor a token ever lands in the ``mcp_servers`` row.
+_DEMO_GCP_AUTH_HEADER = "Authorization"
 
 #: Repository the demo agent skills are cloned from, and the path within it to
 #: each one's ``SKILL.md``.
@@ -296,9 +299,10 @@ _DEMO_SKILL_REPO_URL = "https://github.com/kaitoy/a2flow"
 _DEMO_AWS_SKILL_REPO_PATH = "sample_skills/aws-ec2-launch"
 _DEMO_GKE_SKILL_REPO_PATH = "sample_skills/gke-pod-restart"
 
-#: Stored in place of an AWS credential or Google Cloud API key when the
-#: matching ``DEMO_*`` variable is unset. The demo is then complete in shape but
-#: cannot reach the provider until an operator edits the secret in the admin UI.
+#: Stored in place of an AWS credential or Google Cloud credential JSON when
+#: the matching ``DEMO_*`` variable is unset. The demo is then complete in shape
+#: but cannot reach the provider until an operator edits the secret in the
+#: admin UI.
 _PLACEHOLDER_SECRET_VALUE = "REPLACE_ME"
 
 #: Description shown on the demo AWS secret in the admin UI.
@@ -309,7 +313,9 @@ _DEMO_AWS_SECRET_DESCRIPTION = (
 
 #: Description shown on the demo Google Cloud secret in the admin UI.
 _DEMO_GCP_SECRET_DESCRIPTION = (
-    "Google Cloud API key the demo GKE MCP server sends as its x-goog-api-key header."
+    "Google Cloud credential JSON (a service account key, or the authorized-user "
+    "JSON written by gcloud auth application-default login) the demo GKE MCP "
+    "server mints its OAuth 2.0 access token from."
 )
 
 #: Description shown on the demo MCP server in the admin UI.
@@ -1090,13 +1096,14 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo AWS credentials and Google Cloud API key secrets.
+    """Create the demo AWS credentials and Google Cloud credential secrets.
 
     The AWS access key and secret key live in a single secret as two entries,
-    the way a Vault KV path holds several keys; the Google Cloud API key is a
-    second secret with a single entry. Values come from ``DEMO_AWS_ACCESS_KEY_ID``
-    / ``DEMO_AWS_SECRET_ACCESS_KEY`` / ``DEMO_GCP_API_KEY`` when set, so a fully
-    working demo is one restart away, and fall back to a placeholder otherwise.
+    the way a Vault KV path holds several keys; the Google Cloud credential
+    JSON is a second secret with a single entry. Values come from
+    ``DEMO_AWS_ACCESS_KEY_ID`` / ``DEMO_AWS_SECRET_ACCESS_KEY`` /
+    ``DEMO_GCP_CREDENTIALS_JSON`` when set, so a fully working demo is one
+    restart away, and fall back to a placeholder otherwise.
     They are stored as Fernet ciphertext, the same as any secret created through
     the API — the encryption lives in the service layer, which this
     out-of-request caller cannot use, so the cipher is applied directly here.
@@ -1141,8 +1148,8 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
                 description=_DEMO_GCP_SECRET_DESCRIPTION,
                 type=SecretType.local,
                 entries={
-                    DEMO_GCP_API_KEY_ENTRY_KEY: cipher.encrypt(
-                        settings.demo_gcp_api_key or _PLACEHOLDER_SECRET_VALUE
+                    DEMO_GCP_CREDENTIALS_ENTRY_KEY: cipher.encrypt(
+                        settings.demo_gcp_credentials_json or _PLACEHOLDER_SECRET_VALUE
                     ),
                 },
                 created_by=SYSTEM_USER_ID,
@@ -1217,13 +1224,15 @@ async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> No
     Google runs the GKE MCP server as a managed remote endpoint, so the row is
     registered as a ``streamable_http`` server pointed straight at
     :data:`_DEMO_GKE_MCP_ENDPOINT` -- the full endpoint, not the read-only or
-    delete-only variants Google also publishes. It authenticates with a
-    Google Cloud API key sent as the :data:`_DEMO_GCP_API_KEY_HEADER` request
-    header; the value is a ``${secret:NAME/KEY}`` placeholder resolved at
-    connection time by :class:`infrastructure.secret_resolver.SecretResolver`,
-    so the key never lands in the ``mcp_servers`` row. Like the AWS demo
-    server, its tools can mutate real infrastructure -- rolling-restarting a
-    workload or deleting a Pod, in particular.
+    delete-only variants Google also publishes. Google Cloud MCP servers do
+    not accept API keys, so it authenticates with an OAuth 2.0 access token
+    sent as the :data:`_DEMO_GCP_AUTH_HEADER` bearer header; the value is a
+    ``${gcp-token:NAME/KEY}`` placeholder that
+    :mod:`infrastructure.google_token` turns into a fresh token at connection
+    time from the credential JSON in the demo secret, so neither the
+    credential nor a token ever lands in the ``mcp_servers`` row. Like the AWS
+    demo server, its tools can mutate real infrastructure --
+    rolling-restarting a workload or deleting a Pod, in particular.
 
     Args:
         session: Database session used to read and insert the server.
@@ -1241,8 +1250,9 @@ async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> No
             transport=McpTransport.streamable_http,
             url=_DEMO_GKE_MCP_ENDPOINT,
             headers={
-                _DEMO_GCP_API_KEY_HEADER: (
-                    f"${{secret:{DEMO_GCP_SECRET_NAME}/{DEMO_GCP_API_KEY_ENTRY_KEY}}}"
+                _DEMO_GCP_AUTH_HEADER: (
+                    "Bearer "
+                    f"${{gcp-token:{DEMO_GCP_SECRET_NAME}/{DEMO_GCP_CREDENTIALS_ENTRY_KEY}}}"
                 ),
             },
             created_by=SYSTEM_USER_ID,
