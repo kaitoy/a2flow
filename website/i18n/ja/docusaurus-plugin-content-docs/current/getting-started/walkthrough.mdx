@@ -1,0 +1,208 @@
+---
+title: ウォークスルー
+sidebar_position: 5
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# ウォークスルー
+
+このページでは、[デモデータ](./demo-data.md)のワークフローを 1 本、最初から最後まで動かします。エージェントスキルから生成し、公開し、実行し、途中で上がってくる承認依頼を承認し、結果を確認するところまでを、一度もサインアウトせずに進めます。`root` でサインインし、[なりすまし](../concepts/impersonation.md)でデモアカウントを順に演じるので、ブラウザのタブ 1 つで済みます。
+
+まずプロバイダを選んでください。このページのプロバイダごとのブロックはすべて、ここでの選択に連動します。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  `Demo AWS EC2 Launch` スキルから EC2 インスタンスを起動します。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  `Demo GKE Pod Restart` スキルから GKE クラスタのワークロードをローリング再起動します。
+
+  </TabItem>
+</Tabs>
+
+## 事前準備 \{#before-you-start\}
+
+- [デモデータ](./demo-data.md)を有効にしてバックエンドが起動している。
+- `root` のパスワードが分かっている。`ROOT_PASSWORD` か、未設定なら起動時にバックエンドが一度だけログに出した行です([初期投入されるユーザー](../operations/configuration.md#seeded-users))。
+- プロバイダに実際に届く:
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  [シークレット](../guides/secrets.md) `demo-aws-credentials` に本物のアクセスキーが入っていること。初回起動前に `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` を設定しておくか、あとから **Secrets** でシークレットを編集します。実行すると**本物の EC2 インスタンスが起動し**、終了させるまで課金されます。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  [シークレット](../guides/secrets.md) `demo-gcp-credentials` に、GKE クラスタへ届く身元の Google Cloud 認証情報が入っていること。初回起動前に `DEMO_GCP_CREDENTIALS_JSON` を設定しておくか、あとから **Secrets** でシークレットを編集します。プロジェクト、クラスタ、そのリージョン、再起動してよいワークロードを決めておいてください。実行すると**本当にローリング再起動されます**。
+
+  </TabItem>
+</Tabs>
+
+使えるアカウントがない場合は、同梱の[ツールモック](./demo-data.md#trying-it-out)を使えば、プロバイダに届かないまま同じワークフローを最後まで動かせます。その場合はワークフローを `draft` のまま実行するので、下の公開ステップは飛ばします。
+
+## 登場人物 \{#the-cast\}
+
+| ステップ | AWS | Google Cloud | ロール |
+|---|---|---|---|
+| ワークフローを生成する | `demo-aws-developer` | `demo-gcp-developer` | `developer` |
+| 公開する | `demo-aws-reviewer` | `demo-gcp-reviewer` | `reviewer` |
+| 実行し、結果を確認する | `demo-aws-requester` | `demo-gcp-requester` | `requester` |
+| 依頼を承認する | `demo-approver-1` | `demo-approver-1` | `approver` |
+
+以下の各ステップは、**Users** 一覧の **Impersonate** で始まり、ヘッダーの「Acting as」チップの **Stop** で終わります。この停止は省けません。演じている間はそのアカウントのロールに縛られ、どのアカウントもなりすましはできないので、停止するまで **Impersonate** は出てきません。チャット画面からは、アプリバーの **A2Flow** ロゴでウェルカムページとサイドバーに戻れます。
+
+## 1. root でサインインする \{#1-sign-in-as-root\}
+
+1. サインイン画面で **Username** に `root` を入れ、**Tenant** は空欄のまま(`root` はプラットフォーム管理者で、どのテナントにも属しません)、パスワードを入れて **Sign in** を押します。
+2. ウェルカムページに着きます。アプリバーのテナントセレクタが、デモデータの入っている **Default** になっていることを確認してください。ほかが選ばれていたら Default を選びます。
+
+## 2. developer として、ワークフローを生成する \{#2-act-as-the-developer-and-generate-the-workflow\}
+
+1. 管理サイドバーの **Users** を開き、developer の行で **Impersonate** を押します。**Impersonate User** ダイアログの **Impersonate** で確定します。ウェルカムページに戻り、ヘッダーのチップに「Acting as `demo-…-developer`」と出ます。
+2. **Agent Skills** を開きます。並ぶのはこのプロバイダのスキルだけです。もう一方は[アクセス制御タグ](../guides/tags.md#access-control-tags)で隠れています。**Status** が `ready` になるまで待ちます。`Cloning` のうちは一覧を更新してください。それまで **Generate workflow** は押せません。
+3. 行の **Generate workflow** を押します。**Workflow Name** はそのまま、**Prompt** に下のプロンプトを貼り、**Generate** を押します。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  ```text
+  申請者から希望のパラメーターをヒアリングして、Demo Approversグループの承認を得て、EC2インスタンスを起動する。
+  インスタンスタイプは以下のいずれかから選んでもらう:
+  - t4g.nano
+  - t4g.micro
+  - t4g.small
+  - t4g.medium
+  - t3.micro
+  - t3a.micro
+  - c6g.medium
+  - m6g.medium
+  - t2.micro
+  - t4g.large
+
+  リージョンは以下のいずれかから選んでもらう:
+  - us-east-1
+  - us-east-2
+  - us-west-2
+
+  AMIは申請されたリージョンのAmazon Linux 2023の最新のイメージを使う。
+  VPCとサブネットとセキュリティグループはデフォルトを使う。
+  キーペアは作成しない。
+  AMIとVPCとサブネットのIDは承認依頼前に解決しておく。
+  ```
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  3 つのプレースホルダを、自分のプロジェクト、クラスタ、リージョンに置き換えてください。
+
+  ```text
+  <your project name>プロジェクトの<your cluster name>クラスターのワークロードをDemo Approversの承認後に再起動する。
+  クラスタロケーションは<cluster region>リージョンで、ワークロードの名前空間は実環境から取得したリストから申請者に選んでもらう。
+  ```
+
+  </TabItem>
+</Tabs>
+
+4. 新しいワークフローの詳細ページに着きます。ステータスは `generating` です。ページは自分で更新され、1〜2 分で `draft` になり、ベルに「draft ready」の通知が出ます。**Task Templates** を開くと、デザインエージェントが書いたステップが見られます。パラメータを集め、承認を求め、作業し、報告する、という並びです([ワークフローを生成する](../guides/workflows.md#generating-a-workflow))。
+5. 「Acting as」チップの **Stop** を押します。
+
+## 3. reviewer として、公開する \{#3-act-as-the-reviewer-and-publish\}
+
+1. **Users** で reviewer の行の **Impersonate** を押し、確定します。
+2. **Workflows** を開き、ワークフロー名をクリックします。タスクテンプレートを見ておきます。reviewer は **Open design session** で設計の会話を読むこともできますが、口は出せません。
+3. **Publish** を押します。ステータスが `published` になり、設計は凍結され、`requester` が実行できるようになります([公開する](../guides/workflows.md#publishing))。
+4. **Stop** します。
+
+## 4. requester として、実行する \{#4-act-as-the-requester-and-run-it\}
+
+1. **Users** で requester の行の **Impersonate** を押し、確定します。
+2. **Workflows** を開き、ワークフローの **Run** を押します。**Run Workflow** ダイアログにモックは出ません。公開済みなので、これは本番の申請です。**Run** を押します。
+3. ワークフローセッションが開き、エージェントが最初のタスクに取りかかって、プロンプトが申請者に委ねた項目を聞いてきます。答えが決まっている質問はメッセージの中の選択肢として、それ以外は入力欄の上に[返答の候補](../guides/workflow-executions.md#suggested-replies)として出ます。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  プロンプトの 10 種からインスタンスタイプを、3 つからリージョンを選び、インスタンスの名前など、ほかに聞かれたことにも答えます。エージェントはそのリージョンの Amazon Linux 2023 の最新イメージと、デフォルトの VPC とサブネットを調べ、構成を要約して承認に回します。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  エージェントがクラスタから取ってきた一覧から名前空間を選び、再起動する Deployment か StatefulSet の名前を伝えます。エージェントはそのワークロードを調べて種類を確かめ、対象を要約して承認に回します。
+
+  </TabItem>
+</Tabs>
+
+4. 依頼の宛先は **Demo Approvers** グループで、その下のチャットには「Waiting for a decision from the approver group.」と出ます。申請者には決められません。実行はここで待ちに入ります。
+5. **Stop** します。
+
+## 5. approver として、承認する \{#5-act-as-the-approver-and-approve\}
+
+1. **Users** で `demo-approver-1` の行の **Impersonate** を押し、確定します。`demo-approver-2` でも構いません。グループ宛の依頼は最初の判断で決まります。
+2. ツールバーのベルに未読が 1 件、承認依頼が出ています。クリックすると実行のチャットが開きます。サイドバーの **Approvals** から行の **Open Workflow Session** をたどっても同じ場所に着きます。
+3. 依頼を読みます。エージェントの要約の下の **This authorizes** に、この判断が許可することになる呼び出しと、その入力の範囲が並びます([依頼が許可する呼び出し](../guides/approvals.md#what-a-request-authorizes))。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  **AWS MCP Server** の、インスタンスを起動する呼び出しです。申請者が選んだ構成と突き合わせてください。イメージ、VPC、サブネットの検索は並びません。依頼の前に済んでいて、承認の要らない呼び出しだからです。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  **GKE MCP Server** の `patch_k8s_resource` の呼び出しで、申請者が選んだ名前空間とワークロードを指しています。
+
+  </TabItem>
+</Tabs>
+
+4. 必要なら **Comment** を書いて、**Approve** を押します。同じチャットで実行が再開し、エージェントが作業を終えると、申請者に結果の確認を求めます。この質問に答えるのは申請者です。承認者には入力欄が読み取り専用で出て、下に「Waiting for the initiator to respond.」と表示されます。
+5. **Stop** します。
+
+## 6. requester に戻って、結果を確認する \{#6-back-as-the-requester-confirm-the-result\}
+
+1. **Users** でもう一度 requester の行の **Impersonate** を押し、確定します。
+2. **Workflow Executions** を開き、実行の行の **Open Workflow Session** を押します。
+3. エージェントは作業の結果を報告して、こちらの返事を待っています。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  インスタンス ID と状態です。気になれば AWS コンソールでインスタンスを確かめてから、チャットで確認した旨を返します。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  見守っていたロールアウトが終わったあとの、置き換わった Pod の数です。チャットで確認した旨を返します。
+
+  </TabItem>
+</Tabs>
+
+4. エージェントが要約で締めくくり、最後のタスクが完了し、実行は `completed` になり、ベルに完了の通知が出ます。
+5. **Stop** します。
+
+## 終わったら \{#afterwards\}
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  インスタンスは動いたままで、AWS コンソールで終了させるまで課金されます。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  片付けるものはありません。ワークロードは新しい Pod で元のレプリカ数に戻っています。
+
+  </TabItem>
+</Tabs>
+
+この一巡が残した記録のうち、見ておく価値のあるものが 2 つあります。
+
+| 場所 | 見えるもの |
+|---|---|
+| **Audit Logs** → **Impersonations** | いま開いたセッションの全部。誰が誰として、いつ操作したか。上の書き込みはどれもなりすまし先のアカウントに帰属するので、「本当は誰がやったのか」に答えるのはこの記録です([監査証跡](../concepts/impersonation.md#audit-trail)) |
+| 実行の **Tool Invocations** ページ | 実行が行ったツール呼び出しと、提示したツール証明書。作業をした呼び出しを解放したのは、あなたが出した承認です([Tool Invocations](../guides/workflow-executions.md#tool-invocations)) |

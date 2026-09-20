@@ -66,10 +66,12 @@ leave that unset and one is generated and printed to `docker compose logs backen
 first start — as are the `root` and demo-account passwords.
 
 Demo data is on by default under Compose, so there is something to run straight away:
-[Demo data](https://kaitoy.github.io/a2flow/docs/getting-started/demo-data) walks an
-approval-gated "launch an EC2 instance" workflow from generation to approval, signing in
-as a developer, a requester, and an approver in turn — and it can be played through with
-tool mocks, without an AWS account.
+the [Walkthrough](https://kaitoy.github.io/a2flow/docs/getting-started/walkthrough) plays
+an approval-gated "launch an EC2 instance" (or "restart a GKE workload") workflow from
+generation to approval, signing in once as `root` and impersonating a developer, a
+reviewer, a requester, and an approver in turn.
+[Demo data](https://kaitoy.github.io/a2flow/docs/getting-started/demo-data) lists what is
+seeded, and how to play it through with tool mocks, without an AWS account.
 
 To use a model other than Google Gemini, see
 [LLM configuration](https://kaitoy.github.io/a2flow/docs/getting-started/llm-configuration).

@@ -1,0 +1,208 @@
+---
+title: Walkthrough
+sidebar_position: 5
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Walkthrough
+
+This page plays one [demo](./demo-data.md) workflow through from start to finish — generating it from its agent skill, publishing it, running it, approving the request it raises, and confirming the result — without signing out once. You sign in as `root` and use [impersonation](../concepts/impersonation.md) to act as each demo account in turn, so the whole tour fits in one browser tab.
+
+Pick a provider here. Every provider-specific block on this page follows the choice.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  You will launch an EC2 instance from the `Demo AWS EC2 Launch` skill.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  You will rolling-restart a workload on a GKE cluster from the `Demo GKE Pod Restart` skill.
+
+  </TabItem>
+</Tabs>
+
+## Before you start \{#before-you-start\}
+
+- The backend is running with [demo data](./demo-data.md) enabled.
+- You know the `root` password — `ROOT_PASSWORD`, or the line the backend logged once at startup when it was left unset ([Seeded users](../operations/configuration.md#seeded-users)).
+- The provider can really be reached:
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  The `demo-aws-credentials` [secret](../guides/secrets.md) holds a real access key: either `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` were set before the first start, or you edit the secret under **Secrets**. The run **launches a real EC2 instance**, which costs money until you terminate it.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  The `demo-gcp-credentials` [secret](../guides/secrets.md) holds a Google Cloud credential whose identity can reach a GKE cluster: either `DEMO_GCP_CREDENTIALS_JSON` was set before the first start, or you edit the secret under **Secrets**. Have a project, a cluster, its region, and a workload you may restart ready — the run **really rolling-restarts it**.
+
+  </TabItem>
+</Tabs>
+
+No account to spare? The seeded [tool mocks](./demo-data.md#trying-it-out) let the same workflow play through without reaching a provider. That path runs the workflow while it is still a `draft`, so it skips the publish step below.
+
+## The cast \{#the-cast\}
+
+| Step | AWS | Google Cloud | Role |
+|---|---|---|---|
+| Generate the workflow | `demo-aws-developer` | `demo-gcp-developer` | `developer` |
+| Publish it | `demo-aws-reviewer` | `demo-gcp-reviewer` | `reviewer` |
+| Run it, and confirm the result | `demo-aws-requester` | `demo-gcp-requester` | `requester` |
+| Approve the request | `demo-approver-1` | `demo-approver-1` | `approver` |
+
+Every step below starts with **Impersonate** on the **Users** list and ends with **Stop** on the "Acting as" chip in the header. The stop is not optional: while you act as one of these accounts you are held to that account's roles, and none of them may impersonate, so **Impersonate** is not offered again until you have stopped. From a chat screen, the **A2Flow** logo in the app bar takes you back to the welcome page and its sidebar.
+
+## 1. Sign in as root \{#1-sign-in-as-root\}
+
+1. On the sign-in page, enter `root` as the **Username**, leave **Tenant** blank — `root` is a platform administrator and belongs to no tenant — and enter the password. Press **Sign in**.
+2. You land on the welcome page. The tenant selector in the app bar reads **Default**, the tenant the demo data lives in. Pick it if something else is selected.
+
+## 2. Act as the developer and generate the workflow \{#2-act-as-the-developer-and-generate-the-workflow\}
+
+1. Open **Users** in the admin sidebar and press **Impersonate** on the developer's row. Confirm with **Impersonate** in the **Impersonate User** dialog. You are back on the welcome page, and the header chip reads "Acting as `demo-…-developer`".
+2. Open **Agent Skills**. Only this provider's skill is listed — the other one is hidden by its [access-control tag](../guides/tags.md#access-control-tags). Wait until its **Status** reads `ready`, refreshing the list while it still says `Cloning`; **Generate workflow** stays disabled until then.
+3. Press **Generate workflow** on the row. Leave **Workflow Name** as it is, paste the prompt below into **Prompt**, and press **Generate**.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  ```text
+  Ask the requester for the parameters they want, get approval from the Demo Approvers group, then launch an EC2 instance.
+  Have them choose the instance type from:
+  - t4g.nano
+  - t4g.micro
+  - t4g.small
+  - t4g.medium
+  - t3.micro
+  - t3a.micro
+  - c6g.medium
+  - m6g.medium
+  - t2.micro
+  - t4g.large
+
+  Have them choose the region from:
+  - us-east-1
+  - us-east-2
+  - us-west-2
+
+  For the AMI, use the latest Amazon Linux 2023 image in the requested region.
+  Use the default VPC, subnet, and security group.
+  Do not create a key pair.
+  Resolve the AMI, VPC, and subnet IDs before requesting approval.
+  ```
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Replace the three placeholders with your own project, cluster, and region.
+
+  ```text
+  Restart a workload on the <your cluster name> cluster in the <your project name> project after approval from Demo Approvers.
+  The cluster location is the <cluster region> region. Have the requester choose the workload's namespace from a list fetched from the live cluster.
+  ```
+
+  </TabItem>
+</Tabs>
+
+4. You land on the new workflow's detail page with the status `generating`. The page refreshes itself; in a minute or two the status becomes `draft` and the bell shows a "draft ready" notification. Open its **Task Templates** to see the steps the design agent wrote — gathering the parameters, asking for approval, doing the work, and reporting back ([Generating a workflow](../guides/workflows.md#generating-a-workflow)).
+5. Press **Stop** on the "Acting as" chip.
+
+## 3. Act as the reviewer and publish \{#3-act-as-the-reviewer-and-publish\}
+
+1. On **Users**, press **Impersonate** on the reviewer's row and confirm.
+2. Open **Workflows** and click the workflow's name. Look over its task templates; a reviewer may also **Open design session** to read the design conversation, but not steer it.
+3. Press **Publish**. The status becomes `published`: the design is frozen, and a `requester` may now run it ([Publishing](../guides/workflows.md#publishing)).
+4. **Stop**.
+
+## 4. Act as the requester and run it \{#4-act-as-the-requester-and-run-it\}
+
+1. On **Users**, press **Impersonate** on the requester's row and confirm.
+2. Open **Workflows** and press **Run** on the workflow. The **Run Workflow** dialog offers no mocks — the workflow is published, so this is a real request. Press **Run**.
+3. The workflow session opens and the agent starts on the first task, asking for what the prompt left to the requester. A question with a fixed set of answers is a choice inside the message; otherwise a row of [suggested replies](../guides/workflow-executions.md#suggested-replies) appears above the input.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  Choose an instance type from the ten in the prompt and a region from the three, and answer whatever else it asks, such as a name for the instance. The agent then looks up the latest Amazon Linux 2023 image in that region and the default VPC and subnet, summarizes the configuration, and sends it off for approval.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Choose a namespace from the list the agent fetched from the cluster, and name the Deployment or StatefulSet to restart. The agent looks the workload up, confirms its kind, summarizes the target, and sends it off for approval.
+
+  </TabItem>
+</Tabs>
+
+4. The request is addressed to the **Demo Approvers** group, and under it the chat reads "Waiting for a decision from the approver group." — the requester cannot decide it. The run now waits.
+5. **Stop**.
+
+## 5. Act as the approver and approve \{#5-act-as-the-approver-and-approve\}
+
+1. On **Users**, press **Impersonate** on `demo-approver-1` and confirm. `demo-approver-2` would do just as well: the first decision settles a group request.
+2. The bell in the toolbar shows one unread notification, the approval request. Click it to open the run's chat. **Approvals** in the sidebar, then **Open Workflow Session** on the row, leads to the same place.
+3. Read the request. Below the agent's summary, **This authorizes** lists the calls the decision would permit and the bounds on their inputs ([What a request authorizes](../guides/approvals.md#what-a-request-authorizes)):
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  The call on the **AWS MCP Server** that launches the instance. Check it against the configuration the requester chose — the image, VPC, and subnet look-ups are not listed, since they ran before the request and needed no approval.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  The `patch_k8s_resource` call on the **GKE MCP Server**, pointed at the namespace and workload the requester chose.
+
+  </TabItem>
+</Tabs>
+
+4. Leave a **Comment** if you like and press **Approve**. The run resumes in the same chat and the agent does the work, then asks the requester to confirm the outcome. That question is the requester's to answer: for you the input is read-only, with "Waiting for the initiator to respond." beneath it.
+5. **Stop**.
+
+## 6. Back as the requester: confirm the result \{#6-back-as-the-requester-confirm-the-result\}
+
+1. On **Users**, press **Impersonate** on the requester's row again and confirm.
+2. Open **Workflow Executions** and press **Open Workflow Session** on the run.
+3. The agent has reported what it did and is waiting for you:
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  The instance id and its state. Check the instance in the AWS console if you like, then confirm in the chat.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  How many pods were replaced, once the rollout it watched has finished. Confirm in the chat.
+
+  </TabItem>
+</Tabs>
+
+4. The agent closes with its summary, the last task completes, the run turns `completed`, and the bell shows a completion notification.
+5. **Stop**.
+
+## Afterwards \{#afterwards\}
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  The instance keeps running, and costs money, until you terminate it in the AWS console.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Nothing to clean up: the workload is back at its replica count with fresh pods.
+
+  </TabItem>
+</Tabs>
+
+Two records the tour left behind are worth a look:
+
+| Where | What it shows |
+|---|---|
+| **Audit Logs** → **Impersonations** | Every session you just opened: who acted as whom, and when. Each write above is attributed to the impersonated account, so this trail is what answers "who was really behind it" ([Audit trail](../concepts/impersonation.md#audit-trail)) |
+| The run's **Tool Invocations** page | Each tool call the run made and the certificate it presented — the approval you granted is what unlocked the one that did the work ([Tool Invocations](../guides/workflow-executions.md#tool-invocations)) |

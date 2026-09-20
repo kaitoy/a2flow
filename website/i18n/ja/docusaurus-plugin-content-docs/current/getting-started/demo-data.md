@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # デモデータ
 
-バックエンドで `DEMO_DATA=true` を設定すると、承認つきで状態を変える 2 つの例 — 「EC2 インスタンスを起動する」例と「GKE の Pod を再起動する」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、その手順が下の「試してみる」です。
+バックエンドで `DEMO_DATA=true` を設定すると、承認つきで状態を変える 2 つの例 — 「EC2 インスタンスを起動する」例と「GKE の Pod を再起動する」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、実際に生成するところからの手順が[ウォークスルー](./walkthrough.mdx)です。
 
 ## 有効にする
 
@@ -53,17 +53,11 @@ DEMO_GCP_CREDENTIALS_JSON='{"type":"service_account",...}'
 
 ## 試してみる {#trying-it-out}
 
-`DEMO_PASSWORD` を使い、次の順に各アカウントでサインインします。
+どちらの例も、生成、公開、実行、承認、結果の確認までを一気に通す手順が[ウォークスルー](./walkthrough.mdx)です。`root` で一度サインインし、デモアカウントを順に[なりすまし](../concepts/impersonation.md)で演じます。`DEMO_PASSWORD` で各アカウントにサインインし直しても同じことができます。誰が何をするかは上の表のとおりです。
 
-1. **`demo-aws-developer`** で[エージェントスキル](../guides/agent-skills.md)を開き、`Demo AWS EC2 Launch` の clone が終わるのを待ちます。終わるまで **Generate workflow** は押せません。
-2. その行の **Generate workflow** から、起動したいインスタンスを説明し、デザインエージェントにタスクリストを作らせます([ワークフローを生成する](../guides/workflows.md#generating-a-workflow))。ワークフローは `draft` になります。
-3. **`demo-aws-reviewer`** でサインインし直し、ワークフローの詳細ページで生成されたタスクテンプレートを確認して **Publish** します。
-4. **`demo-aws-requester`** でワークフローの **Run** を押します([ワークフローを実行する](../guides/workflows.md#running-a-workflow))。実行のチャットが開き、エージェントがタスクを順に進めます。
-5. スキルが承認を求めてきたら、**`demo-approver-1`** でサインインして承認します([承認](../guides/approvals.md))。エージェントはそのあと MCP ツールでインスタンスを起動します。
+`Demo AWS Group` と `Demo GCP Group` はそれぞれ自分のプロバイダのレコードしか見えないため、`demo-aws-developer` は `Demo GKE Pod Restart` を開けず、`demo-gcp-developer` は `Demo AWS EC2 Launch` を開けません。`Demo Approvers` は `AWS` と `GCP` 両方のアクセス制御タグを直接持っているので、承認者アカウントはどちらの例でもどちらでも構いません。GKE の例を実際に動かすには、実際の GKE クラスタに届く権限を持つ身元の認証情報を `DEMO_GCP_CREDENTIALS_JSON` に設定しておく必要があります。
 
-同じ 5 ステップは **`Demo GKE Pod Restart`** でも、**`demo-gcp-developer`**、**`demo-gcp-reviewer`**、**`demo-gcp-requester`** でサインインすれば実行できます。`Demo AWS Group` と `Demo GCP Group` はそれぞれ自分のプロバイダのレコードしか見えないため、`demo-aws-developer` は `Demo GKE Pod Restart` を開けず、`demo-gcp-developer` は `Demo AWS EC2 Launch` を開けません。承認は起動ではなく、再起動するワークロード(または、単一の Pod だけを望む場合はその Pod)そのものを対象にし、最後のステップは何かを作る代わりにワークロードのローリング再起動を実行します。`Demo Approvers` は `AWS` と `GCP` 両方のアクセス制御タグを直接持っているので、承認のルーティングは AWS/GCP のグループ分けの影響を受けず、どちらの承認者アカウントでも構いません。ここで実際に動かすには、実際の GKE クラスタに届く権限を持つ身元の認証情報を `DEMO_GCP_CREDENTIALS_JSON` に設定しておく必要があります。
-
-**AWS アカウントも GKE クラスタもない場合。** 手順 3 を飛ばし、`draft` のまま実行してください。`developer` である `demo-aws-developer`(GKE の例なら `demo-gcp-developer`)はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script`、Pod 再起動用の `patch_k8s_resource` または `delete_k8s_resource`、`request_approval`)にチェックを入れれば、AWS や実際の GKE クラスタに届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
+**AWS アカウントも GKE クラスタもない場合。** 公開せず、`draft` のまま実行してください。`developer` である `demo-aws-developer`(GKE の例なら `demo-gcp-developer`)はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる Run ダイアログが出るのはドラフト実行のときだけです。**Mock tools** に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script`、Pod 再起動用の `patch_k8s_resource` または `delete_k8s_resource`、`request_approval`)にチェックを入れれば、AWS や実際の GKE クラスタに届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。
 
 ## 削除する
 

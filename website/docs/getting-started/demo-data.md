@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # Demo data
 
-Setting `DEMO_DATA=true` on the backend registers everything two approval-gated, mutating examples need — "launch an EC2 instance" and "restart a GKE pod" — in the seeded **Default** tenant, so there is something to run without registering every piece by hand. The [workflow](../guides/workflows.md) itself is deliberately not seeded — these records are the ingredients you generate one from, which is exactly the tour below.
+Setting `DEMO_DATA=true` on the backend registers everything two approval-gated, mutating examples need — "launch an EC2 instance" and "restart a GKE pod" — in the seeded **Default** tenant, so there is something to run without registering every piece by hand. The [workflow](../guides/workflows.md) itself is deliberately not seeded — these records are the ingredients you generate one from, and the [Walkthrough](./walkthrough.mdx) is the tour that does it.
 
 ## Enabling it
 
@@ -53,17 +53,11 @@ None of them holds its role directly: each inherits it from a [user group](../gu
 
 ## Trying it out
 
-Sign in with `DEMO_PASSWORD` as each account in turn:
+The [Walkthrough](./walkthrough.mdx) plays either example through end to end — generate, publish, run, approve, confirm — from a single `root` sign-in, [impersonating](../concepts/impersonation.md) each demo account in turn. Signing in as each account with `DEMO_PASSWORD` works just as well; the table above says who does what.
 
-1. As **`demo-aws-developer`**, open [Agent Skills](../guides/agent-skills.md) and wait for `Demo AWS EC2 Launch` to finish cloning — **Generate workflow** stays disabled until it has.
-2. Use that row's **Generate workflow** action, describe the instance you want, and let the design agent build the task list ([Generating a workflow](../guides/workflows.md#generating-a-workflow)). The workflow lands in `draft`.
-3. Sign in as **`demo-aws-reviewer`**, review the generated task templates on the workflow's detail page, then **Publish**.
-4. As **`demo-aws-requester`**, press **Run** on the workflow ([Running a workflow](../guides/workflows.md#running-a-workflow)). The run's chat opens and the agent starts working through the tasks.
-5. When the skill asks for approval, sign in as **`demo-approver-1`** and approve it ([Approvals](../guides/approvals.md)). The agent then launches the instance through the MCP tool.
+`Demo AWS Group` and `Demo GCP Group` each see only their own provider's records, so `demo-aws-developer` cannot open `Demo GKE Pod Restart` and `demo-gcp-developer` cannot open `Demo AWS EC2 Launch`. Either approver account works for both examples, since `Demo Approvers` carries both the `AWS` and `GCP` access-control tags directly. A real GKE run needs `DEMO_GCP_CREDENTIALS_JSON` set to a credential whose identity may reach a real GKE cluster.
 
-The same five steps work from **`Demo GKE Pod Restart`**, signed in as **`demo-gcp-developer`**, **`demo-gcp-reviewer`**, and **`demo-gcp-requester`** instead: `Demo AWS Group` and `Demo GCP Group` each see only their own provider's records, so `demo-aws-developer` cannot open `Demo GKE Pod Restart` and `demo-gcp-developer` cannot open `Demo AWS EC2 Launch`. The approval covers the exact workload (or, for a single pod, the exact pod) to restart rather than a launch, and the last step rolls out a restart of the workload instead of creating anything; either approver account still works, since `Demo Approvers` carries both the `AWS` and `GCP` access-control tags directly, so approval routing is unaffected by the AWS/GCP grouping. A real run there needs `DEMO_GCP_CREDENTIALS_JSON` set to a credential whose identity may reach a real GKE cluster.
-
-**No AWS account or GKE cluster?** Skip step 3 and run the workflow while it is still `draft` — as a `developer`, `demo-aws-developer` (or `demo-gcp-developer` for the GKE story) may do that, and only a draft run's dialog offers the tenant's [tool mocks](../guides/tool-mocks.md). Under **Mock tools**, check the seeded stubs it lists (`aws___call_aws` or `aws___run_script` for the launch, `patch_k8s_resource` or `delete_k8s_resource` for the pod restart, and `request_approval`); the whole workflow then plays through without reaching AWS, a real GKE cluster, or waiting on a human.
+**No AWS account or GKE cluster?** Do not publish: run the workflow while it is still `draft` — as a `developer`, `demo-aws-developer` (or `demo-gcp-developer` for the GKE story) may do that, and only a draft run's dialog offers the tenant's [tool mocks](../guides/tool-mocks.md). Under **Mock tools**, check the seeded stubs it lists (`aws___call_aws` or `aws___run_script` for the launch, `patch_k8s_resource` or `delete_k8s_resource` for the pod restart, and `request_approval`); the whole workflow then plays through without reaching AWS, a real GKE cluster, or waiting on a human.
 
 ## Removing it
 
