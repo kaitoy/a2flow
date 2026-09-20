@@ -532,6 +532,20 @@ def resolve_model() -> LiteLlm | str:
 #: belong to a workflow session, and a design session has none. Reply
 #: suggestions are execution-only too, since only the workflow session chat
 #: shows them.
+#: Agent name per skill-backed kind, surfaced as ``author`` on every ADK event
+#: (``google.adk.agents.BaseAgent`` stamps ``author=self.name``) and in
+#: uvicorn's ``[ADK_EVENT] author=...`` log line. ADK requires a valid Python
+#: identifier here (no spaces), so these stand in for the human-readable
+#: names ("A2Flow Design Agent", "A2Flow Workflow Agent", ...).
+_KIND_AGENT_NAMES: dict[AgentKind, str] = {
+    AgentKind.initial_design: "a2flow_initial_design_agent",
+    AgentKind.design: "a2flow_design_agent",
+    AgentKind.execution: "a2flow_workflow_agent",
+}
+
+#: Name of the default skill-less chat agent (no ``skill_dir``).
+CHAT_AGENT_NAME = "a2flow_chat_agent"
+
 _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
     AgentKind.initial_design: [
         register_task_templates,
@@ -603,7 +617,7 @@ def create_agent(
         instruction = A2UIInstructionProvider(role_description)
 
     return LlmAgent(
-        name="simple_agent",
+        name=_KIND_AGENT_NAMES[kind] if skill_dir is not None else CHAT_AGENT_NAME,
         model=model,
         instruction=instruction,
         tools=tools,
