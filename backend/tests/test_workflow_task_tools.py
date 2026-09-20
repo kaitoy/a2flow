@@ -465,6 +465,26 @@ async def test_agent_records_the_failure_cause(engine: AsyncEngine) -> None:
     assert updated["error_message"] == "billing API returned 503"
 
 
+async def test_agent_records_a_failure_message_over_200_characters(
+    engine: AsyncEngine,
+) -> None:
+    """error_message allows up to 1000 characters, not the shorter ShortText cap
+    other free-text fields share -- a shell/API failure string can run long."""
+    execution_id = await _seed_session(engine, user_id="owner")
+    task_id = await seed_workflow_task(engine, execution_id, title="A")
+    long_message = "x" * 500
+
+    updated = await update_workflow_task(
+        task_id,
+        _ctx(),
+        status="failed",
+        error_kind="permission_denied",
+        error_message=long_message,
+    )
+
+    assert updated["error_message"] == long_message
+
+
 async def test_agent_unknown_error_kind_is_rejected(engine: AsyncEngine) -> None:
     """An invalid classification is reported back to the model, listing the valid ones."""
     execution_id = await _seed_session(engine, user_id="owner")

@@ -648,7 +648,7 @@ async def update_workflow_task(
             credentials or authorization to proceed), "rejected" (a human
             rejected the task's approval request), or "other" (none of the
             above — explain in ``error_message``).
-        error_message: One-sentence description of the failure, up to 200
+        error_message: One-sentence description of the failure, up to 1000
             characters. Include the concrete detail ``error_kind`` cannot carry,
             such as the tool or endpoint that failed and what it reported.
 

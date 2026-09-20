@@ -298,6 +298,12 @@ RepoPath = Annotated[
 #: Short free-text label such as a task or notification title: 1–200 characters.
 ShortText = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 
+#: Free-text failure explanation for a WorkflowTask's ``error_message``: up to
+#: 1000 characters. Split out from :data:`ShortText` because a task failure
+#: message (e.g. a shell or API error string) legitimately runs longer than
+#: the short entity-title fields that share that alias.
+ErrorText = Annotated[str, StringConstraints(max_length=1000)]
+
 #: Free-text description: up to 2000 characters.
 DescText = Annotated[str, StringConstraints(max_length=2000)]
 
