@@ -5,7 +5,9 @@
 **A2Flow is a workflow engine rebuilt from the ground up around an AI agent.** Not an
 engine with an AI step bolted into it: an engine whose runtime *is* an agent. It reads
 the procedure, plans the task graph, binds the tools each step needs, pauses for the
-people who have to sign off, and executes the rest itself.
+people who have to sign off, and executes the rest itself. The plan it makes is kept as a
+workflow and run again: the flexibility of a chat session, with the repeatability of a
+procedure.
 
 There is no flowchart to draw and no diagram to return to. A workflow is not something
 the agent takes part in — it is what the agent does.
@@ -16,7 +18,7 @@ the agent takes part in — it is what the agent does.
 
 | | |
 |---|---|
-| **[Workflows designed in conversation](https://kaitoy.github.io/a2flow/docs/guides/workflows)** | Start from an [Agent Skill](https://kaitoy.github.io/a2flow/docs/guides/agent-skills) — a `SKILL.md` in a Git repository — and talk to the AI. It drafts the task graph, you adjust it, you publish it. |
+| **[Workflows designed in conversation](https://kaitoy.github.io/a2flow/docs/guides/workflows)** | Start from an [Agent Skill](https://kaitoy.github.io/a2flow/docs/guides/agent-skills) — a `SKILL.md` in a Git repository — and talk to the AI. It drafts the task graph, you adjust it, you publish it — and that published plan is what every run follows: an SOP you carry out with the AI. |
 | **[A run is one shared chat](https://kaitoy.github.io/a2flow/docs/guides/workflow-executions)** | The requester presses **Run**, the agent walks the task graph — asking its questions through forms it draws into the chat — and the approver decides in the same thread. No ticket queue, no side channel. |
 | **[Approvals that carry real authority](https://kaitoy.github.io/a2flow/docs/guides/approvals)** | Each task holds a short-lived X.509 certificate over exactly the tools it was granted. The MCP gateway refuses any call that does not present one, signed — a prompt injection cannot talk its way past it, and the agent cannot widen a grant afterwards. |
 | **[MCP servers, sandboxed](https://kaitoy.github.io/a2flow/docs/guides/mcp-servers)** | Register the servers whose tools your workflows use. Third-party server code runs in a [separate proxy](https://kaitoy.github.io/a2flow/docs/architecture/mcp-gateway-and-proxy), away from the database credentials and API keys. |

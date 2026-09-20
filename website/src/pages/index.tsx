@@ -161,7 +161,7 @@ export default function Home(): ReactNode {
       description={translate({
         id: 'home.meta.description',
         message:
-          'A2Flow rebuilds ITSM-style workflows around an AI agent. It plans the work as a task graph, pauses for the humans who must sign off, and executes the rest.',
+          'A2Flow rebuilds ITSM-style workflows around an AI agent. It plans the work as a task graph, pauses for the humans who must sign off, and executes the rest. The plan is kept as a workflow, so the next run follows the same steps.',
       })}>
       <div className="a2flow-home" ref={rootRef}>
         {/* The standalone page kept these in its own sticky header, which the
@@ -180,7 +180,7 @@ export default function Home(): ReactNode {
               <span className="eyebrow"><Translate id="home.hero.eyebrow">{'Agent as Workflow'}</Translate></span>
               <h1><Translate id="home.hero.title" values={{br: <br />, agent: <span className="grad-text"><Translate id="home.hero.title.agent">{'an agent'}</Translate></span>}}>{'The workflow engine{br}is now {agent}.'}</Translate></h1>
               <p className="hero-sub">
-                <Translate id="home.hero.sub">{'A2Flow rebuilds ITSM-style workflows — service requests, change execution, announcements — around an AI agent. It plans the work as a task graph, pauses for the humans who must sign off, and executes the rest.'}</Translate>
+                <Translate id="home.hero.sub">{'A2Flow rebuilds ITSM-style workflows — service requests, change execution, announcements — around an AI agent. It plans the work as a task graph, pauses for the humans who must sign off, and executes the rest. The plan is kept as a workflow, so the next run follows the same steps.'}</Translate>
               </p>
               <div className="hero-cta">
                 <a className="btn btn-primary" href="https://github.com/kaitoy/a2flow">
@@ -310,13 +310,13 @@ export default function Home(): ReactNode {
               <span className="eyebrow"><Translate id="home.concept.eyebrow">{'The concept'}</Translate></span>
               <h2><Translate id="home.concept.title" values={{reimagined: <span className="grad-text"><Translate id="home.concept.title.reimagined">{'reimagined'}</Translate></span>}}>{'ITSM workflows, {reimagined}'}</Translate></h2>
               <p>
-                <Translate id="home.concept.lead">{'Classic workflow engines encode a process as rigid forms, ticket queues, and handoffs between people. Most of the elapsed time is waiting. A2Flow keeps the two things that matter — the procedure and the approvals — and hands everything in between to an agent.'}</Translate>
+                <Translate id="home.concept.lead">{'Classic workflow engines are repeatable but rigid: fixed forms, ticket queues, handoffs between people, and mostly waiting. A chat with an AI agent is the opposite: flexible, but the plan it made is gone when the session ends, and nobody signed off on it. A2Flow keeps the procedure and the approvals from the first, the conversation from the second, and hands everything in between to the agent.'}</Translate>
               </p>
             </div>
             <div className="contrast">
               <div className="contrast-card glass past reveal">
                 <h3><Translate id="home.concept.past.title">{'The ticket pipeline'}</Translate></h3>
-                <p className="sub"><Translate id="home.concept.past.sub">{'Process as software: fixed forms, fixed states, humans as glue.'}</Translate></p>
+                <p className="sub"><Translate id="home.concept.past.sub">{'Process as software: repeatable, but rigid — fixed forms, fixed states, humans as glue.'}</Translate></p>
                 <ul className="flow-steps">
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg></span><span><b><Translate id="home.concept.past.form">{'Fill in the form'}</Translate></b><span className="note"><Translate id="home.concept.past.form.note">{'One field wrong and it bounces back.'}</Translate></span></span></li>
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><b><Translate id="home.concept.past.queue">{'Wait in the queue'}</Translate></b><span className="note"><Translate id="home.concept.past.queue.note">{'Your request is #14 in line.'}</Translate></span></span></li>
@@ -324,12 +324,22 @@ export default function Home(): ReactNode {
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v12H5.2L4 17.2V4z"/><path d="M8 8h8M8 12h5"/></svg></span><span><b><Translate id="home.concept.past.chase">{'Chase the status'}</Translate></b><span className="note"><Translate id="home.concept.past.chase.note">{'“Any update on my ticket?”'}</Translate></span></span></li>
                 </ul>
               </div>
+              <div className="contrast-card glass past reveal">
+                <h3><Translate id="home.concept.chat.title">{'The AI chat session'}</Translate></h3>
+                <p className="sub"><Translate id="home.concept.chat.sub">{'Process as improvisation: flexible, but never the same twice.'}</Translate></p>
+                <ul className="flow-steps">
+                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5c-1.6 0-3.1-.4-4.4-1.2L3 20l1.2-5.1A8.5 8.5 0 1 1 21 11.5z"/></svg></span><span><b><Translate id="home.concept.chat.ask">{'Ask the agent in chat'}</Translate></b><span className="note"><Translate id="home.concept.chat.ask.note">{'No form, any wording.'}</Translate></span></span></li>
+                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span><span><b><Translate id="home.concept.chat.plan">{'The agent plans and acts'}</Translate></b><span className="note"><Translate id="home.concept.chat.plan.note">{'A fresh plan every time — and a slightly different one.'}</Translate></span></span></li>
+                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M19.7 14a7 7 0 0 0 .3-2V5l-8-3-3.3 1.2"/><path d="M4.7 4.7 4 5v7c0 6 8 10 8 10 1.8-.9 3.5-2 4.9-3.3"/><path d="m2 2 20 20"/></svg></span><span><b><Translate id="home.concept.chat.gate">{'No gate for an approver'}</Translate></b><span className="note"><Translate id="home.concept.chat.gate.note">{'Whoever is chatting decides. Nobody else sees it.'}</Translate></span></span></li>
+                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="M10 11v5M14 11v5"/></svg></span><span><b><Translate id="home.concept.chat.gone">{'Session over, plan gone'}</Translate></b><span className="note"><Translate id="home.concept.chat.gone.note">{'The next request starts from zero.'}</Translate></span></span></li>
+                </ul>
+              </div>
               <div className="contrast-card glass next reveal">
                 <h3 className="grad-text"><Translate id="home.concept.next.title">{'The agent workflow'}</Translate></h3>
-                <p className="sub"><Translate id="home.concept.next.sub">{'Process as conversation: the agent drives, humans decide.'}</Translate></p>
+                <p className="sub"><Translate id="home.concept.next.sub">{'An SOP you run together with the AI: as flexible as a chat, as repeatable as a procedure.'}</Translate></p>
                 <ul className="flow-steps">
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5c-1.6 0-3.1-.4-4.4-1.2L3 20l1.2-5.1A8.5 8.5 0 1 1 21 11.5z"/></svg></span><span><b><Translate id="home.concept.next.intent">{'Describe the intent in chat'}</Translate></b><span className="note"><Translate id="home.concept.next.intent.note">{'No form. The Skill knows what to ask.'}</Translate></span></span></li>
-                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span><span><b><Translate id="home.concept.next.plan">{'The agent plans a task graph'}</Translate></b><span className="note"><Translate id="home.concept.next.plan.note">{'Concrete steps with dependencies. Publish once, run it as often as needed.'}</Translate></span></span></li>
+                  <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span><span><b><Translate id="home.concept.next.plan">{'The plan is kept as a workflow'}</Translate></b><span className="note"><Translate id="home.concept.next.plan.note">{'The task graph the agent drafted from the Skill — published once, run as often as needed.'}</Translate></span></span></li>
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span><span><b><Translate id="home.concept.next.approve">{'Humans approve the moments that matter'}</Translate></b><span className="note"><Translate id="home.concept.next.approve.note">{'Publishing the design, and every tool call that changes something.'}</Translate></span></span></li>
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span><span><b><Translate id="home.concept.next.execute">{'The agent executes and verifies'}</Translate></b><span className="note"><Translate id="home.concept.next.execute.note">{'Live progress in the same conversation.'}</Translate></span></span></li>
                 </ul>
@@ -519,9 +529,9 @@ export default function Home(): ReactNode {
               </div>
               <div className="feature glass reveal">
                 <span className="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M6.5 7.5 10.5 16M17.5 7.5 13.5 16"/></svg></span>
-                <h3><Translate id="home.features.graph.title">{'A live task graph'}</Translate></h3>
+                <h3><Translate id="home.features.graph.title">{'A plan you can run again'}</Translate></h3>
                 <p>
-                  <Translate id="home.features.graph.body">{'Tasks form a real DAG — dependencies enforced, cycles rejected — and render as a sortable table or an auto-laid-out graph, updating as the agent works.'}</Translate>
+                  <Translate id="home.features.graph.body">{'The task graph the agent drafts from a Skill is published as a workflow — a real DAG, dependencies enforced, cycles rejected — and every run walks the same graph, rendered as a sortable table or an auto-laid-out graph that updates as the agent works.'}</Translate>
                 </p>
               </div>
               <div className="feature glass reveal">

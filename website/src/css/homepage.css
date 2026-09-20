@@ -758,7 +758,7 @@ to { opacity: 1; transform: none;
 }
 
 /* ---------------------------------------------------------------- concept */
-.a2flow-home .contrast { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+.a2flow-home .contrast { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;
 }
 
 .a2flow-home .contrast-card { border-radius: 1rem; padding: 2rem;
@@ -829,7 +829,7 @@ to { opacity: 1; transform: none;
 .a2flow-home .concept-note b { color: var(--a2f-ink); font-weight: 600;
 }
 
-@media (max-width: 56rem) {
+@media (max-width: 64rem) {
 .a2flow-home .contrast { grid-template-columns: 1fr;
 }
 

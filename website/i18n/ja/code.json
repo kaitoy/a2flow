@@ -365,7 +365,7 @@
     "message": "エージェントがワークフローになる"
   },
   "home.meta.description": {
-    "message": "A2Flow は ITSM 型のワークフローを AI エージェントを軸に組み直します。仕事をタスクグラフとして計画し、承認が要る場面では人を待ち、それ以外は自分で実行します。"
+    "message": "A2Flow は ITSM 型のワークフローを AI エージェントを軸に組み直します。仕事をタスクグラフとして計画し、承認が要る場面では人を待ち、それ以外は自分で実行します。その計画はワークフローとして保存され、次の実行も同じ手順をたどります。"
   },
   "home.nav.concept": {
     "message": "コンセプト"
@@ -389,7 +389,7 @@
     "message": "エージェント"
   },
   "home.hero.sub": {
-    "message": "A2Flow は、サービス依頼、変更作業、周知といった ITSM 型のワークフローを、AI エージェントを軸に組み直します。仕事をタスクグラフとして計画し、承認が必要な場面では人を待ち、それ以外は自分で実行します。"
+    "message": "A2Flow は、サービス依頼、変更作業、周知といった ITSM 型のワークフローを、AI エージェントを軸に組み直します。仕事をタスクグラフとして計画し、承認が必要な場面では人を待ち、それ以外は自分で実行します。その計画はワークフローとして保存され、次の実行も同じ手順をたどります。"
   },
   "home.hero.cta.github": {
     "message": "GitHub で見る"
@@ -410,13 +410,13 @@
     "message": "作り直す"
   },
   "home.concept.lead": {
-    "message": "従来のワークフローエンジンは、業務を固定のフォームとチケットの待ち行列と人から人への引き継ぎとして書き下します。経過時間の大半は待ち時間です。A2Flow は本当に必要な 2 つ、手順と承認だけを残し、あいだの作業はすべてエージェントに渡します。"
+    "message": "従来のワークフローエンジンは繰り返せますが、固いものです。固定のフォーム、チケットの待ち行列、人から人への引き継ぎ。経過時間の大半は待ち時間です。AI エージェントとのチャットはその逆で、柔軟ですが、立てた計画はセッションが終われば消え、誰の承認も通っていません。A2Flow は、ワークフローエンジンからは手順と承認を、チャットからは会話を残し、あいだの作業はすべてエージェントに渡します。"
   },
   "home.concept.past.title": {
     "message": "チケットのパイプライン"
   },
   "home.concept.past.sub": {
-    "message": "ソフトウェアとしての業務。フォームも状態も固定で、人がのりの役をします。"
+    "message": "ソフトウェアとしての業務。繰り返せますが固く、フォームも状態も固定で、人がのりの役をします。"
   },
   "home.concept.past.form": {
     "message": "フォームを埋める"
@@ -442,11 +442,41 @@
   "home.concept.past.chase.note": {
     "message": "「私のチケット、どうなりました?」"
   },
+  "home.concept.chat.title": {
+    "message": "AI とのチャット"
+  },
+  "home.concept.chat.sub": {
+    "message": "即興としての業務。柔軟ですが、二度と同じにはなりません。"
+  },
+  "home.concept.chat.ask": {
+    "message": "チャットで頼む"
+  },
+  "home.concept.chat.ask.note": {
+    "message": "フォームは不要。言い方も自由です。"
+  },
+  "home.concept.chat.plan": {
+    "message": "エージェントが計画して動く"
+  },
+  "home.concept.chat.plan.note": {
+    "message": "毎回新しい計画で、毎回少しずつ違います。"
+  },
+  "home.concept.chat.gate": {
+    "message": "承認の関所がない"
+  },
+  "home.concept.chat.gate.note": {
+    "message": "決めるのはチャットしている本人だけ。ほかの誰にも見えません。"
+  },
+  "home.concept.chat.gone": {
+    "message": "セッションが終われば計画も消える"
+  },
+  "home.concept.chat.gone.note": {
+    "message": "次はまたゼロからです。"
+  },
   "home.concept.next.title": {
     "message": "エージェントのワークフロー"
   },
   "home.concept.next.sub": {
-    "message": "会話としての業務。エージェントが進め、人が決めます。"
+    "message": "AI と一緒に回す SOP。チャットの柔軟さと、手順書の再現性を両方持ちます。"
   },
   "home.concept.next.intent": {
     "message": "チャットでやりたいことを伝える"
@@ -455,10 +485,10 @@
     "message": "フォームは不要。何を聞くべきかはスキルが知っています。"
   },
   "home.concept.next.plan": {
-    "message": "エージェントがタスクグラフを立てる"
+    "message": "計画がワークフローとして残る"
   },
   "home.concept.next.plan.note": {
-    "message": "依存関係つきの具体的な手順。一度公開すれば、何度でも実行できます。"
+    "message": "エージェントがスキルから起こしたタスクグラフを、一度公開すれば何度でも実行できます。"
   },
   "home.concept.next.approve": {
     "message": "要所は人が承認する"
@@ -578,10 +608,10 @@
     "message": "手順は Git リポジトリの {file} ファイルとして置かれ、初回実行時に clone されます。ほかのコードと同じように、バージョン管理して、レビューして、読めます。"
   },
   "home.features.graph.title": {
-    "message": "動くタスクグラフ"
+    "message": "何度でも実行できる計画"
   },
   "home.features.graph.body": {
-    "message": "タスクは本物の DAG を作ります。依存は強制され、循環は拒否されます。並べ替えできるテーブルとしても、自動レイアウトのグラフとしても描画され、エージェントの作業に合わせて更新されます。"
+    "message": "エージェントがスキルから起こしたタスクグラフを、ワークフローとして公開します。依存を守り循環は拒む本物の DAG で、どの実行も同じグラフをたどります。並べ替えできるテーブルとしても、自動レイアウトのグラフとしても描画され、エージェントの作業に合わせて更新されます。"
   },
   "home.features.gates.title": {
     "message": "実行の途中に入る承認ゲート"

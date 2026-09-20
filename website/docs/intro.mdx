@@ -18,6 +18,8 @@ import {IntroPage, IntroHero, IntroContrast, IntroPanel, IntroActs, IntroAct, In
 A2Flow is a workflow engine rebuilt from the ground up around an AI agent. Not an
 engine with an AI step bolted into it: an engine whose runtime *is* an agent. It
 plans the work, asks the people who have to decide, and does the rest itself.
+The plan it makes is kept as a workflow and run again: the flexibility of a chat
+session, with the repeatability of a procedure.
 
 </IntroHero>
 
@@ -50,7 +52,8 @@ You start from an [Agent Skill](./guides/agent-skills.md): a `SKILL.md` file in 
 Git repository, versioned and reviewable like any other code. Then you talk to
 the AI. It drafts the task graph, you adjust it, and the
 [MCP tools](./guides/mcp-servers.md) each step needs are bound as you go. What
-you [publish](./guides/workflows.md) is a workflow nobody had to draw.
+you [publish](./guides/workflows.md) is the agent's own plan, kept: a workflow
+nobody had to draw, and one every run follows the same way.
 
 </IntroAct>
 
@@ -82,7 +85,8 @@ for it.
 <IntroClosing headline={<>Plan. Approve. Execute.</>}>
 
 The three things a workflow was ever really made of. A2Flow keeps those and
-hands everything in between to the agent.
+hands everything in between to the agent — a standard operating procedure you
+carry out together with the AI.
 
 </IntroClosing>
 
