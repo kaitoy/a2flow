@@ -1,6 +1,6 @@
 # A2Flow
 
-![A2Flow](frontend/assets/logo.png)
+<img src="frontend/assets/logo.png" alt="A2Flow" width="512">
 
 **A2Flow is a workflow engine rebuilt from the ground up around an AI agent.** Not an
 engine with an AI step bolted into it: an engine whose runtime *is* an agent. It reads
