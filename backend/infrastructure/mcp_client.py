@@ -28,9 +28,15 @@ Design notes:
 * Any connection, protocol, or timeout failure is normalized to
   :class:`repositories.exceptions.McpConnectionError` so callers map it to one
   error shape (HTTP 502 for the API, an ``{"error": ...}`` dict for the agent).
+  Its ``reason`` — and a matching warning logged right here — comes from
+  :func:`_describe_failure`, not a bare ``str()``: both transports run inside
+  an anyio task group, so the SDK often raises a
+  ``BaseExceptionGroup("unhandled errors in a TaskGroup", [...])`` whose own
+  ``str()`` hides the real cause behind "(1 sub-exception)".
 """
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -45,6 +51,8 @@ from mcp.shared.message import SessionMessage
 
 from infrastructure.url_safety import assert_public_http_url
 from repositories.exceptions import McpConnectionError
+
+logger = logging.getLogger(__name__)
 
 #: Upper bound, in seconds, for one whole streamable-HTTP MCP operation
 #: (connect + initialize + the list/call round-trip).
@@ -227,6 +235,27 @@ async def mcp_session(connection: McpConnection) -> AsyncIterator[ClientSession]
         yield session
 
 
+def _describe_failure(exc: BaseException) -> str:
+    """Describe a connection failure, unwrapping any nested ``ExceptionGroup``.
+
+    ``stdio_client`` and ``streamablehttp_client`` both run their transport
+    inside an anyio task group, so a connection failure often surfaces as a
+    bare ``BaseExceptionGroup("unhandled errors in a TaskGroup", [...])``
+    whose own ``str()`` is just "(1 sub-exception)" -- the actual cause is
+    one level down, in ``.exceptions``.
+
+    Args:
+        exc: The exception caught around a connection attempt.
+
+    Returns:
+        The type and message of every leaf exception, recursing through
+        nested groups and joined with ``"; "``.
+    """
+    if isinstance(exc, BaseExceptionGroup):
+        return "; ".join(_describe_failure(sub) for sub in exc.exceptions)
+    return f"{type(exc).__name__}: {exc}"
+
+
 async def list_server_tools(connection: McpConnection) -> list[types.Tool]:
     """Return the tools advertised by the MCP server behind ``connection``.
 
@@ -247,7 +276,11 @@ async def list_server_tools(connection: McpConnection) -> list[types.Tool]:
                 result = await session.list_tools()
                 return list(result.tools)
     except Exception as e:
-        raise McpConnectionError(connection.label, str(e)) from e
+        reason = _describe_failure(e)
+        logger.warning(
+            "Connection to MCP server %s failed: %s", connection.label, reason
+        )
+        raise McpConnectionError(connection.label, reason) from e
 
 
 async def call_server_tool(
@@ -279,4 +312,8 @@ async def call_server_tool(
             async with mcp_session(connection) as session:
                 return await session.call_tool(tool_name, arguments=arguments)
     except Exception as e:
-        raise McpConnectionError(connection.label, str(e)) from e
+        reason = _describe_failure(e)
+        logger.warning(
+            "Connection to MCP server %s failed: %s", connection.label, reason
+        )
+        raise McpConnectionError(connection.label, reason) from e
