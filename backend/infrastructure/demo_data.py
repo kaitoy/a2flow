@@ -32,9 +32,10 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
   EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks,
   showing that one tag classifies across resource types), ``GCP`` (also
   access-control, gated the same way by ``Demo GCP Group``; attached to the
-  Google Cloud secret, the GKE MCP server, and the pod-restart agent
-  skill -- GKE is a Google Cloud product, so the same provider tag still
-  applies), and ``Approval Required`` (a plain, non-gating tag attached to
+  Google Cloud secret, the GKE MCP server, the pod-restart agent skill, and
+  the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks -- GKE is
+  a Google Cloud product, so the same provider tag still applies), and
+  ``Approval Required`` (a plain, non-gating tag attached to
   both agent skills, calling out their approval gate),
 * eight Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
   either of whom the skill can ask for approval, an AWS trio
@@ -1391,7 +1392,8 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
 
     ``AWS`` lands on the AWS secret, AWS MCP server, the EC2-launch agent skill,
     and the ``call_aws`` and ``run_script`` tool mocks; ``GCP`` lands on the
-    Google Cloud secret, the GKE MCP server, and the pod-restart agent skill;
+    Google Cloud secret, the GKE MCP server, the pod-restart agent skill, and
+    the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks;
     ``Approval Required`` lands on both agent skills. ``AWS`` and ``GCP`` are
     also each attached to their matching user group (``Demo AWS Group`` /
     ``Demo GCP Group``) as access-control tags, which is what gates the
@@ -1514,6 +1516,27 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             resource_id=DEMO_GKE_SKILL_ID,
             tag_id=DEMO_GCP_TAG_ID,
             label=(f"tag '{DEMO_GCP_TAG_NAME}' on agent skill '{DEMO_GKE_SKILL_NAME}'"),
+        )
+        await _link_tag(
+            session,
+            McpToolMockTag,
+            resource_model=MCPToolMock,
+            resource_id=DEMO_PATCH_WORKLOAD_MOCK_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=(
+                f"tag '{DEMO_GCP_TAG_NAME}' on tool mock "
+                f"'{DEMO_PATCH_WORKLOAD_MOCK_NAME}'"
+            ),
+        )
+        await _link_tag(
+            session,
+            McpToolMockTag,
+            resource_model=MCPToolMock,
+            resource_id=DEMO_DELETE_POD_MOCK_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=(
+                f"tag '{DEMO_GCP_TAG_NAME}' on tool mock '{DEMO_DELETE_POD_MOCK_NAME}'"
+            ),
         )
         await _link_tag(
             session,

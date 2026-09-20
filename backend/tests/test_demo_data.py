@@ -264,7 +264,7 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _rows(engine, SecretTag)) == 2
     assert len(await _rows(engine, McpServerTag)) == 2
     assert len(await _rows(engine, AgentSkillTag)) == 4
-    assert len(await _rows(engine, McpToolMockTag)) == 2
+    assert len(await _rows(engine, McpToolMockTag)) == 4
     assert len(await _rows(engine, UserGroupTag)) == 4
 
 
@@ -307,6 +307,8 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
     assert tool_mock_tags == {
         (DEMO_CALL_AWS_MOCK_ID, DEMO_AWS_TAG_ID),
         (DEMO_RUN_SCRIPT_MOCK_ID, DEMO_AWS_TAG_ID),
+        (DEMO_PATCH_WORKLOAD_MOCK_ID, DEMO_GCP_TAG_ID),
+        (DEMO_DELETE_POD_MOCK_ID, DEMO_GCP_TAG_ID),
     }
 
 
