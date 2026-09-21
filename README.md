@@ -2,12 +2,12 @@
 
 <img src="frontend/assets/logo.png" alt="A2Flow" width="512">
 
-**A2Flow is a workflow engine rebuilt from the ground up around an AI agent.** Not an
-engine with an AI step bolted into it: an engine whose runtime *is* an agent. It reads
-the procedure, plans the task graph, binds the tools each step needs, pauses for the
-people who have to sign off, and executes the rest itself. The plan it makes is kept as a
-workflow and run again: the flexibility of a chat session, with the repeatability of a
-procedure.
+**A2Flow is a chat-driven workflow engine, rebuilt from the ground up around an AI
+agent.** Not an engine with an AI step bolted into it: an engine whose runtime *is* an
+agent. It reads the procedure, plans the task graph, binds the tools each step needs,
+pauses for the people who have to sign off, and executes the rest itself. The plan it
+makes is kept as a workflow and run again: the flexibility of a chat session, with the
+repeatability of a procedure.
 
 There is no flowchart to draw and no diagram to return to. A workflow is not something
 the agent takes part in — it is what the agent does.

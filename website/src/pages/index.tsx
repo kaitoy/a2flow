@@ -161,7 +161,7 @@ export default function Home(): ReactNode {
       description={translate({
         id: 'home.meta.description',
         message:
-          'A2Flow rebuilds ITSM-style workflows around an AI agent. It plans the work as a task graph, pauses for the humans who must sign off, and executes the rest. The plan is kept as a workflow, so the next run follows the same steps.',
+          'A2Flow is a chat-driven workflow engine. It rebuilds ITSM-style workflows around an AI agent: it plans the work as a task graph, pauses for the humans who must sign off, and executes the rest. The plan is kept as a workflow, so the next run follows the same steps.',
       })}>
       <div className="a2flow-home" ref={rootRef}>
         {/* The standalone page kept these in its own sticky header, which the
@@ -180,7 +180,7 @@ export default function Home(): ReactNode {
               <span className="eyebrow"><Translate id="home.hero.eyebrow">{'Agent as Workflow'}</Translate></span>
               <h1><Translate id="home.hero.title" values={{br: <br />, agent: <span className="grad-text"><Translate id="home.hero.title.agent">{'an agent'}</Translate></span>}}>{'The workflow engine{br}is now {agent}.'}</Translate></h1>
               <p className="hero-sub">
-                <Translate id="home.hero.sub">{'A2Flow rebuilds ITSM-style workflows — service requests, change execution, announcements — around an AI agent. It plans the work as a task graph, pauses for the humans who must sign off, and executes the rest. The plan is kept as a workflow, so the next run follows the same steps.'}</Translate>
+                <Translate id="home.hero.sub">{'A2Flow is a chat-driven workflow engine. It rebuilds ITSM-style workflows — service requests, change execution, announcements — around an AI agent: it plans the work as a task graph, pauses for the humans who must sign off, and executes the rest. The plan is kept as a workflow, so the next run follows the same steps.'}</Translate>
               </p>
               <div className="hero-cta">
                 <a className="btn btn-primary" href="https://github.com/kaitoy/a2flow">
@@ -190,6 +190,7 @@ export default function Home(): ReactNode {
                 <a className="btn btn-ghost" href="#how"><Translate id="home.hero.cta.how">{'See how it works'}</Translate></a>
               </div>
               <div className="hero-tags">
+                <span className="tag">Chat-Driven Workflow</span>
                 <span className="tag">AG-UI protocol</span>
                 <span className="tag">A2UI</span>
                 <span className="tag">MCP tools</span>
@@ -336,7 +337,7 @@ export default function Home(): ReactNode {
                 </ul>
               </div>
               <div className="contrast-card glass next reveal">
-                <h3 className="grad-text"><Translate id="home.concept.next.title">{'The agent workflow'}</Translate></h3>
+                <h3 className="grad-text"><Translate id="home.concept.next.title">{'The chat-driven workflow'}</Translate></h3>
                 <p className="sub"><Translate id="home.concept.next.sub">{'An SOP you run together with the AI: as flexible as a chat, as repeatable as a procedure.'}</Translate></p>
                 <ul className="flow-steps">
                   <li><span className="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5c-1.6 0-3.1-.4-4.4-1.2L3 20l1.2-5.1A8.5 8.5 0 1 1 21 11.5z"/></svg></span><span><b><Translate id="home.concept.next.intent">{'Describe the intent in chat'}</Translate></b><span className="note"><Translate id="home.concept.next.intent.note">{'No form. The Skill knows what to ask.'}</Translate></span></span></li>

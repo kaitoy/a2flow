@@ -103,7 +103,7 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'A2Flow rebuilds ITSM-style, multi-person, approval-gated workflows around an AI agent.',
+          'A2Flow is a chat-driven workflow engine: ITSM-style, multi-person, approval-gated workflows rebuilt around an AI agent.',
       },
     ],
     colorMode: {
