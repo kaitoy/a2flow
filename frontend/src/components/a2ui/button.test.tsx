@@ -71,4 +71,22 @@ describe("customButton", () => {
     );
     expect(screen.getByRole("button")).toBeDisabled();
   });
+
+  it("makes the label inherit the variant's text color instead of forcing white", () => {
+    // No variant → ghost, which is transparent; a forced white label would vanish on the
+    // light theme. The nested Text keeps its own color class, so the Button must override
+    // descendants to `inherit` rather than set a color on itself.
+    render(
+      <SurfaceResolvedContext.Provider value={false}>
+        <Render
+          props={{ action: vi.fn(), isValid: true, child: "label" }}
+          buildChild={() => <span className="text-on-surface">Reject</span>}
+          context={{}}
+        />
+      </SurfaceResolvedContext.Provider>
+    );
+    const button = screen.getByRole("button", { name: "Reject" });
+    expect(button.className).toContain("[&_*]:!text-inherit");
+    expect(button.className).not.toContain("text-white");
+  });
 });
