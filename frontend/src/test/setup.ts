@@ -47,3 +47,28 @@ Element.prototype.scrollIntoView = vi.fn();
 // three, so the stubs are gone. What happy-dom still lacks is a layout engine —
 // every measurement (`offsetWidth`, `getBoundingClientRect`, …) reads back
 // zero — so tests that depend on real sizes stub those per file.
+
+// happy-dom's `Node.prototype.nodeName` getter returns "" — the real value
+// lives on each subclass getter (Element, Text, Comment, …). DOMPurify 3.4.8+
+// reads every node's name through the cached `Node.prototype` getter to defeat
+// DOM clobbering, so under happy-dom every element is nameless and the
+// sanitizer strips it (jsdom and browsers define the getter on `Node`). Route
+// the base getter to the subclass getter so `renderMarkdown` output survives.
+const baseNodeName = Object.getOwnPropertyDescriptor(Node.prototype, "nodeName");
+if (baseNodeName?.get) {
+  const baseGet = baseNodeName.get;
+  Object.defineProperty(Node.prototype, "nodeName", {
+    ...baseNodeName,
+    get(this: Node) {
+      for (
+        let p = Object.getPrototypeOf(this);
+        p && p !== Node.prototype;
+        p = Object.getPrototypeOf(p)
+      ) {
+        const own = Object.getOwnPropertyDescriptor(p, "nodeName");
+        if (own?.get) return own.get.call(this);
+      }
+      return baseGet.call(this);
+    },
+  });
+}

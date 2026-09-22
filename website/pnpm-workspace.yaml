@@ -4,3 +4,12 @@
 allowBuilds:
   "@swc/core": true
   core-js: false
+
+# Two dev-server / bundler transitives are held below their patched versions
+# by their parents' declared ranges (copy-webpack-plugin 11 wants
+# serialize-javascript ^6, sockjs wants uuid ^8). Both consumers only call
+# `serialize(obj)` and `uuid.v4()`, which the patched majors keep. Drop an
+# entry once @docusaurus/bundler / sockjs move their own range.
+overrides:
+  serialize-javascript: ^7.0.5
+  uuid: ^11.1.1
