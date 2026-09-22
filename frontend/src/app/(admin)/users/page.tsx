@@ -285,7 +285,7 @@ export default function UsersPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Users" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Users" }]} />
       <AdminPageHeader
         title="Users"
         icon={UsersIcon}

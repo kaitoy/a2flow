@@ -160,7 +160,7 @@ export default function ToolInvocationsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Admin", href: "/" },
+          { label: "Home", href: "/" },
           { label: "Workflow Executions", href: "/workflow-executions" },
           { label: workflowName || "…", href: `/workflow-executions/${executionId}` },
           { label: "Tool Invocations" },

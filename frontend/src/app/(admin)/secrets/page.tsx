@@ -156,7 +156,7 @@ export default function SecretsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Secrets" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Secrets" }]} />
       <AdminPageHeader
         title="Secrets"
         icon={KeyRound}

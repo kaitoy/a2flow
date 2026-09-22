@@ -153,7 +153,7 @@ export default function McpServerDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "MCP Servers", href: "/mcp-servers" },
     // The server itself is the current page; an ellipsis stands in until its
     // name has loaded.

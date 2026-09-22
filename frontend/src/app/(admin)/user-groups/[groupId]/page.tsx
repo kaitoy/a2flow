@@ -152,7 +152,7 @@ export default function UserGroupDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "User Groups", href: "/user-groups" },
     // The group itself is the current page; an ellipsis stands in until its
     // name has loaded.

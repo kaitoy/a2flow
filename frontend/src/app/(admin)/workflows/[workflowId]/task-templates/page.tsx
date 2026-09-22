@@ -254,7 +254,7 @@ export default function WorkflowTaskTemplatesPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Admin", href: "/" },
+          { label: "Home", href: "/" },
           { label: "Workflows", href: "/workflows" },
           { label: workflowName || "…", href: `/workflows/${workflowId}` },
           { label: "Task Templates" },

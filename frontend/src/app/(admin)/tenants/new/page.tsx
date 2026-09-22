@@ -66,7 +66,7 @@ export default function NewTenantPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Tenants", href: "/tenants" },
     { label: "New" },
   ];

@@ -105,7 +105,7 @@ export default function NewUserPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Users", href: "/users" },
     { label: "New" },
   ];

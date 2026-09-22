@@ -179,7 +179,7 @@ export default function McpServersPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "MCP Servers" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "MCP Servers" }]} />
       <AdminPageHeader
         title="MCP Servers"
         icon={Server}

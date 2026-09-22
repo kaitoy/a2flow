@@ -229,7 +229,7 @@ export default function AuditToolCertificatesPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Admin", href: "/" },
+          { label: "Home", href: "/" },
           { label: "Audit Logs", href: "/audit" },
           { label: "Certificates" },
         ]}

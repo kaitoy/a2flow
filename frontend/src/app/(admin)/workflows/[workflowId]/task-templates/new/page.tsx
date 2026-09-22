@@ -105,7 +105,7 @@ export default function NewWorkflowTaskTemplatePage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Workflows", href: "/workflows" },
     { label: "Task Templates", href: `/workflows/${workflowId}/task-templates` },
     { label: "New" },

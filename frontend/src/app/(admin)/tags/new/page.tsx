@@ -72,7 +72,7 @@ export default function NewTagPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Tags", href: "/tags" },
     { label: "New" },
   ];

@@ -157,7 +157,7 @@ export default function SecretDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Secrets", href: "/secrets" },
     // The secret itself is the current page; an ellipsis stands in until its
     // name has loaded.

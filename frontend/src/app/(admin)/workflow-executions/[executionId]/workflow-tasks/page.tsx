@@ -226,7 +226,7 @@ export default function WorkflowTasksPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Admin", href: "/" },
+          { label: "Home", href: "/" },
           { label: "Workflow Executions", href: "/workflow-executions" },
           // Links back to this run's own admin record; an ellipsis stands in
           // until its workflow name has loaded.

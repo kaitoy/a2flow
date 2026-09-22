@@ -169,7 +169,7 @@ export default function McpToolMocksPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Tool Mocks" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Tool Mocks" }]} />
       <AdminPageHeader
         title="Tool Mocks"
         icon={FlaskConical}

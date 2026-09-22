@@ -308,7 +308,7 @@ export default function WorkflowsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Workflows" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Workflows" }]} />
       <AdminPageHeader
         title="Workflows"
         icon={WorkflowIcon}

@@ -145,7 +145,7 @@ export default function ApprovalDetailPage() {
   }, [approvalId, isAllTenantsView]);
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Approvals", href: "/approvals" },
     { label: approval?.title || "…" },
   ];

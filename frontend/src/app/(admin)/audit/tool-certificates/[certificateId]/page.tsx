@@ -89,7 +89,7 @@ export default function AuditToolCertificateDetailPage() {
   }, [certificate]);
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Audit Logs", href: "/audit" },
     { label: "Certificates", href: "/audit/tool-certificates" },
     { label: certificate?.serialNumber || "…" },

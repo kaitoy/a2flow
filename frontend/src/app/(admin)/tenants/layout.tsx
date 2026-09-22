@@ -18,7 +18,7 @@ export default function TenantsLayout({ children }: { children: React.ReactNode 
   if (!isSuperAdmin) {
     return (
       <AdminPageContainer>
-        <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Tenants" }]} />
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Tenants" }]} />
         <AccessDeniedState fill="full" />
       </AdminPageContainer>
     );

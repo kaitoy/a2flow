@@ -218,7 +218,7 @@ export default function AuditToolInvocationsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Admin", href: "/" },
+          { label: "Home", href: "/" },
           { label: "Audit Logs", href: "/audit" },
           { label: "Tool Invocations" },
         ]}

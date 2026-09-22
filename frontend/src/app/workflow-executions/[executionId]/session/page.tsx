@@ -146,7 +146,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
         <div className="shrink-0 px-4 pt-3 sm:px-6">
           <Breadcrumbs
             items={[
-              { label: "Admin", href: "/" },
+              { label: "Home", href: "/" },
               { label: "Workflow Executions", href: "/workflow-executions" },
               // Links to this session's own execution record. Unlike the
               // (nullable) design-time workflow id, the execution id always

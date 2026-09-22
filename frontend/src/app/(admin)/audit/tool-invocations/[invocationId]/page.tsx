@@ -82,7 +82,7 @@ export default function AuditToolInvocationDetailPage() {
   }, [invocation]);
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Audit Logs", href: "/audit" },
     { label: "Tool Invocations", href: "/audit/tool-invocations" },
     { label: invocation?.toolName || "…" },

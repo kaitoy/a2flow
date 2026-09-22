@@ -130,7 +130,7 @@ export default function TenantsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Tenants" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Tenants" }]} />
       <AdminPageHeader
         title="Tenants"
         icon={Building2}

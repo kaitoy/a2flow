@@ -84,7 +84,7 @@ export default function NewUserGroupPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "User Groups", href: "/user-groups" },
     { label: "New" },
   ];

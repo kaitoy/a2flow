@@ -65,7 +65,7 @@ export default function NewAgentSkillPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Agent Skills", href: "/agent-skills" },
     { label: "New" },
   ];

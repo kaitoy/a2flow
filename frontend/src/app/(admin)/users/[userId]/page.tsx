@@ -294,7 +294,7 @@ export default function UserDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Users", href: "/users" },
     // The user itself is the current page; an ellipsis stands in until the
     // username has loaded.

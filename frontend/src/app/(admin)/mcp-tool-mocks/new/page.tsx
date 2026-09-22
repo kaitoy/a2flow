@@ -67,7 +67,7 @@ export default function NewMcpToolMockPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Tool Mocks", href: "/mcp-tool-mocks" },
     { label: "New" },
   ];

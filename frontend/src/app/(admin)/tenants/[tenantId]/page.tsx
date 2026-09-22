@@ -125,7 +125,7 @@ export default function TenantDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Tenants", href: "/tenants" },
     // The tenant itself is the current page; an ellipsis stands in until its
     // display name has loaded.

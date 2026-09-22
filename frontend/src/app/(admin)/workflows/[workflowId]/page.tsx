@@ -368,7 +368,7 @@ export default function WorkflowDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Workflows", href: "/workflows" },
     // The workflow itself is the current page; an ellipsis stands in until its
     // name has loaded.

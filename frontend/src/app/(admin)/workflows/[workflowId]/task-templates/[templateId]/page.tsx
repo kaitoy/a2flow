@@ -190,7 +190,7 @@ export default function WorkflowTaskTemplateDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Workflows", href: "/workflows" },
     // Links back to this template's parent workflow; an ellipsis stands in
     // until its name has loaded.

@@ -138,7 +138,7 @@ export default function UserGroupsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "User Groups" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "User Groups" }]} />
       <AdminPageHeader
         title="User Groups"
         icon={UsersRound}

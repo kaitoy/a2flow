@@ -19,7 +19,7 @@ export default function AuditLayout({ children }: { children: React.ReactNode })
   if (!isAdmin) {
     return (
       <AdminPageContainer>
-        <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Audit Logs" }]} />
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Audit Logs" }]} />
         <AccessDeniedState fill="full" />
       </AdminPageContainer>
     );

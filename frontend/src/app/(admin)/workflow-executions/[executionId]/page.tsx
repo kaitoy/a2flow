@@ -113,7 +113,7 @@ export default function WorkflowExecutionDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Workflow Executions", href: "/workflow-executions" },
     { label: session?.name || "…" },
   ];

@@ -59,7 +59,7 @@ export default function AuditImpersonationDetailPage() {
   const names = useUserNames(event ? [event.impersonatorId, event.targetUserId] : []);
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Audit Logs", href: "/audit" },
     { label: "Impersonations", href: "/audit/impersonations" },
     { label: event ? (names.get(event.targetUserId) ?? event.targetUserId) : "…" },

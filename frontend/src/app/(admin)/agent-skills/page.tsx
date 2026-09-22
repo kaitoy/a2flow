@@ -267,7 +267,7 @@ export default function AgentSkillsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Agent Skills" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Agent Skills" }]} />
       <AdminPageHeader
         title="Agent Skills"
         icon={Wand2}

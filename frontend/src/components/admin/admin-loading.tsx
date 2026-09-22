@@ -88,7 +88,7 @@ export function AdminLoading({
   }
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, ...crumbs]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, ...crumbs]} />
       {body}
     </AdminPageContainer>
   );

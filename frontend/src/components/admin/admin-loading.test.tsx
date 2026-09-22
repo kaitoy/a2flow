@@ -15,7 +15,7 @@ describe("AdminLoading", () => {
         columns={["Name", "Created At"]}
       />
     );
-    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "+ Add tag" })).toHaveAttribute("href", "/tags/new");
     expect(screen.getByText("Name")).toBeInTheDocument();

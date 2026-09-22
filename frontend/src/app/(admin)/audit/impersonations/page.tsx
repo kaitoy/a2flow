@@ -155,7 +155,7 @@ export default function AuditImpersonationsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Admin", href: "/" },
+          { label: "Home", href: "/" },
           { label: "Audit Logs", href: "/audit" },
           { label: "Impersonations" },
         ]}

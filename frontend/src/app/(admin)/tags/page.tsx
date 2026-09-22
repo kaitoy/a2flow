@@ -169,7 +169,7 @@ export default function TagsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Tags" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Tags" }]} />
       <AdminPageHeader
         title="Tags"
         icon={Tags}

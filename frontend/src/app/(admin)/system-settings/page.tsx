@@ -315,7 +315,7 @@ export default function SystemSettingsPage() {
     }
   }
 
-  const breadcrumbItems = [{ label: "Admin", href: "/" }, { label: "System Settings" }];
+  const breadcrumbItems = [{ label: "Home", href: "/" }, { label: "System Settings" }];
   const header = <AdminPageHeader title="System Settings" icon={Settings2} />;
 
   if (loading) {

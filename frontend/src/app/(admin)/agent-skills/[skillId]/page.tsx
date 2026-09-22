@@ -248,7 +248,7 @@ export default function AgentSkillDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Agent Skills", href: "/agent-skills" },
     // The skill itself is the current page; an ellipsis stands in until its
     // name has loaded.

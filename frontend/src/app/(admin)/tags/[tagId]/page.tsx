@@ -140,7 +140,7 @@ export default function TagDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Tags", href: "/tags" },
     // The tag itself is the current page; an ellipsis stands in until its name
     // has loaded.

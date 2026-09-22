@@ -275,7 +275,7 @@ export default function WorkflowExecutionsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Workflow Executions" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Workflow Executions" }]} />
       <AdminPageHeader
         title="Workflow Executions"
         icon={ListChecks}

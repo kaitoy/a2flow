@@ -11,7 +11,7 @@ export interface BreadcrumbItem {
 }
 
 interface BreadcrumbsProps {
-  /** Ordered trail from root ("Admin") to the current page. */
+  /** Ordered trail from root ("Home") to the current page. */
   items: BreadcrumbItem[];
   /**
    * Classes for the outer `<nav>`, replacing the default `mb-4` spacing used

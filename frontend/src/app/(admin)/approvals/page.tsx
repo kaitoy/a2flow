@@ -167,7 +167,7 @@ export default function ApprovalsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "Approvals" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Approvals" }]} />
       <AdminPageHeader
         title="Approvals"
         icon={CheckCircle2}

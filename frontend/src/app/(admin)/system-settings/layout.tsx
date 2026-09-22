@@ -17,7 +17,7 @@ export default function SystemSettingsLayout({ children }: { children: React.Rea
   if (!isSuperAdmin) {
     return (
       <AdminPageContainer>
-        <Breadcrumbs items={[{ label: "Admin", href: "/" }, { label: "System Settings" }]} />
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "System Settings" }]} />
         <AccessDeniedState fill="full" />
       </AdminPageContainer>
     );

@@ -70,7 +70,7 @@ export default function NewSecretPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Secrets", href: "/secrets" },
     { label: "New" },
   ];

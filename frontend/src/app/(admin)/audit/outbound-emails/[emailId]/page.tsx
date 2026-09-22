@@ -56,7 +56,7 @@ export default function AuditOutboundEmailDetailPage() {
   }, [emailId]);
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Audit Logs", href: "/audit" },
     { label: "Emails", href: "/audit/outbound-emails" },
     { label: email?.subject || "…" },

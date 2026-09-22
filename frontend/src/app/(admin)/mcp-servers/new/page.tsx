@@ -77,7 +77,7 @@ function NewMcpServerForm() {
   }
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "MCP Servers", href: "/mcp-servers" },
     { label: "New" },
   ];

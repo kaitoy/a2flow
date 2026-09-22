@@ -118,7 +118,7 @@ export default function WorkflowTaskDetailPage() {
   }, [task]);
 
   const breadcrumbItems = [
-    { label: "Admin", href: "/" },
+    { label: "Home", href: "/" },
     { label: "Workflow Executions", href: "/workflow-executions" },
     { label: workflowName || "…", href: `/workflow-executions/${executionId}` },
     {
