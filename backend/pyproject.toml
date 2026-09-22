@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "google-adk>=2.4.0,<3.0.0",
     "anyio>=4.0.0",
-    "fastapi>=0.115.0",
+    "fastapi>=0.141.1",
     "uvicorn[standard]>=0.30.0",
     "python-dotenv>=1.0.0",
     # Capped below 1.92.0: that release replaced litellm's pure-Python
