@@ -70,4 +70,16 @@ describe("FormField", () => {
 
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("labels a control through aria-labelledby as well", () => {
+    render(
+      <FormField htmlFor="source" label="Source">
+        {/* biome-ignore lint/a11y/useFocusableInteractive: stands in for a real focusable custom editor (e.g. code-editor) */}
+        {/* biome-ignore lint/a11y/useSemanticElements: exercises aria-labelledby wiring for a non-native control */}
+        <div role="textbox" aria-labelledby="source-label" />
+      </FormField>
+    );
+
+    expect(screen.getByLabelText("Source")).toHaveAttribute("role", "textbox");
+  });
 });

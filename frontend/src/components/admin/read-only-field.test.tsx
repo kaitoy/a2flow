@@ -26,4 +26,14 @@ describe("ReadOnlyField", () => {
 
     expect(screen.getByTestId("badge")).toBeInTheDocument();
   });
+
+  it("renders as a div for block content", () => {
+    render(
+      <ReadOnlyField as="div">
+        <div>block</div>
+      </ReadOnlyField>
+    );
+
+    expect(screen.getByText("block").parentElement?.tagName).toBe("DIV");
+  });
 });

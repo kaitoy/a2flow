@@ -173,6 +173,18 @@
   --c-tag-amber: oklch(0.55 0.14 65);
   --c-tag-slate: oklch(0.45 0.02 250);
 
+  /* Code editor syntax colors (DESIGN.md → Components → Code editor). Aliases
+     of the tag slots, which already carry one legible value per theme, so the
+     dark block needs no copy: <html> holds both, and these resolve there. */
+  --c-code-keyword: var(--c-tag-violet);
+  --c-code-string: var(--c-tag-mint);
+  --c-code-number: var(--c-tag-amber);
+  --c-code-comment: var(--c-on-surface-variant);
+  --c-code-function: var(--c-tag-cyan);
+  --c-code-type: var(--c-tag-teal);
+  --c-code-constant: var(--c-tag-rose);
+  --c-code-warning: var(--c-tag-amber);
+
   /* Skeleton placeholder: a soft gray tint with a white sweeping sheen so the
      shimmer reads clearly against the light glass panels. */
   --skeleton-base: rgba(15, 23, 42, 0.1);

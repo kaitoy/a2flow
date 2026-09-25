@@ -10,6 +10,7 @@
 "use client";
 
 import { Server } from "lucide-react";
+import { mcpServerEndpoint } from "@/components/admin/mcp-server-fields";
 import { RecordPickerDialog } from "@/components/admin/record-picker-dialog";
 import { tagsColumn } from "@/components/admin/tag-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
@@ -66,10 +67,7 @@ export function McpServerPickerDialog({
       sortField: "url",
       filterField: "url",
       className: "font-mono",
-      cell: (server) =>
-        server.transport === "stdio"
-          ? [server.command, ...(server.args ?? [])].join(" ")
-          : server.url,
+      cell: (server) => mcpServerEndpoint(server),
     },
     tagsColumn<McpServer>((server) => server.tagIds, tagsById),
   ];

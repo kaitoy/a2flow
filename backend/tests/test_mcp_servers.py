@@ -372,6 +372,171 @@ async def test_patch_switching_to_http_clears_command_args_and_env(
     assert body["env"] == {}
 
 
+# ---------- script transport ----------
+
+
+_SCRIPT_BODY = {
+    "name": "calc",
+    "transport": "script",
+    "language": "python",
+    "source": "def add(a: int, b: int) -> int:\n    return a + b\n",
+    "env": {"API_KEY": "tok"},
+}
+
+
+async def test_create_script_server_returns_201_with_its_fields(
+    mcp_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_SCRIPT_BODY), status=201
+    )
+    assert body["transport"] == "script"
+    assert body["language"] == "python"
+    assert body["source"] == _SCRIPT_BODY["source"]
+    assert body["env"] == {"API_KEY": "tok"}
+    assert body["command"] is None
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"source": None},
+        {"language": None},
+        {"command": "npx"},
+        {"url": "https://mcp.example.com/mcp"},
+        {"source": "def broken(:\n"},
+    ],
+    ids=["no-source", "no-language", "command", "url", "syntax-error"],
+)
+async def test_create_invalid_script_server_returns_422(
+    mcp_client: AsyncClient, overrides: dict[str, Any]
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers", json={**_SCRIPT_BODY, **overrides}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_javascript_script_server_skips_the_syntax_check(
+    mcp_client: AsyncClient,
+) -> None:
+    """The backend has no Node.js, so a JavaScript source is stored as is."""
+    body = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={**_SCRIPT_BODY, "language": "javascript", "source": "export {"},
+        ),
+        status=201,
+    )
+    assert body["language"] == "javascript"
+
+
+async def test_create_stdio_server_with_source_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers", json={**_STDIO_BODY, "source": "x = 1"}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_patch_script_source_with_syntax_error_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_SCRIPT_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"source": "def broken(:\n"}
+    )
+    err = assert_err(response, code="INVALID_MCP_SERVER", status=422)
+    assert "line 1" in err["details"]["reason"]
+
+
+async def test_patch_switching_script_to_python_checks_the_stored_source(
+    mcp_client: AsyncClient,
+) -> None:
+    """Changing only the language re-checks the source already stored."""
+    created = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={**_SCRIPT_BODY, "language": "javascript", "source": "export {"},
+        ),
+        status=201,
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"language": "python"}
+    )
+    assert_err(response, code="INVALID_MCP_SERVER", status=422)
+
+
+async def test_patch_command_on_script_server_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_SCRIPT_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"command": "npx"}
+    )
+    err = assert_err(response, code="INVALID_MCP_SERVER", status=422)
+    assert "command" in err["details"]["reason"]
+
+
+async def test_patch_switching_stdio_to_script_clears_command_and_keeps_env(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+    body = assert_ok(
+        await mcp_client.patch(
+            f"/api/v1/mcp-servers/{created['id']}",
+            json={
+                "transport": "script",
+                "language": "python",
+                "source": _SCRIPT_BODY["source"],
+            },
+        )
+    )
+    assert body["transport"] == "script"
+    assert body["command"] is None
+    assert body["args"] == []
+    assert body["env"] == {"API_KEY": "tok"}
+
+
+async def test_patch_switching_to_script_without_source_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_CREATE_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}",
+        json={"transport": "script", "language": "python"},
+    )
+    err = assert_err(response, code="INVALID_MCP_SERVER", status=422)
+    assert "source" in err["details"]["reason"]
+
+
+async def test_patch_switching_script_to_http_clears_language_source_and_env(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_SCRIPT_BODY), status=201
+    )
+    body = assert_ok(
+        await mcp_client.patch(
+            f"/api/v1/mcp-servers/{created['id']}",
+            json={"transport": "streamable_http", "url": "https://mcp.example.com/mcp"},
+        )
+    )
+    assert body["transport"] == "streamable_http"
+    assert body["language"] is None
+    assert body["source"] is None
+    assert body["env"] == {}
+
+
 async def test_list_stdio_server_tools_uses_a_stdio_connection(
     mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -732,3 +897,79 @@ async def test_list_server_tools_missing_secret_returns_502(
     err = assert_err(response, code="SECRET_RESOLUTION_FAILED", status=502)
     assert err["details"] == {"secret": "nope"}
     assert connected == []
+
+
+# ---------- python-lint ----------
+
+
+async def _lint(mcp_client: AsyncClient, source: str) -> list[dict[str, Any]]:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers/python-lint", json={"source": source}
+    )
+    data: list[dict[str, Any]] = assert_ok(response)
+    return data
+
+
+async def test_python_lint_clean_script_has_no_diagnostics(
+    mcp_client: AsyncClient,
+) -> None:
+    source = 'import json\n\ndef add(a: int, b: int) -> int:\n    """Add."""\n    return a + b\n'
+    assert await _lint(mcp_client, source) == []
+
+
+async def test_python_lint_reports_a_syntax_error_alone(
+    mcp_client: AsyncClient,
+) -> None:
+    diagnostics = await _lint(mcp_client, "def f(x):\n    return (x\n")
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["severity"] == "error"
+    assert diagnostics[0]["line"] == 2
+    assert diagnostics[0]["column"] == 11
+    assert set(diagnostics[0]) >= {"endLine", "endColumn", "message"}
+
+
+async def test_python_lint_warns_on_convention_slips(mcp_client: AsyncClient) -> None:
+    diagnostics = await _lint(
+        mcp_client, "import requests\n\ndef f(x):\n    return x\n"
+    )
+    by_message = {d["message"].split(" ")[0]: d for d in diagnostics}
+    assert {d["severity"] for d in diagnostics} == {"warning"}
+    assert by_message["'requests'"]["line"] == 1
+    assert by_message["'f'"] == {
+        "line": 3,
+        "column": 0,
+        "endLine": 3,
+        "endColumn": 5,
+        "severity": "warning",
+        "message": "'f' has no docstring: the tool will have no description.",
+    }
+    assert (by_message["Parameter"]["line"], by_message["Parameter"]["column"]) == (
+        3,
+        6,
+    )
+
+
+async def test_python_lint_warns_when_no_tool_is_exposed(
+    mcp_client: AsyncClient,
+) -> None:
+    diagnostics = await _lint(mcp_client, "def _helper() -> None:\n    pass\n")
+    assert [d["message"] for d in diagnostics] == [
+        "No public top-level function: this server exposes no tools."
+    ]
+
+
+async def test_python_lint_columns_count_characters(mcp_client: AsyncClient) -> None:
+    source = 'def f(a: int, 名前, b: int) -> int:\n    """Doc."""\n    return a\n'
+    [diagnostic] = await _lint(mcp_client, source)
+    assert (diagnostic["column"], diagnostic["endColumn"]) == (14, 16)
+
+
+async def test_python_lint_requires_the_developer_role(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers/python-lint",
+        json={"source": "x = 1"},
+        headers={"X-User-Id": "carol", "X-User-Roles": ""},
+    )
+    assert_err(response, "FORBIDDEN", 403)

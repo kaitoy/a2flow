@@ -15,10 +15,63 @@ sidebar_position: 7
 |---|---|---|
 | **Streamable HTTP**(既定) | **URL**、**HTTP Headers** | リモートのサーバー。ヘッダーは毎リクエストに付きます。多くは `Authorization: Bearer …` です。SSE のみのサーバーには対応していません。 |
 | **stdio** | **Command**、**Arguments**、**Environment Variables** | バックエンドの子プロセスとして起動するサーバー。たとえば `npx` に `["-y", "@modelcontextprotocol/server-everything"]` を渡します。`npx` と `uvx` のどちらも使えます。 |
+| **Script** | **Language**、**Source**、**Environment Variables** | 自分で書いた Python または JavaScript のコード。公開された関数がそれぞれツールになります。[スクリプトを書く](#writing-a-script)を参照してください。 |
 
-既存のサーバーのトランスポートを切り替えると、もう一方の項目は消えます。stdio サーバーに URL、リモートサーバーに command といった、2 つの形が混ざったレコードは拒否されます。
+既存のサーバーのトランスポートを切り替えると、切り替え前のトランスポートの項目は消えます。stdio サーバーに URL、リモートサーバーに command、どちらかにソースコードといった、形が混ざったレコードは拒否されます。
 
 ⚠️ **stdio サーバーの登録は、指定したコマンドをバックエンドのコンテナ内で実行することを意味します。**実行はコンテナの非特権ユーザーとして行われます。ほかの MCP サーバーへの書き込みと同じく `developer` ロールで守られています。Arguments はシェルを介さずリストとしてプロセスに渡され、子プロセスが引き継ぐ環境変数は、安全な小さな組み合わせと設定した Environment Variables だけです。バックエンド自身の API キーやデータベース URL は見えません。
+
+## スクリプトを書く {#writing-a-script}
+
+スクリプトサーバーを使うと、パッケージを公開しなくても、自分で書いた関数をツールにできます。**Transport** で **Script** を選び、**Language** を選んで、コードを **Source** に貼り付けます。
+
+**Source** はコードエディターです。選んだ **Language** に合わせてコードを色分けし、行番号を付け、**Tab** キーでインデントします。**Tab** で次の項目へ移るには、先に **Esc** キーを押します。入力に合わせて問題のある箇所に下線が引かれ、下線にマウスを重ねると内容が表示されます。
+
+| 下線 | 意味 | 例 |
+|---|---|---|
+| 赤の波線 | 構文エラー。スクリプトを実行できません | 閉じていない括弧、綴りを間違えたキーワード |
+| 黄色の波線 | 間違いの可能性があります | ツールになる関数が 1 つもない。Python の関数に docstring がない、または引数に型ヒントがない。標準ライブラリ以外を import している。JavaScript の関数に `description` がない |
+| アクセント色の波線 | 補足です | JavaScript の関数に `inputSchema` がない |
+
+下線は助言であり、保存を妨げることはありません。保存時の検査については後述します。
+
+| | Python | JavaScript |
+|---|---|---|
+| ツールになる関数 | トップレベルで定義した関数のうち、名前が `_` で始まらないもの。import した関数は公開されません。 | export した関数（`export function`、`export async function`）のうち、名前が `_` で始まらないもの。default export は公開されません。 |
+| ツール名 | 関数名 | export 名 |
+| 説明 | docstring | 関数の `description` プロパティ |
+| 引数 | 型ヒントから読み取ります | 関数の `inputSchema` プロパティ（JSON Schema）。無い場合、ツールはどんな引数も受け付けます。 |
+| 呼び出され方 | 引数を名前で渡します | 引数をまとめた 1 つのオブジェクトを渡します |
+| エージェントに返るもの | 戻り値 | 戻り値。文字列はそのまま、それ以外は JSON にします |
+
+```python
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+```
+
+```js
+export function add({ a, b }) {
+  return a + b;
+}
+add.description = "Add two numbers.";
+add.inputSchema = {
+  type: "object",
+  properties: { a: { type: "number" }, b: { type: "number" } },
+  required: ["a", "b"],
+};
+```
+
+どちらの言語にも次の決まりがあります。
+
+- 使えるのは標準ライブラリだけです。Python 自身のモジュールか、Node.js 組み込みの `node:` モジュールです。サードパーティのパッケージはインストールできません。
+- 関数が投げたエラーは、ツール呼び出しの失敗としてメッセージごとエージェントに伝わります。
+- `print()` や `console.log()` の出力はサーバーのログに出ます。エージェントには届きません。
+- **Environment Variables** は `os.environ["NAME"]` や `process.env.NAME` で読めます。[資格情報をレコードに置かない](#keeping-credentials-out-of-the-record)のプレースホルダーも使えます。
+- **Source** に書けるのは 30,000 文字までです。
+- Python のコードに構文エラーがあると、保存時に行番号付きで拒否されます。JavaScript は保存時には検査されません。壊れたスクリプトは、[ツールを確認](#checking-a-servers-tools)したときに起動できないサーバーとして表示されます。
+
+⚠️ スクリプトは stdio サーバーと同じ場所で、同じ制限のもとで実行されます。
 
 ## 資格情報をレコードに置かない {#keeping-credentials-out-of-the-record}
 

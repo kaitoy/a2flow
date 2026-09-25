@@ -2,11 +2,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { render, screen } from "@testing-library/react";
 import { useForm } from "react-hook-form";
 import { describe, expect, it } from "vitest";
+import type { McpServer } from "@/lib/api";
 import {
   emptyMcpServerFormValues,
   McpServerFields,
   type McpServerFormValues,
+  mcpServerEndpoint,
   mcpServerFormSchema,
+  mcpTransportLabel,
   toMcpServerBody,
 } from "./mcp-server-fields";
 
@@ -77,6 +80,22 @@ describe("McpServerFields", () => {
     expect(screen.getByText(/\$\{gcp-token:name\/key\}/)).toBeInTheDocument();
   });
 
+  it("shows language, source, and env fields for the script transport", () => {
+    render(<Host defaults={{ transport: "script" }} />);
+    expect(screen.getByRole("tab", { name: "Python" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Source *")).toHaveAttribute("role", "textbox");
+    expect(screen.getByText("Environment Variables")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Command" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Arguments")).not.toBeInTheDocument();
+    expect(screen.queryByText("HTTP Headers")).not.toBeInTheDocument();
+  });
+
+  it("describes the tool convention of the selected script language", () => {
+    render(<Host defaults={{ transport: "script", language: "javascript" }} />);
+    expect(screen.getByText(/fn\.inputSchema/)).toBeInTheDocument();
+    expect(screen.queryByText(/docstring/)).not.toBeInTheDocument();
+  });
+
   describe("readOnly", () => {
     it("renders a remote server's url and headers as values", () => {
       render(
@@ -119,6 +138,28 @@ describe("McpServerFields", () => {
       expect(screen.getByText("-y files-mcp")).toBeInTheDocument();
       expect(screen.getByText("API_KEY: x")).toBeInTheDocument();
       expect(screen.queryByText("HTTP Headers")).not.toBeInTheDocument();
+    });
+
+    it("renders a script server's language and source as values", () => {
+      render(
+        <McpServerFields
+          readOnly
+          values={{
+            ...emptyMcpServerFormValues(),
+            name: "calc",
+            transport: "script",
+            language: "javascript",
+            source: "export function add() {}",
+            env: [{ key: "API_KEY", value: "x" }],
+          }}
+        />
+      );
+      expect(screen.getByText("Script")).toBeInTheDocument();
+      expect(screen.getByText("JavaScript")).toBeInTheDocument();
+      expect(screen.getByLabelText("Source *")).toHaveTextContent("export function add() {}");
+      expect(screen.getByLabelText("Source *")).toHaveAttribute("contenteditable", "false");
+      expect(screen.getByText("API_KEY: x")).toBeInTheDocument();
+      expect(screen.queryByText("Command")).not.toBeInTheDocument();
     });
 
     it("drops the authoring hints", () => {
@@ -180,6 +221,48 @@ describe("mcpServerFormSchema", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("requires a source for the script transport", () => {
+    const result = mcpServerFormSchema.safeParse({
+      ...emptyMcpServerFormValues(),
+      name: "srv",
+      transport: "script",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ["source"],
+      message: "Source is required",
+    });
+  });
+});
+
+describe("mcpServerEndpoint", () => {
+  const base = { id: "s", name: "srv", tenantId: "t", createdBy: "u", updatedBy: "u" } as const;
+
+  it("summarizes each transport's endpoint", () => {
+    expect(mcpServerEndpoint({ ...base, url: "https://mcp.example.com/mcp" } as McpServer)).toBe(
+      "https://mcp.example.com/mcp"
+    );
+    expect(
+      mcpServerEndpoint({
+        ...base,
+        transport: "stdio",
+        command: "npx",
+        args: ["-y", "pkg"],
+      } as McpServer)
+    ).toBe("npx -y pkg");
+    expect(
+      mcpServerEndpoint({ ...base, transport: "script", language: "javascript" } as McpServer)
+    ).toBe("JavaScript script");
+  });
+});
+
+describe("mcpTransportLabel", () => {
+  it("labels each transport", () => {
+    expect(mcpTransportLabel("streamable_http")).toBe("HTTP");
+    expect(mcpTransportLabel("stdio")).toBe("stdio");
+    expect(mcpTransportLabel("script")).toBe("Script");
+  });
 });
 
 describe("toMcpServerBody", () => {
@@ -223,6 +306,29 @@ describe("toMcpServerBody", () => {
       transport: "stdio",
       command: "npx",
       args: ["-y", "pkg"],
+      env: { API_KEY: "x" },
+    });
+  });
+
+  it("emits language, source, and env, and no other transport's fields, for a script", () => {
+    expect(
+      toMcpServerBody({
+        ...emptyMcpServerFormValues(),
+        name: "srv",
+        transport: "script",
+        url: "https://leftover.example.com",
+        command: "npx",
+        args: ["leftover"],
+        language: "python",
+        source: "def f(): ...",
+        env: [{ key: "API_KEY", value: "x" }],
+      })
+    ).toEqual({
+      name: "srv",
+      description: null,
+      transport: "script",
+      language: "python",
+      source: "def f(): ...",
       env: { API_KEY: "x" },
     });
   });

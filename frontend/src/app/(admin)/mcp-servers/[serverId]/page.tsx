@@ -102,6 +102,8 @@ export default function McpServerDetailPage() {
           command: server.command ?? "npx",
           args: server.args ?? [],
           env: recordToPairs(server.env ?? {}),
+          language: server.language ?? "python",
+          source: server.source ?? "",
         });
         setAudit({
           createdBy: server.createdBy,

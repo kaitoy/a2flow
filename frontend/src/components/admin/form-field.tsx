@@ -14,12 +14,17 @@ interface FormFieldProps {
   children: React.ReactNode;
 }
 
-/** Labeled form field wrapper with optional required marker, label-row action, and inline error text. */
+/**
+ * Labeled form field wrapper with optional required marker, label-row action, and inline error text.
+ *
+ * The label carries the id `${htmlFor}-label`, for a control that a `<label for>`
+ * cannot target (e.g. a contenteditable code editor) to reference via `aria-labelledby`.
+ */
 export function FormField({ htmlFor, label, required, error, action, children }: FormFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex min-h-5 items-center justify-between gap-2">
-        <label htmlFor={htmlFor} className="text-label-caps">
+        <label id={`${htmlFor}-label`} htmlFor={htmlFor} className="text-label-caps">
           {label} {required && <span className="text-accent">*</span>}
         </label>
         {action}

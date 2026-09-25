@@ -4,8 +4,9 @@ import { useParams, useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { DEVELOPER, REQUESTER } from "@/test/auth-state";
+import { codeEditorText, setCodeEditorText } from "@/test/code-editor";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
-import { MCP_SERVER_1, MCP_STDIO_SERVER, MCP_TOOL_1 } from "@/test/msw/handlers";
+import { MCP_SCRIPT_SERVER, MCP_SERVER_1, MCP_STDIO_SERVER, MCP_TOOL_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import McpServerDetailPage from "./page";
@@ -78,6 +79,40 @@ describe("McpServerDetailPage", () => {
     expect(screen.getByDisplayValue("files-mcp@0.3.0")).toBeInTheDocument();
     expect(screen.getByDisplayValue("API_KEY")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^url$/i)).not.toBeInTheDocument();
+  });
+
+  it("prefills language and source for a script server and saves an edit", async () => {
+    vi.mocked(useParams).mockReturnValue({ serverId: "mcp-3" });
+    let receivedBody: unknown;
+    server.use(
+      http.get("http://localhost:8000/api/v1/mcp-servers/:serverId", () =>
+        envelope(MCP_SCRIPT_SERVER)
+      ),
+      http.patch("http://localhost:8000/api/v1/mcp-servers/:serverId", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope(MCP_SCRIPT_SERVER);
+      })
+    );
+
+    renderPage();
+    await waitFor(() => expect(screen.getByDisplayValue("calc")).toBeInTheDocument());
+    expect(screen.getByRole("tab", { name: "Python" })).toHaveAttribute("aria-selected", "true");
+    const source = screen.getByLabelText("Source *");
+    expect(codeEditorText(source)).toBe(MCP_SCRIPT_SERVER.source);
+
+    setCodeEditorText(source, "def one() -> int: return 1");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "calc",
+        description: null,
+        transport: "script",
+        language: "python",
+        source: "def one() -> int: return 1",
+        env: {},
+      })
+    );
   });
 
   it("drops url and headers when switching a server to stdio", async () => {

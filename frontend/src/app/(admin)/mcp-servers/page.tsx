@@ -18,6 +18,7 @@ import { auditColumns, idColumn } from "@/components/admin/audit-columns";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { ColumnPicker } from "@/components/admin/column-picker";
 import { DeleteIconButton } from "@/components/admin/delete-icon-button";
+import { mcpServerEndpoint, mcpTransportLabel } from "@/components/admin/mcp-server-fields";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { RegistrySearchDialog } from "@/components/admin/registry-search-dialog";
 import { tagsColumn } from "@/components/admin/tag-columns";
@@ -75,22 +76,23 @@ function buildColumns(
       filterField: "transport",
       className: "text-center",
       visibility: "optional",
-      cell: (s) => <Badge>{s.transport === "stdio" ? "stdio" : "HTTP"}</Badge>,
+      cell: (s) => <Badge>{mcpTransportLabel(s.transport)}</Badge>,
     },
     {
       header: "Endpoint",
       sortField: "url",
       filterField: "url",
       className: "font-mono",
-      cell: (s) => (s.transport === "stdio" ? [s.command, ...(s.args ?? [])].join(" ") : s.url),
+      cell: (s) => mcpServerEndpoint(s),
     },
     {
       header: "Headers / Env",
       visibility: "optional",
       cell: (s) => {
-        const count = Object.keys((s.transport === "stdio" ? s.env : s.headers) ?? {}).length;
+        const isHttp = s.transport === "streamable_http";
+        const count = Object.keys((isHttp ? s.headers : s.env) ?? {}).length;
         if (count === 0) return <span className="text-on-surface-variant">—</span>;
-        const noun = s.transport === "stdio" ? "variable" : "header";
+        const noun = isHttp ? "header" : "variable";
         return `${count} ${noun}${count === 1 ? "" : "s"}`;
       },
     },

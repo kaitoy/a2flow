@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { DEVELOPER, REQUESTER } from "@/test/auth-state";
+import { setCodeEditorText } from "@/test/code-editor";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
-import { MCP_SERVER_1, MCP_STDIO_SERVER } from "@/test/msw/handlers";
+import { MCP_SCRIPT_SERVER, MCP_SERVER_1, MCP_STDIO_SERVER } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
 import NewMcpServerPage from "./page";
@@ -82,6 +83,44 @@ describe("NewMcpServerPage", () => {
         env: { API_KEY: "secret" },
       })
     );
+  });
+
+  it("submits a script server with its language and source", async () => {
+    const user = userEvent.setup();
+    let receivedBody: unknown;
+    server.use(
+      http.post("http://localhost:8000/api/v1/mcp-servers", async ({ request }) => {
+        receivedBody = await request.json();
+        return envelope({ ...MCP_SCRIPT_SERVER, id: "new-id" }, 201);
+      })
+    );
+
+    renderPage();
+    await user.type(screen.getByLabelText(/name/i), "calc");
+    await user.click(screen.getByRole("tab", { name: "Script" }));
+    await user.click(screen.getByRole("tab", { name: "JavaScript" }));
+    setCodeEditorText(screen.getByLabelText("Source *"), "export function f() {}");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "calc",
+        description: null,
+        transport: "script",
+        language: "javascript",
+        source: "export function f() {}",
+        env: {},
+      })
+    );
+  });
+
+  it("requires a source for a script server", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(screen.getByLabelText(/name/i), "calc");
+    await user.click(screen.getByRole("tab", { name: "Script" }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
+    expect(await screen.findByText("Source is required")).toBeInTheDocument();
   });
 
   it("navigates to list on success", async () => {

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { store as appStore } from "@/store";
 import { DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
+import { MCP_SCRIPT_SERVER } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import McpServersPage from "./page";
@@ -41,6 +42,19 @@ describe("McpServersPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("local-files")).toBeInTheDocument());
     expect(screen.getByText("npx -y files-mcp@0.3.0")).toBeInTheDocument();
+  });
+
+  it("renders a script server's language and transport", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/mcp-servers", () => envelope([MCP_SCRIPT_SERVER]))
+    );
+    renderPage();
+    await waitFor(() => expect(screen.getByText("calc")).toBeInTheDocument());
+    expect(screen.getByText("Python script")).toBeInTheDocument();
+
+    await showColumn(user, "Transport");
+    expect(screen.getByText("Script")).toBeInTheDocument();
   });
 
   it("hides the transport and headers columns by default", async () => {

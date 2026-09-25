@@ -97,7 +97,8 @@ class StdioConnection:
     """An MCP server launched as a child process speaking stdio.
 
     Attributes:
-        command: The executable to run: ``npx`` or ``uvx``.
+        command: The executable to run: ``npx`` or ``uvx``, or -- for a
+            ``script`` server -- the interpreter that starts its runner.
         args: ``argv`` entries passed to the executable, with any
             ``${env:NAME}`` placeholders already expanded against ``env``.
             Handed to the SDK as a list and spawned without a shell, so

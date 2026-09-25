@@ -6,7 +6,7 @@ MCP tools to WorkflowTasks: at design time the agent lists each server's
 tools, and at execution time bound tools are invoked through the
 ``call_mcp_tool`` proxy (see :mod:`infrastructure.mcp_tools`).
 
-Two transports exist, discriminated by ``transport``:
+Three transports exist, discriminated by ``transport``:
 
 * ``streamable_http`` — a remote server addressed by ``url``. The optional
   ``headers`` mapping (e.g. ``{"Authorization": "Bearer ..."}``) is sent
@@ -16,6 +16,10 @@ Two transports exist, discriminated by ``transport``:
   ships) plus ``args``, with ``env`` merged over the small set of variables
   :func:`mcp.client.stdio.get_default_environment` deems safe to inherit.
   ``args`` is passed as a list and never through a shell.
+* ``script`` — a user-written ``source`` in ``language`` (Python or
+  JavaScript), launched like a stdio server through a bundled runner (see
+  :mod:`infrastructure.script_runners`) that exposes each public top-level
+  function as a tool. ``env`` applies as for stdio; nothing else does.
 
 ``headers`` and ``env`` values may embed ``${secret:NAME/KEY}`` placeholders,
 resolved at connection time (see :mod:`infrastructure.secret_resolver`), or
@@ -35,9 +39,11 @@ after ``env``'s own ``${secret:NAME/KEY}`` placeholders are resolved — so
 ``${env:NAME}`` transparently picks up secret-resolved values too.
 """
 
+import ast
 import re
+import sys
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import model_validator
 from pydantic.alias_generators import to_camel
@@ -46,7 +52,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn
-from models.constraints import DescText, EntityName, HttpUrl, McpArg
+from models.constraints import DescText, EntityName, HttpUrl, McpArg, ScriptSource
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -89,10 +95,11 @@ def referenced_env_names(args: list[str]) -> set[str]:
 
 
 class McpTransport(StrEnum):
-    """How A2Flow reaches an MCP server: over HTTP, or as a child process."""
+    """How A2Flow reaches an MCP server: over HTTP, as a child process, or as a script."""
 
     streamable_http = "streamable_http"
     stdio = "stdio"
+    script = "script"
 
 
 class McpCommand(StrEnum):
@@ -100,6 +107,204 @@ class McpCommand(StrEnum):
 
     npx = "npx"
     uvx = "uvx"
+
+
+class ScriptLanguage(StrEnum):
+    """Language of a ``script`` MCP server's ``source``."""
+
+    python = "python"
+    javascript = "javascript"
+
+
+def check_script_syntax(language: ScriptLanguage, source: str) -> None:
+    """Reject a Python script that does not compile.
+
+    JavaScript is not checked: the backend image ships no Node.js, so a broken
+    JavaScript script surfaces only when its tools are listed.
+
+    Args:
+        language: The script's language.
+        source: The script's source code.
+
+    Raises:
+        ValueError: If ``language`` is Python and ``source`` has a syntax
+            error; the message names the offending line.
+    """
+    if language is not ScriptLanguage.python:
+        return
+    try:
+        compile(source, "<script>", "exec")
+    except SyntaxError as exc:
+        raise ValueError(
+            f"Script syntax error on line {exc.lineno}: {exc.msg}"
+        ) from exc
+
+
+class ScriptDiagnostic(SQLModel):
+    """One problem found in a script's source, located for the editor to underline.
+
+    Lines are 1-based; columns are 0-based character offsets within their line.
+    Returned by ``POST /mcp-servers/python-lint``.
+    """
+
+    model_config = _alias_config
+    line: int
+    column: int
+    end_line: int
+    end_column: int
+    severity: Literal["error", "warning"]
+    message: str
+
+
+class PythonLintRequest(SQLModel):
+    """Body of ``POST /mcp-servers/python-lint``: the Python source to check."""
+
+    source: ScriptSource
+
+
+def _char_column(lines: list[str], line: int, byte_col: int) -> int:
+    """Convert an ``ast`` UTF-8 byte offset on ``line`` (1-based) to characters.
+
+    Args:
+        lines: The source split into lines.
+        line: The 1-based line the offset is on.
+        byte_col: The byte offset ``ast`` reported.
+
+    Returns:
+        The same position as a character offset.
+    """
+    text = lines[line - 1] if 0 < line <= len(lines) else ""
+    return len(text.encode()[:byte_col].decode(errors="ignore"))
+
+
+def _warn_at(lines: list[str], node: ast.AST, message: str) -> ScriptDiagnostic:
+    """Build a warning spanning ``node``'s source range.
+
+    Args:
+        lines: The source split into lines.
+        node: A node carrying position attributes.
+        message: The warning text.
+
+    Returns:
+        The diagnostic.
+    """
+    line: int = getattr(node, "lineno", 1)
+    end_line: int = getattr(node, "end_lineno", None) or line
+    col: int = getattr(node, "col_offset", 0)
+    end_col: int = getattr(node, "end_col_offset", None) or col
+    return ScriptDiagnostic(
+        line=line,
+        column=_char_column(lines, line, col),
+        end_line=end_line,
+        end_column=_char_column(lines, end_line, end_col),
+        severity="warning",
+        message=message,
+    )
+
+
+def lint_python_script(source: str) -> list[ScriptDiagnostic]:
+    """Check a Python script server's source for errors and convention slips.
+
+    A syntax error is reported alone, as an error. A script that compiles is
+    checked against the runner's conventions (see
+    :mod:`infrastructure.script_runners.python_runner`), each slip a warning:
+    no public top-level function (so no tools), a public function's parameter
+    without a type hint or the function without a docstring (so a vague tool
+    schema), and an import from outside the standard library.
+
+    Args:
+        source: The script's source code.
+
+    Returns:
+        The diagnostics, in source order per check; empty for a clean script.
+    """
+    try:
+        tree = ast.parse(source, "<script>")
+    except SyntaxError as exc:
+        line = exc.lineno or 1
+        col = max((exc.offset or 1) - 1, 0)
+        end_line = exc.end_lineno or line
+        end_col = (exc.end_offset or 0) - 1
+        if end_line == line and end_col <= col:
+            end_col = col + 1
+        return [
+            ScriptDiagnostic(
+                line=line,
+                column=col,
+                end_line=end_line,
+                end_column=end_col,
+                severity="error",
+                message=exc.msg,
+            )
+        ]
+
+    lines = source.splitlines()
+    diagnostics: list[ScriptDiagnostic] = []
+    public = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        and not node.name.startswith("_")
+    ]
+    if not public:
+        diagnostics.append(
+            ScriptDiagnostic(
+                line=1,
+                column=0,
+                end_line=1,
+                end_column=len(lines[0]) if lines else 0,
+                severity="warning",
+                message="No public top-level function: this server exposes no tools.",
+            )
+        )
+    for fn in public:
+        if ast.get_docstring(fn) is None:
+            name_col = _char_column(lines, fn.lineno, fn.col_offset)
+            # "def" itself may contain the name (``def f``), so match past it.
+            header = re.compile(rf"def\s+{re.escape(fn.name)}")
+            match = header.search(lines[fn.lineno - 1], name_col)
+            name_end = match.end() if match else name_col + 1
+            diagnostics.append(
+                ScriptDiagnostic(
+                    line=fn.lineno,
+                    column=name_col,
+                    end_line=fn.lineno,
+                    end_column=max(name_end, name_col + 1),
+                    severity="warning",
+                    message=f"'{fn.name}' has no docstring: the tool will have "
+                    "no description.",
+                )
+            )
+        params = fn.args.posonlyargs + fn.args.args + fn.args.kwonlyargs
+        diagnostics.extend(
+            _warn_at(
+                lines,
+                param,
+                f"Parameter '{param.arg}' has no type hint: the tool will accept "
+                "any value for it.",
+            )
+            for param in params
+            if param.annotation is None
+        )
+    for node in ast.walk(tree):
+        modules: list[tuple[ast.AST, str]]
+        if isinstance(node, ast.Import):
+            modules = [(alias, alias.name) for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            modules = [(node, node.module)]
+        else:
+            continue
+        diagnostics.extend(
+            _warn_at(
+                lines,
+                where,
+                f"'{name}' is not in the standard library, which is all a "
+                "script can import.",
+            )
+            for where, name in modules
+            if name.partition(".")[0] not in sys.stdlib_module_names
+        )
+    return diagnostics
 
 
 class MCPServerUpdate(SQLModel):
@@ -122,6 +327,8 @@ class MCPServerUpdate(SQLModel):
     command: McpCommand | None = None
     args: list[McpArg] | None = None
     env: dict[str, str] | None = None
+    language: ScriptLanguage | None = None
+    source: ScriptSource | None = None
 
     @model_validator(mode="after")
     def _validate_sizes(self) -> "MCPServerUpdate":
@@ -186,6 +393,8 @@ class MCPServerCreate(MCPServerUpdate):
     command: McpCommand | None = None
     args: list[McpArg] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
+    language: ScriptLanguage | None = None
+    source: ScriptSource | None = None
 
     @model_validator(mode="after")
     def _validate_shape(self) -> "MCPServerCreate":
@@ -195,28 +404,42 @@ class MCPServerCreate(MCPServerUpdate):
             The validated model instance.
 
         Raises:
-            ValueError: If a ``streamable_http`` server is missing ``url`` or
-                carries stdio fields, a ``stdio`` server is missing
-                ``command`` or carries remote fields, or its ``args`` embed a
-                ``${env:NAME}`` placeholder naming a key absent from ``env``.
+            ValueError: If a ``streamable_http`` server is missing ``url``, a
+                ``stdio`` server is missing ``command``, a ``script`` server is
+                missing ``language`` or ``source`` (or its Python source does
+                not compile), any server carries another transport's fields,
+                or a stdio server's ``args`` embed a ``${env:NAME}``
+                placeholder naming a key absent from ``env``.
         """
+        is_script_shaped = self.language is not None or self.source is not None
         if self.transport is McpTransport.streamable_http:
             if self.url is None:
                 raise ValueError("A streamable_http server requires a url")
-            if self.command is not None or self.args or self.env:
+            if self.command is not None or self.args or self.env or is_script_shaped:
                 raise ValueError(
-                    "A streamable_http server must not set command, args, or env"
+                    "A streamable_http server must not set command, args, env, "
+                    "language, or source"
                 )
-        else:
+        elif self.transport is McpTransport.stdio:
             if self.command is None:
                 raise ValueError("A stdio server requires a command")
-            if self.url is not None or self.headers:
-                raise ValueError("A stdio server must not set url or headers")
+            if self.url is not None or self.headers or is_script_shaped:
+                raise ValueError(
+                    "A stdio server must not set url, headers, language, or source"
+                )
             missing = referenced_env_names(self.args) - self.env.keys()
             if missing:
                 raise ValueError(
                     "args reference undefined env vars: " + ", ".join(sorted(missing))
                 )
+        else:
+            if self.language is None or self.source is None:
+                raise ValueError("A script server requires a language and a source")
+            if self.url is not None or self.headers or self.command or self.args:
+                raise ValueError(
+                    "A script server must not set url, headers, command, or args"
+                )
+            check_script_syntax(self.language, self.source)
         return self
 
 
@@ -262,6 +485,8 @@ class McpServerRead(BaseEntity):
     command: McpCommand | None = None
     args: list[str] = []
     env: dict[str, str] = {}
+    language: ScriptLanguage | None = None
+    source: str | None = None
     #: Ids of the tags attached to this server.
     tag_ids: list[str] = []
 

@@ -7,6 +7,8 @@ export interface ReadOnlyFieldProps {
   children: ReactNode;
   /** Extra classes merged onto the `<p>`, e.g. `whitespace-pre-wrap` for multi-line text. */
   className?: string;
+  /** Element to render: `p` (the default) for text, `div` for block content such as a code view. */
+  as?: "p" | "div";
 }
 
 /**
@@ -20,9 +22,9 @@ export interface ReadOnlyFieldProps {
  * import("./form-field").FormField} when the viewer's role can see a field
  * but not edit it.
  */
-export function ReadOnlyField({ children, className }: ReadOnlyFieldProps) {
+export function ReadOnlyField({ children, className, as: Tag = "p" }: ReadOnlyFieldProps) {
   return (
-    <p
+    <Tag
       className={[
         "min-h-9 break-words rounded-xl border border-outline-variant bg-surface-dim/40 px-3 py-2 text-sm font-medium text-on-surface shadow-[inset_0_1px_2px_var(--inner-track-shadow)]",
         className,
@@ -31,6 +33,6 @@ export function ReadOnlyField({ children, className }: ReadOnlyFieldProps) {
         .join(" ")}
     >
       {children}
-    </p>
+    </Tag>
   );
 }

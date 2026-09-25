@@ -15,10 +15,63 @@ Open **MCP Servers** in the admin sidebar to manage the registry. Each record ha
 |---|---|---|
 | **Streamable HTTP** (default) | **URL**, **HTTP Headers** | A remote server. Headers are sent with every request — typically `Authorization: Bearer …`. SSE-only servers are not supported. |
 | **stdio** | **Command**, **Arguments**, **Environment Variables** | A server launched as a child process of the backend, e.g. `npx` with `["-y", "@modelcontextprotocol/server-everything"]`. Both `npx` and `uvx` are available. |
+| **Script** | **Language**, **Source**, **Environment Variables** | Python or JavaScript code you write yourself. Each of its public functions becomes a tool — see [Writing a script](#writing-a-script). |
 
-Switching an existing server's transport clears the other transport's fields, and a record that mixes the two shapes — a URL on a stdio server, a command on a remote one — is refused.
+Switching an existing server's transport clears the fields of the transport it leaves, and a record that mixes shapes — a URL on a stdio server, a command on a remote one, source code on either — is refused.
 
 ⚠️ **Registering a stdio server means running the chosen command inside the backend container**, as the container's unprivileged user. It is gated behind the same `developer` role as any other MCP server write. Arguments are passed to the process as a list and never through a shell, and the child inherits only a small safe set of environment variables plus the ones you configure — the backend's own API keys and database URL are not visible to it.
+
+## Writing a script
+
+A script server turns functions you write into tools without publishing a package. Choose **Script** as the **Transport**, pick a **Language**, and paste the code into **Source**.
+
+**Source** is a code editor. It colors the code for the selected **Language**, numbers its lines, and indents with **Tab** — press **Esc** first to move on to the next field with **Tab**. As you type, it underlines problems in place; hover over an underline to read what is wrong.
+
+| Underline | Meaning | Examples |
+|---|---|---|
+| Red, wavy | Syntax error — the script cannot run | An unclosed bracket, a misspelled keyword |
+| Amber, wavy | Probably a mistake | No function would become a tool; a Python function without a docstring, or a parameter without a type hint; an import from outside the standard library; a JavaScript function without a `description` |
+| Accent, wavy | A note | A JavaScript function without an `inputSchema` |
+
+Underlines are advice and never stop you from saving; the check on save is described below.
+
+| | Python | JavaScript |
+|---|---|---|
+| Functions that become tools | Every function defined at the top level whose name does not start with `_`. Functions you import are not exposed. | Every exported function (`export function`, `export async function`) whose name does not start with `_`. The default export is not exposed. |
+| Tool name | The function's name | The export's name |
+| Description | The docstring | The function's `description` property |
+| Arguments | Read from the type hints | The function's `inputSchema` property, a JSON Schema. Without one, the tool accepts any arguments. |
+| How the tool is called | Arguments by name | One object holding the arguments |
+| What the agent gets back | The return value | The return value: a string as is, anything else as JSON |
+
+```python
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+```
+
+```js
+export function add({ a, b }) {
+  return a + b;
+}
+add.description = "Add two numbers.";
+add.inputSchema = {
+  type: "object",
+  properties: { a: { type: "number" }, b: { type: "number" } },
+  required: ["a", "b"],
+};
+```
+
+A few rules apply to both languages:
+
+- Only the standard library is available — Python's own modules, or Node.js's built-in `node:` modules. Third-party packages cannot be installed.
+- An error thrown by a function reaches the agent as a failed tool call, with its message.
+- Output from `print()` or `console.log()` goes to the server log, not to the agent.
+- **Environment Variables** are readable as `os.environ["NAME"]` or `process.env.NAME`, and may use the placeholders under [Keeping credentials out of the record](#keeping-credentials-out-of-the-record).
+- **Source** holds at most 30,000 characters.
+- Python code with a syntax error is refused when saving, with the line number. JavaScript is not checked on save; a broken script shows up as a server that cannot be launched when you [check its tools](#checking-a-servers-tools).
+
+⚠️ A script runs in the same place as a stdio server, under the same restrictions.
 
 ## Keeping credentials out of the record
 

@@ -21,11 +21,18 @@ nor Vault credentials.
 """
 
 import re
+import sys
 
 from infrastructure.google_token import resolve_gcp_tokens
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
+from infrastructure.script_runners import NODE_RUNNER, PYTHON_RUNNER, SOURCE_ENV_VAR
 from infrastructure.secret_resolver import SecretResolver
-from models.mcp_server import ENV_ARG_PLACEHOLDER_PATTERN, MCPServer, McpTransport
+from models.mcp_server import (
+    ENV_ARG_PLACEHOLDER_PATTERN,
+    MCPServer,
+    McpTransport,
+    ScriptLanguage,
+)
 from repositories.exceptions import McpConnectionError
 
 
@@ -71,6 +78,11 @@ async def resolve_connection(
             ``${gcp-token:NAME/KEY}`` placeholders in the server's header
             (remote) or environment (stdio) values.
 
+    A ``script`` server becomes a stdio connection that starts the runner for
+    its language (see :mod:`infrastructure.script_runners`) with the source in
+    the runner's environment. Python runs on this interpreter,
+    ``sys.executable``, which sits at the same path in the MCP proxy image.
+
     Returns:
         An :data:`infrastructure.mcp_client.McpConnection` ready to hand to an
         :class:`infrastructure.mcp_executor.McpExecutor`.
@@ -94,6 +106,20 @@ async def resolve_connection(
             args=_expand_env_args(list(server.args), resolved_env, server.name),
             env=resolved_env,
             raw_args=list(server.args),
+        )
+    if server.transport is McpTransport.script:
+        if not server.language or not server.source:
+            raise McpConnectionError(server.name, "script server has no source")
+        if server.language is ScriptLanguage.python:
+            command, args = sys.executable, ["-I", str(PYTHON_RUNNER)]
+        else:
+            command, args = "node", [str(NODE_RUNNER)]
+        env = await _resolve_values(server.env, resolver)
+        return StdioConnection(
+            command=command,
+            args=args,
+            env={**env, SOURCE_ENV_VAR: server.source},
+            raw_args=args,
         )
     if not server.url:
         raise McpConnectionError(server.name, "streamable_http server has no url")

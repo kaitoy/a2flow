@@ -21,6 +21,7 @@ from models.mcp_server import (
     MCPServerUpdate,
     McpToolInfo,
     McpTransport,
+    check_script_syntax,
     referenced_env_names,
 )
 from repositories.exceptions import McpServerValidationError, NotFoundError
@@ -32,6 +33,31 @@ from repositories.query import FilterSpec, SortSpec
 # in methods declared after it to that method rather than the builtin; the
 # alias is evaluated in module scope where ``list`` is unambiguously the builtin.
 _McpToolInfoList = list[McpToolInfo]
+
+#: Every transport-specific field, mapped to the value that clears it.
+_TRANSPORT_FIELDS: dict[str, Any] = {
+    "url": None,
+    "headers": {},
+    "command": None,
+    "args": [],
+    "env": {},
+    "language": None,
+    "source": None,
+}
+
+#: The transport-specific fields each transport may carry.
+_TRANSPORT_FIELDS_BY: dict[McpTransport, set[str]] = {
+    McpTransport.streamable_http: {"url", "headers"},
+    McpTransport.stdio: {"command", "args", "env"},
+    McpTransport.script: {"language", "source", "env"},
+}
+
+#: The fields a PATCH switching *to* each transport must supply.
+_REQUIRED_BY: dict[McpTransport, tuple[str, ...]] = {
+    McpTransport.streamable_http: ("url",),
+    McpTransport.stdio: ("command",),
+    McpTransport.script: ("language", "source"),
+}
 
 
 #: Alias for ``list[McpServerRead]``: the ``list`` method below shadows the
@@ -158,12 +184,13 @@ class MCPServerService:
 
         The effective transport is ``data.transport`` when provided, else the
         stored one. Fields explicitly sent in the PATCH must fit the effective
-        transport's shape; fields belonging to the *other* transport that
-        merely remain on the stored record (a transport switch) are cleared
+        transport's shape; fields belonging to *another* transport that merely
+        remain on the stored record (a transport switch) are cleared
         automatically. For a stdio server, any ``${env:NAME}`` placeholder in
-        the effective ``args`` must name a key of the effective ``env`` — both
+        the effective ``args`` must name a key of the effective ``env``, and a
+        Python script server's effective ``source`` must compile — both
         computed the same way as ``effective`` itself, since a PATCH may touch
-        only one of the two fields.
+        only one of the fields involved.
 
         Args:
             server_id: Identifier of the server to update.
@@ -176,43 +203,46 @@ class MCPServerService:
         Raises:
             NotFoundError: If no server exists with the given ID.
             McpServerValidationError: If the merged result violates the
-                effective transport's shape, or its ``args`` embed a
+                effective transport's shape, its ``args`` embed a
                 ``${env:NAME}`` placeholder naming a key absent from the
-                effective ``env``.
+                effective ``env``, or its Python source does not compile.
         """
         existing = await self.get(server_id)
         effective = data.transport or existing.transport
-        updates: dict[str, Any] = {}
+        foreign = _TRANSPORT_FIELDS.keys() - _TRANSPORT_FIELDS_BY[effective]
 
-        if effective is McpTransport.streamable_http:
-            if data.command is not None or data.args or data.env:
-                raise McpServerValidationError(
-                    "A streamable_http server must not set command, args, or env"
-                )
-            if existing.transport is not McpTransport.streamable_http:
-                if data.url is None:
-                    raise McpServerValidationError(
-                        "Switching to a streamable_http server requires a url"
-                    )
-                updates.update({"command": None, "args": [], "env": {}})
-        else:
-            if data.url is not None or data.headers:
-                raise McpServerValidationError(
-                    "A stdio server must not set url or headers"
-                )
-            if existing.transport is not McpTransport.stdio:
-                if data.command is None:
-                    raise McpServerValidationError(
-                        "Switching to a stdio server requires a command"
-                    )
-                updates.update({"url": None, "headers": {}})
-            effective_args = data.args if data.args is not None else existing.args
-            effective_env = data.env if data.env is not None else existing.env
-            missing = referenced_env_names(effective_args) - effective_env.keys()
+        sent_foreign = sorted(f for f in foreign if getattr(data, f))
+        if sent_foreign:
+            raise McpServerValidationError(
+                f"A {effective} server must not set {', '.join(sent_foreign)}"
+            )
+        updates: dict[str, Any] = {}
+        if existing.transport is not effective:
+            missing = [f for f in _REQUIRED_BY[effective] if getattr(data, f) is None]
             if missing:
                 raise McpServerValidationError(
-                    "args reference undefined env vars: " + ", ".join(sorted(missing))
+                    f"Switching to a {effective} server requires "
+                    + " and ".join(missing)
                 )
+            updates = {f: _TRANSPORT_FIELDS[f] for f in foreign}
+
+        if effective is McpTransport.stdio:
+            effective_args = data.args if data.args is not None else existing.args
+            effective_env = data.env if data.env is not None else existing.env
+            missing_env = referenced_env_names(effective_args) - effective_env.keys()
+            if missing_env:
+                raise McpServerValidationError(
+                    "args reference undefined env vars: "
+                    + ", ".join(sorted(missing_env))
+                )
+        elif effective is McpTransport.script:
+            language = data.language or existing.language
+            source = data.source or existing.source
+            if language is not None and source is not None:
+                try:
+                    check_script_syntax(language, source)
+                except ValueError as exc:
+                    raise McpServerValidationError(str(exc)) from exc
 
         if updates:
             data = data.model_copy(update=updates)

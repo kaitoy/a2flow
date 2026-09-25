@@ -347,3 +347,12 @@ AppBaseUrl = Annotated[
 #: except NUL (which ``execve`` cannot carry). Deliberately permissive — an
 #: argument legitimately holds JSON, paths, or free text.
 McpArg = Annotated[str, StringConstraints(max_length=4096, pattern=r"^[^\x00]*$")]
+
+#: Source code of a script MCP server: 1–30,000 characters, anything except NUL.
+#: The runner receives it through an environment variable, which can carry no
+#: NUL and on Windows holds at most 32,767 characters.
+# ponytail: env-var transport caps scripts at 30k chars; hand the runner a temp
+# file instead if larger scripts are ever needed.
+ScriptSource = Annotated[
+    str, StringConstraints(min_length=1, max_length=30000, pattern=r"^[^\x00]*$")
+]

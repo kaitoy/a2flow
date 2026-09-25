@@ -17,6 +17,9 @@ from models.mcp_server import (
     McpServerRead,
     MCPServerUpdate,
     McpToolInfo,
+    PythonLintRequest,
+    ScriptDiagnostic,
+    lint_python_script,
 )
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
@@ -42,6 +45,19 @@ async def create_mcp_server(
 ) -> ApiResponse[McpServerRead]:
     server = await service.create(body, user_id=user_id)
     return ApiResponse(meta=meta, data=await service.to_read(server))
+
+
+@router.post(
+    "/python-lint",
+    response_model=ApiResponse[list[ScriptDiagnostic]],
+    dependencies=_requires_developer,
+)
+async def lint_python(
+    body: PythonLintRequest,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[ScriptDiagnostic]]:
+    """Check a Python script server's source for the editor to underline."""
+    return ApiResponse(meta=meta, data=lint_python_script(body.source))
 
 
 @router.get("", response_model=ApiResponse[list[McpServerRead]])

@@ -209,6 +209,23 @@ export const MCP_STDIO_SERVER = {
   updatedBy: "",
 };
 
+export const MCP_SCRIPT_SERVER = {
+  id: "mcp-3",
+  tenantId: "tenant-1",
+  name: "calc",
+  description: null,
+  transport: "script",
+  headers: {},
+  args: [],
+  env: {},
+  language: "python",
+  source: "def add(a: int, b: int) -> int:\n    return a + b\n",
+  createdAt: "2026-01-03T00:00:00Z",
+  updatedAt: "2026-01-03T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
 export const MCP_TOOL_1 = {
   name: "search",
   description: "Search the web",
@@ -586,6 +603,8 @@ export const handlers = [
   http.get(`${BASE}/api/v1/mcp-servers/:serverId/tools`, () => envelope([MCP_TOOL_1])),
 
   http.get(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
+
+  http.post(`${BASE}/api/v1/mcp-servers/python-lint`, () => envelope([])),
 
   http.post(`${BASE}/api/v1/mcp-servers`, () =>
     envelope({ ...MCP_SERVER_1, id: "new-mcp-id" }, 201)

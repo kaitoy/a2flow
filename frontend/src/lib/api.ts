@@ -42,6 +42,7 @@ import type {
   NotificationType,
   NotificationUpdate,
   OutboundEmailRead as OutboundEmailModel,
+  ScriptDiagnostic,
   SecretCreate,
   SecretRead as SecretModel,
   SecretType,
@@ -365,6 +366,7 @@ export type {
   MockResponse,
   MockResponseKind,
   NotificationType,
+  ScriptDiagnostic,
   SecretCreate,
   SecretType,
   SecretUpdate,
@@ -798,6 +800,16 @@ export async function listMcpServerTools(id: string): Promise<McpToolInfo[]> {
   return unwrap(
     sdk.listMcpServerToolsApiV1McpServersServerIdToolsGet({ path: { server_id: id } })
   ) as Promise<McpToolInfo[]>;
+}
+
+/**
+ * Check a Python script server's source for syntax errors and convention slips,
+ * located for the source editor to underline.
+ */
+export async function lintPythonScript(source: string): Promise<ScriptDiagnostic[]> {
+  return unwrap(sdk.lintPythonApiV1McpServersPythonLintPost({ body: { source } })) as Promise<
+    ScriptDiagnostic[]
+  >;
 }
 
 /**

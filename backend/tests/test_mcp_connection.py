@@ -5,13 +5,16 @@ covers resolution, which is a backend concern, while that file covers the
 transport, which runs in the MCP proxy container.
 """
 
+import sys
+
 import pytest
 
 from infrastructure import google_token
 from infrastructure.mcp_client import HttpConnection, StdioConnection
 from infrastructure.mcp_connection import resolve_connection
+from infrastructure.script_runners import NODE_RUNNER, PYTHON_RUNNER
 from infrastructure.secret_resolver import SecretResolver
-from models.mcp_server import MCPServer, McpTransport
+from models.mcp_server import MCPServer, McpTransport, ScriptLanguage
 from repositories.exceptions import McpConnectionError
 
 
@@ -151,3 +154,52 @@ async def test_resolve_connection_rejects_args_referencing_unknown_env_var() -> 
     server = _unvalidated_server(command="npx", args=["${env:MISSING}"], env={})
     with pytest.raises(McpConnectionError):
         await resolve_connection(server, resolver)
+
+
+async def test_resolve_connection_starts_the_python_runner_for_a_python_script() -> (
+    None
+):
+    """The source travels in the env, beside the secret-resolved user env."""
+    resolver: SecretResolver = _StubResolver()  # type: ignore[assignment]
+    connection = await resolve_connection(
+        _server(
+            transport=McpTransport.script,
+            language=ScriptLanguage.python,
+            source="def f(): ...",
+            env={"API_KEY": "token"},
+        ),
+        resolver,
+    )
+    assert connection == StdioConnection(
+        command=sys.executable,
+        args=["-I", str(PYTHON_RUNNER)],
+        env={"API_KEY": "TOKEN", "A2FLOW_SCRIPT_SOURCE": "def f(): ..."},
+    )
+
+
+async def test_resolve_connection_starts_the_node_runner_for_a_javascript_script() -> (
+    None
+):
+    resolver: SecretResolver = _StubResolver()  # type: ignore[assignment]
+    connection = await resolve_connection(
+        _server(
+            transport=McpTransport.script,
+            language=ScriptLanguage.javascript,
+            source="export function f() {}",
+        ),
+        resolver,
+    )
+    assert connection == StdioConnection(
+        command="node",
+        args=[str(NODE_RUNNER)],
+        env={"A2FLOW_SCRIPT_SOURCE": "export function f() {}"},
+    )
+
+
+async def test_resolve_connection_rejects_a_script_row_without_source() -> None:
+    resolver: SecretResolver = _StubResolver()  # type: ignore[assignment]
+    with pytest.raises(McpConnectionError):
+        await resolve_connection(
+            _server(transport=McpTransport.script, language=ScriptLanguage.python),
+            resolver,
+        )

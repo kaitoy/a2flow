@@ -8,9 +8,9 @@
  */
 "use client";
 
-import { Globe, Terminal } from "lucide-react";
+import { FileCode, Globe, Terminal } from "lucide-react";
 import type { Control, FieldErrors, UseFormRegister } from "react-hook-form";
-import { Controller } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { FormField } from "@/components/admin/form-field";
 import {
@@ -20,12 +20,19 @@ import {
 } from "@/components/admin/key-value-editor";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { StringListEditor } from "@/components/admin/string-list-editor";
+import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
 import { Textarea } from "@/components/ui/textarea";
-import { zMcpCommand, zMcpServerCreate, zMcpTransport } from "@/generated/api/zod.gen";
-import type { McpServerCreate } from "@/lib/api";
+import {
+  zMcpCommand,
+  zMcpServerCreate,
+  zMcpTransport,
+  zScriptLanguage,
+} from "@/generated/api/zod.gen";
+import type { McpServer, McpServerCreate } from "@/lib/api";
 import { EMPTY_VALUE, formatChoice, formatLines, formatPairs } from "@/lib/read-only-display";
+import { lintJavaScript, lintPython } from "@/lib/script-lint";
 
 /**
  * Run a generated field schema against a value that the form keeps as a plain
@@ -69,10 +76,21 @@ export const mcpServerFormSchema = z
     command: zMcpCommand,
     args: z.array(z.string()),
     env: z.array(z.object({ key: z.string(), value: z.string() })),
+    language: zScriptLanguage,
+    source: z.string(),
   })
   .superRefine((values, ctx) => {
     if (values.transport === "streamable_http") {
       validateRequired(values.url, zMcpServerCreate.shape.url, ctx, "url", "URL is required");
+    }
+    if (values.transport === "script") {
+      validateRequired(
+        values.source,
+        zMcpServerCreate.shape.source,
+        ctx,
+        "source",
+        "Source is required"
+      );
     }
   });
 
@@ -87,6 +105,7 @@ export type McpServerFormValues = z.infer<typeof mcpServerFormSchema>;
 const TRANSPORT_OPTIONS: ReadonlyArray<SegmentedOption<McpServerFormValues["transport"]>> = [
   { value: "streamable_http", label: "Streamable HTTP", icon: Globe },
   { value: "stdio", label: "stdio", icon: Terminal },
+  { value: "script", label: "Script", icon: FileCode },
 ];
 
 /** The launchers a stdio server may be started with. See {@link TRANSPORT_OPTIONS}. */
@@ -94,6 +113,39 @@ const COMMAND_OPTIONS: ReadonlyArray<SegmentedOption<McpServerFormValues["comman
   { value: "npx", label: "npx" },
   { value: "uvx", label: "uvx" },
 ];
+
+/** The languages a script server may be written in. See {@link TRANSPORT_OPTIONS}. */
+const LANGUAGE_OPTIONS: ReadonlyArray<SegmentedOption<McpServerFormValues["language"]>> = [
+  { value: "python", label: "Python" },
+  { value: "javascript", label: "JavaScript" },
+];
+
+/**
+ * Short label for a server's transport, as shown in a badge.
+ *
+ * @param transport - The server's transport.
+ * @returns `HTTP`, `stdio`, or `Script`.
+ */
+export function mcpTransportLabel(transport: McpServer["transport"]): string {
+  if (transport === "stdio") return "stdio";
+  if (transport === "script") return "Script";
+  return "HTTP";
+}
+
+/**
+ * One-line summary of where a server is reached: its URL, its stdio command
+ * line, or the language of its script.
+ *
+ * @param server - The registered server.
+ * @returns The summary text.
+ */
+export function mcpServerEndpoint(server: McpServer): string {
+  if (server.transport === "stdio") return [server.command, ...(server.args ?? [])].join(" ");
+  if (server.transport === "script") {
+    return `${formatChoice(LANGUAGE_OPTIONS, server.language ?? "python")} script`;
+  }
+  return server.url ?? "";
+}
 
 /** Blank form values, used as the create form's fallback and the edit form's reset base. */
 export function emptyMcpServerFormValues(): McpServerFormValues {
@@ -106,6 +158,8 @@ export function emptyMcpServerFormValues(): McpServerFormValues {
     command: "npx",
     args: [],
     env: [] as KeyValuePair[],
+    language: "python",
+    source: "",
   };
 }
 
@@ -125,6 +179,16 @@ export function toMcpServerBody(values: McpServerFormValues): McpServerCreate {
       transport: "streamable_http",
       url: values.url,
       headers: pairsToRecord(values.headers),
+    };
+  }
+  if (values.transport === "script") {
+    return {
+      name: values.name,
+      description: values.description || null,
+      transport: "script",
+      language: values.language,
+      source: values.source,
+      env: pairsToRecord(values.env),
     };
   }
   return {
@@ -186,6 +250,49 @@ function SecretReferenceHint() {
   );
 }
 
+/** Note shown under the script editor about which functions become tools, per language. */
+function ScriptConventionHint({ language }: { language: McpServerFormValues["language"] }) {
+  return (
+    <p className="mt-1 text-xs text-on-surface-variant">
+      {language === "python"
+        ? "Every top-level function whose name does not start with _ becomes a tool: its type hints give the arguments and its docstring the description."
+        : "Every exported function whose name does not start with _ becomes a tool, called with one arguments object. Set fn.description and fn.inputSchema to describe it."}{" "}
+      Only the standard library is available; print output goes to the server log.
+    </p>
+  );
+}
+
+/**
+ * The script's source in a code editor, highlighted and linted for the
+ * language currently selected on the form.
+ */
+function ScriptSourceEditor({
+  control,
+  invalid,
+}: {
+  control: Control<McpServerFormValues>;
+  invalid: boolean;
+}) {
+  const language = useWatch({ control, name: "language" });
+  return (
+    <Controller
+      control={control}
+      name="source"
+      render={({ field }) => (
+        <CodeEditor
+          id="source"
+          labelledBy="source-label"
+          value={field.value}
+          onChange={field.onChange}
+          language={language}
+          lint={language === "python" ? lintPython : lintJavaScript}
+          invalid={invalid}
+        />
+      )}
+    />
+  );
+}
+
 /** Note shown under the arguments editor about referencing this server's own env vars. */
 function EnvArgReferenceHint() {
   return (
@@ -237,15 +344,41 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
         </>
       ) : (
         <>
-          <FormField htmlFor="command" label="Command" required>
-            <ReadOnlyField>{formatChoice(COMMAND_OPTIONS, values.command)}</ReadOnlyField>
-          </FormField>
+          {values.transport === "stdio" ? (
+            <>
+              <FormField htmlFor="command" label="Command" required>
+                <ReadOnlyField>{formatChoice(COMMAND_OPTIONS, values.command)}</ReadOnlyField>
+              </FormField>
 
-          <FormField htmlFor="args" label="Arguments">
-            <ReadOnlyField className="whitespace-pre-wrap">
-              {formatLines(values.args.filter((arg) => arg !== ""))}
-            </ReadOnlyField>
-          </FormField>
+              <FormField htmlFor="args" label="Arguments">
+                <ReadOnlyField className="whitespace-pre-wrap">
+                  {formatLines(values.args.filter((arg) => arg !== ""))}
+                </ReadOnlyField>
+              </FormField>
+            </>
+          ) : (
+            <>
+              <FormField htmlFor="language" label="Language" required>
+                <ReadOnlyField>{formatChoice(LANGUAGE_OPTIONS, values.language)}</ReadOnlyField>
+              </FormField>
+
+              <FormField htmlFor="source" label="Source" required>
+                {values.source ? (
+                  <ReadOnlyField as="div">
+                    <CodeEditor
+                      id="source"
+                      labelledBy="source-label"
+                      value={values.source}
+                      language={values.language}
+                      readOnly
+                    />
+                  </ReadOnlyField>
+                ) : (
+                  <ReadOnlyField>{EMPTY_VALUE}</ReadOnlyField>
+                )}
+              </FormField>
+            </>
+          )}
 
           <FormField htmlFor="env" label="Environment Variables">
             <ReadOnlyField className="whitespace-pre-wrap">
@@ -260,8 +393,9 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
 
 /**
  * Name, transport switch, and the transport-specific fields of a registered
- * MCP server: URL plus HTTP headers for a remote server, or command, arguments,
- * and environment variables for one launched over stdio.
+ * MCP server: URL plus HTTP headers for a remote server, command and arguments
+ * for one launched over stdio, or language and source for a script — the last
+ * two with environment variables.
  *
  * Pass `readOnly` with the current `values` to render the same fields as plain
  * values instead, for a viewer whose role cannot write MCP servers.
@@ -335,44 +469,72 @@ export function McpServerFields(props: McpServerFieldsProps) {
         </>
       ) : (
         <>
-          <FormField htmlFor="command" label="Command" required>
-            <Controller
-              control={control}
-              name="command"
-              render={({ field }) => (
-                <SegmentedControl
-                  aria-label="Command"
-                  options={COMMAND_OPTIONS}
-                  value={field.value}
-                  onChange={field.onChange}
+          {transport === "stdio" ? (
+            <>
+              <FormField htmlFor="command" label="Command" required>
+                <Controller
+                  control={control}
+                  name="command"
+                  render={({ field }) => (
+                    <SegmentedControl
+                      aria-label="Command"
+                      options={COMMAND_OPTIONS}
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
-              )}
-            />
-            <p className="mt-1 text-xs text-on-surface-variant">
-              Launched as a child process of the backend.
-            </p>
-          </FormField>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  Launched as a child process of the backend.
+                </p>
+              </FormField>
 
-          <FormField htmlFor="args" label="Arguments">
-            <Controller
-              control={control}
-              name="args"
-              render={({ field }) => (
-                <StringListEditor
+              <FormField htmlFor="args" label="Arguments">
+                <Controller
+                  control={control}
                   name="args"
-                  values={field.value}
-                  onChange={field.onChange}
-                  placeholder="-y"
-                  addLabel="+ Add argument"
+                  render={({ field }) => (
+                    <StringListEditor
+                      name="args"
+                      values={field.value}
+                      onChange={field.onChange}
+                      placeholder="-y"
+                      addLabel="+ Add argument"
+                    />
+                  )}
                 />
-              )}
-            />
-            <p className="mt-1 text-xs text-on-surface-variant">
-              One entry per argument, in order. Passed straight to the process — never through a
-              shell, so quoting and globs are not interpreted.
-            </p>
-            <EnvArgReferenceHint />
-          </FormField>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  One entry per argument, in order. Passed straight to the process — never through a
+                  shell, so quoting and globs are not interpreted.
+                </p>
+                <EnvArgReferenceHint />
+              </FormField>
+            </>
+          ) : (
+            <>
+              <FormField htmlFor="language" label="Language" required>
+                <Controller
+                  control={control}
+                  name="language"
+                  render={({ field }) => (
+                    <>
+                      <SegmentedControl
+                        aria-label="Language"
+                        options={LANGUAGE_OPTIONS}
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                      <ScriptConventionHint language={field.value} />
+                    </>
+                  )}
+                />
+              </FormField>
+
+              <FormField htmlFor="source" label="Source" required error={errors.source?.message}>
+                <ScriptSourceEditor control={control} invalid={Boolean(errors.source)} />
+              </FormField>
+            </>
+          )}
 
           <FormField htmlFor="env" label="Environment Variables">
             <Controller
