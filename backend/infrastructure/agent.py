@@ -502,24 +502,26 @@ def resolve_model() -> LiteLlm | str:
     - "litellm:<provider>/<model>" format: wrapped in :class:`LiteLlm` so any
       LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-4o``.
 
-    ``reasoning_effort="none"`` is pinned for every LiteLLM-routed model:
-    some OpenAI reasoning-tier models (e.g. gpt-5.4+) apply a non-"none"
+    ``reasoning_effort="none"`` is pinned for ``openai/`` routes only: some
+    OpenAI reasoning-tier models (e.g. gpt-5.4+) apply a non-"none"
     server-side default whenever the field is omitted, which that upstream
     then rejects when combined with function-tool calling on
-    ``/v1/chat/completions``. ``drop_params=True`` makes litellm silently
-    drop this argument for providers/models that don't accept it at all, so
-    non-OpenAI routes (Anthropic, Bedrock, ...) are unaffected.
+    ``/v1/chat/completions``. Other providers keep their own thinking
+    default -- for Anthropic, litellm maps ``"none"`` to "send no
+    ``thinking``", which turns thinking off on models such as Claude Sonnet
+    4.6. ``drop_params=True`` makes litellm silently drop arguments a
+    provider/model doesn't accept.
 
     Shared by :func:`create_agent` and the one-shot summarizer
     (:mod:`infrastructure.summarizer`) so model selection is defined once.
     """
     model_env = get_settings().llm_model
     if model_env.startswith(LITELLM_PREFIX):
-        return LiteLlm(
-            model=model_env[len(LITELLM_PREFIX) :],
-            reasoning_effort="none",
-            drop_params=True,
-        )
+        litellm_model = model_env[len(LITELLM_PREFIX) :]
+        extra: dict[str, Any] = {}
+        if litellm_model.startswith("openai/"):
+            extra["reasoning_effort"] = "none"
+        return LiteLlm(model=litellm_model, drop_params=True, **extra)
     return model_env
 
 

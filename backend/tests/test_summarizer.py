@@ -99,6 +99,23 @@ def test_build_llm_uses_litellm_for_prefixed_models(
     assert llm._additional_args["drop_params"] is True
 
 
+def test_build_llm_leaves_thinking_default_for_non_openai_routes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only ``openai/`` routes get the reasoning_effort="none" pin; other
+    providers keep their own thinking default."""
+    from google.adk.models.lite_llm import LiteLlm
+
+    monkeypatch.setenv("LLM_MODEL", "litellm:anthropic/claude-opus-5")
+    from config import get_settings
+
+    get_settings.cache_clear()
+    llm = build_llm()
+    assert isinstance(llm, LiteLlm)
+    assert "reasoning_effort" not in llm._additional_args
+    assert llm._additional_args["drop_params"] is True
+
+
 def test_build_llm_uses_registry_for_bare_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
