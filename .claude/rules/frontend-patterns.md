@@ -15,7 +15,7 @@ scripts/
 src/
 ├── app/
 │   ├── layout.tsx        # Root layout — wraps tree in StoreProvider
-│   ├── page.tsx          # Entry point
+│   ├── (chat)/, (admin)/, workflows/, …  # Route groups and pages
 │   └── globals.css       # Tailwind directives
 ├── components/
 │   ├── Chat.tsx          # Top-level chat screen
