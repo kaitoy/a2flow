@@ -119,9 +119,9 @@ def test_build_llm_leaves_thinking_default_for_non_openai_routes(
 def test_build_llm_uses_registry_for_bare_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("LLM_MODEL", "gemini-2.5-flash")
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.8-flash")
     from config import get_settings
 
     get_settings.cache_clear()
     llm = build_llm()
-    assert llm.model == "gemini-2.5-flash"
+    assert llm.model == "gemini-3.8-flash"

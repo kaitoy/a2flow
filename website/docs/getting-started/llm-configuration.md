@@ -9,7 +9,7 @@ Set `LLM_MODEL` in `backend/.env`:
 
 | Provider | Value |
 |---|---|
-| Google Gemini (default) | `gemini-3.5-flash` |
+| Google Gemini (default) | `gemini-3.8-flash` |
 | OpenAI via LiteLLM | `litellm:openai/gpt-5.6-terra` |
 | Anthropic via LiteLLM | `litellm:anthropic/claude-sonnet-5` |
 | Amazon Bedrock via LiteLLM | `litellm:bedrock/global.anthropic.claude-sonnet-5` |
@@ -19,7 +19,7 @@ Every other backend setting has its own page under [Configuration reference](../
 ## Gemini (default)
 
 ```env
-LLM_MODEL=gemini-3.5-flash
+LLM_MODEL=gemini-3.8-flash
 GOOGLE_API_KEY=your_google_api_key_here
 ```
 

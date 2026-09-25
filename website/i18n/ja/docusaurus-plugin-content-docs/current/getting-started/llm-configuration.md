@@ -9,7 +9,7 @@ sidebar_position: 3
 
 | プロバイダ | 値 |
 |---|---|
-| Google Gemini(既定) | `gemini-3.5-flash` |
+| Google Gemini(既定) | `gemini-3.8-flash` |
 | OpenAI(LiteLLM 経由) | `litellm:openai/gpt-5.6-terra` |
 | Anthropic(LiteLLM 経由) | `litellm:anthropic/claude-sonnet-5` |
 | Amazon Bedrock(LiteLLM 経由) | `litellm:bedrock/global.anthropic.claude-sonnet-5` |
@@ -19,7 +19,7 @@ sidebar_position: 3
 ## Gemini(既定)
 
 ```env
-LLM_MODEL=gemini-3.5-flash
+LLM_MODEL=gemini-3.8-flash
 GOOGLE_API_KEY=your_google_api_key_here
 ```
 

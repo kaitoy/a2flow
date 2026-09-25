@@ -291,7 +291,7 @@ class Settings(BaseSettings):
     session_file_max_bytes: int = _DEFAULT_SESSION_FILE_MAX_BYTES
     session_files_max_total_bytes: int = _DEFAULT_SESSION_FILES_MAX_TOTAL_BYTES
 
-    llm_model: str = "gemini-3.5-flash"
+    llm_model: str = "gemini-3.8-flash"
     role_description: str = "You are a helpful assistant."
 
     admin_password: str | None = None
