@@ -9,7 +9,7 @@
 #   docker compose up --build
 #
 # Usage (Anthropic):
-#   printf 'LLM_MODEL=litellm:anthropic/claude-opus-5\nANTHROPIC_API_KEY=<your-key>\n' > .env
+#   printf 'LLM_MODEL=litellm:anthropic/claude-sonnet-5\nANTHROPIC_API_KEY=<your-key>\n' > .env
 #   docker compose up --build
 #
 # Usage (Amazon Bedrock):

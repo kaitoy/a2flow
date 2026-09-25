@@ -106,7 +106,7 @@ def test_build_llm_leaves_thinking_default_for_non_openai_routes(
     providers keep their own thinking default."""
     from google.adk.models.lite_llm import LiteLlm
 
-    monkeypatch.setenv("LLM_MODEL", "litellm:anthropic/claude-opus-5")
+    monkeypatch.setenv("LLM_MODEL", "litellm:anthropic/claude-sonnet-5")
     from config import get_settings
 
     get_settings.cache_clear()
