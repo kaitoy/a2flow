@@ -10,10 +10,12 @@ dependencies = [
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.30.0",
     "python-dotenv>=1.0.0",
-    # Capped below 1.92.0: that release replaced litellm's pure-Python
-    # `py3-none-any` wheel with manylinux-only wheels, so on Windows it falls
-    # back to the sdist and needs a Rust/maturin toolchain to build.
-    "litellm>=1.50.0,<1.92.0",
+    # Floor at 1.93.2: 1.92.0 dropped litellm's pure-Python `py3-none-any`
+    # wheel, and most of 1.92.x-1.93.0 ship no win_amd64 wheel, so on Windows they fall
+    # back to the sdist and need a Rust/maturin toolchain to build. 1.93.2 is
+    # the first release with wheels for every platform, and it knows gpt-5.6
+    # and Claude Sonnet 5.
+    "litellm>=1.93.2",
     "ag-ui-protocol>=0.1.15",
     "ag-ui-adk>=0.7.0,<0.8.0",
     # Required by litellm's Bedrock route (LLM_MODEL=litellm:bedrock/...). The
