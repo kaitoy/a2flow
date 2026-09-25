@@ -660,7 +660,7 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     assert "delete_workflow_task" not in rendered
     # Before stopping to wait for the user, the agent names a few likely
     # replies; the chat shows them as one-click drafts under the input.
-    assert "call `suggest_replies` FIRST" in rendered
+    assert "call `suggest_replies` first" in rendered
     assert "at most 30 characters" in rendered
 
 
