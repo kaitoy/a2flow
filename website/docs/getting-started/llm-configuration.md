@@ -10,7 +10,7 @@ Set `LLM_MODEL` in `backend/.env`:
 | Provider | Value |
 |---|---|
 | Google Gemini (default) | `gemini-3.5-flash` |
-| OpenAI via LiteLLM | `litellm:openai/gpt-4o` |
+| OpenAI via LiteLLM | `litellm:openai/gpt-5.6-terra` |
 | Anthropic via LiteLLM | `litellm:anthropic/claude-sonnet-5` |
 | Amazon Bedrock via LiteLLM | `litellm:bedrock/global.anthropic.claude-sonnet-5` |
 
@@ -26,7 +26,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 ## OpenAI (via LiteLLM)
 
 ```env
-LLM_MODEL=litellm:openai/gpt-4o
+LLM_MODEL=litellm:openai/gpt-5.6-terra
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 

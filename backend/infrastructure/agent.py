@@ -500,7 +500,7 @@ def resolve_model() -> LiteLlm | str:
     - Gemini model name (e.g. "gemini-*"): returned as-is, so ADK uses
       Google AI / Vertex AI directly.
     - "litellm:<provider>/<model>" format: wrapped in :class:`LiteLlm` so any
-      LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-4o``.
+      LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-5.6-terra``.
 
     ``reasoning_effort="none"`` is pinned for ``openai/`` routes only: some
     OpenAI reasoning-tier models (e.g. gpt-5.4+) apply a non-"none"

@@ -5,7 +5,7 @@
 #   docker compose up --build
 #
 # Usage (OpenAI):
-#   printf 'LLM_MODEL=litellm:openai/gpt-4o\nOPENAI_API_KEY=<your-key>\n' > .env
+#   printf 'LLM_MODEL=litellm:openai/gpt-5.6-terra\nOPENAI_API_KEY=<your-key>\n' > .env
 #   docker compose up --build
 #
 # Usage (Anthropic):

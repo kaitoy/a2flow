@@ -88,13 +88,13 @@ def test_build_llm_uses_litellm_for_prefixed_models(
     pins reasoning_effort="none" + drop_params=True."""
     from google.adk.models.lite_llm import LiteLlm
 
-    monkeypatch.setenv("LLM_MODEL", "litellm:openai/gpt-4o")
+    monkeypatch.setenv("LLM_MODEL", "litellm:openai/gpt-5.6-terra")
     from config import get_settings
 
     get_settings.cache_clear()
     llm = build_llm()
     assert isinstance(llm, LiteLlm)
-    assert llm.model == "openai/gpt-4o"
+    assert llm.model == "openai/gpt-5.6-terra"
     assert llm._additional_args["reasoning_effort"] == "none"
     assert llm._additional_args["drop_params"] is True
 
