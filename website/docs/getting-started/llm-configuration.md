@@ -11,7 +11,7 @@ Set `LLM_MODEL` in `backend/.env`:
 |---|---|
 | Google Gemini (default) | `gemini-3.5-flash` |
 | OpenAI via LiteLLM | `litellm:openai/gpt-4o` |
-| Anthropic via LiteLLM | `litellm:anthropic/claude-3-5-sonnet-20241022` |
+| Anthropic via LiteLLM | `litellm:anthropic/claude-opus-5` |
 | Amazon Bedrock via LiteLLM | `litellm:bedrock/global.anthropic.claude-sonnet-4-6` |
 
 Every other backend setting has its own page under [Configuration reference](../operations/configuration.md).
@@ -33,7 +33,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 ## Anthropic (via LiteLLM)
 
 ```env
-LLM_MODEL=litellm:anthropic/claude-3-5-sonnet-20241022
+LLM_MODEL=litellm:anthropic/claude-opus-5
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 

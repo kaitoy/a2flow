@@ -11,7 +11,7 @@ sidebar_position: 3
 |---|---|
 | Google Gemini(既定) | `gemini-3.5-flash` |
 | OpenAI(LiteLLM 経由) | `litellm:openai/gpt-4o` |
-| Anthropic(LiteLLM 経由) | `litellm:anthropic/claude-3-5-sonnet-20241022` |
+| Anthropic(LiteLLM 経由) | `litellm:anthropic/claude-opus-5` |
 | Amazon Bedrock(LiteLLM 経由) | `litellm:bedrock/global.anthropic.claude-sonnet-4-6` |
 
 バックエンドのそれ以外の設定は[設定リファレンス](../operations/configuration.md)にまとめてあります。
@@ -33,7 +33,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 ## Anthropic(LiteLLM 経由)
 
 ```env
-LLM_MODEL=litellm:anthropic/claude-3-5-sonnet-20241022
+LLM_MODEL=litellm:anthropic/claude-opus-5
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
