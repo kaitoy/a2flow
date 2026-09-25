@@ -1,5 +1,4 @@
 import asyncio
-import gc
 import json
 from collections.abc import AsyncGenerator, MutableMapping
 from typing import Any
@@ -221,31 +220,31 @@ async def test_workflow_session_agent_rejects_a_concurrent_run(
     url = f"/api/v1/workflow-executions/{execution['id']}/agent"
 
     streaming = asyncio.Event()
+    second_done = asyncio.Event()
 
-    async def _slow_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
+    # The first run holds the lock until the second request has its answer,
+    # so the overlap does not depend on how long the second request takes to
+    # reach the lock (auth and execution lookup alone can exceed a fixed
+    # stream duration on a slow machine).
+    async def _held_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
         streaming.set()
-        await asyncio.sleep(0.3)
+        await second_done.wait()
         return
         yield
 
-    mock_adk_agent.run = _slow_run
+    mock_adk_agent.run = _held_run
 
     async def _second_run() -> Response:
         await streaming.wait()
-        return await workflow_client.post(url, json=_make_run_agent_input())
+        try:
+            return await workflow_client.post(url, json=_make_run_agent_input())
+        finally:
+            second_done.set()
 
-    # The second request has roughly 250 ms (the 0.3 s stream minus the 0.05 s
-    # lock wait) to reach the lock; a full garbage collection can pause the
-    # event loop longer than that and turn the expected 409 into a 200, so
-    # keep automatic collection out of the window.
-    gc.disable()
-    try:
-        first, second = await asyncio.gather(
-            workflow_client.post(url, json=_make_run_agent_input()),
-            _second_run(),
-        )
-    finally:
-        gc.enable()
+    first, second = await asyncio.gather(
+        workflow_client.post(url, json=_make_run_agent_input()),
+        _second_run(),
+    )
 
     assert first.status_code == 200
     error = assert_err(second, code="SESSION_RUN_IN_PROGRESS", status=409)
