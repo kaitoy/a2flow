@@ -291,8 +291,8 @@ INITIAL_DESIGN_AGENT_INSTRUCTION = (
     + _DESIGN_REGISTRATION_RULES
     + "\n\n"
     "After registering, reply with a concise plain-text summary of the task "
-    "templates. Do NOT execute any task, do NOT ask questions, and do NOT wait "
-    "for input — finish in this single run."
+    "templates and finish in this single run: execute no task, and ask no "
+    "questions, since nobody is there to answer them."
 )
 
 DESIGN_AGENT_INSTRUCTION = (
