@@ -69,21 +69,27 @@ Wait for the backend with `GET http://127.0.0.1:8099/api/v1/health`, not
 `api_router`'s `/api/v1` prefix like every other route, so the bare path answers
 404 forever and reads as "still starting".
 
-Frontend (only needed for UI work):
+Frontend (only needed for UI work). Serve a production build, not `next dev`:
+Next allows one dev server per project, and the developer's own `next dev` on
+port 3000 is usually already running from the same `frontend/` directory.
 
 ```powershell
 cd frontend
 $env:BACKEND_BASE_URL = "http://127.0.0.1:8099"
-pnpm dev --port 3099
+pnpm build
+pnpm exec next start --port 3099
 ```
 
-Open the UI at **`http://localhost:3099`**, never `http://127.0.0.1:3099`. Next's
-dev server blocks cross-origin access to its own dev resources, so on `127.0.0.1`
-the client chunks never load, the page never hydrates, and every form falls back
-to a native GET — the login form just bounces back to `/login?username=…&password=…`
-with no console error to explain it. The only clue is a
-`Cross-origin access to Next.js dev resources is blocked by default` line in the
-`pnpm dev` log.
+`BACKEND_BASE_URL` is read at runtime by `src/proxy.ts`. The "next start does not
+work with output: standalone" warning is harmless here.
+
+Open the UI at **`http://127.0.0.1:3099`**, not `localhost`. Cookies ignore the
+port, so logging in on `localhost:3099` overwrites the `a2flow_session` cookie of
+the developer's `localhost:3000` tab; that tab's next poll gets a 401 from its own
+backend, and the 401 handler deletes the cookie for both — the verify tab then
+bounces to `/login` a minute or two later with nothing in the 8099 log. (The
+opposite advice — `localhost` only — applies to `next dev`, whose dev resources
+refuse cross-origin access from `127.0.0.1`.)
 
 ## Drive the API
 
