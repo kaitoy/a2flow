@@ -12,7 +12,7 @@ sidebar_position: 3
 | Google Gemini(既定) | `gemini-3.5-flash` |
 | OpenAI(LiteLLM 経由) | `litellm:openai/gpt-4o` |
 | Anthropic(LiteLLM 経由) | `litellm:anthropic/claude-sonnet-5` |
-| Amazon Bedrock(LiteLLM 経由) | `litellm:bedrock/global.anthropic.claude-sonnet-4-6` |
+| Amazon Bedrock(LiteLLM 経由) | `litellm:bedrock/global.anthropic.claude-sonnet-5` |
 
 バックエンドのそれ以外の設定は[設定リファレンス](../operations/configuration.md)にまとめてあります。
 
@@ -42,6 +42,6 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 この経路が必要とする `boto3` と `botocore[crt]` はバックエンドに同梱されているため、追加のインストールは不要です。
 
 ```env
-LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-4-6
+LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-5
 AWS_BEARER_TOKEN_BEDROCK=your_bedrock_bearer_token_here
 ```

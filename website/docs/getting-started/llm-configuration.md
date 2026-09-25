@@ -12,7 +12,7 @@ Set `LLM_MODEL` in `backend/.env`:
 | Google Gemini (default) | `gemini-3.5-flash` |
 | OpenAI via LiteLLM | `litellm:openai/gpt-4o` |
 | Anthropic via LiteLLM | `litellm:anthropic/claude-sonnet-5` |
-| Amazon Bedrock via LiteLLM | `litellm:bedrock/global.anthropic.claude-sonnet-4-6` |
+| Amazon Bedrock via LiteLLM | `litellm:bedrock/global.anthropic.claude-sonnet-5` |
 
 Every other backend setting has its own page under [Configuration reference](../operations/configuration.md).
 
@@ -42,6 +42,6 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 The `boto3` and `botocore[crt]` packages this route needs ship with the backend, so there is no extra install step.
 
 ```env
-LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-4-6
+LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-5
 AWS_BEARER_TOKEN_BEDROCK=your_bedrock_bearer_token_here
 ```
