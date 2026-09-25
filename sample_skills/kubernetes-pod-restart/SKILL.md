@@ -1,6 +1,6 @@
 ---
 name: kubernetes-pod-restart
-description: Restart Kubernetes pods safely. Use this skill whenever the user wants to restart, recycle, bounce, or cycle pods, deployments, statefulsets, or daemonsets — including requests phrased as "restart the api pods", "my pod is stuck in CrashLoopBackOff, restart it", "roll the deployment", "kill that pod so it comes back fresh", or "pods need a restart after the config change". Also use it when the user describes a symptom (a hung, crashing, OOMKilled, or stale pod) and the implied fix is a restart, even if they don't say the word "restart".
+description: Restart Kubernetes pods safely. Use this skill whenever the user wants to restart, recycle, bounce, or cycle pods, deployments, statefulsets, or daemonsets, or describes a hung, crashing, OOMKilled, or stale pod whose implied fix is a restart.
 ---
 
 # Kubernetes Pod Restart

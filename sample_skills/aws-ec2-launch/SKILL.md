@@ -1,6 +1,6 @@
 ---
 name: aws-ec2-launch
-description: Launch an AWS EC2 instance, gated by a manager's explicit approval. Use this skill whenever the user wants to launch, start, spin up, provision, or create an EC2 instance — including requests phrased as "launch a new EC2 instance", "spin up a t3.medium for the staging environment", "I need an EC2 box for load testing", "provision a new instance in ap-northeast-1", or "start an EC2 server for the demo tomorrow". Also use it when the user describes a need for new AWS compute capacity and the implied action is to create an instance, even if they don't say "EC2" explicitly (e.g. "I need a new server on AWS"). This skill gathers the full instance configuration, obtains a manager's approval before touching any infrastructure, launches the instance, and then asks the user to confirm the result — it never launches anything without both a complete configuration and an explicit approval.
+description: Launch an AWS EC2 instance, gated by a manager's explicit approval. Use this skill whenever the user wants to launch, start, spin up, provision, or create an EC2 instance, or describes a need for new AWS compute capacity that implies creating one. This skill gathers the full instance configuration, obtains a manager's approval before touching any infrastructure, launches the instance, and then asks the user to confirm the result — it never launches anything without both a complete configuration and an explicit approval.
 ---
 
 # AWS EC2 Launch
