@@ -252,8 +252,8 @@ _DESIGN_REGISTRATION_RULES = (
     "approval, so a step of its own is what makes the gate land in the right "
     "place. Where the Skill says to act on an external system, that is the "
     "task that needs an MCP tool binding.\n\n"
-    "ALWAYS call `list_mcp_tools` exactly once before registering the task "
-    "templates, to see the tools available on the registered MCP servers. A task "
+    "Call `list_mcp_tools` once before registering the task templates, to see "
+    "the tools available on the registered MCP servers. A task "
     "can only use an MCP tool at run time if you bind it here, so decide this "
     "now: if a step needs an external tool, bind it by adding a `tools` entry "
     '(`[{"server_id": ..., "tool_name": ...}]`) to that task in '
@@ -271,7 +271,7 @@ _DESIGN_REGISTRATION_RULES = (
     "for anything that writes, deletes, spends, or sends. Judge this from the "
     "tool's own description in `list_mcp_tools`, not its name.\n\n"
     "Express the steps "
-    "as a DAG and register them in ONE call to `register_task_templates`, using "
+    "as a DAG and register them in a single call to `register_task_templates`, using "
     "each task's `key` and `depends_on` to encode ordering.\n\n"
     "Title each task as a terse imperative label: 2 to 4 words, at most 50 "
     'characters (e.g. "Gather sources", "Validate schema", "Publish report"). '
