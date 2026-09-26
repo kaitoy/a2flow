@@ -973,3 +973,81 @@ async def test_python_lint_requires_the_developer_role(
         headers={"X-User-Id": "carol", "X-User-Roles": ""},
     )
     assert_err(response, "FORBIDDEN", 403)
+
+
+# ---------- script test run ----------
+
+_SCRIPT = (
+    "import os\n\n"
+    "def add(a: int, b: int) -> int:\n"
+    '    """Add two integers."""\n'
+    "    return a + b\n\n"
+    "def env() -> str:\n"
+    '    """Read an env var."""\n'
+    "    return os.environ['GREETING']\n\n"
+    "def fail() -> None:\n"
+    '    """Always fail."""\n'
+    "    raise RuntimeError('boom')\n"
+)
+
+
+async def test_script_tools_lists_an_unsaved_script(mcp_client: AsyncClient) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers/script-tools",
+        json={"language": "python", "source": _SCRIPT},
+    )
+    data = assert_ok(response)
+    assert data["error"] is None
+    assert [t["name"] for t in data["tools"]] == ["add", "env", "fail"]
+    assert data["tools"][0]["inputSchema"]["required"] == ["a", "b"]
+
+
+async def test_script_tools_reports_a_load_failure(mcp_client: AsyncClient) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers/script-tools",
+        json={"language": "python", "source": "def broken(:\n"},
+    )
+    data = assert_ok(response)
+    assert data["tools"] == []
+    assert data["error"].startswith('  File "<script>", line 1')
+    assert "SyntaxError" in data["error"]
+
+
+async def test_script_call_runs_a_tool_with_its_env(mcp_client: AsyncClient) -> None:
+    body = {"language": "python", "source": _SCRIPT, "env": {"GREETING": "hi"}}
+    added = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers/script-call",
+            json={**body, "toolName": "add", "arguments": {"a": 2, "b": 3}},
+        )
+    )
+    env = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers/script-call", json={**body, "toolName": "env"}
+        )
+    )
+    assert added["isError"] is False
+    assert added["content"] == ["5"]
+    assert env["content"] == ["hi"]
+
+
+async def test_script_call_reports_a_tool_error(mcp_client: AsyncClient) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers/script-call",
+        json={"language": "python", "source": _SCRIPT, "toolName": "fail"},
+    )
+    data = assert_ok(response)
+    assert data["isError"] is True
+    assert "boom" in data["content"][0]
+
+
+@pytest.mark.parametrize("path", ["script-tools", "script-call"])
+async def test_script_test_run_requires_the_developer_role(
+    mcp_client: AsyncClient, path: str
+) -> None:
+    response = await mcp_client.post(
+        f"/api/v1/mcp-servers/{path}",
+        json={"language": "python", "source": _SCRIPT, "toolName": "add"},
+        headers={"X-User-Id": "carol", "X-User-Roles": ""},
+    )
+    assert_err(response, "FORBIDDEN", 403)

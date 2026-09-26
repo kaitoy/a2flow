@@ -35,4 +35,10 @@ describe("JsonBlock", () => {
     const { container } = render(<JsonBlock value={{}} className="max-h-40" />);
     expect(container.firstChild).toHaveClass("max-h-64", "max-h-40");
   });
+
+  it("swaps the text color for the error tone", () => {
+    const { container } = render(<JsonBlock value="boom" tone="error" />);
+    expect(container.firstChild).toHaveClass("text-error");
+    expect(container.firstChild).not.toHaveClass("text-on-surface");
+  });
 });

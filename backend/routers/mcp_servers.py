@@ -18,7 +18,11 @@ from models.mcp_server import (
     MCPServerUpdate,
     McpToolInfo,
     PythonLintRequest,
+    ScriptCallRequest,
+    ScriptCallResult,
     ScriptDiagnostic,
+    ScriptTestRequest,
+    ScriptToolsResult,
     lint_python_script,
 )
 from models.response import ApiResponse
@@ -58,6 +62,34 @@ async def lint_python(
 ) -> ApiResponse[list[ScriptDiagnostic]]:
     """Check a Python script server's source for the editor to underline."""
     return ApiResponse(meta=meta, data=lint_python_script(body.source))
+
+
+@router.post(
+    "/script-tools",
+    response_model=ApiResponse[ScriptToolsResult],
+    dependencies=_requires_developer,
+)
+async def list_script_tools(
+    body: ScriptTestRequest,
+    service: MCPServerServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[ScriptToolsResult]:
+    """Load an unsaved script and list its tools, or report why it cannot load."""
+    return ApiResponse(meta=meta, data=await service.test_script_tools(body))
+
+
+@router.post(
+    "/script-call",
+    response_model=ApiResponse[ScriptCallResult],
+    dependencies=_requires_developer,
+)
+async def call_script_tool(
+    body: ScriptCallRequest,
+    service: MCPServerServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[ScriptCallResult]:
+    """Run one tool of an unsaved script and return what it produced."""
+    return ApiResponse(meta=meta, data=await service.test_script_call(body))
 
 
 @router.get("", response_model=ApiResponse[list[McpServerRead]])

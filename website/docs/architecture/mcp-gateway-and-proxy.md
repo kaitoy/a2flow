@@ -51,6 +51,8 @@ What the proxy gets is one call at a time: the address or command for the one se
 
 That second check is not the same question as the first. Being A2Flow does not mean being authorized to call a given tool, and holding a task's certificate does not mean the request is the one A2Flow sent. Both have to hold, so a request cannot keep a valid authorization while quietly pointing the proxy at a different program.
 
+One call carries no task certificate: a [test run](../guides/mcp-servers.md#testing-a-script) of a script from the MCP server form, which has no task behind it. The proxy accepts it only for a script — never for an arbitrary command or a remote server — and loading a script's tool list already runs the whole script under the same A2Flow-only check, so this lets nothing new through.
+
 The proxy is a second line, not the decision-maker. Whether the task is still running, whether the approval still stands, whether the certificate was withdrawn — none of that is answerable there, and all of it stays with the gateway.
 
 ## The policy chain

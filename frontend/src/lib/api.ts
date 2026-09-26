@@ -42,7 +42,11 @@ import type {
   NotificationType,
   NotificationUpdate,
   OutboundEmailRead as OutboundEmailModel,
+  ScriptCallRequest,
+  ScriptCallResult,
   ScriptDiagnostic,
+  ScriptTestRequest,
+  ScriptToolsResult,
   SecretCreate,
   SecretRead as SecretModel,
   SecretType,
@@ -366,7 +370,11 @@ export type {
   MockResponse,
   MockResponseKind,
   NotificationType,
+  ScriptCallRequest,
+  ScriptCallResult,
   ScriptDiagnostic,
+  ScriptTestRequest,
+  ScriptToolsResult,
   SecretCreate,
   SecretType,
   SecretUpdate,
@@ -810,6 +818,27 @@ export async function lintPythonScript(source: string): Promise<ScriptDiagnostic
   return unwrap(sdk.lintPythonApiV1McpServersPythonLintPost({ body: { source } })) as Promise<
     ScriptDiagnostic[]
   >;
+}
+
+/**
+ * Load an unsaved script server's source and list the tools it advertises. A
+ * script that cannot be loaded resolves with `error` set (its traceback) rather
+ * than rejecting.
+ */
+export async function listScriptTools(body: ScriptTestRequest): Promise<ScriptToolsResult> {
+  return unwrap(
+    sdk.listScriptToolsApiV1McpServersScriptToolsPost({ body })
+  ) as Promise<ScriptToolsResult>;
+}
+
+/**
+ * Run one tool of an unsaved script server. A tool error, or a script that
+ * cannot be loaded, resolves with `isError` set rather than rejecting.
+ */
+export async function callScriptTool(body: ScriptCallRequest): Promise<ScriptCallResult> {
+  return unwrap(
+    sdk.callScriptToolApiV1McpServersScriptCallPost({ body })
+  ) as Promise<ScriptCallResult>;
 }
 
 /**

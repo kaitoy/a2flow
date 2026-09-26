@@ -606,6 +606,14 @@ export const handlers = [
 
   http.post(`${BASE}/api/v1/mcp-servers/python-lint`, () => envelope([])),
 
+  http.post(`${BASE}/api/v1/mcp-servers/script-tools`, () =>
+    envelope({ tools: [MCP_TOOL_1], error: null })
+  ),
+
+  http.post(`${BASE}/api/v1/mcp-servers/script-call`, () =>
+    envelope({ isError: false, content: ["ok"], structured: null })
+  ),
+
   http.post(`${BASE}/api/v1/mcp-servers`, () =>
     envelope({ ...MCP_SERVER_1, id: "new-mcp-id" }, 201)
   ),

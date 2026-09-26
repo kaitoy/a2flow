@@ -522,3 +522,49 @@ class McpToolInfo(SQLModel):
     #: defaults to: the admin UI tells the operator "this tool does not say what
     #: it returns" rather than showing them an empty object.
     output_schema: dict[str, Any] | None = None
+
+
+class ScriptTestRequest(SQLModel):
+    """Body of ``POST /mcp-servers/script-tools``: an unsaved script to load.
+
+    The MCP server form sends what its editor holds, so a script can be tried
+    before it is saved. ``env`` values may carry ``${secret:NAME/KEY}``
+    placeholders, resolved as for a registered server.
+    """
+
+    model_config = _alias_config
+    language: ScriptLanguage
+    source: ScriptSource
+    env: dict[str, str] = Field(default_factory=dict)
+
+
+class ScriptCallRequest(ScriptTestRequest):
+    """Body of ``POST /mcp-servers/script-call``: one tool of an unsaved script to run."""
+
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
+
+class ScriptToolsResult(SQLModel):
+    """The tools an unsaved script advertises, or why it could not be loaded.
+
+    A load failure is an answer here, not an HTTP error: ``error`` carries the
+    runner's traceback so the author can see what to fix.
+    """
+
+    model_config = _alias_config
+    tools: list[McpToolInfo] = Field(default_factory=list)
+    error: str | None = None
+
+
+class ScriptCallResult(SQLModel):
+    """The outcome of running one tool of an unsaved script.
+
+    ``is_error`` is set both when the tool raised and when the script could not
+    be launched at all; ``content`` then carries the message or traceback.
+    """
+
+    model_config = _alias_config
+    is_error: bool
+    content: list[str] = Field(default_factory=list)
+    structured: dict[str, Any] | None = None

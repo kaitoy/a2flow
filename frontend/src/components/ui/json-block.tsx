@@ -33,20 +33,22 @@ export interface JsonBlockProps {
   value: unknown;
   /** Extra classes, e.g. to raise or drop the height cap. */
   className?: string;
+  /** `error` renders the text in the error color, e.g. for a traceback. */
+  tone?: "default" | "error";
 }
 
 /**
  * A scrollable, pretty-printed JSON block.
  *
- * @param props - The value to render and any extra classes.
+ * @param props - The value to render, its tone, and any extra classes.
  * @returns The rendered block.
  */
-export function JsonBlock({ value, className }: JsonBlockProps) {
+export function JsonBlock({ value, className, tone = "default" }: JsonBlockProps) {
   return (
     <pre
-      className={`max-h-64 overflow-auto rounded-lg bg-surface-container-high px-3 py-2 font-mono text-xs leading-relaxed text-on-surface${
-        className ? ` ${className}` : ""
-      }`}
+      className={`max-h-64 overflow-auto rounded-lg bg-surface-container-high px-3 py-2 font-mono text-xs leading-relaxed ${
+        tone === "error" ? "text-error" : "text-on-surface"
+      }${className ? ` ${className}` : ""}`}
     >
       {formatJson(value)}
     </pre>

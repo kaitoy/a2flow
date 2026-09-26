@@ -19,9 +19,28 @@ console.log = console.info = console.debug = console.error;
 
 const source = process.env.A2FLOW_SCRIPT_SOURCE ?? "";
 delete process.env.A2FLOW_SCRIPT_SOURCE;
-const script = await import(
-  `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
-);
+/**
+ * Why the script failed to load, or `undefined` when it loaded. A script that
+ * fails -- a syntax error, a throw at its top level -- is still served, so the
+ * handshake completes and the client sees this text instead of a closed
+ * connection: `tools/list` answers with it as an error, `tools/call` as an
+ * `isError` result.
+ */
+let loadError;
+let script = {};
+const scriptUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
+try {
+  script = await import(scriptUrl);
+} catch (error) {
+  // Keep only the script's own frames, named `<script>` rather than by its
+  // data: URL; the runner's and Node's frames mean nothing to its author.
+  loadError = String(error?.stack ?? error)
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("at ") || line.includes(scriptUrl))
+    .map((line) => line.replaceAll(scriptUrl, "<script>"))
+    .join("\n");
+  console.error(loadError);
+}
 
 /** Public exported functions, by tool name. */
 const tools = new Map(
@@ -72,6 +91,7 @@ async function handle({ method, params }) {
     case "ping":
       return { result: {} };
     case "tools/list":
+      if (loadError) return { error: { code: -32603, message: loadError } };
       return {
         result: {
           tools: [...tools].map(([name, fn]) => ({
@@ -82,6 +102,7 @@ async function handle({ method, params }) {
         },
       };
     case "tools/call": {
+      if (loadError) return { result: { content: [{ type: "text", text: loadError }], isError: true } };
       const fn = tools.get(params?.name);
       if (!fn) return { error: { code: -32602, message: `Unknown tool: ${params?.name}` } };
       return { result: await callTool(fn, params.arguments) };

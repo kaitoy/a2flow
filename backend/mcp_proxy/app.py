@@ -1,4 +1,4 @@
-"""The MCP proxy's HTTP surface: two operations and a liveness probe.
+"""The MCP proxy's HTTP surface: three operations and a liveness probe.
 
 Deliberately small. Everything that decides *whether* an operation may happen
 lives in the backend; what happens here is the evidence check in
@@ -30,8 +30,13 @@ from fastapi.responses import JSONResponse
 from config import get_settings
 from infrastructure import mcp_client
 from infrastructure.mcp_ca import McpCaError, certificate_from_pem
-from infrastructure.mcp_executor import CALL_OPERATION, LIST_OPERATION
+from infrastructure.mcp_executor import (
+    CALL_OPERATION,
+    LIST_OPERATION,
+    TEST_CALL_OPERATION,
+)
 from infrastructure.mcp_transport_tls import proxy_server_credentials
+from infrastructure.script_runners import NODE_RUNNER, PYTHON_RUNNER
 from mcp_proxy.auth import ProxyAuthError, verify_call_credential, verify_sender
 from middleware.envelope import RequestContextMiddleware
 from models.mcp_execution import (
@@ -39,6 +44,8 @@ from models.mcp_execution import (
     ExecutorCallToolResponse,
     ExecutorListToolsRequest,
     ExecutorListToolsResponse,
+    ExecutorTestCallToolRequest,
+    StdioConnectionSpec,
     spec_to_connection,
 )
 from models.response import ApiError, ApiMeta, ApiResponse
@@ -245,6 +252,71 @@ async def call_tool(body: ExecutorCallToolRequest, request: Request) -> JSONResp
             exc.message,
         )
         return _error(request, 403, "MCP_PROXY_FORBIDDEN", exc.message)
+
+    try:
+        result = await mcp_client.call_server_tool(
+            spec_to_connection(body.connection), body.tool_name, body.arguments
+        )
+    except McpConnectionError as exc:
+        return _error(request, 502, "MCP_UNREACHABLE", exc.reason)
+
+    data = ExecutorCallToolResponse(
+        result=result.model_dump(mode="json", by_alias=True)
+    )
+    return JSONResponse(
+        content=ApiResponse[ExecutorCallToolResponse](
+            meta=_meta(request), data=data
+        ).model_dump(mode="json", by_alias=True)
+    )
+
+
+#: The ``args`` tail a script runner is launched with -- the only thing
+#: ``/test-call-tool`` will start.
+_SCRIPT_RUNNERS = frozenset({str(PYTHON_RUNNER), str(NODE_RUNNER)})
+
+
+@app.post("/test-call-tool")
+async def test_call_tool(
+    body: ExecutorTestCallToolRequest, request: Request
+) -> JSONResponse:
+    """Invoke one tool of a script being tested from the MCP server form.
+
+    No tool certificate: a test run has no task behind it. The sender check
+    alone is what ``/list-tools`` relies on too, and a listing of a script
+    already executes all of it, so confining this to script runners adds
+    nothing a listing could not already do.
+
+    Args:
+        body: The runner to launch, the call to make, and the sender block.
+        request: The incoming request.
+
+    Returns:
+        The tool result, or an error envelope.
+    """
+    connection_json = body.connection.model_dump(mode="json")
+    try:
+        verify_sender(
+            body.sender,
+            ca_certificate=load_root_certificate(),
+            operation=TEST_CALL_OPERATION,
+            connection=connection_json,
+            tool_name=body.tool_name,
+            arguments=body.arguments,
+            now=datetime.now(UTC),
+            window=_signature_window(),
+        )
+    except ProxyAuthError as exc:
+        logger.warning("Refused a test call to %s: %s", body.tool_name, exc.message)
+        return _error(request, 403, "MCP_PROXY_FORBIDDEN", exc.message)
+    if not (
+        isinstance(body.connection, StdioConnectionSpec)
+        and body.connection.args[-1:]
+        and body.connection.args[-1] in _SCRIPT_RUNNERS
+    ):
+        logger.warning("Refused a test call to %s: not a script", body.tool_name)
+        return _error(
+            request, 403, "MCP_PROXY_FORBIDDEN", "only a script runner can be tested"
+        )
 
     try:
         result = await mcp_client.call_server_tool(

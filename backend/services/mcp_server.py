@@ -4,13 +4,17 @@ Wraps the :class:`MCPServerRepository` with the business rules the routers need
 (raising :class:`NotFoundError` when a server is missing, and validating the
 *merged* per-transport shape — ``MCPServerCreate``'s validator covers POST
 bodies, but only the service can see what a PATCH merges into) and hosts the
-one orchestration the admin UI's tool picker needs: connecting to a registered
-server to list the tools it advertises.
+orchestrations the admin UI needs: connecting to a registered server to list
+the tools it advertises, and launching an unsaved script to list or run its
+tools before it is saved.
 """
 
 from collections.abc import Sequence
 from typing import Any
 
+from mcp import types
+
+from infrastructure.mcp_client import McpConnection
 from infrastructure.mcp_connection import resolve_connection
 from infrastructure.mcp_executor import get_mcp_executor
 from infrastructure.secret_resolver import SecretResolver
@@ -21,10 +25,18 @@ from models.mcp_server import (
     MCPServerUpdate,
     McpToolInfo,
     McpTransport,
+    ScriptCallRequest,
+    ScriptCallResult,
+    ScriptTestRequest,
+    ScriptToolsResult,
     check_script_syntax,
     referenced_env_names,
 )
-from repositories.exceptions import McpServerValidationError, NotFoundError
+from repositories.exceptions import (
+    McpConnectionError,
+    McpServerValidationError,
+    NotFoundError,
+)
 from repositories.mcp_server import MCPServerRepository
 from repositories.query import FilterSpec, SortSpec
 
@@ -283,13 +295,114 @@ class MCPServerService:
         """
         server = await self.get(server_id)
         connection = await resolve_connection(server, self._resolver)
-        tools = await get_mcp_executor().list_tools(connection)
-        return [
-            McpToolInfo(
-                name=tool.name,
-                description=tool.description,
-                input_schema=tool.inputSchema,
-                output_schema=tool.outputSchema,
+        return _tool_infos(await get_mcp_executor().list_tools(connection))
+
+    async def test_script_tools(self, request: ScriptTestRequest) -> ScriptToolsResult:
+        """Launch an unsaved script and return the tools it advertises.
+
+        Args:
+            request: The script as the form's editor holds it.
+
+        Returns:
+            The tools, or -- when the script cannot be loaded or launched --
+            the reason, typically the runner's traceback. It is returned rather
+            than hidden like a registered server's failure, since it quotes
+            only what the caller wrote.
+
+        Raises:
+            SecretResolutionError: If an ``env`` placeholder cannot be resolved.
+        """
+        connection = await self._script_connection(request)
+        try:
+            tools = await get_mcp_executor().list_tools(connection)
+        except McpConnectionError as exc:
+            return ScriptToolsResult(error=_script_error(exc))
+        return ScriptToolsResult(tools=_tool_infos(tools))
+
+    async def test_script_call(self, request: ScriptCallRequest) -> ScriptCallResult:
+        """Launch an unsaved script and run one of its tools.
+
+        Args:
+            request: The script, the tool to run, and its arguments.
+
+        Returns:
+            The tool's text output, or its error -- including a load or launch
+            failure, reported the same way for the reason given in
+            :meth:`test_script_tools`.
+
+        Raises:
+            SecretResolutionError: If an ``env`` placeholder cannot be resolved.
+        """
+        connection = await self._script_connection(request)
+        try:
+            result = await get_mcp_executor().test_call_tool(
+                connection, request.tool_name, request.arguments
             )
-            for tool in tools
-        ]
+        except McpConnectionError as exc:
+            return ScriptCallResult(is_error=True, content=[_script_error(exc)])
+        return ScriptCallResult(
+            is_error=bool(result.isError),
+            content=[
+                block.text
+                for block in result.content
+                if isinstance(block, types.TextContent)
+            ],
+            structured=result.structuredContent,
+        )
+
+    async def _script_connection(self, request: ScriptTestRequest) -> McpConnection:
+        """Resolve an unsaved script into the connection that launches its runner.
+
+        Builds a transient, never-persisted :class:`MCPServer` so the script is
+        launched exactly as it will be once saved.
+
+        Args:
+            request: The script to launch.
+
+        Returns:
+            The runner's connection, with ``env`` secrets resolved.
+        """
+        server = MCPServer(
+            name="script-test",
+            transport=McpTransport.script,
+            language=request.language,
+            source=request.source,
+            env=request.env,
+        )
+        return await resolve_connection(server, self._resolver)
+
+
+def _script_error(exc: McpConnectionError) -> str:
+    """Return a script test's failure reason without the transport's type label.
+
+    A load failure arrives as the runner's JSON-RPC error, which the client
+    reports as ``McpError: <traceback>``; the label says nothing to the
+    script's author and misaligns the traceback's first line.
+
+    Args:
+        exc: The failure to describe.
+
+    Returns:
+        The reason, minus a leading ``McpError: ``.
+    """
+    return exc.reason.removeprefix("McpError: ")
+
+
+def _tool_infos(tools: Sequence[types.Tool]) -> _McpToolInfoList:
+    """Project MCP tool records into the API's :class:`McpToolInfo` shape.
+
+    Args:
+        tools: The tools a server advertised.
+
+    Returns:
+        One :class:`McpToolInfo` per tool, in order.
+    """
+    return [
+        McpToolInfo(
+            name=tool.name,
+            description=tool.description,
+            input_schema=tool.inputSchema,
+            output_schema=tool.outputSchema,
+        )
+        for tool in tools
+    ]

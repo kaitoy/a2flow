@@ -54,6 +54,7 @@ from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnec
 from infrastructure.mcp_executor import (
     CALL_OPERATION,
     LIST_OPERATION,
+    TEST_CALL_OPERATION,
     RemoteMcpExecutor,
 )
 from infrastructure.mcp_transport_tls import (
@@ -65,6 +66,7 @@ from infrastructure.mcp_transport_tls import (
     TransportCredentials,
     backend_client_credentials,
 )
+from infrastructure.script_runners import PYTHON_RUNNER
 from models.mcp_execution import connection_to_spec
 from repositories.exceptions import McpConnectionError
 
@@ -377,6 +379,78 @@ def test_a_listing_signature_cannot_be_replayed_as_a_call(
     )
 
     response = client.post("/call-tool", json=body)
+
+    assert "signature does not verify" in _forbidden(response)
+
+
+# --------------------------------------------------------------------------
+# Test-calling a script
+# --------------------------------------------------------------------------
+
+SCRIPT_CONNECTION = StdioConnection(
+    command="python", args=["-I", str(PYTHON_RUNNER)], env={"A": "1"}
+)
+
+
+def _test_call_body(
+    ca: RootCertificateAuthority,
+    *,
+    connection: McpConnection = SCRIPT_CONNECTION,
+    operation: str = TEST_CALL_OPERATION,
+) -> dict[str, Any]:
+    """Build a whole /test-call-tool body."""
+    return {
+        "connection": connection_to_spec(connection).model_dump(
+            mode="json", by_alias=True
+        ),
+        "toolName": TOOL_NAME,
+        "arguments": ARGUMENTS,
+        "sender": _sender(
+            ca,
+            operation=operation,
+            connection=connection,
+            tool_name=TOOL_NAME,
+            arguments=ARGUMENTS,
+        ),
+    }
+
+
+def test_a_script_test_call_needs_no_tool_certificate(
+    client: TestClient, ca: RootCertificateAuthority, reachable: None
+) -> None:
+    response = client.post("/test-call-tool", json=_test_call_body(ca))
+
+    assert response.status_code == 200
+    assert response.json()["data"]["result"]["content"][0]["text"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "connection",
+    [
+        pytest.param(StdioConnection(command="npx", args=["-y", "pkg"]), id="stdio"),
+        pytest.param(StdioConnection(command="python", args=[]), id="no-args"),
+        pytest.param(CONNECTION, id="http"),
+    ],
+)
+def test_a_test_call_to_anything_but_a_script_runner_is_refused(
+    client: TestClient,
+    ca: RootCertificateAuthority,
+    reachable: None,
+    connection: McpConnection,
+) -> None:
+    response = client.post(
+        "/test-call-tool", json=_test_call_body(ca, connection=connection)
+    )
+
+    assert "only a script runner" in _forbidden(response)
+
+
+def test_a_call_signature_cannot_be_replayed_as_a_test_call(
+    client: TestClient, ca: RootCertificateAuthority, reachable: None
+) -> None:
+    response = client.post(
+        "/test-call-tool", json=_test_call_body(ca, operation=CALL_OPERATION)
+    )
 
     assert "signature does not verify" in _forbidden(response)
 

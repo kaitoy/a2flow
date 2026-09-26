@@ -72,6 +72,7 @@ from models.mcp_execution import (
     ExecutorCredential,
     ExecutorListToolsRequest,
     ExecutorSender,
+    ExecutorTestCallToolRequest,
     connection_to_spec,
 )
 from repositories.exceptions import McpConnectionError
@@ -98,6 +99,7 @@ _NONCE_BYTES = 16
 #: made for a listing can never stand in for one made for a call.
 LIST_OPERATION = "list_tools"
 CALL_OPERATION = "call_tool"
+TEST_CALL_OPERATION = "test_call_tool"
 
 
 class McpExecutor(Protocol):
@@ -158,6 +160,32 @@ class McpExecutor(Protocol):
         """
         ...
 
+    async def test_call_tool(
+        self,
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> types.CallToolResult:
+        """Invoke one tool of a script server being tested from its form.
+
+        No task authorizes a test run, so no credential is presented; the
+        remote implementation authenticates as the backend itself, and the
+        proxy accepts this only for a script runner.
+
+        Args:
+            connection: The script runner to launch, with secrets resolved.
+            tool_name: Name of the tool to invoke.
+            arguments: Arguments for the tool.
+
+        Returns:
+            The raw ``tools/call`` result.
+
+        Raises:
+            McpConnectionError: If the runner cannot be launched, or the
+                operation could not be carried out at all.
+        """
+        ...
+
 
 class LocalMcpExecutor:
     """Opens the connection in this process.
@@ -208,6 +236,27 @@ class LocalMcpExecutor:
 
         Raises:
             McpConnectionError: If the server cannot be reached or launched.
+        """
+        return await mcp_client.call_server_tool(connection, tool_name, arguments)
+
+    async def test_call_tool(
+        self,
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> types.CallToolResult:
+        """Invoke a tested script's tool directly.
+
+        Args:
+            connection: The script runner to launch.
+            tool_name: Name of the tool to invoke.
+            arguments: Arguments for the tool.
+
+        Returns:
+            The raw ``tools/call`` result.
+
+        Raises:
+            McpConnectionError: If the runner cannot be launched.
         """
         return await mcp_client.call_server_tool(connection, tool_name, arguments)
 
@@ -519,6 +568,46 @@ class RemoteMcpExecutor:
             "/call-tool",
             request.model_dump(mode="json", by_alias=True),
             self._context_for(credential),
+            connection.timeout_seconds,
+        )
+        return types.CallToolResult.model_validate(data["result"])
+
+    async def test_call_tool(
+        self,
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> types.CallToolResult:
+        """Ask the proxy to invoke a tested script's tool.
+
+        Args:
+            connection: The script runner to launch, with secrets resolved.
+            tool_name: Name of the tool to invoke.
+            arguments: Arguments for the tool.
+
+        Returns:
+            The raw ``tools/call`` result.
+
+        Raises:
+            McpConnectionError: If the proxy refuses the call, or the runner
+                cannot be launched.
+        """
+        spec = connection_to_spec(connection)
+        request = ExecutorTestCallToolRequest(
+            connection=spec,
+            tool_name=tool_name,
+            arguments=arguments,
+            sender=self._sign(
+                operation=TEST_CALL_OPERATION,
+                spec=spec,
+                tool_name=tool_name,
+                arguments=arguments,
+            ),
+        )
+        data = await self._post(
+            "/test-call-tool",
+            request.model_dump(mode="json", by_alias=True),
+            self._context_for(None),
             connection.timeout_seconds,
         )
         return types.CallToolResult.model_validate(data["result"])

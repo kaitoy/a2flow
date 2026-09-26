@@ -69,9 +69,29 @@ A few rules apply to both languages:
 - Output from `print()` or `console.log()` goes to the server log, not to the agent.
 - **Environment Variables** are readable as `os.environ["NAME"]` or `process.env.NAME`, and may use the placeholders under [Keeping credentials out of the record](#keeping-credentials-out-of-the-record).
 - **Source** holds at most 30,000 characters.
-- Python code with a syntax error is refused when saving, with the line number. JavaScript is not checked on save; a broken script shows up as a server that cannot be launched when you [check its tools](#checking-a-servers-tools).
+- Python code with a syntax error is refused when saving, with the line number. JavaScript is not checked on save — [test it](#testing-a-script) before saving to catch a script that cannot load.
+- A script that fails to load — a syntax error, or an error thrown at its top level — still starts. Every tool call to it fails with the error that stopped it, and [checking its tools](#checking-a-servers-tools) shows the server as unusable.
 
 ⚠️ A script runs in the same place as a stdio server, under the same restrictions.
+
+## Testing a script
+
+The **Test Run** panel under **Environment Variables** runs the script exactly as the form holds it, without saving. Use it to catch a script that will not load before an agent tries to use it.
+
+1. Click **Load tools**. The script starts with the **Source** and **Environment Variables** currently in the form.
+2. Pick a tool from **Tool**. **Arguments** fills in with every argument the tool declares, each set to `null`.
+3. Edit **Arguments** — a JSON object — and click **Run**.
+
+| You see | Meaning |
+|---|---|
+| A tool list | The script loaded; these are the tools it will expose |
+| Red text in place of the tool list | The script could not load. The text is the error that stopped it |
+| **This script exposes no tools.** | The script loaded, but no function would become a tool |
+| The tool's output under **Run** | The call succeeded |
+| Red text under **Run** | The tool threw an error; the text is its message |
+| **Arguments must be a JSON object.** or **Invalid JSON: …** | **Arguments** is not a JSON object; nothing was run |
+
+Placeholders in **Environment Variables** are expanded as they are for a saved server, so a test run reaches the same services with the same credentials. A test run is a real call: whatever the tool does happens.
 
 ## Keeping credentials out of the record
 

@@ -166,6 +166,28 @@ class ExecutorCallToolRequest(_Wire):
     credential: ExecutorCredential | None = None
 
 
+class ExecutorTestCallToolRequest(_Wire):
+    """Ask the proxy to invoke one tool of a script being tested.
+
+    A test run from the MCP server form has no task behind it, so there is no
+    grant to present -- only the sender block, as for a listing. The proxy
+    confines it to script runners, whose listing already executes the whole
+    script under the same sender check, so this adds nothing a listing could
+    not already do.
+
+    Attributes:
+        connection: The script runner to launch.
+        tool_name: Name of the tool to invoke.
+        arguments: Arguments for the tool, covered by the sender signature.
+        sender: Who is asking, and proof the request is unaltered.
+    """
+
+    connection: ConnectionSpec
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    sender: ExecutorSender
+
+
 class ExecutorListToolsResponse(_Wire):
     """What one registered server advertises.
 

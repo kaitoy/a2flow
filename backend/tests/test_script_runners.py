@@ -15,6 +15,7 @@ from infrastructure.mcp_client import call_server_tool, list_server_tools
 from infrastructure.mcp_connection import resolve_connection
 from infrastructure.secret_resolver import SecretResolver
 from models.mcp_server import MCPServer, McpTransport, ScriptLanguage
+from repositories.exceptions import McpConnectionError
 
 
 class _PassThroughResolver:
@@ -160,3 +161,45 @@ async def test_node_runner_reports_an_exception_as_a_tool_error() -> None:
     result = await call_server_tool(connection, "fail", {})
     assert result.isError
     assert _text(result) == "boom"
+
+
+@pytest.mark.parametrize(
+    ("language", "source", "expected"),
+    [
+        pytest.param(ScriptLanguage.python, "def broken(:\n", "SyntaxError", id="py"),
+        pytest.param(
+            ScriptLanguage.python,
+            "raise ValueError('bad top')\n",
+            "bad top",
+            id="py-raise",
+        ),
+        pytest.param(
+            ScriptLanguage.javascript,
+            "export function broken( {\n",
+            "SyntaxError",
+            id="js",
+            marks=_needs_node,
+        ),
+        pytest.param(
+            ScriptLanguage.javascript,
+            "throw new Error('bad top');\n",
+            "bad top",
+            id="js-raise",
+            marks=_needs_node,
+        ),
+    ],
+)
+async def test_runner_reports_a_load_failure_over_the_protocol(
+    language: ScriptLanguage, source: str, expected: str
+) -> None:
+    connection = await _connection(language, source)
+
+    with pytest.raises(McpConnectionError) as caught:
+        await list_server_tools(connection)
+    called = await call_server_tool(connection, "anything", {})
+
+    assert expected in caught.value.reason
+    assert "script_runners" not in caught.value.reason
+    assert "base64" not in caught.value.reason
+    assert called.isError
+    assert expected in _text(called)

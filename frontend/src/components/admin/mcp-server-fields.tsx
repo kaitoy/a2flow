@@ -19,6 +19,7 @@ import {
   pairsToRecord,
 } from "@/components/admin/key-value-editor";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
+import { ScriptTestPanel } from "@/components/admin/script-test-panel";
 import { StringListEditor } from "@/components/admin/string-list-editor";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
@@ -395,7 +396,8 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
  * Name, transport switch, and the transport-specific fields of a registered
  * MCP server: URL plus HTTP headers for a remote server, command and arguments
  * for one launched over stdio, or language and source for a script — the last
- * two with environment variables.
+ * two with environment variables. A script also gets a {@link ScriptTestPanel}
+ * to try its tools before saving.
  *
  * Pass `readOnly` with the current `values` to render the same fields as plain
  * values instead, for a viewer whose role cannot write MCP servers.
@@ -552,6 +554,8 @@ export function McpServerFields(props: McpServerFieldsProps) {
             />
             <SecretReferenceHint />
           </FormField>
+
+          {transport === "script" && <ScriptTestPanel control={control} />}
         </>
       )}
     </>
