@@ -113,6 +113,7 @@ describe("ScriptTestPanel", () => {
     await user.click(screen.getByRole("button", { name: /^run$/i }));
 
     await waitFor(() => expect(screen.getByText("5")).toBeInTheDocument());
+    expect(screen.getByText("Output")).toBeInTheDocument();
     expect(body).toMatchObject({ toolName: "add", arguments: { a: 2, b: 3 } });
   });
 

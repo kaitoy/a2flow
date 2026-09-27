@@ -87,8 +87,8 @@ The **Test Run** panel under **Environment Variables** runs the script exactly a
 | A tool list | The script loaded; these are the tools it will expose |
 | Red text in place of the tool list | The script could not load. The text is the error that stopped it |
 | **This script exposes no tools.** | The script loaded, but no function would become a tool |
-| The tool's output under **Run** | The call succeeded |
-| Red text under **Run** | The tool threw an error; the text is its message |
+| The tool's output in **Output** | The call succeeded |
+| Red text in **Output** | The tool threw an error; the text is its message |
 | **Arguments must be a JSON object.** or **Invalid JSON: …** | **Arguments** is not a JSON object; nothing was run |
 
 Placeholders in **Environment Variables** are expanded as they are for a saved server, so a test run reaches the same services with the same credentials. A test run is a real call: whatever the tool does happens.

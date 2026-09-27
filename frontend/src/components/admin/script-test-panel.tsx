@@ -70,7 +70,7 @@ function parseArguments(text: string): { value: Record<string, unknown> } | { er
 /**
  * Test run for a script server: **Load tools** launches the unsaved script and
  * lists its tools (or shows why it failed to load); picking a tool fills an
- * arguments skeleton, and **Run** calls it and shows the output.
+ * arguments skeleton, and **Run** calls it and shows the result under **Output**.
  */
 export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
   const [language, source, env] = useWatch({ control, name: ["language", "source", "env"] });
@@ -126,7 +126,7 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
   }
 
   return (
-    <FormField htmlFor="script-test-tool" label="Test Run">
+    <FormField htmlFor="script-test" label="Test Run">
       <div className="flex flex-col gap-3 rounded-xl glass-panel p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-on-surface-variant">
@@ -150,21 +150,27 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
             <p className="text-sm text-on-surface-variant">This script exposes no tools.</p>
           ) : (
             <>
-              <Select
-                id="script-test-tool"
-                aria-label="Tool"
-                options={tools.map((tool) => ({ value: tool.name, label: tool.name }))}
-                value={toolName}
-                onChange={(name) => selectTool(name, tools)}
-              />
-              <Textarea
-                aria-label="Arguments"
-                rows={4}
-                className="font-mono text-xs"
-                value={argsText}
-                onChange={(event) => setArgsText(event.target.value)}
-              />
-              {argsError && <p className="text-xs text-error">{argsError}</p>}
+              <FormField htmlFor="script-test-tool" label="Tool">
+                <Select
+                  id="script-test-tool"
+                  options={tools.map((tool) => ({ value: tool.name, label: tool.name }))}
+                  value={toolName}
+                  onChange={(name) => selectTool(name, tools)}
+                />
+              </FormField>
+              <FormField
+                htmlFor="script-test-args"
+                label="Arguments"
+                error={argsError ?? undefined}
+              >
+                <Textarea
+                  id="script-test-args"
+                  rows={4}
+                  className="font-mono text-xs"
+                  value={argsText}
+                  onChange={(event) => setArgsText(event.target.value)}
+                />
+              </FormField>
               <div className="flex justify-end">
                 <Button
                   variant="secondary"
@@ -180,10 +186,12 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
           ))}
 
         {result && (
-          <JsonBlock
-            value={result.structured ?? (result.content ?? []).join("\n")}
-            tone={result.isError ? "error" : "default"}
-          />
+          <FormField htmlFor="script-test-output" label="Output">
+            <JsonBlock
+              value={result.structured ?? (result.content ?? []).join("\n")}
+              tone={result.isError ? "error" : "default"}
+            />
+          </FormField>
         )}
       </div>
     </FormField>
