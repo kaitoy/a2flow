@@ -104,6 +104,7 @@ export default function McpServerDetailPage() {
           env: recordToPairs(server.env ?? {}),
           language: server.language ?? "python",
           source: server.source ?? "",
+          packages: server.packages ?? [],
         });
         setAudit({
           createdBy: server.createdBy,

@@ -535,6 +535,76 @@ async def test_patch_switching_script_to_http_clears_language_source_and_env(
     assert body["language"] is None
     assert body["source"] is None
     assert body["env"] == {}
+    assert body["packages"] == []
+
+
+async def test_create_script_server_stores_its_packages(
+    mcp_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers",
+            json={**_SCRIPT_BODY, "packages": ["boto3==1.40.0", "pyyaml"]},
+        ),
+        status=201,
+    )
+    assert body["packages"] == ["boto3==1.40.0", "pyyaml"]
+    fetched = assert_ok(await mcp_client.get(f"/api/v1/mcp-servers/{body['id']}"))
+    assert fetched["packages"] == ["boto3==1.40.0", "pyyaml"]
+
+
+@pytest.mark.parametrize(
+    "packages",
+    [["--index-url=https://evil.example"], [""], ["x" * 201], ["p"] * 21],
+    ids=["flag", "empty", "too-long", "too-many"],
+)
+async def test_create_script_server_rejects_bad_packages(
+    mcp_client: AsyncClient, packages: list[str]
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers", json={**_SCRIPT_BODY, "packages": packages}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_create_stdio_server_with_packages_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    response = await mcp_client.post(
+        "/api/v1/mcp-servers", json={**_STDIO_BODY, "packages": ["boto3"]}
+    )
+    assert_err(response, code="VALIDATION_ERROR", status=422)
+
+
+async def test_patch_packages_on_stdio_server_returns_422(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post("/api/v1/mcp-servers", json=_STDIO_BODY), status=201
+    )
+    response = await mcp_client.patch(
+        f"/api/v1/mcp-servers/{created['id']}", json={"packages": ["boto3"]}
+    )
+    err = assert_err(response, code="INVALID_MCP_SERVER", status=422)
+    assert "packages" in err["details"]["reason"]
+
+
+async def test_patch_switching_script_to_stdio_clears_packages(
+    mcp_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await mcp_client.post(
+            "/api/v1/mcp-servers", json={**_SCRIPT_BODY, "packages": ["boto3"]}
+        ),
+        status=201,
+    )
+    body = assert_ok(
+        await mcp_client.patch(
+            f"/api/v1/mcp-servers/{created['id']}",
+            json={"transport": "stdio", "command": "uvx", "args": ["some-server"]},
+        )
+    )
+    assert body["packages"] == []
 
 
 async def test_list_stdio_server_tools_uses_a_stdio_connection(
@@ -902,12 +972,24 @@ async def test_list_server_tools_missing_secret_returns_502(
 # ---------- python-lint ----------
 
 
-async def _lint(mcp_client: AsyncClient, source: str) -> list[dict[str, Any]]:
+async def _lint(
+    mcp_client: AsyncClient, source: str, packages: list[str] | None = None
+) -> list[dict[str, Any]]:
     response = await mcp_client.post(
-        "/api/v1/mcp-servers/python-lint", json={"source": source}
+        "/api/v1/mcp-servers/python-lint",
+        json={"source": source, "packages": packages or []},
     )
     data: list[dict[str, Any]] = assert_ok(response)
     return data
+
+
+async def test_python_lint_accepts_any_import_once_packages_are_declared(
+    mcp_client: AsyncClient,
+) -> None:
+    source = 'import yaml\n\n\ndef f() -> None:\n    """Doc."""\n'
+    assert await _lint(mcp_client, source, ["pyyaml"]) == []
+    [diagnostic] = await _lint(mcp_client, source)
+    assert "Packages" in diagnostic["message"]
 
 
 async def test_python_lint_clean_script_has_no_diagnostics(

@@ -814,10 +814,13 @@ export async function listMcpServerTools(id: string): Promise<McpToolInfo[]> {
  * Check a Python script server's source for syntax errors and convention slips,
  * located for the source editor to underline.
  */
-export async function lintPythonScript(source: string): Promise<ScriptDiagnostic[]> {
-  return unwrap(sdk.lintPythonApiV1McpServersPythonLintPost({ body: { source } })) as Promise<
-    ScriptDiagnostic[]
-  >;
+export async function lintPythonScript(
+  source: string,
+  packages: string[] = []
+): Promise<ScriptDiagnostic[]> {
+  return unwrap(
+    sdk.lintPythonApiV1McpServersPythonLintPost({ body: { source, packages } })
+  ) as Promise<ScriptDiagnostic[]>;
 }
 
 /**

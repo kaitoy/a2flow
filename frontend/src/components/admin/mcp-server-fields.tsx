@@ -8,7 +8,9 @@
  */
 "use client";
 
+import type { EditorView } from "@codemirror/view";
 import { FileCode, Globe, Terminal } from "lucide-react";
+import { useMemo } from "react";
 import type { Control, FieldErrors, UseFormRegister } from "react-hook-form";
 import { Controller, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -20,7 +22,7 @@ import {
 } from "@/components/admin/key-value-editor";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { ScriptTestPanel } from "@/components/admin/script-test-panel";
-import { StringListEditor } from "@/components/admin/string-list-editor";
+import { nonEmpty, StringListEditor } from "@/components/admin/string-list-editor";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
@@ -79,6 +81,7 @@ export const mcpServerFormSchema = z
     env: z.array(z.object({ key: z.string(), value: z.string() })),
     language: zScriptLanguage,
     source: z.string(),
+    packages: z.array(z.string()),
   })
   .superRefine((values, ctx) => {
     if (values.transport === "streamable_http") {
@@ -161,6 +164,7 @@ export function emptyMcpServerFormValues(): McpServerFormValues {
     env: [] as KeyValuePair[],
     language: "python",
     source: "",
+    packages: [],
   };
 }
 
@@ -189,6 +193,7 @@ export function toMcpServerBody(values: McpServerFormValues): McpServerCreate {
       transport: "script",
       language: values.language,
       source: values.source,
+      packages: nonEmpty(values.packages),
       env: pairsToRecord(values.env),
     };
   }
@@ -197,7 +202,7 @@ export function toMcpServerBody(values: McpServerFormValues): McpServerCreate {
     description: values.description || null,
     transport: "stdio",
     command: values.command,
-    args: values.args.filter((arg) => arg !== ""),
+    args: nonEmpty(values.args),
     env: pairsToRecord(values.env),
   };
 }
@@ -258,14 +263,15 @@ function ScriptConventionHint({ language }: { language: McpServerFormValues["lan
       {language === "python"
         ? "Every top-level function whose name does not start with _ becomes a tool: its type hints give the arguments and its docstring the description."
         : "Every exported function whose name does not start with _ becomes a tool, called with one arguments object. Set fn.description and fn.inputSchema to describe it."}{" "}
-      Only the standard library is available; print output goes to the server log.
+      Import from the standard library or the Packages below; print output goes to the server log.
     </p>
   );
 }
 
 /**
  * The script's source in a code editor, highlighted and linted for the
- * language currently selected on the form.
+ * language currently selected on the form. Python linting also sends the
+ * declared packages, which lift the standard-library-only import check.
  */
 function ScriptSourceEditor({
   control,
@@ -274,7 +280,17 @@ function ScriptSourceEditor({
   control: Control<McpServerFormValues>;
   invalid: boolean;
 }) {
-  const language = useWatch({ control, name: "language" });
+  const [language, packages] = useWatch({ control, name: ["language", "packages"] });
+  // Keyed on the joined list so the lint source keeps its identity, and the
+  // editor its marks, until the packages actually change.
+  const declared = nonEmpty(packages).join("\n");
+  const lint = useMemo(
+    () =>
+      language === "python"
+        ? (view: EditorView) => lintPython(view, declared ? declared.split("\n") : [])
+        : lintJavaScript,
+    [language, declared]
+  );
   return (
     <Controller
       control={control}
@@ -286,7 +302,7 @@ function ScriptSourceEditor({
           value={field.value}
           onChange={field.onChange}
           language={language}
-          lint={language === "python" ? lintPython : lintJavaScript}
+          lint={lint}
           invalid={invalid}
         />
       )}
@@ -353,7 +369,7 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
 
               <FormField htmlFor="args" label="Arguments">
                 <ReadOnlyField className="whitespace-pre-wrap">
-                  {formatLines(values.args.filter((arg) => arg !== ""))}
+                  {formatLines(nonEmpty(values.args))}
                 </ReadOnlyField>
               </FormField>
             </>
@@ -378,6 +394,12 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
                   <ReadOnlyField>{EMPTY_VALUE}</ReadOnlyField>
                 )}
               </FormField>
+
+              <FormField htmlFor="packages" label="Packages">
+                <ReadOnlyField className="whitespace-pre-wrap">
+                  {formatLines(nonEmpty(values.packages))}
+                </ReadOnlyField>
+              </FormField>
             </>
           )}
 
@@ -395,8 +417,8 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
 /**
  * Name, transport switch, and the transport-specific fields of a registered
  * MCP server: URL plus HTTP headers for a remote server, command and arguments
- * for one launched over stdio, or language and source for a script — the last
- * two with environment variables. A script also gets a {@link ScriptTestPanel}
+ * for one launched over stdio, or language, source, and packages for a script —
+ * the last two with environment variables. A script also gets a {@link ScriptTestPanel}
  * to try its tools before saving.
  *
  * Pass `readOnly` with the current `values` to render the same fields as plain
@@ -534,6 +556,27 @@ export function McpServerFields(props: McpServerFieldsProps) {
 
               <FormField htmlFor="source" label="Source" required error={errors.source?.message}>
                 <ScriptSourceEditor control={control} invalid={Boolean(errors.source)} />
+              </FormField>
+
+              <FormField htmlFor="packages" label="Packages">
+                <Controller
+                  control={control}
+                  name="packages"
+                  render={({ field }) => (
+                    <StringListEditor
+                      name="packages"
+                      values={field.value}
+                      onChange={field.onChange}
+                      placeholder="boto3==1.40.0"
+                      addLabel="+ Add package"
+                    />
+                  )}
+                />
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  Installed before the script runs: a pip requirement such as boto3==1.40.0 for
+                  Python, an npm package such as @aws-sdk/client-s3@3 for JavaScript. The first run
+                  after a change takes longer while they install.
+                </p>
               </FormField>
             </>
           )}

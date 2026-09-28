@@ -15,7 +15,7 @@ sidebar_position: 7
 |---|---|---|
 | **Streamable HTTP**(既定) | **URL**、**HTTP Headers** | リモートのサーバー。ヘッダーは毎リクエストに付きます。多くは `Authorization: Bearer …` です。SSE のみのサーバーには対応していません。 |
 | **stdio** | **Command**、**Arguments**、**Environment Variables** | バックエンドの子プロセスとして起動するサーバー。たとえば `npx` に `["-y", "@modelcontextprotocol/server-everything"]` を渡します。`npx` と `uvx` のどちらも使えます。 |
-| **Script** | **Language**、**Source**、**Environment Variables** | 自分で書いた Python または JavaScript のコード。公開された関数がそれぞれツールになります。[スクリプトを書く](#writing-a-script)を参照してください。 |
+| **Script** | **Language**、**Source**、**Packages**、**Environment Variables** | 自分で書いた Python または JavaScript のコード。公開された関数がそれぞれツールになります。[スクリプトを書く](#writing-a-script)を参照してください。 |
 
 既存のサーバーのトランスポートを切り替えると、切り替え前のトランスポートの項目は消えます。stdio サーバーに URL、リモートサーバーに command、どちらかにソースコードといった、形が混ざったレコードは拒否されます。
 
@@ -30,7 +30,7 @@ sidebar_position: 7
 | 下線 | 意味 | 例 |
 |---|---|---|
 | 赤の波線 | 構文エラー。スクリプトを実行できません | 閉じていない括弧、綴りを間違えたキーワード |
-| 黄色の波線 | 間違いの可能性があります | ツールになる関数が 1 つもない。Python の関数に docstring がない、または引数に型ヒントがない。標準ライブラリ以外を import している。JavaScript の関数に `description` がない |
+| 黄色の波線 | 間違いの可能性があります | ツールになる関数が 1 つもない。Python の関数に docstring がない、または引数に型ヒントがない。**Packages** が空なのに標準ライブラリ以外を import している。JavaScript の関数に `description` がない |
 | アクセント色の波線 | 補足です | JavaScript の関数に `inputSchema` がない |
 
 下線は助言であり、保存を妨げることはありません。保存時の検査については後述します。
@@ -64,21 +64,44 @@ add.inputSchema = {
 
 どちらの言語にも次の決まりがあります。
 
-- 使えるのは標準ライブラリだけです。Python 自身のモジュールか、Node.js 組み込みの `node:` モジュールです。サードパーティのパッケージはインストールできません。
+- 標準ライブラリ（Python 自身のモジュールか、Node.js 組み込みの `node:` モジュール）はいつでも使えます。それ以外は [Packages](#adding-packages) に登録します。
 - 関数が投げたエラーは、ツール呼び出しの失敗としてメッセージごとエージェントに伝わります。
 - `print()` や `console.log()` の出力はサーバーのログに出ます。エージェントには届きません。
 - **Environment Variables** は `os.environ["NAME"]` や `process.env.NAME` で読めます。[資格情報をレコードに置かない](#keeping-credentials-out-of-the-record)のプレースホルダーも使えます。
 - **Source** に書けるのは 30,000 文字までです。
 - Python のコードに構文エラーがあると、保存時に行番号付きで拒否されます。JavaScript は保存時には検査されません。読み込めないスクリプトを見つけるには、保存前に[テスト実行](#testing-a-script)してください。
-- 読み込みに失敗したスクリプト（構文エラーや、トップレベルで投げられたエラー）も起動はします。そのツール呼び出しはすべて、読み込みを止めたエラーで失敗します。[ツールを確認](#checking-a-servers-tools)すると、使えないサーバーとして表示されます。
+- 読み込みに失敗したスクリプト（インストールできないパッケージ、構文エラー、トップレベルで投げられたエラー）も起動はします。そのツール呼び出しはすべて、読み込みを止めたエラーで失敗します。[ツールを確認](#checking-a-servers-tools)すると、使えないサーバーとして表示されます。
 
 ⚠️ スクリプトは stdio サーバーと同じ場所で、同じ制限のもとで実行されます。
+
+### パッケージを追加する {#adding-packages}
+
+ほかのサービスにアクセスするスクリプトには、たいていそのサービスのクライアントライブラリが要ります。AWS なら `boto3` です。**Packages** に 1 行 1 つずつ登録し、**Source** でいつも通り import します。
+
+| 言語 | パッケージの書き方 | 例 |
+|---|---|---|
+| Python | PyPI のパッケージ名。バージョン指定も付けられます | `boto3`、`boto3==1.40.0`、`requests>=2.32` |
+| JavaScript | npm レジストリのパッケージ名。`@バージョン` も付けられます | `is-number`、`@aws-sdk/client-s3@3` |
+
+```python
+import boto3
+
+
+def list_buckets() -> list[str]:
+    """List the S3 buckets the configured credentials can see."""
+    return [b["Name"] for b in boto3.client("s3").list_buckets()["Buckets"]]
+```
+
+- パッケージは、その組み合わせでスクリプトが初めて起動したときにインストールされるため、時間がかかることがあります。2 回目以降はインストール済みのものを使います。まったく同じパッケージを登録したスクリプト同士は、同じインストール先を共有します。
+- インストールできないパッケージ（綴りの誤り、存在しないバージョンなど）があると、スクリプトは読み込めません。[Load tools](#testing-a-script) でインストーラーのエラーを確認できます。
+- 1 つのサーバーに登録できるのは 20 個までです。各パッケージは 200 文字以内で、英字・数字・`@` のいずれかで始めます。
+- インストールには、スクリプトの実行場所からパッケージレジストリに接続できる必要があります。社内のレジストリから入れるには、インストーラーの変数を **Environment Variables** に設定します。Python は `UV_INDEX_URL`、JavaScript は `NPM_CONFIG_REGISTRY` です。
 
 ## スクリプトをテスト実行する {#testing-a-script}
 
 **Environment Variables** の下にある **Test Run** パネルは、フォームに入っている内容のままスクリプトを実行します。保存はしません。エージェントが使う前に、読み込めないスクリプトを見つけるのに使います。
 
-1. **Load tools** をクリックします。フォームにある **Source** と **Environment Variables** でスクリプトが起動します。
+1. **Load tools** をクリックします。フォームにある **Source**、**Packages**、**Environment Variables** でスクリプトが起動します。
 2. **Tool** からツールを選びます。**Arguments** に、そのツールが宣言している引数がすべて `null` で入ります。
 3. **Arguments**（JSON オブジェクト）を編集し、**Run** をクリックします。
 

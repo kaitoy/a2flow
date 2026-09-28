@@ -20,12 +20,18 @@ cross to the proxy -- which is why that container needs neither the Fernet key
 nor Vault credentials.
 """
 
+import json
 import re
 import sys
 
 from infrastructure.google_token import resolve_gcp_tokens
 from infrastructure.mcp_client import HttpConnection, McpConnection, StdioConnection
-from infrastructure.script_runners import NODE_RUNNER, PYTHON_RUNNER, SOURCE_ENV_VAR
+from infrastructure.script_runners import (
+    NODE_RUNNER,
+    PACKAGES_ENV_VAR,
+    PYTHON_RUNNER,
+    SOURCE_ENV_VAR,
+)
 from infrastructure.secret_resolver import SecretResolver
 from models.mcp_server import (
     ENV_ARG_PLACEHOLDER_PATTERN,
@@ -82,6 +88,8 @@ async def resolve_connection(
     its language (see :mod:`infrastructure.script_runners`) with the source in
     the runner's environment. Python runs on this interpreter,
     ``sys.executable``, which sits at the same path in the MCP proxy image.
+    The script's packages, if any, go to the runner in its environment too;
+    the runner installs them before loading the script.
 
     Returns:
         An :data:`infrastructure.mcp_client.McpConnection` ready to hand to an
@@ -115,12 +123,10 @@ async def resolve_connection(
         else:
             command, args = "node", [str(NODE_RUNNER)]
         env = await _resolve_values(server.env, resolver)
-        return StdioConnection(
-            command=command,
-            args=args,
-            env={**env, SOURCE_ENV_VAR: server.source},
-            raw_args=args,
-        )
+        env[SOURCE_ENV_VAR] = server.source
+        if server.packages:
+            env[PACKAGES_ENV_VAR] = json.dumps(server.packages)
+        return StdioConnection(command=command, args=args, env=env, raw_args=args)
     if not server.url:
         raise McpConnectionError(server.name, "streamable_http server has no url")
     return HttpConnection(

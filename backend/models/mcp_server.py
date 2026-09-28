@@ -19,7 +19,9 @@ Three transports exist, discriminated by ``transport``:
 * ``script`` — a user-written ``source`` in ``language`` (Python or
   JavaScript), launched like a stdio server through a bundled runner (see
   :mod:`infrastructure.script_runners`) that exposes each public top-level
-  function as a tool. ``env`` applies as for stdio; nothing else does.
+  function as a tool. ``packages`` (pip requirements or npm specs) are
+  installed for the script before it runs. ``env`` applies as for stdio;
+  nothing else does.
 
 ``headers`` and ``env`` values may embed ``${secret:NAME/KEY}`` placeholders,
 resolved at connection time (see :mod:`infrastructure.secret_resolver`), or
@@ -52,7 +54,14 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn
-from models.constraints import DescText, EntityName, HttpUrl, McpArg, ScriptSource
+from models.constraints import (
+    DescText,
+    EntityName,
+    HttpUrl,
+    McpArg,
+    ScriptPackage,
+    ScriptSource,
+)
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -71,6 +80,9 @@ _MAX_ENV_VALUE_LENGTH = 4096
 
 #: Maximum number of ``argv`` entries allowed on a stdio MCP server.
 _MAX_ARGS = 100
+
+#: Maximum number of packages allowed on a script MCP server.
+_MAX_PACKAGES = 20
 
 #: Matches ``${env:NAME}`` in an ``args`` entry, referencing a key of this
 #: same server's ``env`` mapping. ``NAME`` uses the POSIX env-var charset so
@@ -157,9 +169,16 @@ class ScriptDiagnostic(SQLModel):
 
 
 class PythonLintRequest(SQLModel):
-    """Body of ``POST /mcp-servers/python-lint``: the Python source to check."""
+    """Body of ``POST /mcp-servers/python-lint``: the Python source to check.
+
+    ``packages`` are the server's declared packages; see
+    :func:`lint_python_script`.
+    """
 
     source: ScriptSource
+    packages: list[ScriptPackage] = Field(
+        default_factory=list, max_length=_MAX_PACKAGES
+    )
 
 
 def _char_column(lines: list[str], line: int, byte_col: int) -> int:
@@ -202,7 +221,9 @@ def _warn_at(lines: list[str], node: ast.AST, message: str) -> ScriptDiagnostic:
     )
 
 
-def lint_python_script(source: str) -> list[ScriptDiagnostic]:
+def lint_python_script(
+    source: str, packages: list[str] | None = None
+) -> list[ScriptDiagnostic]:
     """Check a Python script server's source for errors and convention slips.
 
     A syntax error is reported alone, as an error. A script that compiles is
@@ -210,10 +231,14 @@ def lint_python_script(source: str) -> list[ScriptDiagnostic]:
     :mod:`infrastructure.script_runners.python_runner`), each slip a warning:
     no public top-level function (so no tools), a public function's parameter
     without a type hint or the function without a docstring (so a vague tool
-    schema), and an import from outside the standard library.
+    schema), and -- only when the server declares no packages -- an import
+    from outside the standard library.
 
     Args:
         source: The script's source code.
+        packages: The server's packages. When any is declared the import check
+            is skipped: a distribution's name need not match the module it
+            provides (``pyyaml`` is imported as ``yaml``).
 
     Returns:
         The diagnostics, in source order per check; empty for a clean script.
@@ -286,6 +311,8 @@ def lint_python_script(source: str) -> list[ScriptDiagnostic]:
             for param in params
             if param.annotation is None
         )
+    if packages:
+        return diagnostics
     for node in ast.walk(tree):
         modules: list[tuple[ast.AST, str]]
         if isinstance(node, ast.Import):
@@ -298,8 +325,8 @@ def lint_python_script(source: str) -> list[ScriptDiagnostic]:
             _warn_at(
                 lines,
                 where,
-                f"'{name}' is not in the standard library, which is all a "
-                "script can import.",
+                f"'{name}' is not in the standard library: add the package "
+                "that provides it under Packages.",
             )
             for where, name in modules
             if name.partition(".")[0] not in sys.stdlib_module_names
@@ -310,7 +337,8 @@ def lint_python_script(source: str) -> list[ScriptDiagnostic]:
 class MCPServerUpdate(SQLModel):
     """Partial update payload for an MCPServer — all fields are optional.
 
-    When ``headers``, ``args``, or ``env`` is ``None`` the stored value is left
+    When ``headers``, ``args``, ``env``, or ``packages`` is ``None`` the stored
+    value is left
     unchanged; when it is a mapping (or list) the stored value is replaced
     wholesale. The per-transport shape rules (which fields must be present or
     absent) are enforced against the merged result by
@@ -329,10 +357,11 @@ class MCPServerUpdate(SQLModel):
     env: dict[str, str] | None = None
     language: ScriptLanguage | None = None
     source: ScriptSource | None = None
+    packages: list[ScriptPackage] | None = None
 
     @model_validator(mode="after")
     def _validate_sizes(self) -> "MCPServerUpdate":
-        """Bound the headers/env mappings and the ``args`` list.
+        """Bound the headers/env mappings and the ``args`` and ``packages`` lists.
 
         Returns:
             The validated model instance.
@@ -349,6 +378,8 @@ class MCPServerUpdate(SQLModel):
         )
         if self.args is not None and len(self.args) > _MAX_ARGS:
             raise ValueError(f"At most {_MAX_ARGS} arguments are allowed")
+        if self.packages is not None and len(self.packages) > _MAX_PACKAGES:
+            raise ValueError(f"At most {_MAX_PACKAGES} packages are allowed")
         return self
 
 
@@ -395,6 +426,7 @@ class MCPServerCreate(MCPServerUpdate):
     env: dict[str, str] = Field(default_factory=dict)
     language: ScriptLanguage | None = None
     source: ScriptSource | None = None
+    packages: list[ScriptPackage] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_shape(self) -> "MCPServerCreate":
@@ -411,21 +443,24 @@ class MCPServerCreate(MCPServerUpdate):
                 or a stdio server's ``args`` embed a ``${env:NAME}``
                 placeholder naming a key absent from ``env``.
         """
-        is_script_shaped = self.language is not None or self.source is not None
+        is_script_shaped = (
+            self.language is not None or self.source is not None or bool(self.packages)
+        )
         if self.transport is McpTransport.streamable_http:
             if self.url is None:
                 raise ValueError("A streamable_http server requires a url")
             if self.command is not None or self.args or self.env or is_script_shaped:
                 raise ValueError(
                     "A streamable_http server must not set command, args, env, "
-                    "language, or source"
+                    "language, source, or packages"
                 )
         elif self.transport is McpTransport.stdio:
             if self.command is None:
                 raise ValueError("A stdio server requires a command")
             if self.url is not None or self.headers or is_script_shaped:
                 raise ValueError(
-                    "A stdio server must not set url, headers, language, or source"
+                    "A stdio server must not set url, headers, language, source, "
+                    "or packages"
                 )
             missing = referenced_env_names(self.args) - self.env.keys()
             if missing:
@@ -462,6 +497,9 @@ class MCPServer(MCPServerCreate, TenantScoped, BaseEntity, table=True):
     env: dict[str, str] = Field(
         default_factory=dict, sa_column=Column(JSONColumn, nullable=False)
     )
+    packages: list[str] = Field(
+        default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
 
 
 class McpServerRead(BaseEntity):
@@ -487,6 +525,7 @@ class McpServerRead(BaseEntity):
     env: dict[str, str] = {}
     language: ScriptLanguage | None = None
     source: str | None = None
+    packages: list[str] = []
     #: Ids of the tags attached to this server.
     tag_ids: list[str] = []
 
@@ -535,6 +574,9 @@ class ScriptTestRequest(SQLModel):
     model_config = _alias_config
     language: ScriptLanguage
     source: ScriptSource
+    packages: list[ScriptPackage] = Field(
+        default_factory=list, max_length=_MAX_PACKAGES
+    )
     env: dict[str, str] = Field(default_factory=dict)
 
 

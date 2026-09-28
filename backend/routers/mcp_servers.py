@@ -61,7 +61,7 @@ async def lint_python(
     meta: ApiMetaDep,
 ) -> ApiResponse[list[ScriptDiagnostic]]:
     """Check a Python script server's source for the editor to underline."""
-    return ApiResponse(meta=meta, data=lint_python_script(body.source))
+    return ApiResponse(meta=meta, data=lint_python_script(body.source, body.packages))
 
 
 @router.post(

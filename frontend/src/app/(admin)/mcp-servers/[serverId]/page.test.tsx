@@ -110,6 +110,7 @@ describe("McpServerDetailPage", () => {
         transport: "script",
         language: "python",
         source: "def one() -> int: return 1",
+        packages: [],
         env: {},
       })
     );

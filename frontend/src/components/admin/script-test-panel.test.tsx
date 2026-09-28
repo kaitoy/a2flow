@@ -69,6 +69,7 @@ describe("ScriptTestPanel", () => {
     expect(body).toEqual({
       language: "python",
       source: "def add(a: int, b: int) -> int: ...",
+      packages: [],
       env: { TOKEN: "t" },
     });
     expect(JSON.parse((screen.getByLabelText("Arguments") as HTMLTextAreaElement).value)).toEqual({

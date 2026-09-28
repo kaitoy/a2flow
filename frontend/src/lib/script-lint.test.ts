@@ -90,6 +90,18 @@ describe("lintPython", () => {
     ]);
   });
 
+  it("sends the source with the declared packages", async () => {
+    let body: unknown;
+    server.use(
+      http.post(LINT_URL, async ({ request }) => {
+        body = await request.json();
+        return envelope([]);
+      })
+    );
+    await lintPython(viewOf("import yaml"), ["pyyaml"]);
+    expect(body).toEqual({ source: "import yaml", packages: ["pyyaml"] });
+  });
+
   it("skips a blank document and swallows a failed request", async () => {
     expect(await lintPython(viewOf("\n"))).toEqual([]);
     server.use(http.post(LINT_URL, () => HttpResponse.json({}, { status: 500 })));

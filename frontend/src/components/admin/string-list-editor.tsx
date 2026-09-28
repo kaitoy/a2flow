@@ -4,6 +4,16 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+/**
+ * Drop the blank rows a {@link StringListEditor} leaves behind.
+ *
+ * @param entries - The editor's rows.
+ * @returns The rows that hold a value, in order.
+ */
+export function nonEmpty(entries: string[]): string[] {
+  return entries.filter((entry) => entry !== "");
+}
+
 /** Props for {@link StringListEditor}. */
 export interface StringListEditorProps {
   /** Field name used to derive stable aria labels. */

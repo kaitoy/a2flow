@@ -310,7 +310,7 @@ describe("toMcpServerBody", () => {
     });
   });
 
-  it("emits language, source, and env, and no other transport's fields, for a script", () => {
+  it("emits language, source, packages, and env, and no other transport's fields, for a script", () => {
     expect(
       toMcpServerBody({
         ...emptyMcpServerFormValues(),
@@ -321,6 +321,7 @@ describe("toMcpServerBody", () => {
         args: ["leftover"],
         language: "python",
         source: "def f(): ...",
+        packages: ["boto3", ""],
         env: [{ key: "API_KEY", value: "x" }],
       })
     ).toEqual({
@@ -329,6 +330,7 @@ describe("toMcpServerBody", () => {
       transport: "script",
       language: "python",
       source: "def f(): ...",
+      packages: ["boto3"],
       env: { API_KEY: "x" },
     });
   });

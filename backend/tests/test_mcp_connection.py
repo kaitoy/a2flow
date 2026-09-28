@@ -196,6 +196,31 @@ async def test_resolve_connection_starts_the_node_runner_for_a_javascript_script
     )
 
 
+@pytest.mark.parametrize(
+    ("language", "command"),
+    [(ScriptLanguage.python, sys.executable), (ScriptLanguage.javascript, "node")],
+)
+async def test_resolve_connection_hands_packages_to_the_runner_as_json(
+    language: ScriptLanguage, command: str
+) -> None:
+    resolver: SecretResolver = _StubResolver()  # type: ignore[assignment]
+    connection = await resolve_connection(
+        _server(
+            transport=McpTransport.script,
+            language=language,
+            source="src",
+            packages=["boto3==1.40.0", "@aws-sdk/client-s3@3"],
+        ),
+        resolver,
+    )
+    assert isinstance(connection, StdioConnection)
+    assert connection.command == command
+    assert connection.env == {
+        "A2FLOW_SCRIPT_SOURCE": "src",
+        "A2FLOW_SCRIPT_PACKAGES": '["boto3==1.40.0", "@aws-sdk/client-s3@3"]',
+    }
+
+
 async def test_resolve_connection_rejects_a_script_row_without_source() -> None:
     resolver: SecretResolver = _StubResolver()  # type: ignore[assignment]
     with pytest.raises(McpConnectionError):

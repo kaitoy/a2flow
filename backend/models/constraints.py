@@ -356,3 +356,11 @@ McpArg = Annotated[str, StringConstraints(max_length=4096, pattern=r"^[^\x00]*$"
 ScriptSource = Annotated[
     str, StringConstraints(min_length=1, max_length=30000, pattern=r"^[^\x00]*$")
 ]
+
+#: One package a script MCP server installs before it runs: a pip requirement
+#: (``boto3==1.40.0``) or an npm spec (``@aws-sdk/client-s3@3``), up to 200
+#: characters. It must start with a letter, digit, or ``@`` so that ``uv`` or
+#: ``npm`` can never read it as a flag.
+ScriptPackage = Annotated[
+    str, StringConstraints(max_length=200, pattern=r"^[A-Za-z0-9@][^\x00]*$")
+]

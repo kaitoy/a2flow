@@ -15,6 +15,7 @@ import { type Control, useWatch } from "react-hook-form";
 import { FormField } from "@/components/admin/form-field";
 import { pairsToRecord } from "@/components/admin/key-value-editor";
 import type { McpServerFormValues } from "@/components/admin/mcp-server-fields";
+import { nonEmpty } from "@/components/admin/string-list-editor";
 import { Button } from "@/components/ui/button";
 import { JsonBlock } from "@/components/ui/json-block";
 import { Select } from "@/components/ui/select";
@@ -73,7 +74,10 @@ function parseArguments(text: string): { value: Record<string, unknown> } | { er
  * arguments skeleton, and **Run** calls it and shows the result under **Output**.
  */
 export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
-  const [language, source, env] = useWatch({ control, name: ["language", "source", "env"] });
+  const [language, source, packages, env] = useWatch({
+    control,
+    name: ["language", "source", "packages", "env"],
+  });
   const loadAction = useAsyncAction({ showDone: false });
   const runAction = useAsyncAction({ showDone: false });
   const [tools, setTools] = useState<McpToolInfo[] | null>(null);
@@ -83,7 +87,12 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
   const [argsError, setArgsError] = useState<string | null>(null);
   const [result, setResult] = useState<ScriptCallResult | null>(null);
 
-  const script = () => ({ language, source, env: pairsToRecord(env) });
+  const script = () => ({
+    language,
+    source,
+    packages: nonEmpty(packages),
+    env: pairsToRecord(env),
+  });
 
   function selectTool(name: string, from: McpToolInfo[]) {
     setToolName(name);
@@ -130,7 +139,7 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
       <div className="flex flex-col gap-3 rounded-xl glass-panel p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-on-surface-variant">
-            Runs the source and environment variables above, without saving them.
+            Runs the source, packages, and environment variables above, without saving them.
           </p>
           <Button
             variant="secondary"

@@ -149,15 +149,17 @@ export function lintJavaScript(view: EditorView): Diagnostic[] {
  * rather than blocking the editor.
  *
  * @param view - The editor to lint.
+ * @param packages - The server's declared packages; any at all lifts the
+ *   standard-library-only import warning.
  * @returns The diagnostics for the editor's document.
  */
-export async function lintPython(view: EditorView): Promise<Diagnostic[]> {
+export async function lintPython(view: EditorView, packages: string[] = []): Promise<Diagnostic[]> {
   const doc = view.state.doc;
   const source = doc.toString();
   if (source.trim() === "") return [];
   let found: Awaited<ReturnType<typeof lintPythonScript>>;
   try {
-    found = await lintPythonScript(source);
+    found = await lintPythonScript(source, packages);
   } catch {
     return [];
   }

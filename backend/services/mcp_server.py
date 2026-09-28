@@ -55,13 +55,14 @@ _TRANSPORT_FIELDS: dict[str, Any] = {
     "env": {},
     "language": None,
     "source": None,
+    "packages": [],
 }
 
 #: The transport-specific fields each transport may carry.
 _TRANSPORT_FIELDS_BY: dict[McpTransport, set[str]] = {
     McpTransport.streamable_http: {"url", "headers"},
     McpTransport.stdio: {"command", "args", "env"},
-    McpTransport.script: {"language", "source", "env"},
+    McpTransport.script: {"language", "source", "packages", "env"},
 }
 
 #: The fields a PATCH switching *to* each transport must supply.
@@ -367,6 +368,7 @@ class MCPServerService:
             transport=McpTransport.script,
             language=request.language,
             source=request.source,
+            packages=request.packages,
             env=request.env,
         )
         return await resolve_connection(server, self._resolver)

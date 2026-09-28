@@ -85,7 +85,7 @@ describe("NewMcpServerPage", () => {
     );
   });
 
-  it("submits a script server with its language and source", async () => {
+  it("submits a script server with its language, source, and packages", async () => {
     const user = userEvent.setup();
     let receivedBody: unknown;
     server.use(
@@ -100,6 +100,8 @@ describe("NewMcpServerPage", () => {
     await user.click(screen.getByRole("tab", { name: "Script" }));
     await user.click(screen.getByRole("tab", { name: "JavaScript" }));
     setCodeEditorText(screen.getByLabelText("Source *"), "export function f() {}");
+    await user.click(screen.getByRole("button", { name: "+ Add package" }));
+    await user.type(screen.getByLabelText("packages value 1"), "is-number@7");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
@@ -109,6 +111,7 @@ describe("NewMcpServerPage", () => {
         transport: "script",
         language: "javascript",
         source: "export function f() {}",
+        packages: ["is-number@7"],
         env: {},
       })
     );
