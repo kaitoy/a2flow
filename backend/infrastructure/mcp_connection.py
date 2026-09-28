@@ -87,8 +87,9 @@ async def resolve_connection(
     A ``script`` server becomes a stdio connection that starts the runner for
     its language (see :mod:`infrastructure.script_runners`) with the source in
     the runner's environment. Python runs on this interpreter,
-    ``sys.executable``, which sits at the same path in the MCP proxy image.
-    The script's packages, if any, go to the runner in its environment too;
+    ``sys.executable``, which sits at the same path in the MCP proxy image,
+    with ``-S`` so the script sees none of this interpreter's site-packages --
+    only the standard library and its own packages. The script's packages, if any, go to the runner in its environment too;
     the runner installs them before loading the script.
 
     Returns:
@@ -119,7 +120,7 @@ async def resolve_connection(
         if not server.language or not server.source:
             raise McpConnectionError(server.name, "script server has no source")
         if server.language is ScriptLanguage.python:
-            command, args = sys.executable, ["-I", str(PYTHON_RUNNER)]
+            command, args = sys.executable, ["-I", "-S", str(PYTHON_RUNNER)]
         else:
             command, args = "node", [str(NODE_RUNNER)]
         env = await _resolve_values(server.env, resolver)

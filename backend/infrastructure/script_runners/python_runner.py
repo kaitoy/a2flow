@@ -1,24 +1,30 @@
 """Serve a Python script's public functions as MCP tools over stdio.
 
-Run as ``python -I python_runner.py`` with the source in
+Run as ``python -I -S python_runner.py`` with the source in
 :data:`infrastructure.script_runners.SOURCE_ENV_VAR`. Every function defined at
 the script's top level whose name does not start with ``_`` becomes a tool:
-FastMCP derives its input schema from the type hints and its description from
-the docstring. Functions the script merely imports are skipped.
+its input schema is derived from the type hints (see :func:`input_schema`) and
+its description from the docstring. Functions the script merely imports are
+skipped.
 
-The script's packages, a JSON array in
-:data:`infrastructure.script_runners.PACKAGES_ENV_VAR`, are installed first
-with ``uv pip install --target`` into a directory put ahead of the rest of
-``sys.path``.
+``-S`` keeps ``site`` from running, so no site-packages directory -- in
+particular the backend's own virtual environment -- is on ``sys.path``: a
+script sees the standard library and nothing else. The script's packages, a
+JSON array in :data:`infrastructure.script_runners.PACKAGES_ENV_VAR`, are
+installed first with ``uv pip install --target`` into a directory put ahead of
+the rest of ``sys.path``.
 
-stdout carries the MCP protocol, so ``sys.stdout`` is pointed at stderr before
+That is also why this file depends on nothing outside the standard library,
+the MCP SDK included: it speaks just the slice of MCP a tool server needs --
+``initialize``, ``ping``, ``tools/list``, ``tools/call`` -- as newline-delimited
+JSON-RPC, like ``node_runner.mjs``.
+
+stdout carries the protocol, so ``sys.stdout`` is pointed at stderr before
 the script runs: a stray ``print()`` lands in the server log instead of
 corrupting the stream.
-
-This file is started as a script, not imported, so it depends on nothing of
-A2Flow's own -- only the MCP SDK installed alongside it.
 """
 
+import asyncio
 import hashlib
 import inspect
 import json
@@ -27,20 +33,28 @@ import shutil
 import subprocess
 import sys
 import traceback
+import types
+import typing
+from collections.abc import Callable
 from io import TextIOWrapper
 from pathlib import Path
-from types import ModuleType
 from typing import Any
-
-import anyio
-from mcp import types
-from mcp.server.fastmcp import FastMCP
-from mcp.server.lowlevel import Server
-from mcp.server.stdio import stdio_server
 
 _SOURCE_ENV_VAR = "A2FLOW_SCRIPT_SOURCE"
 _PACKAGES_ENV_VAR = "A2FLOW_SCRIPT_PACKAGES"
 _MODULE_NAME = "user_script"
+
+_PRIMITIVES: dict[Any, str] = {
+    bool: "boolean",
+    int: "integer",
+    float: "number",
+    str: "string",
+    dict: "object",
+    list: "array",
+    tuple: "array",
+    set: "array",
+    type(None): "null",
+}
 
 
 def install_packages(packages: list[str]) -> Path:
@@ -94,26 +108,88 @@ def install_packages(packages: list[str]) -> Path:
     return target
 
 
-def load_tools(source: str) -> FastMCP:
-    """Execute ``source`` and register its public functions on a new server.
+def load_tools(source: str) -> dict[str, Callable[..., Any]]:
+    """Execute ``source`` and collect its public top-level functions.
 
     Args:
         source: The script's source code.
 
     Returns:
-        A FastMCP server exposing one tool per public top-level function.
+        The functions that become tools, by name.
     """
-    module = ModuleType(_MODULE_NAME)
+    module = types.ModuleType(_MODULE_NAME)
     exec(compile(source, "<script>", "exec"), module.__dict__)  # noqa: S102
-    server = FastMCP("script")
-    for name, obj in vars(module).items():
-        if (
-            inspect.isfunction(obj)
-            and not name.startswith("_")
-            and obj.__module__ == _MODULE_NAME
-        ):
-            server.add_tool(obj)
-    return server
+    return {
+        name: obj
+        for name, obj in vars(module).items()
+        if inspect.isfunction(obj)
+        and not name.startswith("_")
+        and obj.__module__ == _MODULE_NAME
+    }
+
+
+def type_schema(hint: Any) -> dict[str, Any]:
+    """Map one type hint to a JSON Schema.
+
+    Covers the JSON-shaped types: ``bool``/``int``/``float``/``str``,
+    ``list``/``tuple``/``set`` (with ``items`` from a ``list[X]``/``set[X]``
+    argument), ``dict``, ``Literal[...]``, and unions such as ``X | None``.
+
+    Args:
+        hint: The annotation.
+
+    Returns:
+        The schema; ``{}`` (any value) for anything else.
+    """
+    if hint in _PRIMITIVES:
+        return {"type": _PRIMITIVES[hint]}
+    origin, args = typing.get_origin(hint), typing.get_args(hint)
+    if origin is typing.Literal:
+        return {"enum": list(args)}
+    if origin is typing.Union or origin is types.UnionType:
+        schemas = [type_schema(arg) for arg in args]
+        return schemas[0] if len(schemas) == 1 else {"anyOf": schemas}
+    if origin in (list, set, frozenset):
+        return (
+            {"type": "array", "items": type_schema(args[0])}
+            if args
+            else {"type": "array"}
+        )
+    if origin in (tuple, dict):
+        return {"type": _PRIMITIVES[origin]}
+    return {}
+
+
+def input_schema(fn: Callable[..., Any]) -> dict[str, Any]:
+    """Build a tool's input schema from its function signature.
+
+    Every named parameter becomes a property typed by :func:`type_schema`;
+    one without a default is required, and a JSON-literal default is carried
+    over. ``*args`` and ``**kwargs`` are left out. Arguments are passed to the
+    function as they arrive -- nothing is coerced.
+
+    Args:
+        fn: The tool's function.
+
+    Returns:
+        An ``object`` schema.
+    """
+    try:
+        hints = typing.get_type_hints(fn)
+    except Exception:
+        hints = {}
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for name, param in inspect.signature(fn).parameters.items():
+        if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+            continue
+        schema = type_schema(hints[name]) if name in hints else {}
+        if param.default is param.empty:
+            required.append(name)
+        elif isinstance(param.default, str | int | float | bool | None):
+            schema = {**schema, "default": param.default}
+        properties[name] = schema
+    return {"type": "object", "properties": properties, "required": required}
 
 
 def script_traceback(exc: BaseException) -> str:
@@ -136,67 +212,129 @@ def script_traceback(exc: BaseException) -> str:
     return "".join(summary.format())
 
 
-def failed_server(error: str) -> Server[Any, Any]:
-    """Build a server that reports a script load failure on every request.
-
-    The handshake still completes, so the client sees ``error`` -- the
-    traceback -- instead of a connection that closed before initializing:
-    ``tools/list`` answers with a JSON-RPC error and ``tools/call`` with an
-    ``isError`` result, both carrying it.
+def call_tool(fn: Callable[..., Any], arguments: dict[str, Any]) -> dict[str, Any]:
+    """Invoke a tool and wrap its outcome as an MCP ``tools/call`` result.
 
     Args:
-        error: The load failure's traceback.
+        fn: The tool's function; a coroutine function is run to completion.
+        arguments: The call's arguments, passed as keyword arguments.
 
     Returns:
-        A low-level server advertising no tools.
+        The result: a string value as is, anything else as JSON, or the
+        exception with ``isError`` set.
     """
-    server: Server[Any, Any] = Server("script")
+    try:
+        value = fn(**arguments)
+        if inspect.iscoroutine(value):
+            value = asyncio.run(value)
+        text = value if isinstance(value, str) else json.dumps(value, default=str)
+    except Exception as exc:
+        return {
+            "content": [{"type": "text", "text": f"{type(exc).__name__}: {exc}"}],
+            "isError": True,
+        }
+    return {"content": [{"type": "text", "text": text}]}
 
-    @server.list_tools()  # type: ignore[no-untyped-call, untyped-decorator]
-    async def _list_tools() -> list[types.Tool]:
-        raise RuntimeError(error)
 
-    @server.call_tool()  # type: ignore[untyped-decorator]
-    async def _call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
-        raise RuntimeError(error)
+def handle(
+    request: dict[str, Any],
+    tools: dict[str, Callable[..., Any]],
+    load_error: str | None,
+) -> dict[str, Any]:
+    """Answer one JSON-RPC request.
 
-    return server
-
-
-async def _serve(server: Server[Any, Any], protocol_out: TextIOWrapper) -> None:
-    """Run ``server`` over stdin and ``protocol_out``.
-
-    Mirrors ``FastMCP.run_stdio_async``, which writes to whatever
-    ``sys.stdout`` is at the time and so cannot be used once it points at
-    stderr.
+    A script that failed to load is still served, so the handshake completes
+    and the client sees ``load_error`` instead of a closed connection:
+    ``tools/list`` answers with it as an error, ``tools/call`` as an
+    ``isError`` result.
 
     Args:
-        server: The low-level server to run.
-        protocol_out: The process's real stdout.
+        request: The parsed request.
+        tools: The script's tools, by name.
+        load_error: Why the script failed to load, or ``None``.
+
+    Returns:
+        Either ``{"result": ...}`` or ``{"error": ...}``.
     """
-    async with stdio_server(stdout=anyio.wrap_file(protocol_out)) as (read, write):
-        await server.run(read, write, server.create_initialization_options())
+    method, params = request.get("method"), request.get("params") or {}
+    if method == "initialize":
+        return {
+            "result": {
+                "protocolVersion": params.get("protocolVersion"),
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "script", "version": "1.0.0"},
+            }
+        }
+    if method == "ping":
+        return {"result": {}}
+    if method == "tools/list":
+        if load_error is not None:
+            return {"error": {"code": -32603, "message": load_error}}
+        return {
+            "result": {
+                "tools": [
+                    {
+                        "name": name,
+                        "description": inspect.getdoc(fn),
+                        "inputSchema": input_schema(fn),
+                    }
+                    for name, fn in tools.items()
+                ]
+            }
+        }
+    if method == "tools/call":
+        if load_error is not None:
+            return {
+                "result": {
+                    "content": [{"type": "text", "text": load_error}],
+                    "isError": True,
+                }
+            }
+        name = str(params.get("name"))
+        fn = tools.get(name)
+        if fn is None:
+            message = f"Unknown tool: {name}"
+            return {"error": {"code": -32602, "message": message}}
+        return {"result": call_tool(fn, params.get("arguments") or {})}
+    return {"error": {"code": -32601, "message": f"Method not found: {method}"}}
 
 
 def main() -> None:
-    """Load the script from the environment and serve it until stdin closes.
-
-    A script that fails to load -- a package that will not install, a syntax
-    error, an exception at its top level -- is served by :func:`failed_server`, so its traceback reaches the
-    client rather than only this process's stderr.
-    """
-    protocol_out = TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    """Load the script from the environment and serve it until stdin closes."""
+    protocol_out = TextIOWrapper(sys.stdout.buffer, encoding="utf-8", newline="\n")
+    protocol_in = TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
     sys.stdout = sys.stderr
+
+    def send(message: dict[str, Any]) -> None:
+        protocol_out.write(json.dumps({"jsonrpc": "2.0", **message}) + "\n")
+        protocol_out.flush()
+
+    tools: dict[str, Callable[..., Any]] = {}
+    load_error: str | None = None
     try:
         packages = json.loads(os.environ.pop(_PACKAGES_ENV_VAR, "[]"))
         if packages:
             sys.path.insert(0, str(install_packages(packages)))
-        server = load_tools(os.environ.pop(_SOURCE_ENV_VAR))._mcp_server
+        tools = load_tools(os.environ.pop(_SOURCE_ENV_VAR))
     except Exception as exc:
-        error = script_traceback(exc)
-        print(error, file=sys.stderr)
-        server = failed_server(error)
-    anyio.run(_serve, server, protocol_out)
+        load_error = script_traceback(exc)
+        print(load_error, file=sys.stderr)
+
+    for line in protocol_in:
+        if not line.strip():
+            continue
+        try:
+            request = json.loads(line)
+            if not isinstance(request, dict):
+                raise ValueError("not a JSON-RPC message")
+        except ValueError:
+            send({"id": None, "error": {"code": -32700, "message": "Parse error"}})
+            continue
+        # A message without an id is a notification (e.g.
+        # notifications/initialized): no reply.
+        if request.get("id") is None:
+            continue
+        send({"id": request["id"], **handle(request, tools, load_error)})
 
 
 if __name__ == "__main__":

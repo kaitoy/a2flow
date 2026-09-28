@@ -40,9 +40,9 @@ Underlines are advice and never stop you from saving; the check on save is descr
 | Functions that become tools | Every function defined at the top level whose name does not start with `_`. Functions you import are not exposed. | Every exported function (`export function`, `export async function`) whose name does not start with `_`. The default export is not exposed. |
 | Tool name | The function's name | The export's name |
 | Description | The docstring | The function's `description` property |
-| Arguments | Read from the type hints | The function's `inputSchema` property, a JSON Schema. Without one, the tool accepts any arguments. |
+| Arguments | Read from the type hints: `str`, `int`, `float`, `bool`, `list`, `dict`, `Literal[...]`, and `X \| None`. A parameter with any other type, or none, accepts any value. | The function's `inputSchema` property, a JSON Schema. Without one, the tool accepts any arguments. |
 | How the tool is called | Arguments by name | One object holding the arguments |
-| What the agent gets back | The return value | The return value: a string as is, anything else as JSON |
+| What the agent gets back | The return value: a string as is, anything else as JSON | The return value: a string as is, anything else as JSON |
 
 ```python
 def add(a: int, b: int) -> int:

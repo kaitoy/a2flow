@@ -40,9 +40,9 @@ sidebar_position: 7
 | ツールになる関数 | トップレベルで定義した関数のうち、名前が `_` で始まらないもの。import した関数は公開されません。 | export した関数（`export function`、`export async function`）のうち、名前が `_` で始まらないもの。default export は公開されません。 |
 | ツール名 | 関数名 | export 名 |
 | 説明 | docstring | 関数の `description` プロパティ |
-| 引数 | 型ヒントから読み取ります | 関数の `inputSchema` プロパティ（JSON Schema）。無い場合、ツールはどんな引数も受け付けます。 |
+| 引数 | 型ヒントから読み取ります。対応するのは `str`、`int`、`float`、`bool`、`list`、`dict`、`Literal[...]`、`X \| None` です。それ以外の型や型ヒントのない引数は、どんな値も受け付けます。 | 関数の `inputSchema` プロパティ（JSON Schema）。無い場合、ツールはどんな引数も受け付けます。 |
 | 呼び出され方 | 引数を名前で渡します | 引数をまとめた 1 つのオブジェクトを渡します |
-| エージェントに返るもの | 戻り値 | 戻り値。文字列はそのまま、それ以外は JSON にします |
+| エージェントに返るもの | 戻り値。文字列はそのまま、それ以外は JSON にします | 戻り値。文字列はそのまま、それ以外は JSON にします |
 
 ```python
 def add(a: int, b: int) -> int:

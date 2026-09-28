@@ -156,6 +156,49 @@ async def test_python_runner_reports_an_exception_as_a_tool_error() -> None:
     assert "boom" in _text(result)
 
 
+async def test_python_runner_derives_input_schemas_from_type_hints() -> None:
+    source = '''
+from typing import Literal
+
+
+def pick(
+    tags: list[str],
+    mode: Literal["a", "b"],
+    limit: int | None = None,
+    label="x",
+    *rest,
+) -> str:
+    """Pick."""
+    return mode
+'''
+    connection = await _connection(ScriptLanguage.python, source)
+    [tool] = await list_server_tools(connection)
+
+    assert tool.inputSchema == {
+        "type": "object",
+        "properties": {
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "mode": {"enum": ["a", "b"]},
+            "limit": {
+                "anyOf": [{"type": "integer"}, {"type": "null"}],
+                "default": None,
+            },
+            "label": {"default": "x"},
+        },
+        "required": ["tags", "mode"],
+    }
+
+
+@pytest.mark.parametrize("module", ["pydantic", "mcp"])
+async def test_python_runner_hides_the_backends_dependencies(module: str) -> None:
+    connection = await _connection(ScriptLanguage.python, f"import {module}\n")
+
+    with pytest.raises(McpConnectionError) as caught:
+        await list_server_tools(connection)
+
+    assert f"ModuleNotFoundError: No module named '{module}'" in caught.value.reason
+
+
 @_needs_node
 async def test_node_runner_exposes_public_exported_functions() -> None:
     connection = await _connection(ScriptLanguage.javascript, _JS_SOURCE)

@@ -172,7 +172,7 @@ async def test_resolve_connection_starts_the_python_runner_for_a_python_script()
     )
     assert connection == StdioConnection(
         command=sys.executable,
-        args=["-I", str(PYTHON_RUNNER)],
+        args=["-I", "-S", str(PYTHON_RUNNER)],
         env={"API_KEY": "TOKEN", "A2FLOW_SCRIPT_SOURCE": "def f(): ..."},
     )
 
