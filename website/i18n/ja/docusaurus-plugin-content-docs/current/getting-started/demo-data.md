@@ -25,7 +25,7 @@ DEMO_GCP_CREDENTIALS_JSON='{"type":"service_account",...}'
 - `DEMO_AWS_REGION` は、デモの AWS MCP サーバーのツールが操作する対象のリージョンです。既定は `us-east-1` です。
 - `DEMO_GCP_CREDENTIALS_JSON` は Google Cloud の認証情報 JSON を 1 行にしたものです。サービスアカウントの鍵か、OAuth クライアント ID とシークレットで一度サインインしたあとに `gcloud` が書き出す authorized-user JSON のどちらかを入れます。GKE MCP サーバーはここからアクセストークンを発行します。Google の MCP サーバーは API キーを受け付けません。入手方法は [Google Cloud の MCP サーバー](../guides/mcp-servers.md#google-cloud-mcp-servers)を参照してください。
 
-⚠️ どちらのデモ MCP サーバーも読み取りだけでなく、**状態を変える**操作を実行できます。AWS MCP サーバーの認証情報は実際の AWS リソースを作成・削除でき、GKE MCP サーバーの身元は実際のクラスタでワークロードのローリング再起動や Pod の削除を行えます。どちらも使い捨てのアカウントか、権限を絞った認証情報を使ってください。実際のプロバイダにまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。
+⚠️ AWS MCP サーバーと GKE MCP サーバーは、読み取りだけでなく、**状態を変える**操作を実行できます。AWS MCP サーバーの認証情報は実際の AWS リソースを作成・削除でき、GKE MCP サーバーの身元は実際のクラスタでワークロードのローリング再起動や Pod の削除を行えます。どちらも使い捨てのアカウントか、権限を絞った認証情報を使ってください。実際のプロバイダにまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。
 
 ## 登録されるもの
 
@@ -33,10 +33,12 @@ DEMO_GCP_CREDENTIALS_JSON='{"type":"service_account",...}'
 - **[エージェントスキル](../guides/agent-skills.md) `Demo GKE Pod Restart`** — 対象(プロジェクト・クラスタ・namespace・そして Deployment/StatefulSet 名か単一の Pod 名のいずれか)をユーザーと合意し、その対象について管理職の明示的な承認を得てから、既定では GKE MCP Server でワークロードをローリング再起動し、ユーザーが1つの Pod だけを望む場合はその Pod を削除して所有コントローラーに再作成させ、結果を報告します。リポジトリの clone も同じ仕組みなので、最初は同様に `pending` と表示されます。
 - **[MCP サーバー](../guides/mcp-servers.md) `AWS MCP Server`** — AWS のマネージド AWS MCP Server に接続する `stdio` サーバーです。EC2 のツールはここから来ます。
 - **[MCP サーバー](../guides/mcp-servers.md) `GKE MCP Server`** — Google Cloud のマネージド GKE(Google Kubernetes Engine)MCP サーバーのフルエンドポイントに接続する `streamable_http` サーバーです。`Authorization` ヘッダーは `Bearer ${gcp-token:demo-gcp-credentials/GOOGLE_CREDENTIALS_JSON}` なので、接続のたびに `demo-gcp-credentials` シークレットから発行したばかりのアクセストークンを送ります。ツールはクラスタや Kubernetes リソースを管理でき、ワークロードのローリング再起動や Pod の削除も含まれます。
+- **[MCP サーバー](../guides/mcp-servers.md) `EC2 Cost Estimator`** — Python の[スクリプトサーバー](../guides/mcp-servers.md#writing-a-script)です。指定したリージョンの価格を AWS の価格表からその場で取得し、EC2 インスタンスタイプのオンデマンド月額を見積もるツール(`estimate_monthly_cost`)と、複数のタイプを安い順に並べるツール(`compare_instance_types`)を提供します。**Packages** で `boto3` をインストールし、`demo-aws-credentials` シークレットを使います。そのため **Test Run** で試すには、AWS の価格表を読む権限(`pricing:GetProducts`)を持つ認証情報が必要です。読み取りしか行いません。
+- **[MCP サーバー](../guides/mcp-servers.md) `Kubernetes Manifest Toolkit`** — JavaScript のスクリプトサーバーです。Kubernetes マニフェストに必須項目の抜けがないかを確認するツール(`validate_manifest`)と、Deployment・StatefulSet・DaemonSet をローリング再起動するパッチを作るツール(`build_restart_patch`)を提供します。**Packages** で `js-yaml` をインストールします。認証情報は不要で、クラスタには接続しないので、**Test Run** ですぐに試せます。
 - **[シークレット](../guides/secrets.md) `demo-aws-credentials`** — AWS MCP Server が読む、AWS のアクセスキー ID とシークレットアクセスキーです。
 - **[シークレット](../guides/secrets.md) `demo-gcp-credentials`** — GKE MCP Server がアクセストークンを発行する元になる、Google Cloud の認証情報 JSON です。
 - **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws___run_script`(どちらも起動成功を返す)、GKE MCP Server の `patch_k8s_resource`(ローリング再起動成功を返す)と `delete_k8s_resource`(Pod 削除成功を返す)、および組み込みの `request_approval`(approved を返す)。ドラフト実行の **Run** ダイアログで選ぶと、AWS や実際の GKE クラスタに触れることも管理職の承認を待つこともなく、どちらのワークフローも最後まで動きます。
-- **[タグ](../guides/tags.md)** `AWS` と `GCP` — それぞれ[アクセス制御タグ](../guides/tags.md#access-control-tags)です。`Demo AWS Group`/`Demo GCP Group` のメンバー(および `admin`、スーパー管理者)以外には、AWS または GCP のタグが付いた上記のレコードは見えません。`Approval Required` は両方のエージェントスキルに付く普通のタグで、何も制限しません。
+- **[タグ](../guides/tags.md)** `AWS` と `GCP` — それぞれ[アクセス制御タグ](../guides/tags.md#access-control-tags)です。`Demo AWS Group`/`Demo GCP Group` のメンバー(および `admin`、スーパー管理者)以外には、AWS または GCP のタグが付いた上記のレコードは見えません。`EC2 Cost Estimator` には `AWS`、`Kubernetes Manifest Toolkit` には `GCP` が付いており、それぞれが補助するプロバイダのレコードと同じ扱いになります。`Approval Required` は両方のエージェントスキルに付く普通のタグで、何も制限しません。
 - **デモユーザーとグループ:**
 
 | ユーザー | ロール | アクセス制御グループ | 役割 |

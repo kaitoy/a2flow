@@ -10,13 +10,18 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
   two entries, and one holding a Google Cloud credential JSON (a service
   account key, or the authorized-user JSON ``gcloud`` writes) as a single
   entry, both described for the admin UI,
-* two MCPServers -- one stdio server reaching the managed AWS MCP Server
+* four MCPServers -- one stdio server reaching the managed AWS MCP Server
   through the ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing
-  the AWS entries from its ``env`` via ``${secret:NAME/KEY}``, and one
+  the AWS entries from its ``env`` via ``${secret:NAME/KEY}``, one
   ``streamable_http`` server reaching the Google-managed GKE (Google
   Kubernetes Engine) remote MCP server, sending an OAuth 2.0 access token
   minted from that credential as its ``Authorization: Bearer`` header via a
-  ``${gcp-token:NAME/KEY}`` placeholder, both described,
+  ``${gcp-token:NAME/KEY}`` placeholder, and two read-only ``script``
+  servers showing off in-app scripts: the Python "EC2 Cost Estimator",
+  pricing instance types through the AWS Price List Query API with ``boto3``
+  and the same AWS secret entries, and the JavaScript "Kubernetes Manifest
+  Toolkit", validating manifests and building rolling-restart patches with
+  ``js-yaml``; all four described,
 * five MCPToolMocks that stub the demo run's side-effecting tools so a
   ``draft`` workflow run plays through without reaching AWS, a real GKE
   cluster, or waiting on a human -- ``call_aws`` and ``run_script`` on the AWS
@@ -28,12 +33,12 @@ approval-gated, mutating workflows need -- "launch an EC2 instance" and
   ``sample_skills/gke-pod-restart`` in this repository,
 * three Tags -- ``AWS`` (an **access-control** tag: visible, and its
   attachments usable, only to ``Demo AWS Group`` members and ``admin``/
-  ``super_admin``; attached to the AWS secret, AWS MCP server, the
-  EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks,
+  ``super_admin``; attached to the AWS secret, AWS MCP server, EC2 Cost
+  Estimator, the EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks,
   showing that one tag classifies across resource types), ``GCP`` (also
   access-control, gated the same way by ``Demo GCP Group``; attached to the
-  Google Cloud secret, the GKE MCP server, the pod-restart agent skill, and
-  the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks -- GKE is
+  Google Cloud secret, the GKE MCP server, the Kubernetes Manifest Toolkit,
+  the pod-restart agent skill, and the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks -- GKE is
   a Google Cloud product, so the same provider tag still applies), and
   ``Approval Required`` (a plain, non-gating tag attached to
   both agent skills, calling out their approval gate),
@@ -96,7 +101,7 @@ from infrastructure.bootstrap import DEFAULT_TENANT_NAME, resolve_seed_password
 from infrastructure.password import hash_password
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
-from models.mcp_server import McpCommand, MCPServer, McpTransport
+from models.mcp_server import McpCommand, MCPServer, McpTransport, ScriptLanguage
 from models.mcp_tool_mock import REQUEST_APPROVAL_TOOL, MCPToolMock
 from models.secret import Secret, SecretType
 from models.tag import (
@@ -180,6 +185,12 @@ DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
 #: Fixed identifier of the demo GKE MCP server.
 DEMO_GKE_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d202"
 
+#: Fixed identifier of the demo EC2 Cost Estimator script MCP server.
+DEMO_COST_ESTIMATOR_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d203"
+
+#: Fixed identifier of the demo Kubernetes Manifest Toolkit script MCP server.
+DEMO_K8S_TOOLKIT_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d204"
+
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
 
@@ -244,6 +255,12 @@ DEMO_MCP_SERVER_NAME = "AWS MCP Server"
 
 #: Name of the demo GKE MCP server as shown in the admin UI.
 DEMO_GKE_MCP_SERVER_NAME = "GKE MCP Server"
+
+#: Name of the demo EC2 Cost Estimator script server as shown in the admin UI.
+DEMO_COST_ESTIMATOR_MCP_SERVER_NAME = "EC2 Cost Estimator"
+
+#: Name of the demo Kubernetes Manifest Toolkit script server in the admin UI.
+DEMO_K8S_TOOLKIT_MCP_SERVER_NAME = "Kubernetes Manifest Toolkit"
 
 #: Name of the demo agent skill as shown in the admin UI.
 DEMO_AGENT_SKILL_NAME = "Demo AWS EC2 Launch"
@@ -333,6 +350,188 @@ _DEMO_GKE_MCP_SERVER_DESCRIPTION = (
     "including mutating tools such as rolling-restarting a workload or "
     "deleting a pod."
 )
+
+#: Description shown on the demo EC2 Cost Estimator server in the admin UI.
+_DEMO_COST_ESTIMATOR_DESCRIPTION = (
+    "Python script server that estimates the monthly On-Demand cost of EC2 "
+    "instance types in a region, from prices fetched live from the AWS Price "
+    "List. Read-only."
+)
+
+#: Description shown on the demo Kubernetes Manifest Toolkit server in the
+#: admin UI.
+_DEMO_K8S_TOOLKIT_DESCRIPTION = (
+    "JavaScript script server that validates Kubernetes manifests and builds "
+    "the patch that rolling-restarts a workload. Computes only; it never "
+    "reaches a cluster."
+)
+
+#: Packages the EC2 Cost Estimator installs, pinned for the same reason as
+#: :data:`_DEMO_MCP_PROXY_PACKAGE`.
+_DEMO_COST_ESTIMATOR_PACKAGES = ["boto3==1.43.103"]
+
+#: Packages the Kubernetes Manifest Toolkit installs, pinned likewise.
+_DEMO_K8S_TOOLKIT_PACKAGES = ["js-yaml@5.4.2"]
+
+#: Source of the EC2 Cost Estimator. It prices through the Price List Query
+#: API, which needs AWS credentials (with ``pricing:GetProducts``) but returns
+#: only the matching products -- the unauthenticated bulk offer file for EC2
+#: runs to gigabytes per region.
+_DEMO_COST_ESTIMATOR_SOURCE = '''\
+"""Estimate EC2 On-Demand costs from the AWS Price List Query API."""
+
+import json
+
+import boto3
+
+#: Average days in a month (365 / 12).
+_DAYS_PER_MONTH = 30.42
+
+
+def _hourly_usd(instance_type: str, region: str) -> float:
+    # The Price List Query API is served from us-east-1 whatever region is priced.
+    client = boto3.client("pricing", region_name="us-east-1")
+    filters = {
+        "instanceType": instance_type,
+        "regionCode": region,
+        "operatingSystem": "Linux",
+        "tenancy": "Shared",
+        "preInstalledSw": "NA",
+        "capacitystatus": "Used",
+    }
+    response = client.get_products(
+        ServiceCode="AmazonEC2",
+        Filters=[
+            {"Type": "TERM_MATCH", "Field": field, "Value": value}
+            for field, value in filters.items()
+        ],
+        MaxResults=1,
+    )
+    if not response["PriceList"]:
+        raise ValueError(f"No On-Demand Linux price for {instance_type} in {region}")
+    product = json.loads(response["PriceList"][0])
+    term = next(iter(product["terms"]["OnDemand"].values()))
+    dimension = next(iter(term["priceDimensions"].values()))
+    return float(dimension["pricePerUnit"]["USD"])
+
+
+def estimate_monthly_cost(
+    instance_type: str, region: str = "us-east-1", hours_per_day: float = 24
+) -> dict:
+    """Estimate the monthly On-Demand cost of one EC2 instance, in USD.
+
+    Prices a Linux instance on shared tenancy with no pre-installed software,
+    fetched live from the AWS Price List. Storage and data transfer are not
+    included.
+
+    Args:
+        instance_type: Instance type, such as t3.micro.
+        region: Region code, such as ap-northeast-1.
+        hours_per_day: Hours per day the instance runs.
+    """
+    hourly = _hourly_usd(instance_type, region)
+    return {
+        "instance_type": instance_type,
+        "region": region,
+        "hourly_usd": hourly,
+        "hours_per_day": hours_per_day,
+        "monthly_usd": round(hourly * hours_per_day * _DAYS_PER_MONTH, 2),
+        "assumptions": (
+            "Linux, shared tenancy, On-Demand; excludes EBS and data transfer"
+        ),
+    }
+
+
+def compare_instance_types(
+    instance_types: list[str], region: str = "us-east-1"
+) -> list[dict]:
+    """Compare the monthly On-Demand cost of EC2 instance types, cheapest first.
+
+    Args:
+        instance_types: Instance types to compare, such as ["t3.micro", "t3.small"].
+        region: Region code, such as ap-northeast-1.
+    """
+    estimates = [estimate_monthly_cost(t, region) for t in instance_types]
+    return sorted(estimates, key=lambda estimate: estimate["monthly_usd"])
+'''
+
+#: Source of the Kubernetes Manifest Toolkit. Each exported function takes the
+#: call's arguments object and carries its own ``description`` and
+#: ``inputSchema`` (see ``infrastructure/script_runners/node_runner.mjs``).
+_DEMO_K8S_TOOLKIT_SOURCE = """\
+import { loadAll } from "js-yaml";
+
+const RESTARTABLE_KINDS = ["Deployment", "StatefulSet", "DaemonSet"];
+
+export function validate_manifest({ manifest }) {
+  let documents;
+  try {
+    documents = loadAll(manifest).filter((doc) => doc != null);
+  } catch (error) {
+    return { valid: false, error: String(error.message ?? error), documents: [] };
+  }
+  const results = documents.map((doc) => {
+    if (typeof doc !== "object" || Array.isArray(doc)) {
+      return { errors: ["document is not a mapping"] };
+    }
+    const errors = [];
+    if (!doc.apiVersion) errors.push("missing apiVersion");
+    if (!doc.kind) errors.push("missing kind");
+    if (!doc.metadata?.name) errors.push("missing metadata.name");
+    return {
+      kind: doc.kind,
+      name: doc.metadata?.name,
+      namespace: doc.metadata?.namespace ?? "default",
+      errors,
+    };
+  });
+  return { valid: results.every((r) => r.errors.length === 0), documents: results };
+}
+validate_manifest.description =
+  "Parse a Kubernetes manifest (one or more YAML documents) and check that " +
+  "each document has apiVersion, kind, and metadata.name.";
+validate_manifest.inputSchema = {
+  type: "object",
+  properties: { manifest: { type: "string", description: "The manifest YAML." } },
+  required: ["manifest"],
+};
+
+export function build_restart_patch({ kind, name, namespace = "default" }) {
+  if (!RESTARTABLE_KINDS.includes(kind)) {
+    throw new Error(
+      `${kind} cannot be rolling-restarted; use one of ${RESTARTABLE_KINDS.join(", ")}`,
+    );
+  }
+  const restartedAt = new Date().toISOString();
+  return {
+    kind,
+    name,
+    namespace,
+    patchType: "strategic-merge",
+    patch: {
+      spec: {
+        template: {
+          metadata: {
+            annotations: { "kubectl.kubernetes.io/restartedAt": restartedAt },
+          },
+        },
+      },
+    },
+  };
+}
+build_restart_patch.description =
+  "Build the patch that rolling-restarts a Deployment, StatefulSet, or " +
+  "DaemonSet -- the same one `kubectl rollout restart` applies.";
+build_restart_patch.inputSchema = {
+  type: "object",
+  properties: {
+    kind: { type: "string", enum: RESTARTABLE_KINDS },
+    name: { type: "string", description: "The workload's name." },
+    namespace: { type: "string", default: "default" },
+  },
+  required: ["kind", "name"],
+};
+"""
 
 #: Description shown on the demo ``AWS`` tag in the admin UI.
 _DEMO_AWS_TAG_DESCRIPTION = (
@@ -778,6 +977,8 @@ async def _seed_demo_data(session: AsyncSession) -> list[str]:
     await _seed_demo_secrets(session, tenant_id)
     await _seed_demo_mcp_server(session, tenant_id)
     await _seed_demo_gke_mcp_server(session, tenant_id)
+    await _seed_demo_cost_estimator_mcp_server(session, tenant_id)
+    await _seed_demo_k8s_toolkit_mcp_server(session, tenant_id)
     await _seed_demo_tool_mocks(session, tenant_id)
     new_skill_ids = [
         skill_id
@@ -835,6 +1036,18 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     )
     await _delete_demo_row(
         session, MCPServer, DEMO_GKE_MCP_SERVER_ID, label="GKE MCP server"
+    )
+    await _delete_demo_row(
+        session,
+        MCPServer,
+        DEMO_COST_ESTIMATOR_MCP_SERVER_ID,
+        label="EC2 Cost Estimator MCP server",
+    )
+    await _delete_demo_row(
+        session,
+        MCPServer,
+        DEMO_K8S_TOOLKIT_MCP_SERVER_ID,
+        label="Kubernetes Manifest Toolkit MCP server",
     )
     await _delete_demo_row(
         session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
@@ -1263,6 +1476,87 @@ async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> No
     )
 
 
+async def _seed_demo_cost_estimator_mcp_server(
+    session: AsyncSession, tenant_id: str
+) -> None:
+    """Create the demo EC2 Cost Estimator, a Python script MCP server.
+
+    Its tools price EC2 instance types through the AWS Price List Query API
+    with ``boto3``, installed from the row's ``packages``. The credentials
+    are the same ``${secret:NAME/KEY}`` placeholders as the AWS MCP server's
+    (see :func:`_seed_demo_mcp_server`), and ``AWS_REGION`` carries
+    ``DEMO_AWS_REGION`` so boto3 has a default region; the tools themselves
+    take the region to price as an argument. Nothing it does mutates AWS, so
+    it has no tool mocks.
+
+    Args:
+        session: Database session used to read and insert the server.
+        tenant_id: Id of the ``Default`` tenant the server belongs to.
+    """
+    if await session.get(MCPServer, DEMO_COST_ESTIMATOR_MCP_SERVER_ID) is not None:
+        return
+    await _insert(
+        session,
+        MCPServer(
+            id=DEMO_COST_ESTIMATOR_MCP_SERVER_ID,
+            tenant_id=tenant_id,
+            name=DEMO_COST_ESTIMATOR_MCP_SERVER_NAME,
+            description=_DEMO_COST_ESTIMATOR_DESCRIPTION,
+            transport=McpTransport.script,
+            language=ScriptLanguage.python,
+            source=_DEMO_COST_ESTIMATOR_SOURCE,
+            packages=list(_DEMO_COST_ESTIMATOR_PACKAGES),
+            headers={},
+            env={
+                "AWS_ACCESS_KEY_ID": (
+                    f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_ACCESS_KEY_ENTRY_KEY}}}"
+                ),
+                "AWS_SECRET_ACCESS_KEY": (
+                    f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_SECRET_KEY_ENTRY_KEY}}}"
+                ),
+                "AWS_REGION": get_settings().demo_aws_region,
+            },
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"MCP server '{DEMO_COST_ESTIMATOR_MCP_SERVER_NAME}'",
+    )
+
+
+async def _seed_demo_k8s_toolkit_mcp_server(
+    session: AsyncSession, tenant_id: str
+) -> None:
+    """Create the demo Kubernetes Manifest Toolkit, a JavaScript script MCP server.
+
+    Its tools parse manifests with ``js-yaml``, installed from the row's
+    ``packages``, and build rolling-restart patches. It needs no credentials
+    and never reaches a cluster, so it has no tool mocks.
+
+    Args:
+        session: Database session used to read and insert the server.
+        tenant_id: Id of the ``Default`` tenant the server belongs to.
+    """
+    if await session.get(MCPServer, DEMO_K8S_TOOLKIT_MCP_SERVER_ID) is not None:
+        return
+    await _insert(
+        session,
+        MCPServer(
+            id=DEMO_K8S_TOOLKIT_MCP_SERVER_ID,
+            tenant_id=tenant_id,
+            name=DEMO_K8S_TOOLKIT_MCP_SERVER_NAME,
+            description=_DEMO_K8S_TOOLKIT_DESCRIPTION,
+            transport=McpTransport.script,
+            language=ScriptLanguage.javascript,
+            source=_DEMO_K8S_TOOLKIT_SOURCE,
+            packages=list(_DEMO_K8S_TOOLKIT_PACKAGES),
+            headers={},
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"MCP server '{DEMO_K8S_TOOLKIT_MCP_SERVER_NAME}'",
+    )
+
+
 async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo tool mocks that let a draft run play through unattended.
 
@@ -1390,10 +1684,11 @@ async def _seed_demo_gke_agent_skill(
 async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo tags and attach them across four of the six taggable kinds.
 
-    ``AWS`` lands on the AWS secret, AWS MCP server, the EC2-launch agent skill,
-    and the ``call_aws`` and ``run_script`` tool mocks; ``GCP`` lands on the
-    Google Cloud secret, the GKE MCP server, the pod-restart agent skill, and
-    the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks;
+    ``AWS`` lands on the AWS secret, AWS MCP server, EC2 Cost Estimator, the
+    EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks;
+    ``GCP`` lands on the Google Cloud secret, the GKE MCP server, the
+    Kubernetes Manifest Toolkit, the pod-restart agent skill, and the
+    ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks;
     ``Approval Required`` lands on both agent skills. ``AWS`` and ``GCP`` are
     also each attached to their matching user group (``Demo AWS Group`` /
     ``Demo GCP Group``) as access-control tags, which is what gates the
@@ -1439,6 +1734,17 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             resource_id=DEMO_MCP_SERVER_ID,
             tag_id=DEMO_AWS_TAG_ID,
             label=f"tag '{DEMO_AWS_TAG_NAME}' on MCP server '{DEMO_MCP_SERVER_NAME}'",
+        )
+        await _link_tag(
+            session,
+            McpServerTag,
+            resource_model=MCPServer,
+            resource_id=DEMO_COST_ESTIMATOR_MCP_SERVER_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=(
+                f"tag '{DEMO_AWS_TAG_NAME}' on MCP server "
+                f"'{DEMO_COST_ESTIMATOR_MCP_SERVER_NAME}'"
+            ),
         )
         await _link_tag(
             session,
@@ -1507,6 +1813,17 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             tag_id=DEMO_GCP_TAG_ID,
             label=(
                 f"tag '{DEMO_GCP_TAG_NAME}' on MCP server '{DEMO_GKE_MCP_SERVER_NAME}'"
+            ),
+        )
+        await _link_tag(
+            session,
+            McpServerTag,
+            resource_model=MCPServer,
+            resource_id=DEMO_K8S_TOOLKIT_MCP_SERVER_ID,
+            tag_id=DEMO_GCP_TAG_ID,
+            label=(
+                f"tag '{DEMO_GCP_TAG_NAME}' on MCP server "
+                f"'{DEMO_K8S_TOOLKIT_MCP_SERVER_NAME}'"
             ),
         )
         await _link_tag(
