@@ -635,7 +635,7 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     ctx.state.get.return_value = []
     rendered = provider(ctx)
     assert "Begin executing immediately" in rendered
-    assert "runnable" in rendered
+    assert "assigned_to_you" in rendered
     assert "A2UI Rules" in rendered
     assert "render_a2ui" in rendered
     # Known allowed values (e.g. listed in the workflow description) must be

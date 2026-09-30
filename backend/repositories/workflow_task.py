@@ -17,7 +17,7 @@ must exist when bindings are written.
 from collections.abc import Iterable, Sequence
 from typing import Protocol
 
-from sqlmodel import col, select
+from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.workflow_task import (
@@ -72,6 +72,8 @@ class WorkflowTaskRepository(Protocol):
     ) -> WorkflowTaskRead: ...
 
     async def delete(self, task_id: str) -> None: ...
+
+    async def claim(self, task_id: str, session_id: str, *, user_id: str) -> bool: ...
 
 
 class SqlWorkflowTaskRepository(TenantScopedRepository[WorkflowTask]):
@@ -222,6 +224,37 @@ class SqlWorkflowTaskRepository(TenantScopedRepository[WorkflowTask]):
             raise NotFoundError("WorkflowTask", task_id)
         await self._db.delete(task)
         await self._db.commit()
+
+    async def claim(self, task_id: str, session_id: str, *, user_id: str) -> bool:
+        """Assign an unassigned task to an ADK session, atomically.
+
+        A compare-and-set on ``session_id IS NULL``: of several writers claiming
+        the same task at once -- the scheduler running after two task writes,
+        or a session starting a task the scheduler has not reached -- exactly
+        one wins, and a task already assigned is never moved.
+
+        Args:
+            task_id: The task to claim.
+            session_id: The ADK session to assign it to.
+            user_id: Recorded on the task's ``updated_by`` when the claim wins.
+
+        Returns:
+            ``True`` when this call assigned the task, ``False`` when it was
+            already assigned (to this session or another) or does not exist in
+            the tenant.
+        """
+        stmt = (
+            update(WorkflowTask)
+            .where(
+                col(WorkflowTask.id) == task_id,
+                col(WorkflowTask.tenant_id) == self._require_tenant(),
+                col(WorkflowTask.session_id).is_(None),
+            )
+            .values(session_id=session_id, updated_by=user_id)
+        )
+        result = await self._db.exec(stmt)
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
+        return bool(result.rowcount)
 
     # -- tool-binding helpers ------------------------------------------------
 

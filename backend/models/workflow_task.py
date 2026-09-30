@@ -169,16 +169,30 @@ class WorkflowTask(TenantScoped, BaseEntity, table=True):
 
     This table holds only the scalar fields of a task. Dependency edges between
     tasks live in :class:`WorkflowTaskDependency`; they are not columns here.
+
+    ``session_id`` names the :class:`models.execution_session.ExecutionSession`
+    the task is assigned to -- the one ADK session allowed to advance it. It is
+    ``NULL`` until the server assigns the task
+    (:mod:`services.execution_branching`), and server-managed like ``status`` on
+    :class:`models.workflow_execution.WorkflowExecution`: it is absent from
+    :class:`WorkflowTaskUpdate`, so no API write can move a task between sessions.
     """
 
     __tablename__ = "workflow_tasks"
     __table_args__ = (
         Index("ix_workflow_tasks_workflow_execution_id", "workflow_execution_id"),
         Index("ix_workflow_tasks_tenant_id_status", "tenant_id", "status"),
+        Index("ix_workflow_tasks_session_id", "session_id"),
         ForeignKeyConstraint(
             ["workflow_execution_id"],
             ["workflow_executions.id"],
             ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["session_id"],
+            ["execution_sessions.id"],
+            ondelete="SET NULL",
+            name="fk_workflow_tasks_session_id",
         ),
     )
 
@@ -188,6 +202,7 @@ class WorkflowTask(TenantScoped, BaseEntity, table=True):
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
     error_kind: TaskErrorKind | None = None
     error_message: str | None = None
+    session_id: str | None = None
 
 
 class WorkflowTaskRead(BaseEntity):
@@ -202,6 +217,8 @@ class WorkflowTaskRead(BaseEntity):
     class, which is what makes them filterable and sortable through the list
     endpoints: ``repositories/workflow_task.py`` passes this class as the
     ``readable`` schema, and a field only resolves when present on both.
+    ``session_id`` is carried for the same reason, and so the UI can show which
+    session works each task.
     """
 
     workflow_execution_id: str
@@ -210,6 +227,7 @@ class WorkflowTaskRead(BaseEntity):
     status: WorkflowTaskStatus = WorkflowTaskStatus.pending
     error_kind: TaskErrorKind | None = None
     error_message: str | None = None
+    session_id: str | None = None
     depends_on_ids: list[str] = []
     tool_bindings: list[ToolBinding] = []
 

@@ -26,6 +26,8 @@ The workflow session opens with a fixed kickoff message and the execution agent 
 ![Flowchart of the run-advancement loop: list the run's tasks, pick one whose dependencies have completed, mark it in progress, do the work, mark it completed, failed, or skipped, and loop, or settle once every task has ended.](./img/workflow-execution-run-loop.svg#gh-light-mode-only)
 ![Flowchart of the run-advancement loop: list the run's tasks, pick one whose dependencies have completed, mark it in progress, do the work, mark it completed, failed, or skipped, and loop, or settle once every task has ended.](./img/workflow-execution-run-loop-dark.svg#gh-dark-mode-only)
 
+The agent does not choose which task comes next. The moment a task's dependencies have all completed, A2Flow **assigns** it to the session that will work it, and the agent works only the tasks assigned to it. Starting any other task — one assigned elsewhere, or one whose dependencies have not finished — is refused.
+
 A run ends `completed` when every task reached a terminal status with no failure among them, and `failed` when at least one failed. The statuses can be watched live in the run's read-only task view, as a table or as the dependency graph.
 
 When a task fails, every task still waiting on it — directly or further down the chain — is set to `skipped`, because it can no longer run. That is what lets the run settle as `failed` instead of waiting forever on a task that will never start. Tasks on other branches that do not depend on the failed one keep running as normal.

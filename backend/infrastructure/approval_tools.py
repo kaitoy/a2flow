@@ -63,6 +63,7 @@ from infrastructure.approved_calls import declared_tools, validate_declaration
 from infrastructure.tool_mocks import resolve_mock
 from infrastructure.workflow_task_tools import (
     _NO_SESSION,
+    _calling_session_id,
     _notify,
     _resolve_scope,
     _user_id,
@@ -76,6 +77,7 @@ from models.mcp_tool_mock import (
 from models.notification import NotificationType
 from models.tag import Tag
 from models.user import Role, User, has_any_role
+from models.workflow_task import WorkflowTaskRead
 from repositories.approval import ApprovalRepository, SqlApprovalRepository
 from repositories.effective_roles import (
     EffectiveRoleRepository,
@@ -350,6 +352,46 @@ _MAX_TASKS = 1000
 #: computed. Any id no real approval can hold works; it never leaves
 #: :func:`_prospective_tool_bindings`.
 _PROSPECTIVE = "<prospective>"
+
+
+def _within_session_reach(
+    tasks: Sequence[WorkflowTaskRead],
+    task_id: str,
+    session_id: str,
+    *,
+    main_session_id: str,
+) -> bool:
+    """Return whether ``task_id`` is assigned to ``session_id`` or depends on a task that is.
+
+    A session may gate only its own part of the run: the tasks assigned to it
+    and those downstream of them. That still lets an approval name a later step
+    of its own branch -- the way a skill asks for sign-off before a step it has
+    not reached -- while keeping a branch from gating another branch's work. A
+    task with no session recorded counts as the main session's, as it does for
+    task assignment (:mod:`services.execution_branching`).
+
+    Args:
+        tasks: Every task of the run.
+        task_id: The task an approval would take effect from.
+        session_id: The ADK session requesting the approval.
+        main_session_id: The run's main session.
+
+    Returns:
+        ``True`` when the task or one of its transitive dependencies is
+        assigned to ``session_id``.
+    """
+    by_id = {task.id: task for task in tasks}
+    seen: set[str] = set()
+    stack = [task_id]
+    while stack:
+        current = by_id.get(stack.pop())
+        if current is None or current.id in seen:
+            continue
+        if (current.session_id or main_session_id) == session_id:
+            return True
+        seen.add(current.id)
+        stack.extend(current.depends_on_ids)
+    return False
 
 
 async def _prospective_tool_bindings(
@@ -650,6 +692,26 @@ async def request_approval(
                 return {
                     "error": f"WorkflowTask {workflow_task_id!r} "
                     "not found in the current session"
+                }
+            calling = _calling_session_id(tool_context)
+            execution = await s.execution_repo.get(s.execution_id)
+            run_tasks = await s.task_repo.list(
+                limit=_MAX_TASKS, offset=0, workflow_execution_id=s.execution_id
+            )
+            if (
+                calling is not None
+                and execution is not None
+                and not _within_session_reach(
+                    run_tasks,
+                    workflow_task_id,
+                    calling,
+                    main_session_id=execution.session_id,
+                )
+            ):
+                return {
+                    "error": f"WorkflowTask {workflow_task_id!r} is outside the "
+                    "part of the run this session works: name a task assigned "
+                    "to you, or one that depends on a task assigned to you"
                 }
             try:
                 declaration = [ApprovedCall(**entry) for entry in approved_calls or []]

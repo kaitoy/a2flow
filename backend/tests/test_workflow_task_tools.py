@@ -38,6 +38,7 @@ from repositories.workflow_execution import SqlWorkflowExecutionRepository
 from tests._engine import make_test_engine
 from tests._seed import (
     DEFAULT_TEST_TENANT_ID,
+    seed_branch_session,
     seed_tenant,
     seed_users,
     seed_workflow_task,
@@ -500,3 +501,72 @@ async def test_agent_unknown_error_kind_is_rejected(engine: AsyncEngine) -> None
     assert (
         await _execution(engine, execution_id)
     ).status is WorkflowExecutionStatus.running
+
+
+# ---------- session assignment ----------
+
+
+async def _seed_branch(engine: AsyncEngine, execution_id: str) -> None:
+    """Record the run's main session ``sess-abc`` and a branch ``sess-branch`` forked from it."""
+    await seed_branch_session(engine, execution_id, "sess-abc")
+    await seed_branch_session(engine, execution_id, "sess-branch", parent_id="sess-abc")
+
+
+async def test_update_refuses_a_task_another_session_is_working(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine)
+    await _seed_branch(engine, execution_id)
+    task_id = await seed_workflow_task(engine, execution_id, session_id="sess-branch")
+
+    refused = await update_workflow_task(
+        task_id, _ctx("sess-abc"), status="in_progress"
+    )
+    assert "assigned to another session" in refused["error"]
+    started = await update_workflow_task(
+        task_id, _ctx("sess-branch"), status="in_progress"
+    )
+    assert started["status"] == "in_progress"
+    assert started["assigned_to_you"] is True
+
+
+async def test_update_refuses_to_start_before_dependencies_complete(
+    engine: AsyncEngine,
+) -> None:
+    execution_id = await _seed_session(engine)
+    first = await seed_workflow_task(engine, execution_id, title="First")
+    second = await seed_workflow_task(engine, execution_id, depends_on_ids=[first])
+
+    refused = await update_workflow_task(second, _ctx(), status="in_progress")
+    assert "cannot start before its dependencies" in refused["error"]
+
+
+async def test_starting_an_unassigned_task_claims_it(engine: AsyncEngine) -> None:
+    execution_id = await _seed_session(engine)
+    task_id = await seed_workflow_task(engine, execution_id)
+
+    await update_workflow_task(task_id, _ctx(), status="in_progress")
+
+    async with AsyncSession(engine) as db:
+        task = await db.get(WorkflowTask, task_id)
+    assert task is not None
+    assert task.session_id == "sess-abc"
+
+
+async def test_completing_a_task_assigns_its_dependents(engine: AsyncEngine) -> None:
+    """The scheduler runs after every write, so the next step is waiting when the agent looks."""
+    execution_id = await _seed_session(engine)
+    first = await seed_workflow_task(engine, execution_id, title="First")
+    second = await seed_workflow_task(
+        engine, execution_id, title="Second", depends_on_ids=[first]
+    )
+    await update_workflow_task(first, _ctx(), status="in_progress")
+    await update_workflow_task(first, _ctx(), status="completed")
+
+    listed = {t["id"]: t for t in (await list_workflow_tasks(_ctx()))["tasks"]}
+    assert listed[second]["assigned_to_you"] is True
+    assert listed[second]["session_id"] == "sess-abc"
+    # A branch session reading the same run sees the task as someone else's.
+    await seed_branch_session(engine, execution_id, "sess-branch", parent_id="sess-abc")
+    branch_view = await list_workflow_tasks(_ctx("sess-branch"))
+    assert all(not t["assigned_to_you"] for t in branch_view["tasks"])

@@ -33,8 +33,10 @@ from models.workflow_task import (
     WorkflowTaskStatus,
     WorkflowTaskUpdate,
 )
+from repositories.execution_session import ExecutionSessionRepository
 from repositories.workflow_execution import WorkflowExecutionRepository
 from repositories.workflow_task import WorkflowTaskRepository
+from services.execution_branching import assign_runnable_tasks
 from services.notification_dispatch import NotificationDispatcher
 
 logger = logging.getLogger(__name__)
@@ -115,11 +117,17 @@ async def evaluate_completion(
     *,
     executions: WorkflowExecutionRepository,
     tasks: WorkflowTaskRepository,
+    sessions: ExecutionSessionRepository,
     notifications: NotificationDispatcher,
     execution_id: str,
     acting_user_id: str,
 ) -> None:
-    """Finish a run whose tasks have all reached a terminal state.
+    """Advance a run's bookkeeping after a task write, finishing it once every task is terminal.
+
+    Newly runnable tasks are assigned to the session that will work them
+    (:func:`services.execution_branching.assign_runnable_tasks`) after blocked
+    dependents are skipped, so a task freed by this write is already marked
+    for its session when the agent next lists the run's tasks.
 
     When every task of the run is terminal (and there is at least one), stamps
     the execution's ``status`` and ``finished_at`` and emits the one-shot
@@ -146,7 +154,9 @@ async def evaluate_completion(
 
     Args:
         executions: Repository used to resolve and stamp the execution.
-        tasks: Repository used to read the run's tasks and skip blocked ones.
+        tasks: Repository used to read the run's tasks, skip blocked ones, and
+            assign runnable ones.
+        sessions: Repository holding the run's ADK sessions.
         notifications: Dispatcher used to check for, persist, and email the
             one-shot completion notification.
         execution_id: Primary key of the workflow execution to evaluate.
@@ -164,6 +174,16 @@ async def evaluate_completion(
                 limit=_TASK_SCAN_LIMIT, offset=0, workflow_execution_id=execution_id
             )
         if any(t.status not in TERMINAL_TASK_STATUSES for t in run_tasks):
+            execution = await executions.get(execution_id)
+            if execution is not None:
+                await assign_runnable_tasks(
+                    tasks=tasks,
+                    sessions=sessions,
+                    execution_id=execution_id,
+                    main_session_id=execution.session_id,
+                    run_tasks=run_tasks,
+                    acting_user_id=acting_user_id,
+                )
             return
         status = (
             WorkflowExecutionStatus.failed

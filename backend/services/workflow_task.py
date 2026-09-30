@@ -49,6 +49,7 @@ from repositories.exceptions import (
     ForbiddenError,
     NotFoundError,
 )
+from repositories.execution_session import ExecutionSessionRepository
 from repositories.query import FilterSpec, SortSpec
 from repositories.workflow_execution import WorkflowExecutionRepository
 from repositories.workflow_task import WorkflowTaskRepository
@@ -75,6 +76,7 @@ class WorkflowTaskService:
         notifications: NotificationDispatcher,
         approver_groups: ApproverGroupResolver,
         certificates: McpToolCertificateService,
+        sessions: ExecutionSessionRepository,
     ) -> None:
         """Initialize the service.
 
@@ -96,6 +98,8 @@ class WorkflowTaskService:
                 starts and revoking it when it finishes, so a run driven through
                 these endpoints carries the same signed authority as one the
                 agent drives itself.
+            sessions: Repository holding the run's ADK sessions, which the
+                shared completion bookkeeping assigns newly runnable tasks to.
         """
         self._repo = repo
         self._execution_repo = execution_repo
@@ -104,6 +108,7 @@ class WorkflowTaskService:
         self._approver_groups = approver_groups
         self._notifications = notifications
         self._certificates = certificates
+        self._sessions = sessions
 
     async def _evaluate_completion(
         self, execution_id: str, acting_user_id: str
@@ -123,6 +128,7 @@ class WorkflowTaskService:
         await evaluate_completion(
             executions=self._execution_repo,
             tasks=self._repo,
+            sessions=self._sessions,
             notifications=self._notifications,
             execution_id=execution_id,
             acting_user_id=acting_user_id,

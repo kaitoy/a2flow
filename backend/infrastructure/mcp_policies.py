@@ -69,19 +69,32 @@ _NO_CREDENTIAL = (
 
 
 async def _in_progress_tasks(
-    db: AsyncSession, execution_id: str, tenant_id: str
+    db: AsyncSession, execution_id: str, tenant_id: str, session_id: str
 ) -> list[WorkflowTaskRead]:
-    """Return the run's tasks currently in the ``in_progress`` status.
+    """Return the ``in_progress`` tasks the calling session is working on.
+
+    Only the calling ADK session's own tasks count: when branches of a run are
+    worked in parallel, several tasks are ``in_progress`` at once, and a
+    session must neither call a tool bound to another branch's task nor present
+    that task's certificate. A task with no session recorded counts as the main
+    session's, as it does for task assignment
+    (:mod:`services.execution_branching`).
 
     Args:
         db: The gateway's open database session.
         execution_id: The WorkflowExecution driving the run.
         tenant_id: Tenant the run belongs to.
+        session_id: The ADK session making the call.
 
     Returns:
-        The run's ``in_progress`` tasks, each with its tool bindings resolved.
+        The calling session's ``in_progress`` tasks, each with its tool
+        bindings resolved.
     """
     execution_repo = SqlWorkflowExecutionRepository(db, tenant_id=tenant_id)
+    execution = await execution_repo.get(execution_id)
+    if execution is None:
+        return []
+    main_session_id = execution.session_id
     task_repo = SqlWorkflowTaskRepository(
         db,
         execution_repo,
@@ -91,7 +104,12 @@ async def _in_progress_tasks(
     tasks = await task_repo.list(
         limit=_MAX_TASKS, offset=0, workflow_execution_id=execution_id
     )
-    return [t for t in tasks if t.status == WorkflowTaskStatus.in_progress]
+    return [
+        t
+        for t in tasks
+        if t.status == WorkflowTaskStatus.in_progress
+        and (t.session_id or main_session_id) == session_id
+    ]
 
 
 class InProgressToolBindingPolicy:
@@ -125,7 +143,10 @@ class InProgressToolBindingPolicy:
         if ctx.identity.execution_id is None:
             raise McpPolicyDeniedError(_NO_EXECUTION)
         tasks = await _in_progress_tasks(
-            db, ctx.identity.execution_id, ctx.identity.tenant_id
+            db,
+            ctx.identity.execution_id,
+            ctx.identity.tenant_id,
+            ctx.principal.session_id,
         )
         if not tasks:
             raise McpPolicyDeniedError(_NO_TASK_IN_PROGRESS)
@@ -347,7 +368,10 @@ class TaskCertificatePolicy:
             return
 
         tasks = await _in_progress_tasks(
-            db, ctx.identity.execution_id, ctx.identity.tenant_id
+            db,
+            ctx.identity.execution_id,
+            ctx.identity.tenant_id,
+            ctx.principal.session_id,
         )
         binding_tasks = [
             task

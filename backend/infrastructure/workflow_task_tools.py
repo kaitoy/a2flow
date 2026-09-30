@@ -67,6 +67,10 @@ from repositories.effective_roles import (
 from repositories.exceptions import (
     NotFoundError,
 )
+from repositories.execution_session import (
+    ExecutionSessionRepository,
+    SqlExecutionSessionRepository,
+)
 from repositories.mcp_server import SqlMCPServerRepository
 from repositories.tenant_bootstrap import (
     NoTenantSessionError,
@@ -121,6 +125,8 @@ class _Scope:
     tenant_id: str
     execution_repo: WorkflowExecutionRepository
     task_repo: WorkflowTaskRepository
+    #: The run's ADK sessions, which newly runnable tasks are assigned to.
+    session_repo: ExecutionSessionRepository
     #: The run's approvals, so :func:`update_workflow_task` can tell which
     #: approval governs a task before letting a designated approver advance it.
     approval_repo: ApprovalRepository
@@ -209,6 +215,7 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
                 SqlMCPServerRepository(db, tenant_id=tenant_id),
                 tenant_id=tenant_id,
             ),
+            session_repo=SqlExecutionSessionRepository(db, tenant_id=tenant_id),
             approval_repo=SqlApprovalRepository(
                 db, execution_repo, group_repo, tenant_id=tenant_id
             ),
@@ -309,6 +316,7 @@ async def _evaluate_completion(scope: _Scope, acting_user_id: str) -> None:
     await evaluate_completion(
         executions=scope.execution_repo,
         tasks=scope.task_repo,
+        sessions=scope.session_repo,
         notifications=scope.notifications,
         execution_id=scope.execution_id,
         acting_user_id=acting_user_id,
@@ -354,13 +362,38 @@ async def _settle_certificate(
         )
 
 
-def _task_to_dict(task: WorkflowTaskRead) -> dict[str, Any]:
-    """Convert a WorkflowTaskRead into a plain dict the LLM can consume."""
+def _calling_session_id(tool_context: ToolContext) -> str | None:
+    """Return the ADK session id the tool is being called from, or ``None``."""
+    session = getattr(tool_context, "session", None)
+    session_id = getattr(session, "id", None)
+    return session_id if isinstance(session_id, str) else None
+
+
+def _task_to_dict(
+    task: WorkflowTaskRead, calling_session_id: str | None = None
+) -> dict[str, Any]:
+    """Convert a WorkflowTaskRead into a plain dict the LLM can consume.
+
+    ``assigned_to_you`` tells the model which tasks are its own to work: the
+    server assigns each runnable task to one session of the run, and only that
+    session may advance it.
+
+    Args:
+        task: The task to convert.
+        calling_session_id: The ADK session of the agent reading the task.
+
+    Returns:
+        The task as plain JSON-serializable values.
+    """
     return {
         "id": task.id,
         "title": task.title,
         "description": task.description,
         "status": task.status.value,
+        "session_id": task.session_id,
+        "assigned_to_you": (
+            task.session_id is not None and task.session_id == calling_session_id
+        ),
         "error_kind": task.error_kind.value if task.error_kind else None,
         "error_message": task.error_message,
         "depends_on_ids": list(task.depends_on_ids),
@@ -499,25 +532,29 @@ def _topo_sort(keys: list[str], by_key: dict[str, dict[str, Any]]) -> list[str] 
 async def list_workflow_tasks(tool_context: ToolContext) -> dict[str, Any]:
     """List all WorkflowTasks in the current session, in creation order.
 
-    Call this to decide what to do next: pick a ``pending`` task whose
-    ``depends_on_ids`` are all ``completed`` (a "runnable" task). When several
-    are runnable, the one appearing first in this list was created first.
+    Call this to decide what to do next: work the ``pending`` task marked
+    ``assigned_to_you``. The server assigns each task to one session of the run
+    once its dependencies are ``completed``; a task assigned elsewhere, or not
+    assigned yet, is not yours to start. When several are assigned to you, the
+    one appearing first in this list was created first.
 
     Args:
         tool_context: Injected by ADK; identifies the current session. Not shown
             to the model.
 
     Returns:
-        ``{"tasks": [{"id", "title", "description", "status", "depends_on_ids",
-        "tool_bindings"}, ...]}`` ordered by creation time, or
-        ``{"error": <message>}`` if the session cannot be resolved.
+        ``{"tasks": [{"id", "title", "description", "status", "session_id",
+        "assigned_to_you", "depends_on_ids", "tool_bindings"}, ...]}`` ordered
+        by creation time, or ``{"error": <message>}`` if the session cannot be
+        resolved.
     """
+    calling = _calling_session_id(tool_context)
     try:
         async with _repos(tool_context) as s:
             tasks = await s.task_repo.list(
                 limit=1000, offset=0, workflow_execution_id=s.execution_id
             )
-            return {"tasks": [_task_to_dict(t) for t in tasks]}
+            return {"tasks": [_task_to_dict(t, calling) for t in tasks]}
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
 
@@ -539,7 +576,7 @@ async def get_workflow_task(task_id: str, tool_context: ToolContext) -> dict[str
             task = await s.task_repo.get(task_id)
             if task is None or task.workflow_execution_id != s.execution_id:
                 return _not_in_session_error(task_id)
-            return _task_to_dict(task)
+            return _task_to_dict(task, _calling_session_id(tool_context))
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
 
@@ -605,6 +642,74 @@ async def _status_change_denied_reason(
     )
 
 
+def _assigned_elsewhere_error(task_id: str) -> str:
+    """Build the error text for a task another session of the run is working."""
+    return (
+        f"task {task_id!r} is assigned to another session of this run; "
+        "work only the tasks list_workflow_tasks marks assigned_to_you"
+    )
+
+
+async def _session_denied_reason(
+    s: _Scope,
+    task: WorkflowTaskRead,
+    calling_session_id: str | None,
+    new_status: WorkflowTaskStatus,
+    acting_user_id: str,
+) -> str | None:
+    """Return why the calling session may not move ``task`` to ``new_status``, or ``None``.
+
+    A task belongs to the one session the server assigned it to
+    (:mod:`services.execution_branching`), so another session of the run is
+    refused. Starting a task additionally needs every dependency ``completed``.
+    A task nobody has been assigned yet is claimed for the calling session as
+    it starts -- atomically, so two sessions starting it at once cannot both win.
+
+    Args:
+        s: The current tool call's resolved run and repositories.
+        task: The task as it stands before the change.
+        calling_session_id: The ADK session the tool is called from.
+        new_status: The status the agent asked for.
+        acting_user_id: Recorded on the task's ``updated_by`` if it is claimed.
+
+    Returns:
+        An error message for the model, or ``None`` when the change may proceed.
+    """
+    if task.session_id not in (None, calling_session_id):
+        return _assigned_elsewhere_error(task.id)
+    if new_status != WorkflowTaskStatus.in_progress:
+        return None
+    run_tasks = await s.task_repo.list(
+        limit=_MAX_TASKS, offset=0, workflow_execution_id=s.execution_id
+    )
+    status_by_id = {t.id: t.status for t in run_tasks}
+    unfinished = [
+        dep_id
+        for dep_id in task.depends_on_ids
+        if status_by_id.get(dep_id) != WorkflowTaskStatus.completed
+    ]
+    if unfinished:
+        return (
+            f"task {task.id!r} cannot start before its dependencies are completed; "
+            f"still unfinished: {', '.join(unfinished)}"
+        )
+    if task.session_id is None and calling_session_id is not None:
+        execution = await s.execution_repo.get(s.execution_id)
+        if execution is not None and execution.session_id == calling_session_id:
+            # A run created before sessions were recorded has no main-session
+            # row yet, and the claim below needs one to point at.
+            await s.session_repo.ensure_main(
+                execution_id=s.execution_id,
+                session_id=calling_session_id,
+                user_id=acting_user_id,
+            )
+        if not await s.task_repo.claim(
+            task.id, calling_session_id, user_id=acting_user_id
+        ):
+            return _assigned_elsewhere_error(task.id)
+    return None
+
+
 async def update_workflow_task(
     task_id: str,
     tool_context: ToolContext,
@@ -625,6 +730,11 @@ async def update_workflow_task(
     ``in_progress`` is what grants it permission to call the MCP tools bound to
     it. Whenever you set ``status`` to "failed", also pass ``error_kind`` and
     ``error_message`` so the failure can be triaged later.
+
+    Only the tasks assigned to you (``assigned_to_you`` in
+    ``list_workflow_tasks``) may be changed; a task another session of the run
+    is working is refused. A task cannot be set ``in_progress`` until every
+    task in its ``depends_on_ids`` is ``completed``.
 
     When the person driving this turn is only a designated approver of the run
     (not its initiator), a status change is accepted only for a task an approval
@@ -654,8 +764,9 @@ async def update_workflow_task(
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an invalid status
-        or error kind, unknown task, cross-session task, unresolved session, or
-        a status change the acting approver is not allowed to make.
+        or error kind, unknown task, cross-session task, unresolved session, a
+        task assigned to another session, a start before the dependencies are
+        completed, or a status change the acting approver is not allowed to make.
     """
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
@@ -676,10 +787,15 @@ async def update_workflow_task(
             if error_message is not None:
                 fields["error_message"] = error_message
             acting_user_id = _user_id(tool_context)
+            calling = _calling_session_id(tool_context)
             if status_enum is not None and status_enum != existing.status:
-                denied = await _status_change_denied_reason(s, existing, acting_user_id)
+                denied = await _session_denied_reason(
+                    s, existing, calling, status_enum, acting_user_id
+                ) or await _status_change_denied_reason(s, existing, acting_user_id)
                 if denied is not None:
                     return {"error": denied}
+            elif existing.session_id not in (None, calling):
+                return {"error": _assigned_elsewhere_error(task_id)}
             try:
                 task = await s.task_repo.update(
                     task_id,
@@ -692,6 +808,6 @@ async def update_workflow_task(
             # just finished no longer needs the certificate it had.
             await _settle_certificate(s, task, acting_user_id)
             await _evaluate_completion(s, acting_user_id)
-            return _task_to_dict(task)
+            return _task_to_dict(task, calling)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}

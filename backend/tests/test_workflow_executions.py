@@ -25,9 +25,12 @@ from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import (
     GENERATE_BODY,
+    add_template,
     create_published_workflow,
     create_skill,
+    generate_workflow,
     insert_workflow_task,
+    publish_workflow,
 )
 from tests.conftest import FAKE_COMMIT_SHA
 
@@ -285,6 +288,32 @@ async def test_workflow_session_agent_unknown_id_returns_404(
         json=_make_run_agent_input(),
     )
     assert response.status_code == 404
+
+
+async def test_execute_assigns_the_root_tasks_to_the_main_session(
+    workflow_client: AsyncClient,
+) -> None:
+    """The first runnable tasks are the main session's before the agent's first turn."""
+    skill = await _create_skill(workflow_client)
+    wf = await generate_workflow(workflow_client, skill["id"])
+    first = await add_template(workflow_client, wf["id"], title="First")
+    await add_template(
+        workflow_client, wf["id"], title="Second", depends_on_ids=[first["id"]]
+    )
+    await publish_workflow(workflow_client, wf["id"])
+    execution = assert_ok(
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"),
+        status=201,
+    )
+
+    tasks = assert_ok(
+        await workflow_client.get(
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
+        )
+    )
+    by_title = {t["title"]: t for t in tasks}
+    assert by_title["First"]["sessionId"] == execution["sessionId"]
+    assert by_title["Second"]["sessionId"] is None
 
 
 async def test_workflow_session_agent_refuses_another_sessions_thread(

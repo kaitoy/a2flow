@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
+from models.execution_session import ExecutionSession, ExecutionSessionStatus
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.workflow_task import (
@@ -174,6 +175,7 @@ async def seed_workflow_task(
     input_approval_exempt: Sequence[tuple[str, str]] = (),
     tenant_id: str = DEFAULT_TEST_TENANT_ID,
     user_id: str = "owner",
+    session_id: str | None = None,
 ) -> str:
     """Insert a WorkflowTask, its dependency edges, and its tool bindings.
 
@@ -200,6 +202,9 @@ async def seed_workflow_task(
             the many callers that never exempt anything stay as they are.
         tenant_id: Tenant the task belongs to.
         user_id: Actor recorded in ``created_by`` / ``updated_by``.
+        session_id: The ADK session the task is assigned to, or ``None`` for
+            one not assigned yet. A branch session must already have its row
+            (:func:`seed_branch_session`).
 
     Returns:
         The new task's id.
@@ -210,6 +215,7 @@ async def seed_workflow_task(
             title=title,
             description=description,
             status=status,
+            session_id=session_id,
             tenant_id=tenant_id,
             created_by=user_id,
             updated_by=user_id,
@@ -237,3 +243,39 @@ async def seed_workflow_task(
             )
         await session.commit()
         return task_id
+
+
+async def seed_branch_session(
+    engine: AsyncEngine,
+    execution_id: str,
+    session_id: str,
+    *,
+    parent_id: str | None = None,
+    status: ExecutionSessionStatus = ExecutionSessionStatus.idle,
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
+    user_id: str = "owner",
+) -> None:
+    """Insert an ExecutionSession row, standing in for a fork of the run's session.
+
+    Args:
+        engine: The async engine bound to the test database.
+        execution_id: The WorkflowExecution the session belongs to.
+        session_id: The ADK session id, which is also the row's id.
+        parent_id: The session it was forked from, or ``None`` for a main session.
+        status: The session's lifecycle status.
+        tenant_id: Tenant the session belongs to.
+        user_id: Actor recorded in ``created_by`` / ``updated_by``.
+    """
+    async with AsyncSession(engine) as session:
+        session.add(
+            ExecutionSession(
+                id=session_id,
+                workflow_execution_id=execution_id,
+                parent_id=parent_id,
+                status=status,
+                tenant_id=tenant_id,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+        )
+        await session.commit()

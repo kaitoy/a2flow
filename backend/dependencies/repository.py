@@ -18,6 +18,10 @@ from repositories.effective_roles import (
     EffectiveRoleRepository,
     SqlEffectiveRoleRepository,
 )
+from repositories.execution_session import (
+    ExecutionSessionRepository,
+    SqlExecutionSessionRepository,
+)
 from repositories.impersonation_event import (
     ImpersonationEventRepository,
     SqlImpersonationEventRepository,
@@ -463,6 +467,18 @@ def get_workflow_task_repository(
 
 WorkflowTaskRepositoryDep = Annotated[
     WorkflowTaskRepository, Depends(get_workflow_task_repository)
+]
+
+
+def get_execution_session_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> ExecutionSessionRepository:
+    """Create an ExecutionSessionRepository backed by the current database session."""
+    return SqlExecutionSessionRepository(db, tenant_id=tenant_id)
+
+
+ExecutionSessionRepositoryDep = Annotated[
+    ExecutionSessionRepository, Depends(get_execution_session_repository)
 ]
 
 

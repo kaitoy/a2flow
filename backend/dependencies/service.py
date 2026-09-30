@@ -49,6 +49,7 @@ from .repository import (
     ApprovalRepositoryDep,
     DBSessionDep,
     EffectiveRoleRepositoryDep,
+    ExecutionSessionRepositoryDep,
     ImpersonationEventRepositoryDep,
     McpCertificateAuthorityRepositoryDep,
     MCPServerRepositoryDep,
@@ -321,6 +322,7 @@ def get_workflow_service(
     execution_repo: WorkflowExecutionRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
+    sessions: ExecutionSessionRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
     meta: MessageMetaRepositoryDep,
     mocks: MCPToolMockRepositoryDep,
@@ -341,6 +343,7 @@ def get_workflow_service(
         execution_repo,
         templates,
         tasks,
+        sessions,
         versions,
         meta,
         mocks,
@@ -523,8 +526,9 @@ def get_workflow_task_service(
     notifications: NotificationDispatcherDep,
     approver_groups: ApproverGroupResolverDep,
     certificates: McpToolCertificateServiceDep,
+    sessions: ExecutionSessionRepositoryDep,
 ) -> WorkflowTaskService:
-    """Create a WorkflowTaskService wiring the task, session, and approval repositories, the notification dispatcher, the access policy, and the approver-group resolver."""
+    """Create a WorkflowTaskService wiring the task, execution, ADK-session, and approval repositories, the notification dispatcher, the access policy, and the approver-group resolver."""
     return WorkflowTaskService(
         repo,
         execution_repo,
@@ -533,6 +537,7 @@ def get_workflow_task_service(
         notifications,
         approver_groups,
         certificates,
+        sessions,
     )
 
 

@@ -66,6 +66,7 @@ from repositories.exceptions import (
     WorkflowNotModifiedError,
     WorkflowNotRunnableError,
 )
+from repositories.execution_session import ExecutionSessionRepository
 from repositories.mcp_tool_mock import MCPToolMockRepository
 from repositories.message_meta import MessageMetaRepository
 from repositories.query import FilterSpec, SortSpec
@@ -78,6 +79,7 @@ from repositories.workflow_task_template import (
     WorkflowTaskTemplateRepository,
 )
 from services import session_attribution
+from services.execution_branching import assign_runnable_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +168,7 @@ class WorkflowService:
         execution_repo: WorkflowExecutionRepository,
         templates: WorkflowTaskTemplateRepository,
         tasks: WorkflowTaskRepository,
+        sessions: ExecutionSessionRepository,
         versions: WorkflowPublishedVersionRepository,
         meta: MessageMetaRepository,
         mocks: MCPToolMockRepository,
@@ -184,6 +187,8 @@ class WorkflowService:
                 read at execute time to copy the task templates into the new session.
             tasks: Repository providing WorkflowTask persistence, written at
                 execute time with the copied tasks.
+            sessions: Repository holding a run's ADK sessions, written at
+                execute time with the main session and its first assignments.
             versions: Repository holding the snapshot taken at publish time,
                 which a ``modified`` workflow runs against and
                 :meth:`discard_changes` restores from.
@@ -201,6 +206,7 @@ class WorkflowService:
         self._execution_repo = execution_repo
         self._templates = templates
         self._tasks = tasks
+        self._sessions = sessions
         self._versions = versions
         self._meta = meta
         self._mocks = mocks
@@ -941,6 +947,20 @@ class WorkflowService:
                 user_id=user,
             )
             template_to_task[template.id] = task.id
+        # Record the main session and assign it the root tasks now, so the
+        # agent's first turn already finds work marked as its own.
+        await assign_runnable_tasks(
+            tasks=self._tasks,
+            sessions=self._sessions,
+            execution_id=execution_id,
+            main_session_id=session_id,
+            run_tasks=await self._tasks.list(
+                limit=len(template_to_task),
+                offset=0,
+                workflow_execution_id=execution_id,
+            ),
+            acting_user_id=user,
+        )
         # Re-read after the last commit: each task commit on the shared request
         # session expires the ``execution`` instance, and serializing an expired one
         # outside the request's greenlet context would fail.

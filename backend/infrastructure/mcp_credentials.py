@@ -50,6 +50,7 @@ from infrastructure.mcp_certificate import (
     pop_digest,
     sign_pop_digest,
 )
+from infrastructure.mcp_policies import _in_progress_tasks
 from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
 from models.mcp_tool_certificate import McpToolCertificate
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
@@ -165,7 +166,13 @@ class ApprovalCredentialProvider:
     async def _find(
         self, session_id: str, mcp_server_id: str, tool_name: str
     ) -> McpToolCertificate | None:
-        """Pick the run's live certificate that best covers the target tool.
+        """Pick the calling session's live certificate that best covers the target tool.
+
+        Only certificates of tasks the calling session is working on are
+        candidates: when branches of a run are worked in parallel, another
+        session's certificate may grant the same tool under a different
+        approval, and presenting it would check the call against the wrong
+        declaration.
 
         Args:
             session_id: The ADK session the call belongs to.
@@ -174,15 +181,25 @@ class ApprovalCredentialProvider:
 
         Returns:
             The chosen certificate, or ``None`` when the session maps to no run
-            or the run has no live certificate.
+            or none of its in-progress tasks holds a live certificate.
         """
         async with self._session_factory() as db:
             resolved = await resolve_workflow_execution_tenant(db, session_id)
             if resolved is None:
                 return None
             execution_id, tenant_id = resolved
+            own_task_ids = {
+                task.id
+                for task in await _in_progress_tasks(
+                    db, execution_id, tenant_id, session_id
+                )
+            }
             repo = SqlMcpToolCertificateRepository(db, tenant_id=tenant_id)
-            candidates = await repo.list_live_for_execution(execution_id)
+            candidates = [
+                certificate
+                for certificate in await repo.list_live_for_execution(execution_id)
+                if certificate.workflow_task_id in own_task_ids
+            ]
 
         if not candidates:
             return None

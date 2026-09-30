@@ -18,6 +18,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
+from models.execution_session import ExecutionSession
 from models.workflow import Workflow
 from models.workflow_execution import WorkflowExecution
 
@@ -29,13 +30,27 @@ class NoTenantSessionError(Exception):
 async def resolve_workflow_execution_tenant(
     db: AsyncSession, session_id: str
 ) -> tuple[str, str] | None:
-    """Return ``(workflow_execution_id, tenant_id)`` for an ADK session id, or ``None``."""
+    """Return ``(workflow_execution_id, tenant_id)`` for an ADK session id, or ``None``.
+
+    Any session of the run resolves: the main session through
+    ``WorkflowExecution.session_id``, and a branch session forked from it
+    through its :class:`models.execution_session.ExecutionSession` row. Every
+    execution-side tool maps its session to the run this way, so a branch
+    session is recognized as part of the run everywhere at once.
+    """
     stmt = (
         select(WorkflowExecution.id, WorkflowExecution.tenant_id)
         .where(col(WorkflowExecution.session_id) == session_id)
         .limit(1)
     )
     row = (await db.exec(stmt)).first()
+    if row is None:
+        branch = (
+            select(ExecutionSession.workflow_execution_id, ExecutionSession.tenant_id)
+            .where(col(ExecutionSession.id) == session_id)
+            .limit(1)
+        )
+        row = (await db.exec(branch)).first()
     return (row[0], row[1]) if row is not None else None
 
 
