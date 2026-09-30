@@ -37,6 +37,10 @@ useChat.sendMessage()
             POST /agent  →  FastAPI backend
 ```
 
+### Turns the server starts
+
+A workflow session's kickoff, and its resumption after an approval is decided, are run by the backend's session runner (`backend/services/session_runner.py`), with no browser and so no middleware in between. The runner attaches the same tools and context itself, from `backend/infrastructure/client_contract.json`: `render_approval`, `render_a2ui`, and the two A2UI context entries, exactly as a browser sends them. That file is generated, not written — `frontend/src/lib/clientContract.test.ts` captures the request body a real `createChatAgent()` run sends and fails whenever the committed file differs, so a middleware upgrade, a catalog revision, or an edit to the approval tool cannot silently leave server-started turns offering the model something else. Regenerate it with `UPDATE_CLIENT_CONTRACT=1` (see [CONTRIBUTING.md](../CONTRIBUTING.md#testing)).
+
 ---
 
 ## 3. Backend — LLM calls render_a2ui

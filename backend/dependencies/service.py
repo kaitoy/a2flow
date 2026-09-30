@@ -17,6 +17,7 @@ from services.agent_skill import AgentSkillService
 from services.agent_skill_sync import sync_agent_skill
 from services.approval import ApprovalService
 from services.approver_groups import ApproverGroupResolver
+from services.execution_session import ExecutionSessionService
 from services.impersonation_event import ImpersonationEventService
 from services.mcp_registry import MCPRegistryService
 from services.mcp_server import MCPServerService
@@ -565,13 +566,28 @@ def get_approval_service(
     approver_groups: ApproverGroupResolverDep,
     certificates: McpToolCertificateServiceDep,
     executions: WorkflowExecutionRepositoryDep,
+    sessions: ExecutionSessionRepositoryDep,
 ) -> ApprovalService:
     """Create an ApprovalService backed by the request's repositories.
 
     ``executions`` is read only for its tag attachments -- see
     ``ApprovalService.__init__``.
     """
-    return ApprovalService(repo, approver_groups, certificates, executions)
+    return ApprovalService(repo, approver_groups, certificates, executions, sessions)
 
 
 ApprovalServiceDep = Annotated[ApprovalService, Depends(get_approval_service)]
+
+
+def get_execution_session_service(
+    sessions: ExecutionSessionRepositoryDep,
+    approvals: ApprovalRepositoryDep,
+    executions: WorkflowExecutionRepositoryDep,
+) -> ExecutionSessionService:
+    """Create an ExecutionSessionService backed by the request's repositories."""
+    return ExecutionSessionService(sessions, approvals, executions)
+
+
+ExecutionSessionServiceDep = Annotated[
+    ExecutionSessionService, Depends(get_execution_session_service)
+]

@@ -16,6 +16,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from dependencies.context import APP_NAME
+from dependencies.singletons import get_agent_registry, get_session_service
 from infrastructure.bootstrap import (
     apply_system_settings_env_overrides,
     seed_default_tenant_and_admin_user,
@@ -28,6 +29,7 @@ from infrastructure.demo_data import sync_demo_data
 from infrastructure.logging_context import setup_logging
 from infrastructure.mcp_transport_tls import provision_transport_credentials
 from infrastructure.migrations import run_migrations
+from infrastructure.skill_manager import get_skill_manager
 from middleware.envelope import RequestContextMiddleware
 from models.user import SYSTEM_USER_ID
 from repositories.exceptions import HttpMappedError
@@ -40,6 +42,7 @@ from routers.exception_handlers import (
 )
 from services.agent_skill_sync import sync_agent_skill
 from services.email_queue_worker import run_email_queue_worker
+from services.session_runner import SessionRunner, run_session_dispatcher
 
 # Populates os.environ from backend/.env so vendor SDKs (litellm, google-genai)
 # that read GOOGLE_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY/AWS_BEARER_TOKEN_BEDROCK
@@ -75,6 +78,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     mail with nothing else running. A deployment with the dedicated ``worker``
     process turns it off; either way the ``email-queue`` advisory lock still
     elects exactly one sender across the whole deployment.
+
+    The session runner's dispatcher always starts: it runs the workflow-session
+    turns no browser drives -- a run's kickoff, and its resumption once an
+    approval is decided (:mod:`services.session_runner`). Every replica runs
+    one; each session's run lock keeps them from running the same turn twice.
     """
     await run_migrations()
     # Holds a strong reference to the background tasks for as long as the
@@ -101,6 +109,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         background.add(clone)
         clone.add_done_callback(background.discard)
+    session_dispatcher = asyncio.create_task(
+        run_session_dispatcher(
+            SessionRunner(
+                registry=get_agent_registry(),
+                skills_store=get_skill_manager(),
+                session_service=get_session_service(),
+                app_name=APP_NAME,
+            ),
+            concurrency=settings.session_runner_concurrency,
+        )
+    )
+    background.add(session_dispatcher)
+    session_dispatcher.add_done_callback(background.discard)
     email_worker: asyncio.Task[None] | None = None
     if settings.email_worker_in_process:
         email_worker = asyncio.create_task(run_email_queue_worker())
@@ -109,6 +130,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         yield
     finally:
+        session_dispatcher.cancel()
+        # Cancelling it cancels the turns it started; this waits for them to
+        # record where they stopped before the process goes.
+        await asyncio.gather(session_dispatcher, return_exceptions=True)
         if email_worker is not None:
             email_worker.cancel()
             # The worker swallows its own cancellation, so this only waits for

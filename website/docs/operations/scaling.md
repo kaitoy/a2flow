@@ -32,7 +32,9 @@ So each agent run (`POST /api/v1/workflow-executions/{id}/agent`, `POST /api/v1/
 
 A second concurrent run of the same session is refused before any SSE headers are sent, rather than being left to diverge quietly. Different sessions never contend, and the lock is briefly waited on before it gives up, so a client that aborts a stream and immediately retries is not rejected while the abandoned run is still tearing down.
 
-Human-in-the-loop is unaffected: a frontend tool call ends the run and closes the stream, releasing the lock, and the approval resumes as a *new* agent request that may land on any replica.
+Human-in-the-loop is unaffected: a frontend tool call ends the run and closes the stream, releasing the lock, and the approval resumes as a *new* turn that may run on any replica.
+
+Every replica also runs a **session runner** that performs the turns no browser drives — a run's kickoff and its resumption after an approval. It takes the same lock without waiting, so a session already being run elsewhere is left to that replica, and it picks up a turn that a stopped replica left unfinished. How many such turns one replica runs at once is set by `SESSION_RUNNER_CONCURRENCY` (see the [configuration reference](./configuration.md#agent)).
 
 ## Connection pooling {#connection-pooling}
 

@@ -37,6 +37,8 @@ The agent explains the request in plain text, and the controls appear in the cha
 | **Reject** | Do not do this | Marks the task `failed` or `skipped` |
 | **Return** | Revise and ask again | Sends the work back rather than settling the request |
 
+A decision resumes the run straight away, wherever it is made — in the chat or from the [Approvals](#browsing-approvals) list — even when nobody has the run's chat open. A decision made before the controls have even appeared is not lost either: the run picks it up as soon as it reaches that point.
+
 **Return** is a third decision alongside the other two, not a variant of Reject: a high return rate points at an upstream quality problem, rather than at work that should not have been requested at all.
 
 Each decision takes an optional **comment**. The decision itself is **final** — two members of an approver group can genuinely race each other, so a second decision that would change the recorded one is refused rather than overwriting it. Editing the comment afterwards is still allowed, and it moves neither the recorded decider nor the decision time, so the turnaround from request to decision stays the approver's real one.

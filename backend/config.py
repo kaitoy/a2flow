@@ -257,6 +257,12 @@ class Settings(BaseSettings):
             elects exactly one sender — just pointless.
         email_send_rate_per_second: Messages per second handed to the SMTP
             relay; the worker pauses ``1 / rate`` before each send.
+        session_runner_concurrency: Most workflow-session turns this process
+            runs at once on the server's behalf -- a run's kickoff, and its
+            resumption after an approval is decided (see
+            :mod:`services.session_runner`). Each is a live LLM conversation,
+            so this bounds a replica's concurrent model calls from runs nobody
+            is watching.
         email_queue_batch_size: How many messages one drain pass claims.
         email_queue_poll_interval_seconds: How long the worker sleeps when the
             queue is empty.
@@ -348,6 +354,7 @@ class Settings(BaseSettings):
     smtp_from_name: str | None = None
 
     email_worker_in_process: bool = True
+    session_runner_concurrency: int = Field(default=4, ge=1)
     email_send_rate_per_second: float = _DEFAULT_EMAIL_RATE_PER_SECOND
     email_queue_batch_size: int = _DEFAULT_EMAIL_BATCH_SIZE
     email_queue_poll_interval_seconds: float = _DEFAULT_EMAIL_POLL_INTERVAL_SECONDS

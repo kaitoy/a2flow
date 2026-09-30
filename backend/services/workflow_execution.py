@@ -372,6 +372,25 @@ class WorkflowExecutionService:
         """
         execution = await self._get(execution_id)
         await self._access.assert_access(execution_id, execution.initiator_id, caller)
+        return await self.agent_for(execution), execution
+
+    async def agent_for(self, execution: WorkflowExecution) -> ADKAgent:
+        """Return the ADK agent for an execution's skill revision, without authorizing anyone.
+
+        The body of :meth:`resolve_agent` minus its access check, for the
+        session runner (:mod:`services.session_runner`), which drives turns on
+        the run's own behalf rather than for a caller.
+
+        Args:
+            execution: The execution whose agent to resolve.
+
+        Returns:
+            The ADK agent configured for the execution's skill revision.
+
+        Raises:
+            SkillNotReadyError: If neither the revision the execution pinned nor
+                the skill's current revision is present in the store.
+        """
         skill = await self._skills.get(execution.agent_skill_id)
         if skill is None:
             raise SkillNotReadyError(execution.agent_skill_id)
@@ -403,14 +422,13 @@ class WorkflowExecutionService:
             if not skill_dir.exists():
                 raise SkillNotReadyError(skill.id)
 
-        agent = self._registry.get(
+        return self._registry.get(
             execution.agent_skill_id,
             commit_sha,
             skill_dir,
             tenant_id=execution.tenant_id,
             kind=AgentKind.execution,
         )
-        return agent, execution
 
     async def get_messages(
         self, execution_id: str, *, caller: User, caller_roles: Collection[str]

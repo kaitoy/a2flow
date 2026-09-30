@@ -132,6 +132,15 @@ Both suites also run from the pre-commit hook, gated so a backend-only or fronte
 commit skips the other side. See [backend/README.md](backend/README.md#testing) and
 [frontend/README.md](frontend/README.md#testing) for the options each takes.
 
+`backend/infrastructure/client_contract.json` — the client tools and A2UI context the
+backend attaches to the turns it runs itself — is generated from the frontend, and
+`frontend/src/lib/clientContract.test.ts` fails when the two drift apart. After changing
+the A2UI middleware config, the catalog, or `render_approval`, regenerate and commit it:
+
+```bash
+cd frontend && UPDATE_CLIENT_CONTRACT=1 pnpm vitest run src/lib/clientContract.test.ts
+```
+
 ### Running the backend suite against PostgreSQL
 
 The backend suite runs on in-memory SQLite by default — no setup, nothing to

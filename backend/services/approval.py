@@ -8,6 +8,7 @@ so the router never repeats the null check.
 from collections.abc import Collection
 
 from models.approval import Approval, ApprovalRead, ApprovalStatus, ApprovalUpdate
+from models.execution_session import ExecutionSessionStatus
 from models.user import Role, User, has_any_role
 from repositories.approval import ApprovalRepository
 from repositories.exceptions import (
@@ -15,10 +16,13 @@ from repositories.exceptions import (
     ForbiddenError,
     NotFoundError,
 )
+from repositories.execution_session import ExecutionSessionRepository
 from repositories.query import FilterSpec, SortSpec
 from repositories.workflow_execution import WorkflowExecutionRepository
 from services.approver_groups import ApproverGroupResolver
 from services.mcp_tool_certificate import McpToolCertificateService
+from services.session_inputs import WaitingCall
+from services.session_queue import decision_input, queue_input
 
 
 class ApprovalService:
@@ -30,6 +34,7 @@ class ApprovalService:
         approver_groups: ApproverGroupResolver,
         certificates: McpToolCertificateService,
         executions: WorkflowExecutionRepository,
+        sessions: ExecutionSessionRepository,
     ) -> None:
         """Initialize the service.
 
@@ -50,11 +55,14 @@ class ApprovalService:
                 read here only for its tag attachments -- an approval has no
                 tag join table of its own (see :mod:`models.tag`) and carries
                 the same tags as the execution it belongs to.
+            sessions: Repository holding the run's ADK sessions, so a decision
+                can resume the session paused on it.
         """
         self._repo = repo
         self._approver_groups = approver_groups
         self._certificates = certificates
         self._executions = executions
+        self._sessions = sessions
 
     async def list(
         self,
@@ -216,7 +224,41 @@ class ApprovalService:
             raise ApprovalAlreadyResolvedError(approval_id, approval.status.value)
         resolved = await self._repo.resolve(approval_id, data, user_id=acting_user.id)
         await self._certificates.issue(resolved, user_id=acting_user.id)
-        return resolved
+        if resolved.status is ApprovalStatus.pending:
+            return resolved
+        await self._resume_waiting_session(resolved, acting_user.id)
+        # Re-read: queueing the resume commits on the request's session, which
+        # expires ``resolved``, and serializing an expired row would need a
+        # lazy load outside the request's greenlet context.
+        return await self._get(approval_id)
+
+    async def _resume_waiting_session(self, approval: Approval, user_id: str) -> None:
+        """Queue the decision on the session paused on this approval, if one is.
+
+        The decision reaches the run on the server whichever screen it was made
+        from, so the run resumes even with nobody's chat open. A session not yet
+        paused on it -- its turn is still running -- finds the decision when
+        that turn ends instead (:func:`services.session_queue.settle_turn`).
+
+        Args:
+            approval: The approval just decided.
+            user_id: The deciding user, recorded on the session's audit field.
+        """
+        for session in await self._sessions.list_for_execution(
+            approval.workflow_execution_id
+        ):
+            if session.status is not ExecutionSessionStatus.waiting_for_approval:
+                continue
+            for raw in session.waiting_on:
+                call = WaitingCall.model_validate(raw)
+                if call.approval_id == approval.id:
+                    await queue_input(
+                        self._sessions,
+                        session.id,
+                        decision_input(call, approval.status, approval.decided_by),
+                        user_id=user_id,
+                    )
+                    return
 
     async def _assert_may_resolve(self, approval: Approval, caller: User) -> None:
         """Reject a caller who is not the approval's designated approver.

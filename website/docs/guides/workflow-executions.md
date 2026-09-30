@@ -31,7 +31,7 @@ When a task fails, any task still waiting on it — directly or down the chain �
 
 ## The workflow session screen {#the-workflow-session-screen}
 
-The workflow session is the chat one run happens in. It opens with the run's kickoff message and the agent already working.
+The workflow session is the chat one run happens in. It opens with the run's kickoff message and the agent already working — the run starts as soon as it is created, whether or not anyone opens this screen.
 
 ![Flowchart showing the workflow session screen layout: the task timeline and the messages grouped by task sit side by side, and messages lead into the chat input.](./img/workflow-executions-layout.svg#gh-light-mode-only)
 ![Flowchart showing the workflow session screen layout: the task timeline and the messages grouped by task sit side by side, and messages lead into the chat input.](./img/workflow-executions-layout-dark.svg#gh-dark-mode-only)

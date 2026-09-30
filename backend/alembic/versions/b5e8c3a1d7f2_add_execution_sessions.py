@@ -18,6 +18,8 @@ Create Date: 2026-09-30 12:00:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy import Text
+from sqlalchemy.dialects import postgresql
 from sqlmodel.sql.sqltypes import AutoString
 
 from alembic import op
@@ -28,7 +30,21 @@ down_revision: str | Sequence[str] | None = "9d4f1a7c2e63"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_status = sa.Enum("idle", "done", name="executionsessionstatus")
+_status = sa.Enum(
+    "queued",
+    "running",
+    "waiting_for_input",
+    "waiting_for_approval",
+    "idle",
+    "done",
+    "error",
+    name="executionsessionstatus",
+)
+
+
+def _json() -> sa.types.TypeEngine[object]:
+    """Return the column type ``models.base.JSONColumn`` renders to."""
+    return sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql")
 
 
 def upgrade() -> None:
@@ -44,6 +60,8 @@ def upgrade() -> None:
         sa.Column("workflow_execution_id", AutoString(), nullable=False),
         sa.Column("parent_id", AutoString(), nullable=True),
         sa.Column("status", _status, nullable=False),
+        sa.Column("pending_input", _json(), nullable=True),
+        sa.Column("waiting_on", _json(), nullable=False, server_default="[]"),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),

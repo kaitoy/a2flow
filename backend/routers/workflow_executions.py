@@ -27,7 +27,14 @@ from typing import Annotated, Any
 from urllib.parse import quote
 
 import anyio
-from ag_ui.core import Context, RunAgentInput, SystemMessage
+from ag_ui.core import (
+    BaseEvent,
+    Context,
+    RunAgentInput,
+    RunErrorEvent,
+    RunFinishedEvent,
+    SystemMessage,
+)
 from ag_ui.encoder import EventEncoder
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
@@ -43,6 +50,7 @@ from dependencies.context import (
     SortDep,
 )
 from dependencies.service import (
+    ExecutionSessionServiceDep,
     MetricsServiceDep,
     SessionFileServiceDep,
     WorkflowExecutionServiceDep,
@@ -356,6 +364,7 @@ async def workflow_session_agent(
     request: Request,
     service: WorkflowExecutionServiceDep,
     files: SessionFileServiceDep,
+    sessions: ExecutionSessionServiceDep,
     caller: CurrentUserDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent driving an execution's workflow session.
@@ -387,7 +396,13 @@ async def workflow_session_agent(
     at once — the second run would reason over an in-memory session the first has
     already moved past, and its messages would be misattributed. A run already in
     progress surfaces as HTTP 409, before any SSE headers go out (see
-    ``infrastructure/locks.py``).
+    ``infrastructure/locks.py``). That includes a turn the server itself is
+    running (:mod:`services.session_runner`), which takes the same lock.
+
+    After the turn, the session's server-side record is settled from the
+    events it streamed: the client-tool calls it left open are what a later
+    approval decision -- made in this chat or anywhere else -- resumes on the
+    server (:meth:`services.execution_session.ExecutionSessionService.settle_browser_turn`).
     """
     # Resolve (and authorize) before locking, so a caller with no business here
     # gets their 403/404 rather than queueing behind someone else's run.
@@ -459,13 +474,16 @@ async def workflow_session_agent(
         # over session state, and a concurrent run appending between the two
         # halves would misattribute its messages to this caller.
         prior_keys = await service.attributable_keys(execution_id)
+        previous = await sessions.waiting_on(input_data.thread_id)
 
         run_stack = stack.pop_all()
 
     async def event_generator() -> AsyncGenerator[str, None]:
+        events: list[BaseEvent] = []
         async with run_stack:
             try:
                 async for event in adk_agent.run(input_data):
+                    events.append(event)
                     yield encoder.encode(event)
             finally:
                 # A client that goes away mid-stream (tab closed, page reloaded)
@@ -486,6 +504,16 @@ async def workflow_session_agent(
                     # Associate each message with the workflow task in progress
                     # at the time.
                     await service.record_message_tasks(execution_id)
+                    await sessions.settle_browser_turn(
+                        session_id=input_data.thread_id,
+                        execution_id=execution_id,
+                        previous=previous,
+                        messages=input_data.messages,
+                        events=events,
+                        failed=not any(isinstance(e, RunFinishedEvent) for e in events)
+                        or any(isinstance(e, RunErrorEvent) for e in events),
+                        user_id=current_user_id,
+                    )
 
     return StreamingResponse(
         event_generator(),

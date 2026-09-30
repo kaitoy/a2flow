@@ -1795,6 +1795,24 @@ class CredentialedHttpAgent extends HttpAgent {
 }
 
 /**
+ * Create the A2UI middleware every agent in the app is configured with.
+ *
+ * It injects the `render_a2ui` tool and the two A2UI context entries (the
+ * component catalog and the tool's usage guide) into each run, and turns the
+ * tool's streamed arguments into surfaces. The backend supplies the same tool
+ * and entries itself on the runs it starts, from
+ * `backend/infrastructure/client_contract.json`; `clientContract.test.ts`
+ * regenerates that file from this factory and fails when the two drift apart.
+ */
+export function createA2UIMiddleware(): A2UIMiddleware {
+  return new A2UIMiddleware({
+    injectA2UITool: true,
+    schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
+    defaultCatalogId: A2UI_CATALOG_ID,
+  });
+}
+
+/**
  * Create an HttpAgent for the general chat endpoint, pre-configured with the A2UI middleware
  * so the agent can render interactive surfaces via the RENDER_A2UI tool.
  */
@@ -1803,13 +1821,7 @@ export function createChatAgent(sessionId: string): HttpAgent {
     url: `${API_BASE}/api/v1/agent`,
     threadId: sessionId,
   });
-  agent.use(
-    new A2UIMiddleware({
-      injectA2UITool: true,
-      schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
-      defaultCatalogId: A2UI_CATALOG_ID,
-    })
-  );
+  agent.use(createA2UIMiddleware());
   return agent;
 }
 
@@ -1826,13 +1838,7 @@ export function createWorkflowSessionAgent(
     url: `${API_BASE}/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}/agent`,
     threadId: sessionId,
   });
-  agent.use(
-    new A2UIMiddleware({
-      injectA2UITool: true,
-      schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
-      defaultCatalogId: A2UI_CATALOG_ID,
-    })
-  );
+  agent.use(createA2UIMiddleware());
   return agent;
 }
 
@@ -1846,12 +1852,6 @@ export function createDesignSessionAgent(workflowId: string, sessionId: string):
     url: `${API_BASE}/api/v1/workflows/${encodeURIComponent(workflowId)}/agent`,
     threadId: sessionId,
   });
-  agent.use(
-    new A2UIMiddleware({
-      injectA2UITool: true,
-      schema: basicCatalogJson as unknown as A2UIInlineCatalogSchema,
-      defaultCatalogId: A2UI_CATALOG_ID,
-    })
-  );
+  agent.use(createA2UIMiddleware());
   return agent;
 }

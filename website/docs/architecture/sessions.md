@@ -23,9 +23,11 @@ An approval addressed to a group brings in every member holding `approver`, so t
 
 The backend bridges the AG-UI protocol to the agent: it translates events both ways, keeps the conversation in step, and streams events back to the browser as they arrive, so text appears incrementally rather than in one block at the end. Conversation state is kept under the chat's id, so reopening it continues where it left off.
 
+A workflow session does not need anyone's chat to be open. Two kinds of turn are run by A2Flow itself: the run's **kickoff**, as soon as the run is created, and the turn that **resumes** it once an [approval](../guides/approvals.md) is decided. A message someone types still starts a turn from their chat. Whoever starts it, a turn is the same conversation, and the chat shows it once it is there.
+
 ## Interactive surfaces
 
-The `render_a2ui` tool is attached by the frontend rather than by the backend, and it carries the schema of the [A2UI](https://a2ui.org) component catalog the agent may draw from. When the model calls it the backend executes nothing — it forwards the call, and the browser is what draws the result.
+The `render_a2ui` tool is attached by the frontend — or, on a turn A2Flow runs itself, by the backend with the very same definition — and it carries the schema of the [A2UI](https://a2ui.org) component catalog the agent may draw from. When the model calls it the backend executes nothing — it forwards the call, and the browser is what draws the result.
 
 | Component | Used for |
 |---|---|

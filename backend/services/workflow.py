@@ -80,6 +80,8 @@ from repositories.workflow_task_template import (
 )
 from services import session_attribution
 from services.execution_branching import assign_runnable_tasks
+from services.session_inputs import EXECUTION_KICKOFF_PROMPT, SessionInput
+from services.session_queue import queue_input
 
 logger = logging.getLogger(__name__)
 
@@ -960,6 +962,13 @@ class WorkflowService:
                 workflow_execution_id=execution_id,
             ),
             acting_user_id=user,
+        )
+        # The run starts on the server, not when someone opens its chat.
+        await queue_input(
+            self._sessions,
+            session_id,
+            SessionInput(kind="message", text=EXECUTION_KICKOFF_PROMPT, sender_id=user),
+            user_id=user,
         )
         # Re-read after the last commit: each task commit on the shared request
         # session expires the ``execution`` instance, and serializing an expired one

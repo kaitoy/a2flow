@@ -31,7 +31,6 @@ import {
   SUPPRESS_FORBIDDEN_TOAST,
   type WorkflowExecution,
 } from "@/lib/api";
-import { EXECUTION_KICKOFF_PROMPT } from "@/lib/workflowKickoff";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -48,7 +47,6 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     suggestions,
     sendMessage,
     sendA2uiAction,
-    sendApprovalResult,
     messageSenders,
     senderUsers,
     locallySentMessageIds,
@@ -58,7 +56,9 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
   } = useWorkflowSessionChat(
     execution.id,
     execution.sessionId,
-    EXECUTION_KICKOFF_PROMPT,
+    // The run's kickoff, and its resumption once an approval is decided, are
+    // run by the server: the chat only shows them.
+    null,
     execution.initiatorId
   );
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
@@ -176,7 +176,6 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
           onVisibleTaskChange={setScrolledTaskId}
           onHoverTask={setHoveredTaskId}
           onAction={sendA2uiAction}
-          onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}
           canActOnSurfaces={canActOnSurfaces}
         />

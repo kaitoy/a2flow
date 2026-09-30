@@ -13,22 +13,38 @@ advance the tasks assigned to it.
 """
 
 from enum import StrEnum
+from typing import Any
 
-from sqlalchemy import ForeignKeyConstraint, Index
+from sqlalchemy import Column, ForeignKeyConstraint, Index
 from sqlmodel import Field
 
-from models.base import BaseEntity
+from models.base import BaseEntity, JSONColumn
 from models.tenant_scoped import TenantScoped
 
 
 class ExecutionSessionStatus(StrEnum):
     """Lifecycle states of an ExecutionSession, declared in sort order."""
 
+    queued = "queued"
+    """Holds input the server has yet to run a turn on."""
+
+    running = "running"
+    """A server-driven turn is under way (or its process died mid-turn)."""
+
+    waiting_for_input = "waiting_for_input"
+    """Paused on a form (``render_a2ui``) someone has to fill in."""
+
+    waiting_for_approval = "waiting_for_approval"
+    """Paused on an approval (``render_approval``) someone has to decide."""
+
     idle = "idle"
-    """Alive, and not currently running a turn."""
+    """Alive, with nothing to run and nothing pending."""
 
     done = "done"
-    """A branch session with nothing left assigned to it; it never resumes."""
+    """Finished for good: a branch with nothing left assigned, or a finished run."""
+
+    error = "error"
+    """Its last turn failed; the next input queues it again."""
 
 
 class ExecutionSession(TenantScoped, BaseEntity, table=True):
@@ -61,3 +77,14 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
     workflow_execution_id: str
     parent_id: str | None = None
     status: ExecutionSessionStatus = Field(default=ExecutionSessionStatus.idle)
+    #: The input the next server-driven turn runs on, as a
+    #: :class:`services.session_inputs.SessionInput` dump: at most one, since a
+    #: session holding unrun input is ``queued`` and accepts no more.
+    pending_input: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSONColumn, nullable=True)
+    )
+    #: The client-tool calls the last turn left unanswered, each
+    #: ``{"tool_call_id", "name", "approval_id"}`` -- what resuming has to answer.
+    waiting_on: list[dict[str, Any]] = Field(
+        default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
