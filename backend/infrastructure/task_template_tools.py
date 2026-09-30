@@ -52,6 +52,7 @@ from models.workflow_task_template import (
     WorkflowTaskTemplateUpdate,
 )
 from repositories.agent_skill import SqlAgentSkillRepository
+from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import (
     DependencyCycleError,
     ForeignKeyViolationError,
@@ -156,6 +157,12 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
         if resolved is None:
             raise NoTenantSessionError()
         workflow_id, tenant_id = resolved
+        # The design agent acts for the user chatting with it, so it binds only
+        # the MCP servers that user could open: the template repository checks
+        # new bindings against this tag-scoped MCPServer repository.
+        access_tag_ids = await SqlEffectiveRoleRepository(db).access_tag_ids_for_user(
+            _user_id(tool_context)
+        )
         workflow_repo = SqlWorkflowRepository(
             db,
             SqlAgentSkillRepository(db, tenant_id=tenant_id),
@@ -167,7 +174,9 @@ async def _repos(tool_context: ToolContext) -> AsyncIterator[_Scope]:
             template_repo=SqlWorkflowTaskTemplateRepository(
                 db,
                 workflow_repo,
-                SqlMCPServerRepository(db, tenant_id=tenant_id),
+                SqlMCPServerRepository(
+                    db, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+                ),
                 tenant_id=tenant_id,
             ),
             workflow_repo=workflow_repo,

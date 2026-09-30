@@ -128,9 +128,11 @@ def get_mcp_server_repository(
     """Create an MCPServerRepository backed by the current database session.
 
     Restricted to the servers the caller may act on -- see
-    :func:`dependencies.auth.get_access_tag_ids`. Collaborators that only
-    call ``exists`` on it (tool bindings, tool mocks) are unaffected, since
-    that check is tenant-only.
+    :func:`dependencies.auth.get_access_tag_ids`. That restriction reaches the
+    task-template repository too, which checks each new tool binding with
+    ``get``, so a developer cannot bind a server they could not open.
+    Collaborators that only call ``exists`` on it (tool mocks, restoring a
+    published snapshot) are unaffected, since that check is tenant-only.
     """
     return SqlMCPServerRepository(
         db, tenant_id=tenant_id, access_tag_ids=access_tag_ids

@@ -179,12 +179,14 @@ def _listing_to_dict(listing: ServerToolListing) -> dict[str, Any]:
 
 
 async def list_mcp_tools(tool_context: ToolContext) -> dict[str, Any]:
-    """List the tools advertised by every MCP server registered in A2Flow.
+    """List the tools advertised by the MCP servers registered in A2Flow.
 
     Call this during design to discover what external tools exist before
-    binding them to tasks: while designing a workflow, bind them through the
-    ``tools`` entries of ``register_task_templates`` or the ``tool_bindings``
-    argument of ``create_task_template``/``update_task_template``. Tools are
+    binding them to tasks. While designing, the list holds only the servers the
+    user you are working for may see, and you cannot bind any other. Bind tools
+    through the ``tools`` entries of ``register_task_templates`` or the
+    ``tool_bindings`` argument of
+    ``create_task_template``/``update_task_template``. Tools are
     bound only at design time; while executing a run, call this to see which
     bound tools the in-progress task may invoke through ``call_mcp_tool``.
     Each server is queried live and concurrently; a server that cannot be

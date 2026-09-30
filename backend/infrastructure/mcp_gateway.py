@@ -82,6 +82,7 @@ from infrastructure.secret_resolver import SecretResolver
 from infrastructure.vault_client import get_vault_client
 from models.mcp_server import MCPServer
 from models.mcp_tool_invocation import McpAuditDecision
+from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import McpConnectionError, SecretResolutionError
 from repositories.mcp_ca import SqlMcpCertificateAuthorityRepository
 from repositories.mcp_server import SqlMCPServerRepository
@@ -590,7 +591,13 @@ class McpGateway:
         self._session_factory = session_factory or _default_session
 
     async def list_tools(self, request: ListToolsRequest) -> list[ServerToolListing]:
-        """Return the tools advertised by every server registered in the tenant.
+        """Return the tools advertised by the servers the caller may see in the tenant.
+
+        In a design session that is every server the acting user could open --
+        the design agent lists on their behalf, so an MCPServer gated by an
+        access-control tag their groups do not carry is left out. A run's
+        listing is not narrowed by tags: what it may *call* is decided by the
+        task's bindings.
 
         Each server is queried live and concurrently; one that cannot be reached
         is reported through its entry's ``error`` field instead of failing the
@@ -600,8 +607,8 @@ class McpGateway:
             request: The listing request.
 
         Returns:
-            One :class:`ServerToolListing` per registered server, in
-            registration order. An empty registry yields an empty list.
+            One :class:`ServerToolListing` per visible server, in registration
+            order. An empty registry yields an empty list.
 
         Raises:
             McpAuthenticationError: If the caller maps to no tenant.
@@ -610,8 +617,18 @@ class McpGateway:
         prepared: list[tuple[ServerToolListing, McpConnection | None]] = []
         async with self._session_factory() as db:
             identity = await self._authenticate(db, request.principal, NO_TENANT)
+            # A design session lists on behalf of the user chatting with the
+            # design agent, so it sees only what that user could open. A run
+            # (execution_id set) lists what its bound tools may reach.
+            access_tag_ids = (
+                await SqlEffectiveRoleRepository(db).access_tag_ids_for_user(
+                    identity.user_id
+                )
+                if identity.execution_id is None
+                else None
+            )
             servers = await SqlMCPServerRepository(
-                db, tenant_id=identity.tenant_id
+                db, tenant_id=identity.tenant_id, access_tag_ids=access_tag_ids
             ).list(limit=_MAX_SERVERS, offset=0)
             resolver = self._build_resolver(db, identity.tenant_id)
             for server in servers:

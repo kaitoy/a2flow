@@ -47,6 +47,8 @@ One guard rail applies when tagging: **you cannot attach an access-control tag y
 
 The restriction is about who can open, edit, run, or delete a record. What a record uses behind the scenes is untouched: a workflow still runs with the agent skill it was generated from and the secrets its MCP servers reference, even for a requester who could not open that skill or secret themselves.
 
+Workflow design is the exception: giving a step a tool counts as using the MCP server yourself. You can bind tools only from servers **you** could open, whether you pick them in a task template's **MCP Tools** picker or ask the design agent, which works on your behalf. A server tagged with an access-control tag your groups do not carry never shows up in the agent's tool list, and binding it is rejected as if the server did not exist. A tool already bound to a step by someone who could see it stays in place when you edit the step, and **Discard changes** restores the published bindings as they were.
+
 ## Workflow execution and approval tags {#execution-and-approval-tags}
 
 A [workflow execution](./workflow-executions.md) shows a **Tags** column and field too, and so does the [approval](./approvals.md) it belongs to — but read-only, and outside the six taggable registries above. When a run starts, it copies the tags its workflow carries at that moment; retagging the workflow afterwards, or deleting it, never changes what an already-started run shows. There is no **Tags** picker on these two screens and no tag filter on their lists — attaching and detaching tags stays on the workflow itself.

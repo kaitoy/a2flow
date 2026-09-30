@@ -936,3 +936,62 @@ async def test_list_tools_stays_tenant_scoped(
     )
     listings = await McpGateway().list_tools(ListToolsRequest(_principal()))
     assert [entry.server_id for entry in listings] == [mine]
+
+
+async def _gate_server(eng: AsyncEngine, server_id: str) -> None:
+    """Label ``server_id`` with a fresh access-control tag no group carries."""
+    from models.tag import McpServerTag, Tag
+
+    async with AsyncSession(eng) as db:
+        tag = Tag(
+            name="gate",
+            access_control=True,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(tag)
+        await db.commit()
+        await db.refresh(tag)
+        db.add(McpServerTag(resource_id=server_id, tag_id=tag.id))
+        await db.commit()
+
+
+async def test_design_session_list_tools_hides_servers_the_user_may_not_see(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The design agent lists for the acting user, so an access-control-gated server is left out."""
+    await _seed_design_session(engine)
+    open_id = await _seed_server(engine, name="open")
+    gated_id = await _seed_server(engine, name="gated")
+    await _gate_server(engine, gated_id)
+
+    async def fake_list_server_tools(connection: McpConnection) -> list[types.Tool]:
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    listings = await McpGateway().list_tools(
+        ListToolsRequest(_principal("design-abc", "tester"))
+    )
+    assert [entry.server_id for entry in listings] == [open_id]
+
+
+async def test_execution_list_tools_is_not_narrowed_by_access_tags(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What a run may call is decided by its task bindings, not by tags on the server."""
+    await _seed_session(engine)
+    open_id = await _seed_server(engine, name="open")
+    gated_id = await _seed_server(engine, name="gated")
+    await _gate_server(engine, gated_id)
+
+    async def fake_list_server_tools(connection: McpConnection) -> list[types.Tool]:
+        return []
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.list_server_tools", fake_list_server_tools
+    )
+    listings = await McpGateway().list_tools(ListToolsRequest(_principal()))
+    assert {entry.server_id for entry in listings} == {open_id, gated_id}

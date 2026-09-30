@@ -11,10 +11,12 @@ may not depend on itself, and the resulting edge set must remain acyclic.
 Templates may additionally bind MCP tools (a registered server plus a tool
 name). Bindings are persisted in the ``workflow_task_template_tool_bindings``
 join table and exposed on :class:`WorkflowTaskTemplateRead` as
-``tool_bindings``; every bound server must exist when bindings are written.
+``tool_bindings``; every newly bound server must be visible to the caller (the
+MCPServer repository applies their access-control tags) when bindings are
+written.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Protocol
 
 from sqlmodel import col, select
@@ -239,7 +241,8 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
             await self._replace_edges(template_id, dep_ids)
         if data.tool_bindings is not None:
             bindings = _dedupe_bindings(data.tool_bindings)
-            await self._validate_bindings(bindings)
+            current = await self._bindings_for(template_id)
+            await self._validate_bindings(bindings, {b.mcp_server_id for b in current})
             await self._replace_bindings(template_id, bindings)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(template)
@@ -281,7 +284,9 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
         Dependency edges are not re-validated: the snapshot was a valid DAG of
         this workflow when it was captured, and it is written back whole.
         Tool bindings *are* re-validated, since a bound MCP server may have
-        been deleted in the meantime.
+        been deleted in the meantime -- for existence only: the snapshot is a
+        design already published, so a server hidden from the caller by an
+        access-control tag does not block restoring it.
 
         Args:
             workflow_id: Identifier of the workflow whose templates to replace.
@@ -296,8 +301,11 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
         bindings_by_template = {
             t.id: _dedupe_bindings(t.tool_bindings) for t in templates
         }
-        for bindings in bindings_by_template.values():
-            await self._validate_bindings(bindings)
+        for server_id in _dedupe(
+            b.mcp_server_id for bs in bindings_by_template.values() for b in bs
+        ):
+            if not await self._mcp.exists(server_id):
+                raise ForeignKeyViolationError("MCPServer", server_id)
 
         existing = await self._db.exec(
             select(WorkflowTaskTemplate).where(
@@ -402,18 +410,32 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
                 )
             )
 
-    async def _validate_bindings(self, bindings: _BindingList) -> None:
-        """Reject bindings that reference an unregistered MCP server.
+    async def _validate_bindings(
+        self, bindings: _BindingList, already_bound: Collection[str] = ()
+    ) -> None:
+        """Reject bindings to an MCP server the caller may not see.
+
+        Checked with ``get`` rather than ``exists``: ``get`` honours the
+        access-control tags the MCPServer repository was built with, so a
+        developer in the template editor or the design agent acting for a user
+        binds only the servers that user could open. A hidden server reports
+        exactly like a missing one, so its existence is not disclosed. A repo
+        built without ``access_tag_ids`` (background jobs) sees every server.
 
         Args:
             bindings: The proposed tool bindings (deduplicated).
+            already_bound: Server ids the template being updated already binds.
+                Exempt, so writing back bindings someone else added to a server
+                the caller cannot see does not fail.
 
         Raises:
             ForeignKeyViolationError: If a binding's ``mcp_server_id`` does not
-                reference a registered MCP server.
+                reference an MCP server visible to the caller.
         """
         for server_id in _dedupe(b.mcp_server_id for b in bindings):
-            if not await self._mcp.exists(server_id):
+            if server_id in already_bound:
+                continue
+            if await self._mcp.get(server_id) is None:
                 raise ForeignKeyViolationError("MCPServer", server_id)
 
     # -- dependency helpers ------------------------------------------------

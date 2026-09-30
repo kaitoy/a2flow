@@ -152,7 +152,7 @@ Tasks can use tools from the servers registered under [MCP Servers](./mcp-server
 ![Flowchart showing a design-time tool binding copied at run onto the task, then checked at call time: if the tool is bound to an in-progress task the call goes through, otherwise it is refused with the tools that are allowed.](./img/workflows-tool-binding.svg#gh-light-mode-only)
 ![Flowchart showing a design-time tool binding copied at run onto the task, then checked at call time: if the tool is bound to an in-progress task the call goes through, otherwise it is refused with the tools that are allowed.](./img/workflows-tool-binding-dark.svg#gh-dark-mode-only)
 
-While designing, the agent can list the tools every registered server advertises and give a step the ones it needs. Those bindings live on the template and are copied onto the run's tasks when it starts.
+While designing, the agent can list the tools that the servers you may see advertise (a server hidden from you by an [access-control tag](./tags.md) is left out) and give a step the ones it needs. Those bindings live on the template and are copied onto the run's tasks when it starts.
 
 At execution time every call is checked before it reaches a server: the `(server, tool)` pair must be bound to a task that is currently in progress. Calls to unbound tools are refused with a message listing what is allowed, so an agent shared across workflows can never reach for a tool a task was not granted. A task that also has an [approval](./approvals.md) attached is gated by that too.
 

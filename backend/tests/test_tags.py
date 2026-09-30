@@ -1134,6 +1134,65 @@ async def test_executing_a_visible_workflow_resolves_its_hidden_skill(
     )
 
 
+async def test_a_developer_cannot_bind_a_hidden_mcp_server_to_a_template(
+    workflow_client: AsyncClient,
+) -> None:
+    """Binding is gated like opening the server; bindings already in place are kept."""
+    client = workflow_client
+    gated = await _create_tag(client, "gated", accessControl=True)
+    skill = await create_skill(client)
+    workflow_id = (await create_published_workflow(client, skill["id"]))["id"]
+    hidden, other = [
+        assert_ok(
+            await client.post(
+                "/api/v1/mcp-servers",
+                json={"name": name, "url": "https://mcp.example.com/mcp"},
+            ),
+            201,
+        )["id"]
+        for name in ("hidden", "other")
+    ]
+    await _gate(client, "mcp-servers", hidden, [gated["id"]])
+    await _gate(client, "mcp-servers", other, [gated["id"]])
+    bound = [{"mcpServerId": hidden, "toolName": "t"}]
+    # Bound by someone who can see the server (the super admin default).
+    template_id = assert_ok(
+        await client.post(
+            "/api/v1/workflow-task-templates",
+            json={"workflowId": workflow_id, "title": "T", "toolBindings": bound},
+        ),
+        201,
+    )["id"]
+    template_url = f"/api/v1/workflow-task-templates/{template_id}"
+
+    response = await client.post(
+        "/api/v1/workflow-task-templates",
+        json={"workflowId": workflow_id, "title": "U", "toolBindings": bound},
+        headers=DEVELOPER,
+    )
+    assert_err(response, "FOREIGN_KEY_VIOLATION", 422)
+    added = [*bound, {"mcpServerId": other, "toolName": "t"}]
+    response = await client.patch(
+        template_url, json={"toolBindings": added}, headers=DEVELOPER
+    )
+    assert_err(response, "FOREIGN_KEY_VIOLATION", 422)
+    # Writing back what is already bound is not a new binding.
+    assert_ok(
+        await client.patch(
+            template_url,
+            json={"title": "Renamed", "toolBindings": bound},
+            headers=DEVELOPER,
+        )
+    )
+
+    await _create_member_group(client, "holders", ["bob"], [gated["id"]])
+    assert_ok(
+        await client.patch(
+            template_url, json={"toolBindings": added}, headers=DEVELOPER
+        )
+    )
+
+
 async def _insert_approval(
     eng: AsyncEngine, *, workflow_execution_id: str, approver: str = "carol"
 ) -> str:

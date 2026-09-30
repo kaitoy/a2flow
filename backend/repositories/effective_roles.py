@@ -31,6 +31,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.tag import UserGroupTag
+from models.user import Role, User, has_any_role
 from models.user_group import UserGroup, UserGroupMember
 
 #: Maximum ids bound into a single ``IN (...)`` predicate. SQLite caps the
@@ -73,6 +74,10 @@ class EffectiveRoleRepository(Protocol):
     async def group_tag_ids_for_users(
         self, user_ids: Collection[str]
     ) -> dict[str, frozenset[str]]: ...
+
+    async def access_tag_ids_for_user(
+        self, user_id: str | None
+    ) -> frozenset[str] | None: ...
 
 
 class SqlEffectiveRoleRepository:
@@ -240,3 +245,30 @@ class SqlEffectiveRoleRepository:
             The effective roles to authorize the user against.
         """
         return frozenset(direct_roles) | await self.group_roles_for_user(user_id)
+
+    async def access_tag_ids_for_user(
+        self, user_id: str | None
+    ) -> frozenset[str] | None:
+        """Return the access-control tags ``user_id`` may act on, for callers outside FastAPI.
+
+        The same rule as ``dependencies.auth.get_access_tag_ids`` -- an
+        ``admin`` (which includes ``super_admin``) is unrestricted, everyone else
+        holds their groups' tags -- for ADK tools and the MCP gateway, which act
+        on behalf of a user but run outside the request scope and so have no
+        ``AccessTagIdsDep``. Keep the two in step.
+
+        Args:
+            user_id: The user to resolve, or ``None`` when the run has none.
+
+        Returns:
+            ``None`` when the user is unrestricted, otherwise the tag ids their
+            groups carry. An unknown or missing user fails closed to an empty
+            set, which admits only records gated by no access-control tag.
+        """
+        user = await self._db.get(User, user_id) if user_id else None
+        if user is None:
+            return frozenset()
+        roles = await self.effective_roles_for_user(user.id, user.roles or [])
+        if has_any_role(roles, Role.admin):
+            return None
+        return await self.group_tag_ids_for_user(user.id)

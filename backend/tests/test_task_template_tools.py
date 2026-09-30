@@ -461,6 +461,182 @@ async def test_update_replaces_tool_bindings(engine: AsyncEngine) -> None:
     ]
 
 
+# ---------- access-control tags on MCP servers ----------
+
+
+def _ctx_as(user_id: str) -> Any:
+    """Build a ToolContext whose acting user (per turn) is ``user_id``.
+
+    The ADK session's own ``user_id`` stays the workflow owner, as in
+    production, so these tests exercise the acting-user override.
+    """
+    from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
+
+    return _ctx(user_id="owner", state={ACTING_USER_STATE_KEY: user_id})
+
+
+async def _seed_gated_server(
+    eng: AsyncEngine, *, name: str = "gated"
+) -> tuple[str, str]:
+    """Insert an MCPServer labelled with an access-control tag.
+
+    Returns:
+        The server's id and the tag's id.
+    """
+    from models.tag import McpServerTag, Tag
+    from models.user import SYSTEM_USER_ID
+
+    server_id = await _seed_mcp_server(eng, name=name)
+    async with AsyncSession(eng) as db:
+        tag = Tag(
+            name=f"tag-{name}",
+            access_control=True,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        db.add(tag)
+        await db.commit()
+        await db.refresh(tag)
+        tag_id = tag.id
+        db.add(McpServerTag(resource_id=server_id, tag_id=tag_id))
+        await db.commit()
+        return server_id, tag_id
+
+
+async def _seed_actors(eng: AsyncEngine, tag_id: str) -> None:
+    """Seed ``holder`` (in a group carrying ``tag_id``), ``outsider``, and ``boss`` (admin)."""
+    from models.tag import UserGroupTag
+    from models.user import SYSTEM_USER_ID, Role
+    from models.user_group import UserGroup, UserGroupMember
+
+    await seed_users(eng, ids=("holder", "outsider"), roles=())
+    await seed_users(eng, ids=("boss",), roles=(Role.admin,))
+    async with AsyncSession(eng) as db:
+        db.add(
+            UserGroup(
+                id="group-1",
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                name="Holders",
+                roles=[],
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        db.add(UserGroupMember(group_id="group-1", user_id="holder"))
+        # Committed apart: with no ORM relationship the unit of work does not
+        # order the group's insert ahead of the tag link's foreign key.
+        await db.commit()
+        db.add(UserGroupTag(resource_id="group-1", tag_id=tag_id))
+        await db.commit()
+
+
+async def test_create_rejects_server_hidden_from_acting_user(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_design_session(engine)
+    server_id, tag_id = await _seed_gated_server(engine)
+    await _seed_actors(engine, tag_id)
+    result = await create_task_template(
+        "Solo",
+        _ctx_as("outsider"),
+        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    )
+    assert "error" in result
+    assert (await list_task_templates(_ctx()))["tasks"] == []
+
+
+async def test_register_rejects_server_hidden_from_acting_user(
+    engine: AsyncEngine,
+) -> None:
+    await _seed_design_session(engine)
+    server_id, tag_id = await _seed_gated_server(engine)
+    await _seed_actors(engine, tag_id)
+    result = await register_task_templates(
+        [
+            {
+                "key": "t0",
+                "title": "Search",
+                "tools": [{"server_id": server_id, "tool_name": "search"}],
+            }
+        ],
+        _ctx_as("outsider"),
+    )
+    assert "error" in result
+    assert (await list_task_templates(_ctx()))["tasks"] == []
+
+
+@pytest.mark.parametrize("actor", ["holder", "boss"])
+async def test_create_binds_server_the_acting_user_may_see(
+    engine: AsyncEngine, actor: str
+) -> None:
+    """A member of a group carrying the tag, and an admin, may bind the gated server."""
+    await _seed_design_session(engine)
+    server_id, tag_id = await _seed_gated_server(engine)
+    await _seed_actors(engine, tag_id)
+    result = await create_task_template(
+        "Solo",
+        _ctx_as(actor),
+        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    )
+    assert "error" not in result
+    assert result["tool_bindings"][0]["server_id"] == server_id
+
+
+async def test_acting_user_not_session_owner_decides_visibility(
+    engine: AsyncEngine,
+) -> None:
+    """Without a per-turn acting user the session's own user_id (the owner) is used."""
+    await _seed_design_session(engine)
+    server_id, tag_id = await _seed_gated_server(engine)
+    await _seed_actors(engine, tag_id)
+    from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
+
+    binding = [{"server_id": server_id, "tool_name": "search"}]
+    # No state: falls back to ``tool_context.user_id``.
+    result = await create_task_template(
+        "Solo", _ctx(user_id="outsider"), tool_bindings=binding
+    )
+    assert "error" in result
+    # The session's user is the outsider, but the acting user in state wins.
+    result = await create_task_template(
+        "Solo",
+        _ctx(user_id="outsider", state={ACTING_USER_STATE_KEY: "boss"}),
+        tool_bindings=binding,
+    )
+    assert "error" not in result
+
+
+async def test_update_keeps_already_bound_hidden_server_but_rejects_new_ones(
+    engine: AsyncEngine,
+) -> None:
+    """Writing back bindings another designer added must not fail; adding one must."""
+    await _seed_design_session(engine)
+    server_id, tag_id = await _seed_gated_server(engine)
+    other_id, _ = await _seed_gated_server(engine, name="other")
+    await _seed_actors(engine, tag_id)
+    created = await create_task_template(
+        "Solo",
+        _ctx_as("boss"),
+        tool_bindings=[{"server_id": server_id, "tool_name": "search"}],
+    )
+    kept = await update_task_template(
+        created["id"],
+        _ctx_as("outsider"),
+        tool_bindings=[{"server_id": server_id, "tool_name": "fetch"}],
+    )
+    assert "error" not in kept
+    added = await update_task_template(
+        created["id"],
+        _ctx_as("outsider"),
+        tool_bindings=[
+            {"server_id": server_id, "tool_name": "fetch"},
+            {"server_id": other_id, "tool_name": "fetch"},
+        ],
+    )
+    assert "error" in added
+
+
 # ---------- published -> modified ----------
 
 
