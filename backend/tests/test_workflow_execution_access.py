@@ -181,9 +181,13 @@ async def _seed_task(eng: AsyncEngine, execution_id: str) -> str:
 
 
 def _run_agent_input() -> dict[str, Any]:
-    """Build a minimal RunAgentInput payload for the agent stream endpoint."""
+    """Build a minimal RunAgentInput payload for the agent stream endpoint.
+
+    The thread id is the session :func:`_seed_session` records, since the route
+    refuses any other.
+    """
     return {
-        "threadId": "thread-001",
+        "threadId": "sess-1",
         "runId": "run-001",
         "state": {},
         "messages": [],

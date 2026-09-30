@@ -338,7 +338,7 @@ async def test_agent_run_is_told_which_files_the_session_holds(
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
         json={
-            "threadId": "thread-001",
+            "threadId": execution["sessionId"],
             "runId": "run-001",
             "state": {},
             "messages": [],

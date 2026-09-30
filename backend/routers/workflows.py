@@ -60,7 +60,7 @@ from models.workflow import (
 )
 from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task_template import WorkflowTaskTemplateRead
-from repositories.exceptions import SessionRunInProgressError
+from repositories.exceptions import NotFoundError, SessionRunInProgressError
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -238,6 +238,11 @@ async def design_session_agent(
     adk_agent, workflow = await service.resolve_agent(
         workflow_id, caller=caller, caller_roles=caller_roles
     )
+    # The thread id picks the ADK session the run drives, and the caller was
+    # authorized against this workflow only -- so it must be this workflow's
+    # design session, or the caller could drive any other thread its owner has.
+    if input_data.thread_id != workflow.session_id:
+        raise NotFoundError("DesignSession", input_data.thread_id)
     current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]

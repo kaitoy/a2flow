@@ -31,9 +31,14 @@ async def _design_session(client: AsyncClient) -> tuple[Any, Any]:
     return skill, wf
 
 
-def _make_run_agent_input() -> dict[str, Any]:
+def _make_run_agent_input(thread_id: str = "thread-001") -> dict[str, Any]:
+    """Build a minimal RunAgentInput payload for ``thread_id``.
+
+    The agent routes refuse a thread other than the session they own, so a
+    test that expects the run to go through passes that session's id.
+    """
     return {
-        "threadId": "thread-001",
+        "threadId": thread_id,
         "runId": "run-001",
         "state": {},
         "messages": [],
@@ -159,7 +164,7 @@ async def test_design_session_agent_returns_200(
     _skill, wf = await _design_session(workflow_client)
     response = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
     )
     assert response.status_code == 200
 
@@ -172,7 +177,7 @@ async def test_design_session_agent_uses_design_kind(
     skill, wf = await _design_session(workflow_client)
     await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
     )
     mock_agent_registry.get.assert_called_with(
         skill["id"],
@@ -212,7 +217,7 @@ async def test_design_session_agent_stamps_acting_user_in_state(
 
     await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
         headers={"X-User-Id": "alice", "X-User-Roles": "developer"},
     )
     assert received_inputs[0].state[ACTING_USER_STATE_KEY] == "alice"
@@ -228,7 +233,7 @@ async def test_design_session_agent_allowed_for_other_developer(
     _skill, wf = await _design_session(workflow_client)
     response = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
         headers={"X-User-Id": "alice", "X-User-Roles": "developer"},
     )
     assert response.status_code == 200
@@ -241,7 +246,7 @@ async def test_design_session_agent_forbidden_without_developer_role(
     _skill, wf = await _design_session(workflow_client)
     response = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
         headers={"X-User-Id": "alice", "X-User-Roles": "requester"},
     )
     assert_err(response, code="FORBIDDEN", status=403)
@@ -255,7 +260,7 @@ async def test_design_session_agent_forbidden_for_reviewer(
     _skill, wf = await _design_session(workflow_client)
     response = await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
         headers={"X-User-Id": "alice", "X-User-Roles": "reviewer"},
     )
     assert_err(response, code="FORBIDDEN", status=403)
@@ -267,6 +272,19 @@ async def test_design_session_agent_unknown_id_returns_404(
     response = await workflow_client.post(
         "/api/v1/workflows/nonexistent/agent",
         json=_make_run_agent_input(),
+    )
+    assert response.status_code == 404
+
+
+async def test_design_session_agent_refuses_another_sessions_thread(
+    workflow_client: AsyncClient,
+) -> None:
+    """A design run authorized against one workflow cannot drive another's session."""
+    skill, wf_a = await _design_session(workflow_client)
+    wf_b = await generate_workflow(workflow_client, skill["id"], name="other-workflow")
+    response = await workflow_client.post(
+        f"/api/v1/workflows/{wf_a['id']}/agent",
+        json=_make_run_agent_input(wf_b["sessionId"]),
     )
     assert response.status_code == 404
 
@@ -305,7 +323,7 @@ async def test_design_session_messages_record_sender_after_run(
 
     await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
         headers={"X-User-Id": "alice", "X-User-Roles": "developer"},
     )
 
@@ -352,7 +370,7 @@ async def test_design_session_leaves_prior_messages_unattributed(
 
     await workflow_client.post(
         f"/api/v1/workflows/{wf['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(wf["sessionId"]),
         headers={"X-User-Id": "alice", "X-User-Roles": "developer"},
     )
 

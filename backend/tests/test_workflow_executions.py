@@ -43,9 +43,14 @@ async def _execute_workflow(client: AsyncClient, skill_id: str) -> Any:
     )
 
 
-def _make_run_agent_input() -> dict[str, Any]:
+def _make_run_agent_input(thread_id: str = "thread-001") -> dict[str, Any]:
+    """Build a minimal RunAgentInput payload for ``thread_id``.
+
+    The agent routes refuse a thread other than the session they own, so a
+    test that expects the run to go through passes that session's id.
+    """
     return {
-        "threadId": "thread-001",
+        "threadId": thread_id,
         "runId": "run-001",
         "state": {},
         "messages": [],
@@ -55,7 +60,7 @@ def _make_run_agent_input() -> dict[str, Any]:
     }
 
 
-async def _post_agent_and_disconnect(path: str, user_id: str) -> None:
+async def _post_agent_and_disconnect(path: str, user_id: str, thread_id: str) -> None:
     """Drive an agent run over raw ASGI, disconnecting after the first SSE chunk.
 
     Simulates a browser closing the tab mid-run. It has to speak ASGI directly:
@@ -67,10 +72,11 @@ async def _post_agent_and_disconnect(path: str, user_id: str) -> None:
         path: The agent endpoint to POST to.
         user_id: The acting user, sent as the ``X-User-Id`` header the test auth
             override reads.
+        thread_id: The session id the run targets.
     """
     from main import app
 
-    payload = json.dumps(_make_run_agent_input()).encode()
+    payload = json.dumps(_make_run_agent_input(thread_id)).encode()
     streaming = asyncio.Event()
     body_sent = False
 
@@ -192,7 +198,7 @@ async def test_workflow_session_agent_returns_200(
     execution = await _execute_workflow(workflow_client, skill["id"])
     response = await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
     )
     assert response.status_code == 200
 
@@ -237,18 +243,20 @@ async def test_workflow_session_agent_rejects_a_concurrent_run(
     async def _second_run() -> Response:
         await streaming.wait()
         try:
-            return await workflow_client.post(url, json=_make_run_agent_input())
+            return await workflow_client.post(
+                url, json=_make_run_agent_input(execution["sessionId"])
+            )
         finally:
             second_done.set()
 
     first, second = await asyncio.gather(
-        workflow_client.post(url, json=_make_run_agent_input()),
+        workflow_client.post(url, json=_make_run_agent_input(execution["sessionId"])),
         _second_run(),
     )
 
     assert first.status_code == 200
     error = assert_err(second, code="SESSION_RUN_IN_PROGRESS", status=409)
-    assert error["details"]["threadId"] == "thread-001"
+    assert error["details"]["threadId"] == execution["sessionId"]
 
 
 async def test_workflow_session_agent_allows_a_later_run(
@@ -260,8 +268,12 @@ async def test_workflow_session_agent_allows_a_later_run(
     execution = await _execute_workflow(workflow_client, skill["id"])
     url = f"/api/v1/workflow-executions/{execution['id']}/agent"
 
-    first = await workflow_client.post(url, json=_make_run_agent_input())
-    second = await workflow_client.post(url, json=_make_run_agent_input())
+    first = await workflow_client.post(
+        url, json=_make_run_agent_input(execution["sessionId"])
+    )
+    second = await workflow_client.post(
+        url, json=_make_run_agent_input(execution["sessionId"])
+    )
     assert (first.status_code, second.status_code) == (200, 200)
 
 
@@ -273,6 +285,38 @@ async def test_workflow_session_agent_unknown_id_returns_404(
         json=_make_run_agent_input(),
     )
     assert response.status_code == 404
+
+
+async def test_workflow_session_agent_refuses_another_sessions_thread(
+    workflow_client: AsyncClient,
+    mock_adk_agent: MagicMock,
+) -> None:
+    """A run authorized against one execution cannot drive another's session.
+
+    The thread id selects the ADK session, so accepting any id would let a
+    participant of run A drive run B of the same initiator.
+    """
+    skill = await _create_skill(workflow_client)
+    wf = await create_published_workflow(workflow_client, skill["id"])
+    execute_url = f"/api/v1/workflows/{wf['id']}/execute"
+    run_a = assert_ok(await workflow_client.post(execute_url), status=201)
+    run_b = assert_ok(await workflow_client.post(execute_url), status=201)
+    ran: list[Any] = []
+
+    async def _recording_run(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
+        ran.append(args)
+        return
+        yield
+
+    mock_adk_agent.run = _recording_run
+
+    response = await workflow_client.post(
+        f"/api/v1/workflow-executions/{run_a['id']}/agent",
+        json=_make_run_agent_input(run_b["sessionId"]),
+    )
+
+    assert_err(response, code="NOT_FOUND", status=404)
+    assert ran == []
 
 
 async def test_workflow_session_agent_delegates_to_agent_registry(
@@ -290,7 +334,7 @@ async def test_workflow_session_agent_delegates_to_agent_registry(
     mock_adk_agent.run = _capturing_run
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
     )
     # The agent is keyed by the revision the session pinned, so a later pull of
     # the skill cannot change which code this session's runs load — and by the
@@ -323,7 +367,7 @@ async def test_workflow_session_agent_strips_system_messages(
     mock_adk_agent.run = _capturing_run
 
     input_with_system = {
-        **_make_run_agent_input(),
+        **_make_run_agent_input(execution["sessionId"]),
         "messages": [
             {"id": "m1", "role": "system", "content": "You are helpful."},
             {"id": "m2", "role": "user", "content": "Hello"},
@@ -361,7 +405,7 @@ async def test_workflow_session_agent_keeps_only_a2ui_context(
     mock_adk_agent.run = _capturing_run
 
     input_with_context = {
-        **_make_run_agent_input(),
+        **_make_run_agent_input(execution["sessionId"]),
         "context": [
             {
                 "description": A2UI_SCHEMA_CONTEXT_DESCRIPTION,
@@ -404,7 +448,7 @@ async def test_workflow_session_agent_keys_run_by_execution_initiator(
     # the session's owner so everyone shares the same ADK session.
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
         headers={"X-User-Id": "alice"},
     )
     assert received_inputs[0].forwarded_props["userId"] == execution["initiatorId"]
@@ -439,7 +483,7 @@ async def test_workflow_session_agent_stamps_acting_user_in_state(
 
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
         headers={"X-User-Id": "alice"},
     )
     assert received_inputs[0].state[ACTING_USER_STATE_KEY] == "alice"
@@ -499,7 +543,9 @@ async def test_workflow_session_agent_records_sender_on_client_disconnect(
     mock_adk_agent.run = _appending_run
 
     await _post_agent_and_disconnect(
-        f"/api/v1/workflow-executions/{execution['id']}/agent", user_id="alice"
+        f"/api/v1/workflow-executions/{execution['id']}/agent",
+        user_id="alice",
+        thread_id=execution["sessionId"],
     )
 
     # Guard against a false pass: the run must really have been cut short.
@@ -604,7 +650,7 @@ async def test_workflow_execution_messages_record_sender_after_run(
     # Alice (a designated approver, not the owner) drives the run.
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
         headers={"X-User-Id": "alice"},
     )
 
@@ -665,7 +711,7 @@ async def test_workflow_execution_messages_record_tool_sender_after_run(
     # Alice (a designated approver, not the owner) resolves the A2UI action.
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
         headers={"X-User-Id": "alice"},
     )
 
@@ -730,7 +776,7 @@ async def test_workflow_execution_messages_skip_render_ack_sender(
     # the surface, so the response must stay unattributed.
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
         headers={"X-User-Id": "alice"},
     )
 
@@ -810,7 +856,7 @@ async def test_workflow_execution_messages_record_task_after_run(
 
     await workflow_client.post(
         f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json=_make_run_agent_input(),
+        json=_make_run_agent_input(execution["sessionId"]),
     )
 
     response = await workflow_client.get(

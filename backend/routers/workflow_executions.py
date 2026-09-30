@@ -60,7 +60,7 @@ from models.session_file import SessionFileRead
 from models.user import Role
 from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task import WorkflowTaskRead
-from repositories.exceptions import SessionRunInProgressError
+from repositories.exceptions import NotFoundError, SessionRunInProgressError
 from services.metrics import MetricsWindow
 from services.session_file import describe_session_files
 from services.workflow_execution_access import assert_may_answer_surfaces
@@ -392,6 +392,12 @@ async def workflow_session_agent(
     # Resolve (and authorize) before locking, so a caller with no business here
     # gets their 403/404 rather than queueing behind someone else's run.
     adk_agent, execution = await service.resolve_agent(execution_id, caller=caller)
+    # The thread id picks the ADK session the run drives, and the caller was
+    # authorized against this execution only -- so it must be this execution's
+    # session, or an approver of one run could drive any other thread its
+    # initiator owns. 404, like any id the caller may not see.
+    if input_data.thread_id != execution.session_id:
+        raise NotFoundError("WorkflowSession", input_data.thread_id)
     current_user_id = caller.id
 
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
