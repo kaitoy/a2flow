@@ -515,6 +515,36 @@ async def test_a_turn_reaches_viewers_through_the_stream(
     assert after > cursor
 
 
+async def test_a_viewer_from_the_last_turn_still_gets_the_next_one(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """Stream ids never go backwards, though each turn drops the previous turn's rows.
+
+    A viewer that read the history after one turn waits for events after that
+    turn's last id. Had the next turn's ids restarted below it -- SQLite reuses
+    the ids of deleted rows unless told not to -- the viewer would never see it.
+    """
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+    registry.get.return_value = ScriptedAgent()
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)  # kickoff
+    cursor = assert_ok(await client.get(f"{_base(execution)}/messages"))["streamCursor"]
+
+    assert_ok(
+        await client.post(f"{_base(execution)}/input", json={"message": "next"}),
+        status=202,
+    )
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+    response = await client.get(f"{_base(execution)}/stream", params={"after": cursor})
+
+    types = [
+        json.loads(line.removeprefix("data: "))["type"]
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert types == ["RUN_STARTED", "RUN_FINISHED"]
+
+
 async def test_the_history_stops_where_a_running_turn_began(
     runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
     real_session_service: InMemorySessionService,

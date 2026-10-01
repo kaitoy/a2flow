@@ -175,6 +175,11 @@ class SessionStreamEvent(SQLModel, table=True):
             ondelete="CASCADE",
             name="fk_session_stream_events_session_id",
         ),
+        # Ids are viewers' cursors, so they must never go backwards. A plain
+        # SQLite rowid is max(id) + 1, which falls back once a new turn deletes
+        # the previous turn's rows -- leaving a viewer waiting "after" an id the
+        # new turn's events never reach. PostgreSQL sequences never reuse ids.
+        {"sqlite_autoincrement": True},
     )
 
     id: int | None = Field(default=None, primary_key=True)

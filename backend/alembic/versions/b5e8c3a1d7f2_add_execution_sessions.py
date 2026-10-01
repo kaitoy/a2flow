@@ -104,6 +104,8 @@ def upgrade() -> None:
             name="fk_session_stream_events_session_id",
         ),
         sa.PrimaryKeyConstraint("id"),
+        # Ids are viewers' stream cursors; see the model for why SQLite needs this.
+        sqlite_autoincrement=True,
     )
     op.create_index(
         "ix_session_stream_events_session_id_id",

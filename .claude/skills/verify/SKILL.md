@@ -181,8 +181,14 @@ resulting task templates are on `GET /api/v1/workflows/{id}/task-templates`.
 workflow, so a freshly generated `draft` needs `POST
 /api/v1/workflows/{id}/publish` first — otherwise it answers `409
 WORKFLOW_NOT_RUNNABLE`. The execution comes back with its own id; its chat lives
-at `/workflow-executions/{executionId}/session` in the UI, and opening that page
-is what auto-sends the kickoff prompt and starts the run. With `DEMO_DATA=true`
+at `/workflow-executions/{executionId}/session` in the UI. The server starts the
+run itself the moment it is created -- no page has to be open -- so watch
+`GET /api/v1/workflow-executions/{id}/sessions` for the main session's `status`
+(`queued` → `running` → `waiting_for_input` / `waiting_for_approval` / `idle`).
+Opening the page right after executing shows the kickoff turn arrive live over
+`.../sessions/{sid}/stream`; opening it later shows it from the history.
+`admin` holds no `approver` role, so a run that asks for approval needs a user
+or group that does before the approval path can be driven. With `DEMO_DATA=true`
 the demo tool mocks stub the side-effecting calls, so the run plays through
 without reaching AWS.
 
