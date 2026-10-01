@@ -9,26 +9,43 @@ and agent-resolution business rules.
 import builtins
 import logging
 from collections.abc import Collection, Sequence
-from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.sessions import BaseSessionService, Session
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
+from infrastructure.client_tools import RENDER_A2UI_TOOL_NAME
 from infrastructure.skill_manager import SkillManager
+from models.execution_session import (
+    ExecutionSession,
+    ExecutionSessionStatus,
+    SessionHistory,
+    SessionInputCreate,
+)
 from models.mcp_tool_invocation import MCPToolInvocation
 from models.message_meta import MessageScope
 from models.user import Role, User, has_any_role
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionRead
 from models.workflow_task import WorkflowTaskRead
 from repositories.agent_skill import AgentSkillRepository
-from repositories.exceptions import NotFoundError, SkillNotReadyError
+from repositories.exceptions import (
+    ForbiddenError,
+    NotFoundError,
+    SessionAwaitingApprovalError,
+    SessionInputValidationError,
+    SessionRunInProgressError,
+    SkillNotReadyError,
+)
+from repositories.execution_session import ExecutionSessionRepository
 from repositories.mcp_tool_invocation import McpToolInvocationRepository
 from repositories.message_meta import MessageMetaRepository
 from repositories.query import FilterSpec, SortSpec
+from repositories.session_stream import SessionStreamRepository
 from repositories.workflow_execution import WorkflowExecutionRepository
 from repositories.workflow_task import WorkflowTaskRepository
 from services import session_attribution
+from services.session_inputs import SessionInput, WaitingCall
+from services.session_queue import queue_input
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 
 logger = logging.getLogger(__name__)
@@ -49,6 +66,8 @@ class WorkflowExecutionService:
         session_service: BaseSessionService,
         app_name: str,
         access: WorkflowExecutionAccessPolicy,
+        sessions: ExecutionSessionRepository,
+        stream: SessionStreamRepository,
     ) -> None:
         """Initialize the service.
 
@@ -79,6 +98,10 @@ class WorkflowExecutionService:
             access: Policy restricting execution-scoped operations to the
                 initiator, the execution's designated approvers, admins
                 (read-only), and super admins.
+            sessions: Repository holding the run's ADK sessions, which input
+                is queued on.
+            stream: The sessions' streamed events, read for the cursor a
+                history comes with.
         """
         self._execution_repo = execution_repo
         self._tasks = tasks
@@ -90,6 +113,8 @@ class WorkflowExecutionService:
         self._session_service = session_service
         self._app_name = app_name
         self._access = access
+        self._sessions = sessions
+        self._stream = stream
 
     async def _get(self, execution_id: str) -> WorkflowExecution:
         """Return the WorkflowExecution with the given ID, without authorization.
@@ -430,66 +455,214 @@ class WorkflowExecutionService:
             kind=AgentKind.execution,
         )
 
-    async def get_messages(
+    async def list_sessions(
         self, execution_id: str, *, caller: User, caller_roles: Collection[str]
-    ) -> builtins.list[dict[str, Any]]:
-        """Return the chat history of a WorkflowExecution's workflow session.
+    ) -> builtins.list[ExecutionSession]:
+        """Return the ADK sessions of a run, main session first.
 
-        The ADK session is looked up by the WorkflowExecution's initiator
-        (``execution.initiator_id``), so the same history is returned
-        regardless of which authorized user requests it — a designated
-        approver opening the chat sees the initiator's conversation instead
-        of starting a fresh one.
-        Returns an empty list when the ADK session does not exist yet (before
-        the first agent run).
+        Read access, like the chat itself.
 
         Args:
-            execution_id: Identifier of the WorkflowExecution whose messages to fetch.
-            caller: The authenticated user requesting the history.
-            caller_roles: The caller's effective roles, including any
-                inherited from their groups.
+            execution_id: Identifier of the WorkflowExecution.
+            caller: The authenticated user.
+            caller_roles: The caller's effective roles.
 
         Returns:
-            The workflow session's messages as plain JSON-serializable dicts
-            (the same shape as ``GET /sessions/{id}/messages``).
+            The run's sessions with their status and what they wait on.
 
         Raises:
-            NotFoundError: If no WorkflowExecution exists with the given ID.
-            ForbiddenError: If the caller is neither the execution initiator,
-                a designated approver of the execution, nor holds ``admin``
-                or ``super_admin``.
+            NotFoundError: If the execution does not exist or is hidden.
+            ForbiddenError: If the caller may not read the execution.
+        """
+        await self._get_authorized(
+            execution_id, caller=caller, caller_roles=caller_roles
+        )
+        return await self._sessions.list_for_execution(execution_id)
+
+    async def get_session_messages(
+        self,
+        execution_id: str,
+        session_id: str,
+        *,
+        caller: User,
+        caller_roles: Collection[str],
+    ) -> SessionHistory:
+        """Return one session's chat history and the cursor to stream it from.
+
+        The ADK session is keyed by the run's initiator, so every authorized
+        viewer -- a designated approver included -- reads the one shared
+        conversation. While a turn is under way, the history stops where that
+        turn began and the cursor points at the turn's first streamed event: a
+        viewer joining mid-turn gets the turn from the stream, once, instead of
+        half of it twice. The cursor is read before the history, so an event
+        written in between is streamed rather than lost.
+
+        Args:
+            execution_id: Identifier of the WorkflowExecution.
+            session_id: The ADK session to read.
+            caller: The authenticated user requesting the history.
+            caller_roles: The caller's effective roles.
+
+        Returns:
+            The messages, with sender and task attribution merged in, and the
+            stream cursor.
+
+        Raises:
+            NotFoundError: If the execution or the session does not exist, the
+                session belongs to another run, or the execution is hidden.
+            ForbiddenError: If the caller may not read the execution.
         """
         execution = await self._get_authorized(
             execution_id, caller=caller, caller_roles=caller_roles
         )
-        session = await self._adk_session(execution)
+        row = await self._session_of(execution_id, session_id)
+        cursor = await self._stream.cursor_before_run(session_id, row.active_run_id)
+        session = await self._adk_session(execution, session_id)
         if session is None:
-            return []
+            return SessionHistory(messages=[], stream_cursor=cursor)
+        events = session.events
+        if row.active_run_id is not None:
+            events = events[: row.run_event_index]
         meta = await self._meta.meta_for_session(
             MessageScope.workflow_session(execution_id)
         )
-        return session_attribution.merge_message_meta(
-            adk_events_to_messages(session.events), meta
+        return SessionHistory(
+            messages=session_attribution.merge_message_meta(
+                adk_events_to_messages(events), meta
+            ),
+            stream_cursor=cursor,
         )
 
-    async def _adk_session(self, execution: WorkflowExecution) -> Session | None:
-        """Return the ADK session holding an execution's workflow session chat.
+    async def authorize_stream(
+        self,
+        execution_id: str,
+        session_id: str,
+        *,
+        caller: User,
+        caller_roles: Collection[str],
+    ) -> None:
+        """Check the caller may watch a session's stream, before it is opened.
+
+        Read access, like the history: a plain admin may watch a run without
+        being able to drive it.
+
+        Raises:
+            NotFoundError: If the execution or the session does not exist.
+            ForbiddenError: If the caller may not read the execution.
+        """
+        await self._get_authorized(
+            execution_id, caller=caller, caller_roles=caller_roles
+        )
+        await self._session_of(execution_id, session_id)
+
+    async def send_input(
+        self,
+        execution_id: str,
+        session_id: str,
+        data: SessionInputCreate,
+        *,
+        caller: User,
+    ) -> ExecutionSession:
+        """Queue a person's input for a session's next turn, which the server runs.
+
+        Driving the chat is an action, so it takes ``assert_access`` (the
+        initiator, a designated approver, or a super admin) rather than read
+        access. Answering a form the agent rendered is narrower still -- the
+        initiator only, like submitting it ever was. The turn runs with the
+        sender's own authority.
+
+        Args:
+            execution_id: Identifier of the WorkflowExecution.
+            session_id: The ADK session to send to.
+            data: A chat message, or the answer to a form the session waits on.
+            caller: The authenticated user sending it.
+
+        Returns:
+            The session, now ``queued``.
+
+        Raises:
+            NotFoundError: If the execution or the session does not exist.
+            ForbiddenError: If the caller may not drive the run, or answers a
+                form without being its initiator.
+            SessionInputValidationError: If the input is empty, answers a call
+                the session is not waiting on, or targets a finished branch.
+            SessionAwaitingApprovalError: If a message is sent while the
+                session waits on an approval.
+            SessionRunInProgressError: If the session already has a turn queued
+                or running.
+        """
+        execution = await self._get(execution_id)
+        await self._access.assert_access(execution_id, execution.initiator_id, caller)
+        row = await self._session_of(execution_id, session_id)
+        if row.parent_id is not None and row.status is ExecutionSessionStatus.done:
+            raise SessionInputValidationError("this branch session has finished")
+        waiting = [WaitingCall.model_validate(c) for c in row.waiting_on]
+        if data.a2ui_action is not None:
+            if caller.id != execution.initiator_id:
+                raise ForbiddenError("only the run's initiator can answer its forms")
+            if not any(
+                c.tool_call_id == data.a2ui_action.tool_call_id
+                and c.name == RENDER_A2UI_TOOL_NAME
+                for c in waiting
+            ):
+                raise SessionInputValidationError(
+                    "the session is not waiting on that form"
+                )
+            session_input = SessionInput(
+                kind="tool_result",
+                tool_call_id=data.a2ui_action.tool_call_id,
+                content=data.a2ui_action.content,
+                sender_id=caller.id,
+                acting_user_id=caller.id,
+            )
+        else:
+            text = (data.message or "").strip()
+            if not text:
+                raise SessionInputValidationError("the message is empty")
+            if row.status is ExecutionSessionStatus.waiting_for_approval:
+                raise SessionAwaitingApprovalError(session_id)
+            session_input = SessionInput(
+                kind="message", text=text, sender_id=caller.id, acting_user_id=caller.id
+            )
+        if not await queue_input(
+            self._sessions, session_id, session_input, user_id=caller.id
+        ):
+            raise SessionRunInProgressError(session_id)
+        return await self._session_of(execution_id, session_id)
+
+    async def _session_of(self, execution_id: str, session_id: str) -> ExecutionSession:
+        """Return a session of the execution ``execution_id``, or raise NotFoundError.
+
+        Takes the id rather than the execution itself: a commit since it was
+        read (queueing input commits) leaves the ORM object expired, and
+        reading it again would need a lazy load outside the request's greenlet.
+        """
+        row = await self._sessions.get(session_id)
+        if row is None or row.workflow_execution_id != execution_id:
+            raise NotFoundError("ExecutionSession", session_id)
+        return row
+
+    async def _adk_session(
+        self, execution: WorkflowExecution, session_id: str | None = None
+    ) -> Session | None:
+        """Return the ADK session holding one of an execution's chats.
 
         Keyed by the execution's initiator, not the current user, so every
-        authorized viewer (for example a designated approver) reads and writes
-        the one shared conversation.
+        authorized viewer (for example a designated approver) reads the one
+        shared conversation.
 
         Args:
             execution: The WorkflowExecution whose chat to look up.
+            session_id: The session to read; the main session when omitted.
 
         Returns:
             The ADK session, or ``None`` when it does not exist yet (before the
-            first agent run).
+            first turn).
         """
         return await self._session_service.get_session(
             app_name=tenant_app_name(self._app_name, execution.tenant_id),
             user_id=execution.initiator_id,
-            session_id=execution.session_id,
+            session_id=session_id or execution.session_id,
         )
 
     async def attributable_keys(self, execution_id: str) -> set[str]:

@@ -65,9 +65,11 @@ The two are linked both ways:
 
 ### Live updates
 
-The page refreshes itself every few seconds so each participant sees the others' messages, and the agent's progress, without reloading. Refreshing pauses while your own message is being answered, so it never disturbs the live reply, and the view follows new messages to the bottom only when you are already scrolled near the bottom.
+Every participant watching the run sees each reply as it is written — whoever's message started it, and also the turns A2Flow runs on its own, such as the kickoff and the resumption after an approval. The view follows new messages to the bottom only when you are already scrolled near the bottom.
 
-The [design session](./workflows.md#adjusting-the-task-templates) is a shared chat too, with the same avatars and the same live updates. It is shared by the tenant's Developers rather than by a run's participants.
+A message you send waits for the agent: while it is still working on a turn, the message is refused and you can send it again once the reply has finished. While the run is waiting for an approval, the chat takes no messages at all — the approval's decision is what moves it on.
+
+The [design session](./workflows.md#adjusting-the-task-templates) is a shared chat too, with the same avatars. It is shared by the tenant's Developers rather than by a run's participants, and it refreshes itself every few seconds rather than showing other people's replies as they are written.
 
 ### Suggested replies {#suggested-replies}
 

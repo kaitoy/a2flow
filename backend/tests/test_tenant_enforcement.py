@@ -30,7 +30,7 @@ from models.workflow import Workflow
 from models.workflow_execution import WorkflowExecution
 from repositories.exceptions import ForbiddenError
 from tests._envelope import assert_err, assert_ok
-from tests._seed import DEFAULT_TEST_TENANT_ID
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_branch_session
 from tests._workflow import create_published_workflow
 from tests.conftest import FAKE_COMMIT_SHA
 
@@ -606,6 +606,9 @@ async def _seed_cross_tenant_execution_with_message(
             ),
         ),
     )
+    await seed_branch_session(
+        eng, execution.id, session_id, tenant_id=tenant_id, user_id="owner"
+    )
     return execution.id
 
 
@@ -673,21 +676,21 @@ async def test_super_admin_all_tenants_reads_workflow_session_messages_in_other_
     )
 
     response = await client.get(
-        f"/api/v1/workflow-executions/{execution_id}/messages",
+        f"/api/v1/workflow-executions/{execution_id}/sessions/exec-session-{tenant_b}/messages",
         headers=_all_tenants_headers(),
     )
-    messages = assert_ok(response)
+    messages = assert_ok(response)["messages"]
     assert [m["content"] for m in messages] == ["hello from tenant-b run"]
 
 
-async def test_super_admin_all_tenants_rejects_workflow_session_agent(
+async def test_super_admin_all_tenants_rejects_workflow_session_input(
     workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     """Regression guard: the fix must not have leaked into the write route."""
     client, _eng = workflow_client_with_engine
     response = await client.post(
-        "/api/v1/workflow-executions/nonexistent/agent",
-        json=_RUN_AGENT_INPUT_BODY,
+        "/api/v1/workflow-executions/nonexistent/sessions/nonexistent/input",
+        json={"message": "hi"},
         headers=_all_tenants_headers(),
     )
     assert_err(response, "FORBIDDEN", 403)

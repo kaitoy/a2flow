@@ -282,3 +282,321 @@ async def test_a_failed_turn_leaves_the_session_in_error(
     row = await _session(engine, execution["sessionId"])
     assert row.status is ExecutionSessionStatus.error
     assert row.pending_input is None
+
+
+# ---------- input, history, and stream over the API ----------
+
+
+class AppendingAgent(ScriptedAgent):
+    """A scripted agent that also persists ADK events, the way ag-ui-adk does mid-turn."""
+
+    def __init__(
+        self,
+        adk: InMemorySessionService,
+        execution: dict[str, Any],
+        events: list[Any],
+        script: list[Any] | None = None,
+    ) -> None:
+        super().__init__(*([script] if script is not None else []))
+        self.adk = adk
+        self.execution = execution
+        self.events = events
+
+    async def persist(self) -> None:
+        """Append this agent's events to the run's ADK session."""
+        key = {
+            "app_name": tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+            "user_id": self.execution["initiatorId"],
+            "session_id": self.execution["sessionId"],
+        }
+        session = await self.adk.get_session(**key) or await self.adk.create_session(
+            **key
+        )
+        for event in self.events:
+            await self.adk.append_event(session, event)
+
+    async def run(self, input_data: RunAgentInput) -> AsyncGenerator[Any, None]:
+        await self.persist()
+        async for event in super().run(input_data):
+            yield event
+
+
+def _user_event(text: str) -> Any:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    return Event(
+        author="user",
+        content=types.Content(role="user", parts=[types.Part(text=text)]),
+    )
+
+
+def _tool_response_event(call_id: str, response: dict[str, Any]) -> Any:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    return Event(
+        author="tool",
+        content=types.Content(
+            role="function",
+            parts=[
+                types.Part(
+                    function_response=types.FunctionResponse(
+                        id=call_id, name=call_id, response=response
+                    )
+                )
+            ],
+        ),
+    )
+
+
+def _base(execution: dict[str, Any]) -> str:
+    return (
+        f"/api/v1/workflow-executions/{execution['id']}"
+        f"/sessions/{execution['sessionId']}"
+    )
+
+
+async def test_a_message_runs_as_its_sender_and_is_attributed_to_them(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+    real_session_service: InMemorySessionService,
+) -> None:
+    """An approver typing in the chat acts with their own authority, not the initiator's."""
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+    registry.get.return_value = ScriptedAgent()
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)  # kickoff
+
+    queued = await client.post(
+        f"{_base(execution)}/input",
+        json={"message": "hi from alice"},
+        headers={"X-User-Id": "alice"},
+    )
+    assert assert_ok(queued, status=202)["status"] == "queued"
+
+    agent = AppendingAgent(
+        real_session_service, execution, [_user_event("hi from alice")]
+    )
+    registry.get.return_value = agent
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    (sent,) = agent.inputs
+    assert sent.state["temp:actingUserId"] == "alice"
+    history = assert_ok(await client.get(f"{_base(execution)}/messages"))
+    alice = [m for m in history["messages"] if m.get("content") == "hi from alice"]
+    assert alice[0]["senderUserId"] == "alice"
+
+
+async def test_a_form_answer_resumes_its_call_and_skips_the_no_op_acks(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+    real_session_service: InMemorySessionService,
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    form = [
+        RunStartedEvent(type=EventType.RUN_STARTED, thread_id="t", run_id="r"),
+        ToolCallStartEvent(
+            type=EventType.TOOL_CALL_START,
+            tool_call_id="tc-1",
+            tool_call_name="render_a2ui",
+        ),
+        ToolCallEndEvent(type=EventType.TOOL_CALL_END, tool_call_id="tc-1"),
+        ToolCallStartEvent(
+            type=EventType.TOOL_CALL_START,
+            tool_call_id="tc-2",
+            tool_call_name="render_a2ui",
+        ),
+        ToolCallEndEvent(type=EventType.TOOL_CALL_END, tool_call_id="tc-2"),
+        RunFinishedEvent(type=EventType.RUN_FINISHED, thread_id="t", run_id="r"),
+    ]
+    registry.get.return_value = ScriptedAgent(form)
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+    paused = await _session(engine, execution["sessionId"])
+    assert paused.status is ExecutionSessionStatus.waiting_for_input
+
+    assert_ok(
+        await client.post(
+            f"{_base(execution)}/input",
+            json={"a2uiAction": {"toolCallId": "tc-1", "content": "submitted"}},
+            headers={"X-User-Id": execution["initiatorId"]},
+        ),
+        status=202,
+    )
+    agent = AppendingAgent(
+        real_session_service,
+        execution,
+        [
+            _tool_response_event("tc-2", {"status": "rendered"}),
+            _tool_response_event("tc-1", {"result": "submitted"}),
+        ],
+    )
+    registry.get.return_value = agent
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    results = {
+        m.tool_call_id: m.content
+        for m in agent.inputs[0].messages
+        if isinstance(m, ToolMessage)
+    }
+    assert results == {
+        "tc-1": "submitted",
+        "tc-2": json.dumps({"status": "rendered"}),
+    }
+    history = assert_ok(await client.get(f"{_base(execution)}/messages"))["messages"]
+    senders = {
+        m["toolCallId"]: m["senderUserId"] for m in history if m["role"] == "tool"
+    }
+    # The answer is the initiator's; the no-op acknowledgement is nobody's.
+    assert senders == {"tc-1": execution["initiatorId"], "tc-2": None}
+
+
+async def test_work_after_a_task_starts_is_associated_with_it(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+    real_session_service: InMemorySessionService,
+) -> None:
+    from google.adk.events.event import Event
+    from google.genai import types
+
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+    (task,) = assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
+        )
+    )
+    started = Event(
+        author="agent",
+        content=types.Content(
+            role="model",
+            parts=[
+                types.Part(
+                    function_call=types.FunctionCall(
+                        name="update_workflow_task",
+                        args={"task_id": task["id"], "status": "in_progress"},
+                    )
+                )
+            ],
+        ),
+    )
+    work = Event(
+        author="agent",
+        content=types.Content(role="model", parts=[types.Part(text="work done")]),
+    )
+    registry.get.return_value = AppendingAgent(
+        real_session_service, execution, [_user_event("kick off"), started, work]
+    )
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    messages = assert_ok(await client.get(f"{_base(execution)}/messages"))["messages"]
+    assert messages[0]["workflowTaskId"] is None
+    assert messages[-1]["workflowTaskId"] == task["id"]
+
+
+async def test_a_turn_reaches_viewers_through_the_stream(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """Joining at the history's cursor replays the turn once, ending with it."""
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+    cursor = assert_ok(await client.get(f"{_base(execution)}/messages"))["streamCursor"]
+    registry.get.return_value = ScriptedAgent()
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    response = await client.get(f"{_base(execution)}/stream", params={"after": cursor})
+
+    assert response.status_code == 200
+    events = [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert [e["type"] for e in events] == ["RUN_STARTED", "RUN_FINISHED"]
+    after = assert_ok(await client.get(f"{_base(execution)}/messages"))["streamCursor"]
+    assert after > cursor
+
+
+async def test_the_history_stops_where_a_running_turn_began(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+    real_session_service: InMemorySessionService,
+) -> None:
+    """A viewer joining mid-turn gets the turn from the stream, not twice."""
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    registry.get.return_value = AppendingAgent(
+        real_session_service, execution, [_user_event("before")]
+    )
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+    async with AsyncSession(engine) as db:
+        row = await db.get(ExecutionSession, execution["sessionId"])
+        assert row is not None
+        # A turn is under way that began after the one event above.
+        row.active_run_id = "run-now"
+        row.run_event_index = 1
+        db.add(row)
+        await db.commit()
+    await AppendingAgent(
+        real_session_service, execution, [_user_event("during")]
+    ).persist()
+
+    history = assert_ok(await client.get(f"{_base(execution)}/messages"))
+    assert [m.get("content") for m in history["messages"]] == ["before"]
+
+
+async def test_input_is_refused_while_the_session_is_busy_or_awaiting_approval(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)  # its kickoff is still queued
+    busy = await client.post(f"{_base(execution)}/input", json={"message": "hi"})
+    assert busy.status_code == 409
+    assert busy.json()["error"]["code"] == "SESSION_RUN_IN_PROGRESS"
+
+    approval_id = await _insert_approval(engine, execution["id"])
+    registry.get.return_value = ScriptedAgent(_asks_for_approval(approval_id))
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+    waiting = await client.post(f"{_base(execution)}/input", json={"message": "hi"})
+    assert waiting.status_code == 409
+    assert waiting.json()["error"]["code"] == "SESSION_AWAITING_APPROVAL"
+
+
+async def test_only_the_initiator_answers_a_form_and_only_an_open_one(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+    registry.get.return_value = ScriptedAgent()
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)  # kickoff
+    answer = {"a2uiAction": {"toolCallId": "tc-9", "content": "x"}}
+
+    not_open = await client.post(
+        f"{_base(execution)}/input",
+        json=answer,
+        headers={"X-User-Id": execution["initiatorId"]},
+    )
+    assert not_open.status_code == 422
+    assert not_open.json()["error"]["code"] == "INVALID_SESSION_INPUT"
+    someone_else = await client.post(
+        f"{_base(execution)}/input", json=answer, headers={"X-User-Id": "alice"}
+    )
+    assert someone_else.status_code == 403
+
+
+async def test_a_turn_is_told_which_files_the_session_holds(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """The file listing reaches the agent from the server's records, as context."""
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+    assert_ok(
+        await client.post(
+            f"/api/v1/workflow-executions/{execution['id']}/files",
+            files={"file": ("input.csv", b"a,b\n1,2\n", "text/csv")},
+        ),
+        status=201,
+    )
+    agent = ScriptedAgent()
+    registry.get.return_value = agent
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    entries = {c.description: c.value for c in agent.inputs[0].context}
+    assert "input.csv" in entries["Files attached to this session"]

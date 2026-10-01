@@ -4,7 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from ag_ui.core import Context, Message, RunAgentInput, TextInputContent, UserMessage
+from ag_ui.core import Message, RunAgentInput, TextInputContent, UserMessage
 from ag_ui_adk import CONTEXT_STATE_KEY, ADKAgent, AGUIToolset
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -79,26 +79,6 @@ DEFAULT_USER_ID = "user"
 #: tells the LLM to call ``render_a2ui``, so the flag is stripped to keep that
 #: tool in place.
 A2UI_INJECT_PROP_KEY = "injectA2UITool"
-
-#: Descriptions of the two ``context`` entries ``@ag-ui/a2ui-middleware`` injects
-#: on every request (see its ``injectSchemaContext`` / ``injectToolGuidelines``):
-#: the component catalog, and the argument format for ``render_a2ui``. Neither is
-#: derivable from the tool's own JSON schema, which types ``components`` as a bare
-#: array of objects — without them the LLM guesses the component shape (``type``
-#: instead of ``component``) and invents component names, and every surface it
-#: renders dies in the client's ``MessageProcessor``.
-#:
-#: Both strings must stay byte-identical to the middleware's: it matches them by
-#: exact equality to replace its own entries, and so does :func:`keep_a2ui_context`.
-#: The guide's description embeds the tool name, which is ``render_a2ui`` because
-#: A2Flow passes ``injectA2UITool: true`` (a bool, not a custom name).
-A2UI_SCHEMA_CONTEXT_DESCRIPTION = (
-    "A2UI Component Schema — available components for generating UI surfaces. "
-    "Use these component names and properties when creating A2UI operations."
-)
-A2UI_GUIDE_CONTEXT_DESCRIPTION = (
-    "A2UI render tool usage guide — how to call render_a2ui with valid arguments."
-)
 
 _SESSION_TITLE_MAX_LENGTH = 60
 
@@ -211,33 +191,6 @@ def with_user_id(
     state = dict(input_data.state or {})
     state[ACTING_USER_STATE_KEY] = acting_user_id or user_id or DEFAULT_USER_ID
     return input_data.model_copy(update={"forwarded_props": props, "state": state})
-
-
-def keep_a2ui_context(context: Sequence[Context]) -> list[Context]:
-    """Return only the A2UI entries of a client-sent ``context``.
-
-    ``context`` feeds the agent's system instruction (via ``CONTEXT_STATE_KEY``),
-    so an endpoint that shares one ADK session across users cannot pass the
-    client's through wholesale. It cannot drop it wholesale either: the A2UI
-    component catalog and ``render_a2ui`` call format reach the LLM *only* as
-    context entries the frontend middleware injects, so discarding them leaves it
-    inventing an A2UI dialect the client cannot render.
-
-    This keeps the two entries A2Flow's own middleware config produces — matched
-    by :data:`A2UI_SCHEMA_CONTEXT_DESCRIPTION` / :data:`A2UI_GUIDE_CONTEXT_DESCRIPTION`
-    — and drops everything else, including any extra entry a client invents. Their
-    *values* are still client-supplied, so this is an allowlist of purpose, not a
-    proof of provenance; a caller who forges one only reaches an LLM they can
-    already send chat messages to.
-
-    Args:
-        context: The client-sent context entries.
-
-    Returns:
-        The subset carrying A2UI instructions, in their original order.
-    """
-    allowed = {A2UI_SCHEMA_CONTEXT_DESCRIPTION, A2UI_GUIDE_CONTEXT_DESCRIPTION}
-    return [entry for entry in context if entry.description in allowed]
 
 
 #: Shared rules for turning a Skill into task templates, used by both design

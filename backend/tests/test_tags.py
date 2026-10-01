@@ -1233,24 +1233,15 @@ async def test_a_workflow_executions_copied_access_tag_hides_it_from_a_former_gr
     assert execution["tagIds"] == [gated["id"]]
     detail_url = f"/api/v1/workflow-executions/{execution_id}"
     tasks_url = f"{detail_url}/workflow-tasks"
-    messages_url = f"{detail_url}/messages"
-    agent_url = f"{detail_url}/agent"
-    run_input = {
-        "threadId": execution["sessionId"],
-        "runId": "run-001",
-        "state": {},
-        "messages": [],
-        "tools": [],
-        "context": [],
-        "forwardedProps": {},
-    }
+    session_url = f"{detail_url}/sessions/{execution['sessionId']}"
+    messages_url = f"{session_url}/messages"
+    input_url = f"{session_url}/input"
 
     # carol (REQUESTER) is the run's own initiator and still holds the tag.
     assert execution_id in await _listed_ids(client, "workflow-executions", REQUESTER)
     assert_ok(await client.get(detail_url, headers=REQUESTER))
     assert_ok(await client.get(tasks_url, headers=REQUESTER))
-    agent_response = await client.post(agent_url, json=run_input, headers=REQUESTER)
-    assert agent_response.status_code == 200
+    assert_ok(await client.get(messages_url, headers=REQUESTER))
 
     # She leaves the only group holding the tag.
     assert_ok(
@@ -1265,7 +1256,7 @@ async def test_a_workflow_executions_copied_access_tag_hides_it_from_a_former_gr
     assert_err(await client.get(tasks_url, headers=REQUESTER), "NOT_FOUND", 404)
     assert_err(await client.get(messages_url, headers=REQUESTER), "NOT_FOUND", 404)
     assert_err(
-        await client.post(agent_url, json=run_input, headers=REQUESTER),
+        await client.post(input_url, json={"message": "hi"}, headers=REQUESTER),
         "NOT_FOUND",
         404,
     )

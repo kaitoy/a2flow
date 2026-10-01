@@ -38,10 +38,10 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const useWorkflowSessionChatMock = vi.fn();
+const useDesignSessionChatMock = vi.fn();
 
-vi.mock("@/hooks/useWorkflowSessionChat", () => ({
-  useWorkflowSessionChat: (...args: unknown[]) => useWorkflowSessionChatMock(...args),
+vi.mock("@/hooks/useDesignSessionChat", () => ({
+  useDesignSessionChat: (...args: unknown[]) => useDesignSessionChatMock(...args),
 }));
 
 vi.mock("@/components/MessageList", () => ({
@@ -106,7 +106,7 @@ function mockMe(roles: string[]) {
 
 beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ workflowId: "wf-1" });
-  useWorkflowSessionChatMock.mockReturnValue({
+  useDesignSessionChatMock.mockReturnValue({
     messages: [],
     isRunning: false,
     isStreaming: false,
@@ -114,7 +114,6 @@ beforeEach(() => {
     pendingRenderCalls: [],
     sendMessage: vi.fn(),
     sendA2uiAction: vi.fn(),
-    sendApprovalResult: vi.fn(),
     messageSenders: new Map(),
     senderUsers: new Map(),
     locallySentMessageIds: new Set(),
@@ -134,16 +133,10 @@ describe("DesignSessionPage", () => {
     expect(within(nav).getByText("Design Session")).toHaveAttribute("aria-current", "page");
   });
 
-  it("drives the chat hook in design mode with no kickoff prompt", async () => {
+  it("drives the design-session chat hook", async () => {
     render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     await screen.findByRole("link", { name: "my-workflow" });
-    expect(useWorkflowSessionChatMock).toHaveBeenCalledWith(
-      "wf-1",
-      "design-session-id",
-      null,
-      "user",
-      "design"
-    );
+    expect(useDesignSessionChatMock).toHaveBeenCalledWith("wf-1", "design-session-id", "user");
   });
 
   it("shows the recorded sender's avatar beside a message", async () => {
@@ -156,7 +149,7 @@ describe("DesignSessionPage", () => {
       lastName: "Developer",
       avatarUpdatedAt: "2026-01-01T00:00:00Z",
     } as User;
-    useWorkflowSessionChatMock.mockReturnValue({
+    useDesignSessionChatMock.mockReturnValue({
       messages: [],
       isRunning: false,
       isStreaming: false,
@@ -164,7 +157,6 @@ describe("DesignSessionPage", () => {
       pendingRenderCalls: [],
       sendMessage: vi.fn(),
       sendA2uiAction: vi.fn(),
-      sendApprovalResult: vi.fn(),
       messageSenders: new Map([["m1", "dev-2"]]),
       senderUsers: new Map([["dev-2", sender]]),
       locallySentMessageIds: new Set(),
@@ -184,7 +176,7 @@ describe("DesignSessionPage", () => {
       lastName: "Owner",
       avatarUpdatedAt: "2026-01-01T00:00:00Z",
     } as User;
-    useWorkflowSessionChatMock.mockReturnValue({
+    useDesignSessionChatMock.mockReturnValue({
       messages: [],
       isRunning: false,
       isStreaming: false,
@@ -192,7 +184,6 @@ describe("DesignSessionPage", () => {
       pendingRenderCalls: [],
       sendMessage: vi.fn(),
       sendA2uiAction: vi.fn(),
-      sendApprovalResult: vi.fn(),
       messageSenders: new Map(),
       senderUsers: new Map([["user", owner]]),
       locallySentMessageIds: new Set(),
@@ -406,14 +397,14 @@ describe("DesignSessionPage", () => {
     await screen.findByRole("alert");
 
     // A turn runs...
-    useWorkflowSessionChatMock.mockReturnValue({
-      ...useWorkflowSessionChatMock(),
+    useDesignSessionChatMock.mockReturnValue({
+      ...useDesignSessionChatMock(),
       isRunning: true,
     });
     rerender(<DesignSessionPage />);
     // ...and finishes.
-    useWorkflowSessionChatMock.mockReturnValue({
-      ...useWorkflowSessionChatMock(),
+    useDesignSessionChatMock.mockReturnValue({
+      ...useDesignSessionChatMock(),
       isRunning: false,
     });
     rerender(<DesignSessionPage />);
@@ -471,7 +462,7 @@ describe("DesignSessionPage", () => {
   });
 
   it("shows the access-denied state when the design chat history load is FORBIDDEN", async () => {
-    useWorkflowSessionChatMock.mockReturnValue({
+    useDesignSessionChatMock.mockReturnValue({
       messages: [],
       isRunning: false,
       isStreaming: false,
@@ -479,7 +470,6 @@ describe("DesignSessionPage", () => {
       pendingRenderCalls: [],
       sendMessage: vi.fn(),
       sendA2uiAction: vi.fn(),
-      sendApprovalResult: vi.fn(),
       messageSenders: new Map(),
       senderUsers: new Map(),
       locallySentMessageIds: new Set(),

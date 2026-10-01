@@ -31,9 +31,9 @@ from repositories.message_meta import MessageMetaRepository
 #: acknowledgement (``RENDER_ACK_CONTENT`` in ``frontend/src/lib/a2uiAction.ts``,
 #: mirroring the ``@ag-ui/a2ui-middleware`` convention). Such a response merely
 #: unblocks the long-running render call for a surface nobody acted on, so it
-#: must not be attributed to the user whose run happened to flush it -- nor
-#: does sending one count as acting on the surface (see
-#: :func:`services.workflow_execution_access.assert_may_answer_surfaces`).
+#: must not be attributed to the user whose run happened to flush it. In a
+#: workflow session the server sends these itself, for every open surface a
+#: turn's input does not answer (:func:`services.session_inputs.build_messages`).
 RENDER_ACK_RESPONSE = {"status": "rendered"}
 
 

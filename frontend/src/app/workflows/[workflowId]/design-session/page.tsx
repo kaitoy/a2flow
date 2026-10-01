@@ -27,8 +27,8 @@ import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useDesignSessionChat } from "@/hooks/useDesignSessionChat";
 import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
-import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
   generateWorkflowDescription,
   getWorkflow,
@@ -86,12 +86,11 @@ function DesignSessionView({
     pendingRenderCalls,
     sendMessage,
     sendA2uiAction,
-    sendApprovalResult,
     messageSenders,
     senderUsers,
     locallySentMessageIds,
     forbidden: chatForbidden,
-  } = useWorkflowSessionChat(workflow.id, workflow.sessionId, null, workflow.createdBy, "design");
+  } = useDesignSessionChat(workflow.id, workflow.sessionId, workflow.createdBy);
 
   // The design chat is shared by the tenant's developers, so each message shows
   // who sent it and takes their side of the thread — the same resolution the
@@ -249,7 +248,6 @@ function DesignSessionView({
           renderAvatar={renderAvatar}
           isOwnMessage={isOwnMessage}
           onAction={sendA2uiAction}
-          onApprovalResolved={sendApprovalResult}
           pendingRenderCalls={pendingRenderCalls}
         />
         {canEdit && (

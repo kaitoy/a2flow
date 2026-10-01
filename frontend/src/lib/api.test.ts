@@ -8,8 +8,8 @@ import {
   createChatAgent,
   getAgentSkill,
   getDesignSessionHistory,
+  getExecutionSessionHistory,
   getSessionMessages,
-  getWorkflowSessionHistory,
   isForbiddenError,
   listSessions,
 } from "./api";
@@ -90,55 +90,71 @@ describe("getSessionMessages", () => {
   });
 });
 
-describe("getWorkflowSessionHistory", () => {
-  it("fetches the workflow-execution-scoped messages URL", async () => {
+describe("getExecutionSessionHistory", () => {
+  it("fetches the session-scoped messages URL and its stream cursor", async () => {
     let calledUrl = "";
     server.use(
-      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, ({ request }) => {
-        calledUrl = request.url;
-        return envelope([]);
-      })
+      http.get(
+        `${BASE}/api/v1/workflow-executions/:executionId/sessions/:sessionId/messages`,
+        ({ request }) => {
+          calledUrl = request.url;
+          return envelope({ messages: [], streamCursor: 7 });
+        }
+      )
     );
-    const result = await getWorkflowSessionHistory("execution-1");
+    const result = await getExecutionSessionHistory("execution-1", "sess-1");
     expect(Array.isArray(result.messages)).toBe(true);
-    expect(calledUrl).toContain("/workflow-executions/execution-1/messages");
+    expect(result.streamCursor).toBe(7);
+    expect(calledUrl).toContain("/workflow-executions/execution-1/sessions/sess-1/messages");
   });
 
   it("derives the messages, senders and tasks from a single request", async () => {
     let requests = 0;
     server.use(
-      http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () => {
-        requests += 1;
-        return envelope([
-          { id: "m1", role: "user", content: "go", senderUserId: "alice", workflowTaskId: null },
-          {
-            id: "m2",
-            role: "assistant",
-            content: "a",
-            senderUserId: null,
-            workflowTaskId: "task-a",
-          },
-          {
-            // A tool message's own id is regenerated on every fetch, so its
-            // attribution is keyed by the call it answers instead.
-            id: "m3-random",
-            role: "tool",
-            toolCallId: "tc-1",
-            content: "ack",
-            senderUserId: "bob",
-            workflowTaskId: "task-a",
-          },
-          {
-            id: "m4",
-            role: "user",
-            content: "later",
-            senderUserId: null,
-            workflowTaskId: null,
-          },
-        ]);
-      })
+      http.get(
+        `${BASE}/api/v1/workflow-executions/:executionId/sessions/:sessionId/messages`,
+        () => {
+          requests += 1;
+          return envelope({
+            streamCursor: 0,
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                content: "go",
+                senderUserId: "alice",
+                workflowTaskId: null,
+              },
+              {
+                id: "m2",
+                role: "assistant",
+                content: "a",
+                senderUserId: null,
+                workflowTaskId: "task-a",
+              },
+              {
+                // A tool message's own id is regenerated on every fetch, so its
+                // attribution is keyed by the call it answers instead.
+                id: "m3-random",
+                role: "tool",
+                toolCallId: "tc-1",
+                content: "ack",
+                senderUserId: "bob",
+                workflowTaskId: "task-a",
+              },
+              {
+                id: "m4",
+                role: "user",
+                content: "later",
+                senderUserId: null,
+                workflowTaskId: null,
+              },
+            ],
+          });
+        }
+      )
     );
-    const result = await getWorkflowSessionHistory("execution-1");
+    const result = await getExecutionSessionHistory("execution-1", "sess-1");
     expect(requests).toBe(1);
     expect(result.messages).toHaveLength(4);
     expect(result.senders.get("m1")).toBe("alice");

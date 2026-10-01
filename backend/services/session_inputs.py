@@ -70,6 +70,10 @@ class SessionInput(BaseModel):
         content: The answer, for ``tool_result``.
         sender_id: Who the turn's new messages are attributed to in the shared
             chat, or ``None`` for input nobody typed (the recovery prompt).
+        acting_user_id: Whose authority the turn's tools act with -- the
+            person who typed the input. ``None`` runs the turn as the run's
+            initiator: input the server produced (kickoff, recovery) and an
+            approval decision, which resumes the run on the initiator's behalf.
     """
 
     kind: Literal["message", "tool_result", "recovery"]
@@ -77,6 +81,7 @@ class SessionInput(BaseModel):
     tool_call_id: str | None = None
     content: str | None = None
     sender_id: str | None = None
+    acting_user_id: str | None = None
 
 
 class WaitingCall(BaseModel):

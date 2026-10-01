@@ -250,7 +250,7 @@ Endpoints: `GET /workflows/{id}/messages` (empty until the generation run starts
 
 ### Workflow executions
 
-A `WorkflowExecution` is the snapshot record created when a published workflow is executed via `POST /workflows/{id}/execute`, pre-filled with `pending` WorkflowTasks copied from the workflow's templates. Its **workflow session** — the chat the run happens in — has no record of its own and is addressed by the execution's id: streaming at `POST /workflow-executions/{id}/agent`, history at `GET /workflow-executions/{id}/messages`. The execution metadata is fetched via `GET /workflow-executions/{id}`, and the list endpoint (ordered most recent first) is scoped to the caller: a super admin sees every execution in the tenant, everyone else sees only executions they initiated or are a designated approver of. The run endpoint overwrites the AG-UI `context` with the workflow's summarized `description` server-side, so the execution agent receives the design intent as trusted context (and a client can never inject its own).
+A `WorkflowExecution` is the snapshot record created when a published workflow is executed via `POST /workflows/{id}/execute`, pre-filled with `pending` WorkflowTasks copied from the workflow's templates. Its **workflow session** — the chat the run happens in — is run entirely by the server (`services/session_runner.py`): the kickoff is queued when the run is created, an approval decision queues the turn that resumes it, and a person's message or form answer is queued with `POST /workflow-executions/{id}/sessions/{sid}/input`. A run may be worked in several ADK sessions (`GET /workflow-executions/{id}/sessions`); each serves its history at `GET .../sessions/{sid}/messages` (with the `streamCursor` to continue from) and its live events at `GET .../sessions/{sid}/stream?after=<cursor>`, an SSE stream every viewer can follow, whichever replica runs the turn. The execution metadata is fetched via `GET /workflow-executions/{id}`, and the list endpoint (ordered most recent first) is scoped to the caller: a super admin sees every execution in the tenant, everyone else sees only executions they initiated or are a designated approver of. The runner builds each turn's AG-UI `context` server-side — the workflow's summarized `description`, the session's file list, and the A2UI entries from `infrastructure/client_contract.json` — so the execution agent receives the design intent as trusted context, and nothing a client sends can add to it.
 
 The list (ordered most-recent-first) and get endpoints are in the [API reference](http://localhost:3000/api-doc).
 
@@ -273,7 +273,7 @@ There is deliberately **no list and no delete endpoint**. Nothing needs them: th
 
 `services/session_file.py` splits the two concerns on purpose. `SessionFileStore` validates and persists — sanitizing names down to a bare filename, enforcing both caps, and *renaming* a colliding write rather than overwriting it, which is what makes "the agent can only add" true by construction. `SessionFileService` wraps it with `WorkflowExecutionAccessPolicy`. The agent tools (`infrastructure/session_file_tools.py`: `list_session_files`, `read_session_file`, `write_session_file`, execution-kind only) take the *store*, since they run inside a turn the policy already authorized — so there is no access check there to forget rather than one skipped on purpose.
 
-The agent learns which files exist from the server, never from the client: `POST /workflow-executions/{id}/agent` reads the session's file list and injects it as a `Context` entry beside the workflow description.
+The agent learns which files exist from the server, never from the client: the session runner reads the session's file list for every turn and injects it as a `Context` entry beside the workflow description.
 
 ---
 
@@ -538,7 +538,7 @@ Both endpoints — list (ordered `created_at` DESC, `?unreadOnly=true` for the b
 
 ### Agent streaming — `POST /api/v1/agent`
 
-This endpoint and its per-execution variant `POST /api/v1/workflow-executions/{id}/agent` are marked `include_in_schema=False`, so they are **not** in the [API reference](http://localhost:3000/api-doc) and are documented here instead.
+This endpoint and the design-session variant `POST /api/v1/workflows/{id}/agent` are marked `include_in_schema=False`, so they are **not** in the [API reference](http://localhost:3000/api-doc) and are documented here instead.
 
 Send an [AG-UI `RunAgentInput`](https://docs.ag-ui.com/concepts/events) to a session and receive the agent's response as an SSE stream. If no ADK session exists for the provided `threadId`, one is created implicitly.
 

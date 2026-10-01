@@ -42,6 +42,10 @@ class ExecutionSessionRepository(Protocol):
         clear_input: bool = False,
     ) -> None: ...
 
+    async def mark_run(
+        self, session_id: str, *, run_id: str | None, event_index: int, user_id: str
+    ) -> None: ...
+
 
 class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
     """SQLModel-backed implementation of ExecutionSessionRepository."""
@@ -116,7 +120,6 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
         A compare-and-set: a session already ``queued`` or ``running`` keeps
         the input it has, so two writers queueing at once cannot overwrite
         each other and a turn in flight never has its input swapped under it.
-        A ``done`` session never runs again and refuses input too.
 
         Args:
             session_id: The session to queue.
@@ -125,13 +128,9 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
 
         Returns:
             ``True`` when the input was queued, ``False`` when the session was
-            busy, finished, or not found.
+            busy or not found.
         """
-        busy = (
-            ExecutionSessionStatus.queued,
-            ExecutionSessionStatus.running,
-            ExecutionSessionStatus.done,
-        )
+        busy = (ExecutionSessionStatus.queued, ExecutionSessionStatus.running)
         stmt = (
             update(ExecutionSession)
             .where(
@@ -169,6 +168,38 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             clear_input: Whether the turn consumed its queued input.
         """
         values: dict[str, Any] = {"status": status, "updated_by": user_id}
+        await self._update(session_id, values, waiting_on, clear_input)
+
+    async def mark_run(
+        self, session_id: str, *, run_id: str | None, event_index: int, user_id: str
+    ) -> None:
+        """Record which turn is under way and where its events start in the history.
+
+        Args:
+            session_id: The session running the turn.
+            run_id: The turn's AG-UI run id, or ``None`` once it has ended.
+            event_index: How many ADK events the session held when it started.
+            user_id: Recorded on the row's ``updated_by``.
+        """
+        await self._update(
+            session_id,
+            {
+                "active_run_id": run_id,
+                "run_event_index": event_index,
+                "updated_by": user_id,
+            },
+            None,
+            False,
+        )
+
+    async def _update(
+        self,
+        session_id: str,
+        values: dict[str, Any],
+        waiting_on: builtins.list[dict[str, Any]] | None,
+        clear_input: bool,
+    ) -> None:
+        """Write ``values`` (plus the optional waiting list and input reset) to one row."""
         if waiting_on is not None:
             values["waiting_on"] = waiting_on
         if clear_input:

@@ -21,7 +21,7 @@ export interface SessionSenderRendererOptions {
    * unattended background design run) is theirs by default.
    */
   ownerUserId: string;
-  /** Message id (or tool call id) → sender user id, from `useWorkflowSessionChat`. */
+  /** Message id (or tool call id) → sender user id, from the session chat hook. */
   messageSenders: Map<string, string>;
   /** Resolved `User` records for every sender id above, plus the owner. */
   senderUsers: Map<string, User>;

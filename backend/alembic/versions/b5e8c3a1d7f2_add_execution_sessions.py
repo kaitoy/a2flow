@@ -62,6 +62,8 @@ def upgrade() -> None:
         sa.Column("status", _status, nullable=False),
         sa.Column("pending_input", _json(), nullable=True),
         sa.Column("waiting_on", _json(), nullable=False, server_default="[]"),
+        sa.Column("active_run_id", AutoString(), nullable=True),
+        sa.Column("run_event_index", sa.Integer(), nullable=False, server_default="0"),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
@@ -86,6 +88,27 @@ def upgrade() -> None:
         "ix_execution_sessions_workflow_execution_id",
         "execution_sessions",
         ["workflow_execution_id"],
+    )
+
+    op.create_table(
+        "session_stream_events",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("session_id", AutoString(), nullable=False),
+        sa.Column("run_id", AutoString(), nullable=False),
+        sa.Column("payload", _json(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["session_id"],
+            ["execution_sessions.id"],
+            ondelete="CASCADE",
+            name="fk_session_stream_events_session_id",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_session_stream_events_session_id_id",
+        "session_stream_events",
+        ["session_id", "id"],
     )
 
     with op.batch_alter_table("workflow_tasks") as batch_op:
@@ -139,6 +162,10 @@ def downgrade() -> None:
         batch_op.drop_index("ix_workflow_tasks_session_id")
         batch_op.drop_constraint("fk_workflow_tasks_session_id", type_="foreignkey")
         batch_op.drop_column("session_id")
+    op.drop_index(
+        "ix_session_stream_events_session_id_id", table_name="session_stream_events"
+    )
+    op.drop_table("session_stream_events")
     op.drop_index(
         "ix_execution_sessions_workflow_execution_id", table_name="execution_sessions"
     )

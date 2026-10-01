@@ -39,7 +39,7 @@ useChat.sendMessage()
 
 ### Turns the server starts
 
-A workflow session's kickoff, and its resumption after an approval is decided, are run by the backend's session runner (`backend/services/session_runner.py`), with no browser and so no middleware in between. The runner attaches the same tools and context itself, from `backend/infrastructure/client_contract.json`: `render_approval`, `render_a2ui`, and the two A2UI context entries, exactly as a browser sends them. That file is generated, not written — `frontend/src/lib/clientContract.test.ts` captures the request body a real `createChatAgent()` run sends and fails whenever the committed file differs, so a middleware upgrade, a catalog revision, or an edit to the approval tool cannot silently leave server-started turns offering the model something else. Regenerate it with `UPDATE_CLIENT_CONTRACT=1` (see [CONTRIBUTING.md](../CONTRIBUTING.md#testing)).
+Every turn of a workflow session — its kickoff, its resumption after an approval is decided, and whatever a person sends — is run by the backend's session runner (`backend/services/session_runner.py`), with no browser and so no middleware in between. The browser only posts input and watches the session's stream, through an agent that carries the same middleware so streamed `render_a2ui` calls still become surfaces (`createSessionStreamAgent` in `src/lib/api.ts`). The runner attaches the same tools and context itself, from `backend/infrastructure/client_contract.json`: `render_approval`, `render_a2ui`, and the two A2UI context entries, exactly as a browser sends them. That file is generated, not written — `frontend/src/lib/clientContract.test.ts` captures the request body a real `createChatAgent()` run sends and fails whenever the committed file differs, so a middleware upgrade, a catalog revision, or an edit to the approval tool cannot silently leave server-started turns offering the model something else. Regenerate it with `UPDATE_CLIENT_CONTRACT=1` (see [CONTRIBUTING.md](../CONTRIBUTING.md#testing)).
 
 ---
 
@@ -103,7 +103,7 @@ is being generated — e.g. `content: { "status": "building" }` (or `retrying` /
 `a2ui_operations` key. `ActivityMessageBubble` renders nothing for these; only snapshots that
 carry `a2ui_operations` reach `A2uiRenderer`. If the LLM omits `catalogId` in the tool args
 (or passes the alias `"basic"`), the middleware substitutes the `defaultCatalogId` configured
-in `createChatAgent` / `createWorkflowSessionAgent` (`A2UI_CATALOG_ID` from
+by `createA2UIMiddleware()` (`A2UI_CATALOG_ID` from
 `src/lib/a2uiCatalogId.ts`), which must match the id `tailwindCatalog` is registered under.
 
 ---
@@ -232,6 +232,8 @@ Button click
 
 The `render_a2ui` tool call ID used above is captured by `onToolCallEndEvent` during the previous turn and stored in `pendingRenderCalls` in `chatSlice`.
 
+That is the design session's path, where the browser drives the run. In a workflow session the browser posts only `{ toolCallId, content }` to `POST /workflow-executions/{id}/sessions/{sid}/input` (`useExecutionSessionChat`), and the session runner builds the same carrier and tool message server-side (`build_messages` in `backend/services/session_inputs.py`) — acknowledging every other open `render_a2ui` call with `{"status":"rendered"}` exactly as `buildRenderAckMessages` does.
+
 ### Why the tool result is JSON, and why it carries the whole data model
 
 Both properties are load-bearing. The codec lives in `src/lib/a2uiAction.ts`.
@@ -266,7 +268,7 @@ the surface is acted on, and AG-UI state only travels with a run.
 `ADKAgent._extract_tool_results` resolves a tool result's **function name** by scanning
 `RunAgentInput.messages` for the assistant message that issued the call, and falls back to the
 literal string `"unknown"` when it finds none. Every send builds a fresh `HttpAgent`
-(`createChatAgent` / `createWorkflowSessionAgent` / `createDesignSessionAgent`), whose message
+(`createChatAgent` / `createDesignSessionAgent`), whose message
 list starts empty — so a request that carried only the tool results made ADK persist
 `FunctionResponse(name="unknown")`, and Gemini rejected the whole request with
 `400 INVALID_ARGUMENT`, because no function by that name had been declared. The failure is
@@ -278,8 +280,9 @@ calls as an assistant message placed **before** the tool results — before, bec
 decides a request is a tool-result submission by looking at the *last* unseen message. Its
 `arguments` are always `"{}"`: only `function.name` is read from the carrier, and real arguments
 would hand `@ag-ui/a2ui-middleware` a second, argument-bearing `render_a2ui` call to rebuild a
-surface from. `buildRenderAckMessages` emits the carrier itself; `sendApprovalResult` builds its
-own under the `render_approval` name.
+surface from. `buildRenderAckMessages` emits the carrier itself; for a workflow session, the session runner's
+`build_messages` (`backend/services/session_inputs.py`) emits the same carrier, under the
+`render_approval` name for an approval decision.
 
 ---
 

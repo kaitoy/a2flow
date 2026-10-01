@@ -4,31 +4,18 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "react-redux";
-import {
-  buildRenderAckMessages,
-  buildToolCallCarrierMessage,
-  type PendingRenderCall,
-} from "@/lib/a2uiAction";
+import { buildRenderAckMessages, type PendingRenderCall } from "@/lib/a2uiAction";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
   createDesignSessionAgent,
-  createWorkflowSessionAgent,
   getDesignSessionHistory,
   getUsersByIds,
-  getWorkflowSessionHistory,
   isForbiddenError,
-  listWorkflowTasks,
   type SessionHistory,
   SUPPRESS_FORBIDDEN_TOAST,
   type User,
-  uploadSessionFile,
-  type WorkflowTask,
 } from "@/lib/api";
-import {
-  APPROVAL_ACTIVITY_TYPE,
-  RENDER_APPROVAL_TOOL,
-  RENDER_APPROVAL_TOOL_NAME,
-} from "@/lib/approvalTool";
+import { APPROVAL_ACTIVITY_TYPE, RENDER_APPROVAL_TOOL } from "@/lib/approvalTool";
 import type { AppDispatch, RootState } from "@/store";
 import {
   addActivityMessage,
@@ -44,7 +31,7 @@ import {
 } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
-/** How often (ms) to poll the shared workflow chat for new messages. */
+/** How often (ms) to poll the shared design chat for new messages. */
 const POLL_INTERVAL_MS = 10_000;
 
 /**
@@ -71,7 +58,7 @@ function historySignature(messages: Message[]): string {
 }
 
 /**
- * Build the workflow-execution AG-UI subscriber: the shared subscriber plus an
+ * Build the design session's AG-UI subscriber: the shared subscriber plus an
  * approval-rendering handler that turns `render_approval` tool calls into
  * approval-control activity messages.
  *
@@ -90,8 +77,9 @@ function makeEventHandlers(
       onRenderA2uiEnd({ toolCallId, surfaceId });
     },
     onRenderApprovalEnd: (toolCallId, args) => {
-      // Render approve/reject controls; the decision is sent back as this
-      // tool's result by sendApprovalResult, so it is not auto-acknowledged.
+      // Render approve/reject controls. A design agent has no approval tool of
+      // its own, so this only keeps a stray call visible; it is not
+      // auto-acknowledged.
       const { approvalId, title, description } = args as {
         approvalId?: string;
         title?: string;
@@ -111,83 +99,49 @@ function makeEventHandlers(
 }
 
 /**
- * Which session-scoped chat backend the hook talks to: a workflow session (the
- * chat a workflow execution runs in, shared with its approvers) or a design
- * session (the chat that refines a workflow's task templates, shared with the
- * tenant's other developers).
+ * Manage the agent interaction for a workflow's design session.
+ *
+ * A design session has no record of its own, so it is addressed by its
+ * workflow. On mount, loads prior message history; subsequent user messages and
+ * A2UI user actions (e.g. a button click inside a rendered surface) are sent to
+ * the design session's agent endpoint, and the browser drives the run. (A
+ * workflow *execution's* session is run by the server instead -- see
+ * `useExecutionSessionChat`.) A FORBIDDEN (403) failure on the initial load
+ * surfaces as the returned `forbidden` flag instead of an error toast.
+ *
+ * The chat is shared by every developer in the tenant, plus the background
+ * generation run, so the history is re-fetched every {@link POLL_INTERVAL_MS}
+ * and messages from other participants appear without a reload. Polling pauses
+ * while the current viewer's own run is in flight and skips re-applying an
+ * unchanged history -- see {@link historySignature} for what counts as
+ * unchanged. The viewer's own run ends with the same re-read, which reconciles
+ * the ids the live stream minted with the persisted ones without disturbing a
+ * single bubble.
+ *
+ * Sender attribution rides on the same `/messages` response as the history, so
+ * each message can show who sent it without a request of its own.
+ *
+ * @param workflowId - The workflow whose design session this is.
+ * @param sessionId - The design session's ADK session id.
+ * @param ownerUserId - The session's owner, whom unattributed messages (the
+ *   background generation run's) fall back to.
  */
-export type SessionChatVariant = "workflow" | "design";
-
-/**
- * Manage the agent interaction for a workflow session or a design session.
- *
- * Neither chat has a record of its own, so both are addressed by their parent:
- * `parentId` is a WorkflowExecution id for the `"workflow"` variant and a
- * Workflow id for the `"design"` one.
- *
- * On mount, loads prior message history and — when `kickoffPrompt` is non-null
- * and the session is new — auto-sends it to start the run; design sessions
- * pass `null` because their first exchange happened in the background
- * generation run (or the user types it).
- *
- * A workflow session's messages can carry files. They are uploaded as part of
- * sending, not when they were picked, so an abandoned draft leaves no orphaned
- * files behind; the message text then names them so the transcript still shows
- * what was attached after a reload. What the *agent* sees is not this line but
- * the file listing the backend injects into the run's context, so nothing the
- * client sends decides which files exist. Subsequent user messages and A2UI
- * user actions (e.g. a button click inside a rendered surface) are routed to
- * the session's dedicated agent endpoint, selected by `variant`. A FORBIDDEN
- * (403) failure on that initial load surfaces as the returned `forbidden`
- * flag instead of retrying or auto-sending the kickoff prompt.
- *
- * Both chats are shared, so the history is re-fetched every
- * {@link POLL_INTERVAL_MS} and messages from other participants appear without
- * a reload: a workflow session's execution initiator, its approvers, and the
- * agent all post into it; a design session's is every developer in the tenant,
- * plus the background generation run. Polling pauses while the current viewer's
- * own run is in flight and skips re-applying an unchanged history — see
- * {@link historySignature} for what counts as unchanged. The viewer's own run
- * ends with the same re-read, which reconciles the ids the live stream minted
- * with the persisted ones without disturbing a single bubble.
- *
- * Sender attribution is loaded for both variants so each message can show who
- * sent it, and it rides on the same `/messages` response as the history rather
- * than costing a request of its own. Task association is workflow-session-only —
- * a design session edits task *templates*, which the page fetches itself, rather
- * than working through the status-ful tasks a run produces.
- */
-export function useWorkflowSessionChat(
-  parentId: string,
-  sessionId: string,
-  kickoffPrompt: string | null,
-  ownerUserId: string,
-  variant: SessionChatVariant = "workflow"
-) {
-  const isDesign = variant === "design";
-  const fetchHistory = isDesign ? getDesignSessionHistory : getWorkflowSessionHistory;
-  const buildAgent = isDesign ? createDesignSessionAgent : createWorkflowSessionAgent;
+export function useDesignSessionChat(workflowId: string, sessionId: string, ownerUserId: string) {
+  const parentId = workflowId;
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
   const { messages, isRunning, isStreaming, error, pendingRenderCalls, suggestions } =
     useAppSelector((s) => s.chat);
-  const autoSentRef = useRef(false);
   // The session the mount effect has already initialized. React StrictMode (and
   // Fast Refresh) mount, unmount, then remount in development, re-invoking the
   // mount effect for the same session; guarding on this stops the repeat run
-  // from calling setSession again — which would clear the just-auto-sent prompt
-  // while autoSentRef (already set) suppressed re-sending it, so the workflow
-  // prompt vanished moments after appearing (before the first poll).
+  // from calling setSession again and wiping what the first one loaded.
   const initializedSessionRef = useRef<string | null>(null);
   // Per-message sender attribution for the shared chat: a map from message id
   // to the sender's user id, and the resolved sender User records (always
   // including the owner, for the fallback below).
   const [messageSenders, setMessageSenders] = useState<Map<string, string>>(new Map());
   const [senderUsers, setSenderUsers] = useState<Map<string, User>>(new Map());
-  // Per-message task association (message id -> WorkflowTask id) and the session's
-  // WorkflowTasks, used to render the task timeline and the in-chat task dividers.
-  const [messageTasks, setMessageTasks] = useState<Map<string, string>>(new Map());
-  const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   // Set when the initial history load is rejected with a FORBIDDEN (403) --
   // the caller renders AccessDeniedState instead of the chat UI.
   const [forbidden, setForbidden] = useState(false);
@@ -210,28 +164,20 @@ export function useWorkflowSessionChat(
   const reapplyAfterRunRef = useRef(false);
 
   /**
-   * Apply the attribution a fetched history carries: the sender and task maps
-   * themselves, the User records they name, and the session's WorkflowTasks.
+   * Apply the sender attribution a fetched history carries, and resolve the
+   * User records it names.
    *
-   * The two maps come back on the history's own records, so they cost no extra
-   * request; only the User records and the task list are fetched separately.
+   * The sender map comes back on the history's own records, so it costs no
+   * extra request; only the User records are fetched separately.
    */
   const applyAttribution = useCallback(
     async (history: SessionHistory) => {
       setMessageSenders(history.senders);
-      setMessageTasks(history.tasks);
-      const [users, taskList] = await Promise.all([
-        // The owner is resolved too, even when they sent nothing: unattributed
-        // messages fall back to them.
-        getUsersByIds([ownerUserId, ...history.senders.values()]),
-        // Design sessions edit the workflow's task templates, which the page
-        // fetches itself; there are no status-ful session tasks to track here.
-        isDesign ? Promise.resolve<WorkflowTask[]>([]) : listWorkflowTasks(parentId),
-      ]);
-      setSenderUsers(users);
-      if (!isDesign) setTasks(taskList);
+      // The owner is resolved too, even when they sent nothing: unattributed
+      // messages fall back to them.
+      setSenderUsers(await getUsersByIds([ownerUserId, ...history.senders.values()]));
     },
-    [parentId, ownerUserId, isDesign]
+    [ownerUserId]
   );
 
   /**
@@ -247,7 +193,7 @@ export function useWorkflowSessionChat(
     // stream, so polling is only safe between runs.
     if (isRunningRef.current || isStreamingRef.current) return;
     try {
-      const history = await fetchHistory(parentId);
+      const history = await getDesignSessionHistory(parentId);
       // A run may have started while the fetch was in flight; re-check the guard.
       if (isRunningRef.current || isStreamingRef.current) return;
       // Skip re-applying an unchanged fetch — it costs two more requests and a
@@ -264,7 +210,7 @@ export function useWorkflowSessionChat(
     } catch (err) {
       console.error("failed to refresh session history", err);
     }
-  }, [parentId, sessionId, dispatch, applyAttribution, fetchHistory]);
+  }, [parentId, sessionId, dispatch, applyAttribution]);
 
   /**
    * Re-read the history the moment the viewer's own run ends, and ask the next
@@ -293,38 +239,14 @@ export function useWorkflowSessionChat(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
-    async (prompt: string, files: File[] = []) => {
+    async (content: string) => {
       if (!sessionId || isRunning) return;
-
-      // Attachments are uploaded here rather than when they were picked, so a
-      // draft the user abandons leaves nothing behind on the server. Only a
-      // workflow session has a file store; a design session never gets files.
-      let content = prompt;
-      if (files.length > 0 && !isDesign) {
-        dispatch(startRun());
-        try {
-          const uploaded = await Promise.all(
-            files.map((file) => uploadSessionFile(parentId, file))
-          );
-          // The names come from the response, not from the picked files: a name
-          // already taken in the session is stored as a numbered variant, and
-          // the transcript has to name what was actually stored. The agent
-          // learns the real list from the server-injected run context; this
-          // line is what makes the attachment visible in the conversation.
-          const names = uploaded.map((file) => file.name).join(", ");
-          content = `${prompt}\n\nAttached files: ${names}`.trim();
-        } catch (err) {
-          console.error("failed to upload session files", err);
-          dispatch(setError("The files could not be attached. Nothing was sent."));
-          return;
-        }
-      }
 
       const msgId = crypto.randomUUID();
       dispatch(addUserMessage({ id: msgId, content }));
       locallySentIds.current.add(msgId);
 
-      const agent = buildAgent(parentId, sessionId);
+      const agent = createDesignSessionAgent(parentId, sessionId);
 
       const pending = store.getState().chat.pendingRenderCalls;
       for (const ack of buildRenderAckMessages(pending)) {
@@ -353,7 +275,7 @@ export function useWorkflowSessionChat(
       // their keys, so reconciling their ids with the persisted ones is invisible.
       resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, isDesign, dispatch, resyncAfterRun, buildAgent]
+    [parentId, sessionId, isRunning, dispatch, resyncAfterRun]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -363,7 +285,7 @@ export function useWorkflowSessionChat(
 
       dispatch(startRun());
 
-      const agent = buildAgent(parentId, sessionId);
+      const agent = createDesignSessionAgent(parentId, sessionId);
 
       // The action rides as the tool result of the render call that produced
       // the acted-on surface, carrying `values` (the surface's data model) so
@@ -396,100 +318,34 @@ export function useWorkflowSessionChat(
       // the same resumed-history path keeps it consistent with the sender map.
       resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, dispatch, refreshHistory, buildAgent]
-  );
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
-  const sendApprovalResult = useCallback(
-    async (toolCallId: string, decision: "approved" | "rejected" | "returned") => {
-      if (!sessionId || isRunning) return;
-
-      dispatch(startRun());
-
-      const agent = createWorkflowSessionAgent(parentId, sessionId);
-
-      const pending = store.getState().chat.pendingRenderCalls;
-      for (const ack of buildRenderAckMessages(pending)) {
-        agent.addMessage(ack);
-      }
-      if (pending.length > 0) dispatch(clearPendingRenderCalls());
-
-      // The approval tool's result resumes the agent run with the decision. It
-      // needs its own carrier for the same reason the A2UI acks do: without the
-      // issuing tool call in `messages`, ag-ui-adk names the FunctionResponse
-      // "unknown" and the provider rejects the run.
-      agent.addMessage(
-        buildToolCallCarrierMessage([{ toolCallId, name: RENDER_APPROVAL_TOOL_NAME }])
-      );
-      agent.addMessage({
-        id: crypto.randomUUID(),
-        role: "tool",
-        toolCallId,
-        content: decision,
-      });
-
-      try {
-        await agent.runAgent(
-          { tools: [RENDER_APPROVAL_TOOL] },
-          makeEventHandlers(dispatch, (call) => {
-            dispatch(addPendingRenderCall(call));
-          })
-        );
-      } catch (err) {
-        console.error("stream error", err);
-        dispatch(setError("An error occurred while communicating with the agent."));
-        return;
-      }
-
-      dispatch(finishRun());
-      // The decision's tool result is now persisted with its sender, and the
-      // agent may have advanced tasks while resuming after it; one resync shows
-      // the decider's avatar and the new task state without waiting for a poll.
-      resyncAfterRun();
-    },
     [parentId, sessionId, isRunning, dispatch, resyncAfterRun]
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: sendMessage intentionally omitted — it changes on every isRunning flip and the init guard below prevents double-sends
+  // biome-ignore lint/correctness/useExhaustiveDependencies: initialization runs once per session; the guard below keeps it from repeating
   useEffect(() => {
     // Initialize each session exactly once. A repeat run for the same session
-    // (StrictMode/Fast Refresh remount) is a no-op, so it can't clear the
-    // optimistically-rendered prompt; a genuine session change re-initializes.
+    // (StrictMode/Fast Refresh remount) is a no-op; a genuine session change
+    // re-initializes.
     if (initializedSessionRef.current === sessionId) return;
     initializedSessionRef.current = sessionId;
-    autoSentRef.current = false;
     appliedSignatureRef.current = null;
     reapplyAfterRunRef.current = false;
     setForbidden(false);
     dispatch(setSession(sessionId));
-    fetchHistory(parentId, SUPPRESS_FORBIDDEN_TOAST)
+    getDesignSessionHistory(parentId, SUPPRESS_FORBIDDEN_TOAST)
       .then((history) => {
         const loadedMessages = history.messages;
         dispatch(resumeSession({ sessionId, messages: loadedMessages }));
         // Record the loaded history so the first poll doesn't re-apply it.
         appliedSignatureRef.current = historySignature(loadedMessages);
-        // Catches its own failure: a rejection here must not reach the catch
-        // below, which would read it as a missing session and auto-send.
+        // Catches its own failure, so the catch below only sees the history's.
         void applyAttribution(history).catch((err: unknown) => {
           console.error("failed to load session attribution", err);
         });
-        if (kickoffPrompt !== null && loadedMessages.length === 0 && !autoSentRef.current) {
-          autoSentRef.current = true;
-          sendMessage(kickoffPrompt);
-        }
       })
       .catch((err: unknown) => {
-        if (isForbiddenError(err)) {
-          setForbidden(true);
-          return;
-        }
-        // ADK session not yet created (first run) — auto-send to kick off the workflow
-        if (kickoffPrompt !== null && !autoSentRef.current) {
-          autoSentRef.current = true;
-          sendMessage(kickoffPrompt);
-        }
+        if (isForbiddenError(err)) setForbidden(true);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, dispatch]);
 
   // Poll the shared chat so messages posted by other participants (and agent
@@ -517,12 +373,9 @@ export function useWorkflowSessionChat(
     suggestions,
     sendMessage,
     sendA2uiAction,
-    sendApprovalResult,
     messageSenders,
     senderUsers,
     locallySentMessageIds: locallySentIds.current,
-    messageTasks,
-    tasks,
     forbidden,
   };
 }

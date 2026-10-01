@@ -35,10 +35,10 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const useWorkflowSessionChatMock = vi.fn();
+const useExecutionSessionChatMock = vi.fn();
 
-vi.mock("@/hooks/useWorkflowSessionChat", () => ({
-  useWorkflowSessionChat: (...args: unknown[]) => useWorkflowSessionChatMock(...args),
+vi.mock("@/hooks/useExecutionSessionChat", () => ({
+  useExecutionSessionChat: (...args: unknown[]) => useExecutionSessionChatMock(...args),
 }));
 
 vi.mock("@/components/MessageList", () => ({
@@ -68,7 +68,7 @@ const AUTH_STATE = authState(["developer"]);
 
 beforeEach(() => {
   vi.mocked(useParams).mockReturnValue({ workflowExecutionId: "execution-1" });
-  useWorkflowSessionChatMock.mockReturnValue({
+  useExecutionSessionChatMock.mockReturnValue({
     messages: [],
     isRunning: false,
     isStreaming: false,
@@ -77,7 +77,6 @@ beforeEach(() => {
     suggestions: [],
     sendMessage: vi.fn(),
     sendA2uiAction: vi.fn(),
-    sendApprovalResult: vi.fn(),
     messageSenders: new Map(),
     senderUsers: new Map(),
     locallySentMessageIds: new Set(),
@@ -130,7 +129,7 @@ describe("WorkflowSessionPage", () => {
   });
 
   it("shows the access-denied state when the chat history load is FORBIDDEN", async () => {
-    useWorkflowSessionChatMock.mockReturnValue({
+    useExecutionSessionChatMock.mockReturnValue({
       messages: [],
       isRunning: false,
       isStreaming: false,
@@ -138,7 +137,6 @@ describe("WorkflowSessionPage", () => {
       pendingRenderCalls: [],
       sendMessage: vi.fn(),
       sendA2uiAction: vi.fn(),
-      sendApprovalResult: vi.fn(),
       messageSenders: new Map(),
       senderUsers: new Map(),
       locallySentMessageIds: new Set(),

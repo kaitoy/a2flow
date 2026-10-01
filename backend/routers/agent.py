@@ -46,9 +46,9 @@ async def agent_endpoint(
     (ag_ui_adk appends their content directly to agent instructions).
 
     This is the general-purpose chat endpoint and always runs the default
-    skill-less agent. Skill-backed runs go through
-    ``POST /workflow-executions/{execution_id}/agent``, which resolves the skill and its
-    pinned revision from the WorkflowExecution record.
+    skill-less agent. A workflow execution's turns are run by the server
+    (:mod:`services.session_runner`), which resolves the skill and its pinned
+    revision from the WorkflowExecution record.
 
     The whole run is serialized per ADK session by a cross-process lock, so a
     horizontally scaled deployment never has two replicas driving one session at

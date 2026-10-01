@@ -6,9 +6,7 @@ and the storage rules: sizes are capped, names are reduced to a bare filename,
 and nothing already stored is ever replaced.
 """
 
-from collections.abc import AsyncGenerator
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 from httpx import AsyncClient
@@ -307,51 +305,6 @@ async def test_download_session_file_from_another_run_returns_404(
         headers=ALICE,
     )
     assert_err(response, code="NOT_FOUND", status=404)
-
-
-@pytest.mark.asyncio
-async def test_agent_run_is_told_which_files_the_session_holds(
-    workflow_client: AsyncClient, mock_adk_agent: MagicMock
-) -> None:
-    """The agent learns what is attached from the server, never from the client.
-
-    The frontend uploads a file and then sends an ordinary message; nothing it
-    sends says which files exist. The run's context is where that list comes
-    from, which is what makes it trustworthy.
-    """
-    execution = await _execute(workflow_client)
-    assert_ok(
-        await _upload(workflow_client, execution["id"], name="input.csv"), status=201
-    )
-
-    received: list[Any] = []
-
-    async def _capturing_run(
-        input_data: Any, *args: Any, **kwargs: Any
-    ) -> AsyncGenerator[Any, None]:
-        received.append(input_data)
-        return
-        yield
-
-    mock_adk_agent.run = _capturing_run
-
-    await workflow_client.post(
-        f"/api/v1/workflow-executions/{execution['id']}/agent",
-        json={
-            "threadId": execution["sessionId"],
-            "runId": "run-001",
-            "state": {},
-            "messages": [],
-            "tools": [],
-            "context": [],
-            "forwardedProps": {},
-        },
-        headers=ALICE,
-    )
-
-    entries = {c.description: c.value for c in received[0].context}
-    assert "Files attached to this session" in entries
-    assert "input.csv" in entries["Files attached to this session"]
 
 
 @pytest.mark.asyncio

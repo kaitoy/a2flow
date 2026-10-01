@@ -12,14 +12,20 @@ tasks to sessions (:mod:`services.execution_branching`), and a session may only
 advance the tasks assigned to it.
 """
 
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from pydantic import model_validator
+from pydantic.alias_generators import to_camel
 from sqlalchemy import Column, ForeignKeyConstraint, Index
-from sqlmodel import Field
+from sqlmodel import Field, SQLModel
+from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity, JSONColumn
+from models.base import BaseEntity, JSONColumn, TZDateTime
 from models.tenant_scoped import TenantScoped
+
+_alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
 
 class ExecutionSessionStatus(StrEnum):
@@ -87,4 +93,94 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
     #: ``{"tool_call_id", "name", "approval_id"}`` -- what resuming has to answer.
     waiting_on: list[dict[str, Any]] = Field(
         default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
+    #: The AG-UI run id of the turn under way, or ``None`` between turns. While
+    #: set, a history read stops at ``run_event_index`` and the rest of the turn
+    #: is replayed from its :class:`SessionStreamEvent` rows instead, so a
+    #: viewer joining mid-turn sees it once, not twice.
+    active_run_id: str | None = None
+    #: How many ADK events the session held when the active turn started.
+    run_event_index: int = Field(default=0)
+
+
+class SessionHistory(SQLModel):
+    """One session's chat history, and the cursor to stream what follows from.
+
+    Attributes:
+        messages: The AG-UI messages, oldest first, with sender and task
+            attribution merged in.
+        stream_cursor: The id of the last streamed event the history already
+            covers; a viewer subscribes to the session's stream after it.
+    """
+
+    model_config = _alias_config
+    messages: list[dict[str, Any]]
+    stream_cursor: int
+
+
+class A2uiActionInput(SQLModel):
+    """The answer to a form (``render_a2ui`` surface) a session is paused on.
+
+    Attributes:
+        tool_call_id: The paused ``render_a2ui`` call the form came from.
+        content: The tool result: the action taken and the values entered, as
+            the frontend formats them.
+    """
+
+    model_config = _alias_config
+    tool_call_id: str = Field(min_length=1)
+    content: str = Field(max_length=100_000)
+
+
+class SessionInputCreate(SQLModel):
+    """What a person sends to a session: a chat message, or a form's answer.
+
+    Exactly one of the two. An approval is not decided here -- that is
+    ``PATCH /approvals/{id}``, which resumes the session itself.
+    """
+
+    model_config = _alias_config
+    message: str | None = Field(default=None, max_length=100_000)
+    #: Aliased by hand: the generator would spell it ``a2UiAction``.
+    a2ui_action: A2uiActionInput | None = Field(default=None, alias="a2uiAction")
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> "SessionInputCreate":
+        """Reject a body carrying both a message and a form answer, or neither."""
+        if (self.message is None) == (self.a2ui_action is None):
+            raise ValueError("send exactly one of message or a2uiAction")
+        return self
+
+
+class SessionStreamEvent(SQLModel, table=True):
+    """One AG-UI event of a session's current turn, as streamed to its viewers.
+
+    The turn runs in whichever process picked it up, while the people watching
+    the session may be connected to any replica; this table is how the events
+    reach them. Rows are appended in order by the one process holding the
+    session's run lock, so ``id`` orders a session's events, and a viewer
+    resumes from the last id it saw. A new turn deletes the previous turn's
+    rows: once a turn has ended, its events are in the session's history.
+
+    Not tenant scoped on its own: it is only ever read through a session the
+    caller was first authorized for, the way a task's dependency edges are.
+    """
+
+    __tablename__ = "session_stream_events"
+    __table_args__ = (
+        Index("ix_session_stream_events_session_id_id", "session_id", "id"),
+        ForeignKeyConstraint(
+            ["session_id"],
+            ["execution_sessions.id"],
+            ondelete="CASCADE",
+            name="fk_session_stream_events_session_id",
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    session_id: str
+    run_id: str
+    payload: dict[str, Any] = Field(sa_column=Column(JSONColumn, nullable=False))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), sa_type=TZDateTime
     )

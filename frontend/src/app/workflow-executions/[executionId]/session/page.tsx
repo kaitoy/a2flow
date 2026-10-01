@@ -23,8 +23,8 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
+import { useExecutionSessionChat } from "@/hooks/useExecutionSessionChat";
 import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
-import { useWorkflowSessionChat } from "@/hooks/useWorkflowSessionChat";
 import {
   getWorkflowExecution,
   isForbiddenError,
@@ -53,14 +53,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     messageTasks,
     tasks,
     forbidden: chatForbidden,
-  } = useWorkflowSessionChat(
-    execution.id,
-    execution.sessionId,
-    // The run's kickoff, and its resumption once an approval is decided, are
-    // run by the server: the chat only shows them.
-    null,
-    execution.initiatorId
-  );
+  } = useExecutionSessionChat(execution.id, execution.sessionId, execution.initiatorId);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   // Focus state shared by the timeline and chat: a hovered entry wins over the

@@ -4,9 +4,11 @@ A WorkflowExecution is one run of a published workflow: the snapshot of the
 workflow and skill it started against, plus the WorkflowTasks it works through.
 The *workflow session* is the LLM chat that run happens in — the ADK session
 named by ``WorkflowExecution.session_id``. It has no table of its own, so it is
-identified by its execution and served from this router's ``/messages`` and
-``/agent`` sub-resources — the same pair ``routers/workflows.py`` uses to serve
-a workflow's design session, the design-time counterpart.
+identified by its execution. A run may be worked in several ADK sessions -- a
+main session plus branch sessions forked from it -- each served from the
+``/sessions/{session_id}`` sub-resources: its ``messages`` (the history), its
+``input`` (what a person sends; the server runs the turn), and its ``stream``
+(the turn's events, live, for every viewer).
 
 A workflow session also holds files (:mod:`models.session_file`), served from
 the ``/files`` sub-resources: participants attach them, the agent reads them and
@@ -21,28 +23,16 @@ their failed tasks recorded). All three are declared before ``/{execution_id}``
 so their literal path segment is matched first.
 """
 
-from collections.abc import AsyncGenerator
-from contextlib import AsyncExitStack
-from typing import Annotated, Any
+from typing import Annotated
 from urllib.parse import quote
 
-import anyio
-from ag_ui.core import (
-    BaseEvent,
-    Context,
-    RunAgentInput,
-    RunErrorEvent,
-    RunFinishedEvent,
-    SystemMessage,
-)
-from ag_ui.encoder import EventEncoder
-from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies.auth import CurrentUserDep, EffectiveRolesDep
 from dependencies.authz import require_roles
 from dependencies.context import (
-    APP_NAME,
     ApiMetaDep,
     FilterDep,
     MetricsWindowDep,
@@ -50,13 +40,16 @@ from dependencies.context import (
     SortDep,
 )
 from dependencies.service import (
-    ExecutionSessionServiceDep,
     MetricsServiceDep,
     SessionFileServiceDep,
     WorkflowExecutionServiceDep,
 )
-from infrastructure.agent import keep_a2ui_context, tenant_app_name, with_user_id
-from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from infrastructure import database
+from models.execution_session import (
+    ExecutionSession,
+    SessionHistory,
+    SessionInputCreate,
+)
 from models.mcp_tool_invocation import MCPToolInvocation
 from models.metrics import (
     FailedExecutionEntry,
@@ -68,10 +61,8 @@ from models.session_file import SessionFileRead
 from models.user import Role
 from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task import WorkflowTaskRead
-from repositories.exceptions import NotFoundError, SessionRunInProgressError
 from services.metrics import MetricsWindow
-from services.session_file import describe_session_files
-from services.workflow_execution_access import assert_may_answer_surfaces
+from services.session_stream import stream_events
 
 router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 
@@ -357,198 +348,116 @@ async def download_session_file(
     )
 
 
-@router.post("/{execution_id}/agent", include_in_schema=False)
-async def workflow_session_agent(
-    execution_id: str,
-    input_data: RunAgentInput,
-    request: Request,
-    service: WorkflowExecutionServiceDep,
-    files: SessionFileServiceDep,
-    sessions: ExecutionSessionServiceDep,
-    caller: CurrentUserDep,
-) -> StreamingResponse:
-    """Stream AG-UI events from the agent driving an execution's workflow session.
-
-    Restricted to the execution's initiator, its designated approvers, and
-    super admins -- deliberately excluding plain admins, who may view this
-    execution (``GET`` above) but not drive its agent. Submitting a form the
-    agent rendered (a ``render_a2ui`` action result) is narrower still: the
-    initiator only, see ``assert_may_answer_surfaces``. The skill and skill
-    directory are resolved from the WorkflowExecution record so the correct
-    ADK tools are loaded regardless of the global agent state. SystemMessages
-    are stripped to prevent prompt
-    injection.
-
-    Because the run is keyed by the execution's initiator, the new messages are
-    attributed to the actual sender (the caller) once the run ends: the
-    session's attributable keys present before the run are snapshotted
-    (``"user"`` event ids and tool-response tool_call_ids -- the latter covers
-    A2UI user-action acknowledgements), and any that appear afterwards are
-    recorded as the current user's -- except no-op render acknowledgements,
-    which merely unblock surfaces nobody acted on (see
-    ``WorkflowExecutionService.record_new_senders``). "Ends" includes ending
-    badly: a run the client abandoned mid-stream has still appended its
-    messages, so the attribution runs on the cancellation path too, shielded
-    from it.
-
-    The run is serialized per ADK session by a cross-process lock, so neither two
-    replicas nor two people sharing the session (owner and approver) can drive it
-    at once — the second run would reason over an in-memory session the first has
-    already moved past, and its messages would be misattributed. A run already in
-    progress surfaces as HTTP 409, before any SSE headers go out (see
-    ``infrastructure/locks.py``). That includes a turn the server itself is
-    running (:mod:`services.session_runner`), which takes the same lock.
-
-    After the turn, the session's server-side record is settled from the
-    events it streamed: the client-tool calls it left open are what a later
-    approval decision -- made in this chat or anywhere else -- resumes on the
-    server (:meth:`services.execution_session.ExecutionSessionService.settle_browser_turn`).
-    """
-    # Resolve (and authorize) before locking, so a caller with no business here
-    # gets their 403/404 rather than queueing behind someone else's run.
-    adk_agent, execution = await service.resolve_agent(execution_id, caller=caller)
-    # The thread id picks the ADK session the run drives, and the caller was
-    # authorized against this execution only -- so it must be this execution's
-    # session, or an approver of one run could drive any other thread its
-    # initiator owns. 404, like any id the caller may not see.
-    if input_data.thread_id != execution.session_id:
-        raise NotFoundError("WorkflowSession", input_data.thread_id)
-    current_user_id = caller.id
-
-    filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
-    assert_may_answer_surfaces(
-        filtered, caller_id=caller.id, initiator_id=execution.initiator_id
-    )
-    # The context feeds the system instruction (via CONTEXT_STATE_KEY), so the
-    # client-sent one is stripped to the A2UI entries the frontend middleware
-    # injects — the LLM has no other source for the component catalog or the
-    # render_a2ui argument format — and the workflow description and the
-    # session's file listing are prepended from server-trusted records rather
-    # than taken from the client. The file listing is how the agent learns what
-    # was attached: the frontend uploads a file and then sends an ordinary
-    # message, and nothing it sends is trusted to say which files exist.
-    context = keep_a2ui_context(input_data.context or [])
-    session_files = await files.list_for_run(execution_id)
-    if session_files:
-        context.insert(
-            0,
-            Context(
-                description="Files attached to this session",
-                value=describe_session_files(session_files),
-            ),
-        )
-    if execution.description:
-        context.insert(
-            0,
-            Context(description="Workflow description", value=execution.description),
-        )
-    input_data = input_data.model_copy(
-        update={"messages": filtered, "context": context}
-    )
-    # Key the ADK run by the WorkflowExecution's owner rather than the current user
-    # so every viewer (e.g. a designated approver) shares the same ADK session.
-    input_data = with_user_id(
-        input_data, execution.initiator_id, acting_user_id=caller.id
-    )
-    encoder = EventEncoder(accept=request.headers.get("accept") or "")
-
-    async with AsyncExitStack() as stack:
-        # Lock on the owner's id, matching how the ADK session is keyed above:
-        # the owner and their approvers share one session, so two of them hitting
-        # send at once is an ordinary collision here, not an edge case — and no
-        # client-side "already running" guard can see across users.
-        try:
-            await stack.enter_async_context(
-                advisory_lock(
-                    agent_run_key(
-                        tenant_app_name(APP_NAME, execution.tenant_id),
-                        execution.initiator_id,
-                        input_data.thread_id,
-                    )
-                )
-            )
-        except LockNotAcquiredError as exc:
-            raise SessionRunInProgressError(input_data.thread_id) from exc
-
-        # Snapshot inside the lock: this is the "before" half of a read-then-diff
-        # over session state, and a concurrent run appending between the two
-        # halves would misattribute its messages to this caller.
-        prior_keys = await service.attributable_keys(execution_id)
-        previous = await sessions.waiting_on(input_data.thread_id)
-
-        run_stack = stack.pop_all()
-
-    async def event_generator() -> AsyncGenerator[str, None]:
-        events: list[BaseEvent] = []
-        async with run_stack:
-            try:
-                async for event in adk_agent.run(input_data):
-                    events.append(event)
-                    yield encoder.encode(event)
-            finally:
-                # A client that goes away mid-stream (tab closed, page reloaded)
-                # makes Starlette cancel this generator wherever it is suspended
-                # -- usually inside the run itself. Whatever the run already
-                # appended to the shared ADK session stays there, so the
-                # bookkeeping has to happen on the way out too, or an abandoned
-                # run's messages end up attributed to nobody. It also has to be
-                # shielded: without that, the cancellation unwinding us would
-                # abort it at its first await, which is the same silent loss.
-                with anyio.CancelScope(shield=True):
-                    # Attribute the messages this run appended to the user who
-                    # sent them. Still inside the run lock -- this is the "after"
-                    # half of the read-then-diff the snapshot above opened.
-                    await service.record_new_senders(
-                        execution_id, prior_keys, current_user_id
-                    )
-                    # Associate each message with the workflow task in progress
-                    # at the time.
-                    await service.record_message_tasks(execution_id)
-                    await sessions.settle_browser_turn(
-                        session_id=input_data.thread_id,
-                        execution_id=execution_id,
-                        previous=previous,
-                        messages=input_data.messages,
-                        events=events,
-                        failed=not any(isinstance(e, RunFinishedEvent) for e in events)
-                        or any(isinstance(e, RunErrorEvent) for e in events),
-                        user_id=current_user_id,
-                    )
-
-    return StreamingResponse(
-        event_generator(),
-        media_type=encoder.get_content_type(),
-        headers={"X-Accel-Buffering": "no"},
-    )
-
-
 @router.get(
-    "/{execution_id}/messages", response_model=ApiResponse[list[dict[str, Any]]]
+    "/{execution_id}/sessions", response_model=ApiResponse[list[ExecutionSession]]
 )
-async def get_workflow_session_messages(
+async def list_workflow_execution_sessions(
     execution_id: str,
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[dict[str, Any]]]:
-    """Return the chat history of a WorkflowExecution's workflow session.
+) -> ApiResponse[list[ExecutionSession]]:
+    """List the ADK sessions a run is worked in, main session first.
 
-    Restricted to the execution's initiator, its designated approvers,
-    admins, and super admins. The history is keyed by the initiator, so a
-    designated approver opening the chat sees their conversation rather than
-    an empty, separate session. Returns an empty list when the ADK session
-    has not been created yet. Raises HTTP 404 if the WorkflowExecution does
-    not exist.
-
-    Unlike ``POST /workflow-executions/{id}/agent`` above, this is a read: a
-    platform-scoped super_admin who has selected "All tenants"
-    (``X-Tenant-Id: __all__``) can read this chat for an execution in any
-    tenant -- see ``WorkflowExecutionServiceDep`` and
-    ``dependencies.auth.get_current_tenant_scope``. The agent route stays on
-    the strict, single-tenant dependency, since driving the chat is a write.
+    Each carries its status -- running, waiting for an approval or for input,
+    idle, done -- and the client-tool calls it is paused on. Read access, like
+    the chat.
     """
-    messages = await service.get_messages(
+    sessions = await service.list_sessions(
         execution_id, caller=caller, caller_roles=caller_roles
     )
-    return ApiResponse(meta=meta, data=messages)
+    return ApiResponse(meta=meta, data=sessions)
+
+
+@router.get(
+    "/{execution_id}/sessions/{session_id}/messages",
+    response_model=ApiResponse[SessionHistory],
+)
+async def get_workflow_session_messages(
+    execution_id: str,
+    session_id: str,
+    service: WorkflowExecutionServiceDep,
+    caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[SessionHistory]:
+    """Return one session's chat history and the cursor to stream what follows from.
+
+    Restricted to the execution's initiator, its designated approvers, admins,
+    and super admins. The history is keyed by the initiator, so a designated
+    approver opening the chat sees their conversation rather than an empty,
+    separate one. While a turn is under way the history stops where it began,
+    and the turn is replayed from ``GET .../stream?after=<streamCursor>``.
+
+    A read: a platform-scoped super_admin who has selected "All tenants"
+    (``X-Tenant-Id: __all__``) can read it for an execution in any tenant -- see
+    ``dependencies.auth.get_current_tenant_scope``.
+    """
+    history = await service.get_session_messages(
+        execution_id, session_id, caller=caller, caller_roles=caller_roles
+    )
+    return ApiResponse(meta=meta, data=history)
+
+
+@router.post(
+    "/{execution_id}/sessions/{session_id}/input",
+    response_model=ApiResponse[ExecutionSession],
+    status_code=202,
+)
+async def send_workflow_session_input(
+    execution_id: str,
+    session_id: str,
+    data: SessionInputCreate,
+    service: WorkflowExecutionServiceDep,
+    caller: CurrentUserDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[ExecutionSession]:
+    """Queue a chat message, or a form's answer, for the session's next turn.
+
+    The turn itself runs on the server (:mod:`services.session_runner`); this
+    returns as soon as the input is queued, and the turn reaches the chat
+    through the session's stream. Restricted to the execution's initiator, its
+    designated approvers, and super admins; answering a form the agent rendered
+    is the initiator's alone. An approval is not decided here but through
+    ``PATCH /approvals/{id}``, which resumes the session itself.
+
+    409 ``SESSION_RUN_IN_PROGRESS`` when the session already has a turn queued
+    or running, and 409 ``SESSION_AWAITING_APPROVAL`` for a message sent while
+    it waits on an approval.
+    """
+    session = await service.send_input(execution_id, session_id, data, caller=caller)
+    return ApiResponse(meta=meta, data=session)
+
+
+@router.get("/{execution_id}/sessions/{session_id}/stream", include_in_schema=False)
+async def stream_workflow_session(
+    execution_id: str,
+    session_id: str,
+    request: Request,
+    service: WorkflowExecutionServiceDep,
+    caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
+    after: Annotated[int, Query(ge=0)] = 0,
+) -> StreamingResponse:
+    """Stream a session's AG-UI events after ``after``, until its turn ends.
+
+    Whichever replica runs the turn, every viewer gets its events as they come;
+    between turns the stream waits for the next one, sending keepalive
+    comments. It ends after the turn's last event, and the client re-reads the
+    history and subscribes again. Read access, like the history: a plain admin
+    can watch a run without being able to drive it.
+    """
+    await service.authorize_stream(
+        execution_id, session_id, caller=caller, caller_roles=caller_roles
+    )
+    return StreamingResponse(
+        stream_events(
+            session_id,
+            after,
+            open_db=lambda: AsyncSession(database.engine),
+            disconnected=request.is_disconnected,
+        ),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )

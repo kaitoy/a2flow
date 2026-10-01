@@ -1,24 +1,20 @@
 import { RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { type ReactNode, StrictMode } from "react";
+import type { ReactNode } from "react";
 import { Provider } from "react-redux";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { formatActionContent, RENDER_ACK_CONTENT } from "@/lib/a2uiAction";
 import * as api from "@/lib/api";
 import { addPendingRenderCall } from "@/store/chatSlice";
 import { makeStore } from "@/test/test-utils";
-import { useWorkflowSessionChat } from "./useWorkflowSessionChat";
+import { useDesignSessionChat } from "./useDesignSessionChat";
 
 vi.mock("@/lib/api", () => ({
   createDesignSessionAgent: vi.fn(),
-  createWorkflowSessionAgent: vi.fn(),
   getDesignSessionHistory: vi.fn(),
-  getWorkflowSessionHistory: vi.fn(),
   isForbiddenError: vi.fn(),
-  listWorkflowTasks: vi.fn(),
   getUsersByIds: vi.fn(),
-  uploadSessionFile: vi.fn(),
   SUPPRESS_FORBIDDEN_TOAST: { suppressForbiddenToast: true },
   formatUserName: (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`,
 }));
@@ -32,27 +28,22 @@ function history(
   return { messages, senders, tasks };
 }
 
-/** Point the workflow-session history mock at a history, for every call. */
-function mockWorkflowHistory(
-  messages: Message[],
-  senders?: Map<string, string>,
-  tasks?: Map<string, string>
-) {
-  vi.mocked(api.getWorkflowSessionHistory).mockResolvedValue(history(messages, senders, tasks));
-}
-
-/** Point the workflow-session history mock at a history, for the next call only. */
-function mockWorkflowHistoryOnce(
-  messages: Message[],
-  senders?: Map<string, string>,
-  tasks?: Map<string, string>
-) {
-  vi.mocked(api.getWorkflowSessionHistory).mockResolvedValueOnce(history(messages, senders, tasks));
-}
-
 /** Point the design-session history mock at a history, for every call. */
-function mockDesignHistory(messages: Message[], senders?: Map<string, string>) {
-  vi.mocked(api.getDesignSessionHistory).mockResolvedValue(history(messages, senders));
+function mockHistory(
+  messages: Message[],
+  senders?: Map<string, string>,
+  tasks?: Map<string, string>
+) {
+  vi.mocked(api.getDesignSessionHistory).mockResolvedValue(history(messages, senders, tasks));
+}
+
+/** Point the design-session history mock at a history, for the next call only. */
+function mockHistoryOnce(
+  messages: Message[],
+  senders?: Map<string, string>,
+  tasks?: Map<string, string>
+) {
+  vi.mocked(api.getDesignSessionHistory).mockResolvedValueOnce(history(messages, senders, tasks));
 }
 
 const mockAgent = {
@@ -68,15 +59,10 @@ function makeWrapper(store: ReturnType<typeof makeStore>) {
 }
 
 beforeEach(() => {
-  vi.mocked(api.createWorkflowSessionAgent).mockClear();
-  vi.mocked(api.createWorkflowSessionAgent).mockReturnValue(mockAgent as never);
   vi.mocked(api.createDesignSessionAgent).mockClear();
   vi.mocked(api.createDesignSessionAgent).mockReturnValue(mockAgent as never);
-  mockWorkflowHistory([]);
   vi.mocked(api.getDesignSessionHistory).mockClear();
-  mockDesignHistory([]);
-  vi.mocked(api.listWorkflowTasks).mockClear();
-  vi.mocked(api.listWorkflowTasks).mockResolvedValue([]);
+  mockHistory([]);
   vi.mocked(api.getUsersByIds).mockClear();
   vi.mocked(api.getUsersByIds).mockResolvedValue(new Map());
   vi.mocked(api.isForbiddenError).mockReset().mockReturnValue(false);
@@ -84,15 +70,15 @@ beforeEach(() => {
   mockAgent.runAgent.mockClear();
 });
 
-describe("useWorkflowSessionChat", () => {
-  it("calls getWorkflowSessionHistory on mount with the workflow execution id", async () => {
+describe("useDesignSessionChat", () => {
+  it("reads the design-session history on mount", async () => {
     const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"), {
+    renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
       wrapper: makeWrapper(store),
     });
     await waitFor(() =>
-      expect(api.getWorkflowSessionHistory).toHaveBeenCalledWith(
-        "execution-1",
+      expect(api.getDesignSessionHistory).toHaveBeenCalledWith(
+        "workflow-1",
         api.SUPPRESS_FORBIDDEN_TOAST
       )
     );
@@ -100,72 +86,41 @@ describe("useWorkflowSessionChat", () => {
 
   it("returns pendingRenderCalls mirroring the store", async () => {
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
-    await waitFor(() => expect(api.getWorkflowSessionHistory).toHaveBeenCalled());
+    const { result } = renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
+    await waitFor(() => expect(api.getDesignSessionHistory).toHaveBeenCalled());
     act(() => {
       store.dispatch(addPendingRenderCall({ toolCallId: "tc-1", surfaceId: "s1" }));
     });
     expect(result.current.pendingRenderCalls).toEqual([{ toolCallId: "tc-1", surfaceId: "s1" }]);
   });
 
-  it("auto-sends workflowPrompt when messages are empty on mount", async () => {
-    mockWorkflowHistory([]);
-    const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"), {
-      wrapper: makeWrapper(store),
-    });
-    await waitFor(() =>
-      expect(api.createWorkflowSessionAgent).toHaveBeenCalledWith("execution-1", "sess-abc")
-    );
-    await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalled());
-    const messages = store.getState().chat.messages;
-    expect(messages.some((m) => m.role === "user" && m.content === "Do the thing")).toBe(true);
-  });
-
-  it("does NOT auto-send when kickoffPrompt is null (design sessions)", async () => {
-    mockWorkflowHistory([]);
-    const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("execution-1", "sess-abc", null, "owner-1"), {
-      wrapper: makeWrapper(store),
-    });
-    await waitFor(() => expect(api.getWorkflowSessionHistory).toHaveBeenCalled());
-    expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
-    expect(store.getState().chat.messages).toHaveLength(0);
-  });
-
   it("design variant reads and sends through the design-session endpoints", async () => {
-    vi.mocked(api.getWorkflowSessionHistory).mockClear();
+    vi.mocked(api.getDesignSessionHistory).mockClear();
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("ds-1", "design-sess", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() =>
       expect(api.getDesignSessionHistory).toHaveBeenCalledWith("ds-1", api.SUPPRESS_FORBIDDEN_TOAST)
     );
-    expect(api.getWorkflowSessionHistory).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.sendMessage("add a step");
     });
     expect(api.createDesignSessionAgent).toHaveBeenCalledWith("ds-1", "design-sess");
-    expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
   });
 
   it("design variant skips task fetches but still loads sender attribution", async () => {
     // The design chat is shared by the tenant's developers, so it is attributed
     // through its own endpoint — but it has no status-ful tasks to associate.
-    mockDesignHistory([], new Map([["m1", "developer-2"]]));
+    mockHistory([], new Map([["m1", "developer-2"]]));
     const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"), {
+    renderHook(() => useDesignSessionChat("ds-1", "design-sess", "owner-1"), {
       wrapper: makeWrapper(store),
     });
     await waitFor(() => expect(api.getDesignSessionHistory).toHaveBeenCalled());
-    expect(api.listWorkflowTasks).not.toHaveBeenCalled();
-    expect(api.getWorkflowSessionHistory).not.toHaveBeenCalled();
     // The owner is resolved alongside the senders, for the avatar fallback.
     await waitFor(() => expect(api.getUsersByIds).toHaveBeenCalledWith(["owner-1", "developer-2"]));
   });
@@ -177,172 +132,38 @@ describe("useWorkflowSessionChat", () => {
       firstName: "Dev",
       lastName: "Two",
     } as never;
-    mockDesignHistory([], new Map([["m1", "developer-2"]]));
+    mockHistory([], new Map([["m1", "developer-2"]]));
     vi.mocked(api.getUsersByIds).mockResolvedValue(new Map([["developer-2", sender]]));
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"),
-      { wrapper: makeWrapper(store) }
-    );
-    await waitFor(() => expect(result.current.messageSenders.get("m1")).toBe("developer-2"));
-    expect(result.current.senderUsers.get("developer-2")).toBe(sender);
-  });
-
-  it("does NOT auto-send when messages already exist", async () => {
-    mockWorkflowHistory([{ id: "m1", role: "user", content: "previous message" }]);
-    const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"), {
+    const { result } = renderHook(() => useDesignSessionChat("ds-1", "design-sess", "owner-1"), {
       wrapper: makeWrapper(store),
     });
-    await waitFor(() => expect(api.getWorkflowSessionHistory).toHaveBeenCalled());
-    await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
-    expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
-  });
-
-  it("sets forbidden and does not auto-send when the initial fetch is FORBIDDEN", async () => {
-    vi.mocked(api.getWorkflowSessionHistory).mockRejectedValue(new Error("forbidden"));
-    vi.mocked(api.isForbiddenError).mockReturnValue(true);
-    const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
-    await waitFor(() => expect(result.current.forbidden).toBe(true));
-    // A FORBIDDEN failure must not be treated as "no session yet" -- it must
-    // not auto-send the kickoff prompt and start an unauthorized run.
-    expect(api.createWorkflowSessionAgent).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.messageSenders.get("m1")).toBe("developer-2"));
+    expect(result.current.senderUsers.get("developer-2")).toBe(sender);
   });
 
   it("sets forbidden for the design variant without treating it as a new session", async () => {
     vi.mocked(api.getDesignSessionHistory).mockRejectedValue(new Error("forbidden"));
     vi.mocked(api.isForbiddenError).mockReturnValue(true);
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("ds-1", "design-sess", null, "owner-1", "design"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("ds-1", "design-sess", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() => expect(result.current.forbidden).toBe(true));
     expect(api.createDesignSessionAgent).not.toHaveBeenCalled();
   });
 
-  it("sendMessage uses createWorkflowSessionAgent with the correct ids", async () => {
-    const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
-    await waitFor(() => expect(api.getWorkflowSessionHistory).toHaveBeenCalled());
-    // Wait for auto-send to finish
-    await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalled());
-    mockAgent.runAgent.mockClear();
-    vi.mocked(api.createWorkflowSessionAgent).mockClear();
-
-    await result.current.sendMessage("hello");
-    expect(api.createWorkflowSessionAgent).toHaveBeenCalledWith("execution-1", "sess-abc");
-    expect(mockAgent.runAgent).toHaveBeenCalled();
-  });
-
-  describe("attachments", () => {
-    /** Build the metadata the upload endpoint answers with. */
-    function uploaded(name: string): api.SessionFile {
-      return {
-        id: `file-${name}`,
-        tenantId: "tenant-1",
-        workflowExecutionId: "execution-1",
-        name,
-        contentType: "text/plain",
-        sizeBytes: 3,
-        origin: "user",
-        createdAt: "2026-01-01T00:00:00Z",
-        updatedAt: "2026-01-01T00:00:00Z",
-        createdBy: "owner-1",
-        updatedBy: "owner-1",
-      };
-    }
-
-    /** Mount the hook and let its kickoff run settle. */
-    async function mountSettled(store: ReturnType<typeof makeStore>) {
-      const { result } = renderHook(
-        () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-        { wrapper: makeWrapper(store) }
-      );
-      await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalled());
-      mockAgent.runAgent.mockClear();
-      mockAgent.addMessage.mockClear();
-      return result;
-    }
-
-    it("uploads the files then names them in the sent message", async () => {
-      vi.mocked(api.uploadSessionFile).mockResolvedValue(uploaded("notes.txt"));
-      const store = makeStore();
-      const result = await mountSettled(store);
-
-      await result.current.sendMessage("look at this", [
-        new File(["abc"], "notes.txt", { type: "text/plain" }),
-      ]);
-
-      expect(api.uploadSessionFile).toHaveBeenCalledWith("execution-1", expect.any(File));
-      expect(mockAgent.addMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          role: "user",
-          content: "look at this\n\nAttached files: notes.txt",
-        })
-      );
-    });
-
-    it("names the file the server stored, not the one that was picked", async () => {
-      // A colliding name is stored as a numbered variant, so the transcript has
-      // to name what actually landed.
-      vi.mocked(api.uploadSessionFile).mockResolvedValue(uploaded("notes (2).txt"));
-      const store = makeStore();
-      const result = await mountSettled(store);
-
-      await result.current.sendMessage("", [new File(["abc"], "notes.txt")]);
-
-      expect(mockAgent.addMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ content: "Attached files: notes (2).txt" })
-      );
-    });
-
-    it("sends nothing when an upload fails", async () => {
-      vi.mocked(api.uploadSessionFile).mockRejectedValue(new Error("too large"));
-      const store = makeStore();
-      const result = await mountSettled(store);
-
-      await result.current.sendMessage("look at this", [new File(["abc"], "huge.bin")]);
-
-      expect(mockAgent.runAgent).not.toHaveBeenCalled();
-      expect(store.getState().chat.error).toBeTruthy();
-      expect(store.getState().chat.isRunning).toBe(false);
-    });
-
-    it("uploads nothing for a design session, which has no file store", async () => {
-      vi.mocked(api.uploadSessionFile).mockClear();
-      const store = makeStore();
-      const { result } = renderHook(
-        () => useWorkflowSessionChat("wf-1", "sess-design", null, "owner-1", "design"),
-        { wrapper: makeWrapper(store) }
-      );
-      await waitFor(() => expect(api.getDesignSessionHistory).toHaveBeenCalled());
-
-      await result.current.sendMessage("hi", [new File(["abc"], "notes.txt")]);
-
-      expect(api.uploadSessionFile).not.toHaveBeenCalled();
-    });
-  });
-
   it("sendA2uiAction posts the action as a tool result and resumes the run", async () => {
-    mockWorkflowHistory([{ id: "m1", role: "user", content: "existing" }]);
+    mockHistory([{ id: "m1", role: "user", content: "existing" }]);
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     store.dispatch(addPendingRenderCall({ toolCallId: "tc-a2ui-1", surfaceId: "s1" }));
     mockAgent.addMessage.mockClear();
     mockAgent.runAgent.mockClear();
-    vi.mocked(api.getWorkflowSessionHistory).mockClear();
+    vi.mocked(api.getDesignSessionHistory).mockClear();
 
     const action = { name: "click", surfaceId: "s1", sourceComponentId: "btn1", context: {} };
     const values = { email: "a@b.c" };
@@ -373,16 +194,15 @@ describe("useWorkflowSessionChat", () => {
     // card's sourceToolCallId is re-derived from the same persisted ids rather
     // than the one streamed live to the browser (which ADK can remap for
     // long-running client tools).
-    expect(api.getWorkflowSessionHistory).toHaveBeenCalledWith("execution-1");
+    expect(api.getDesignSessionHistory).toHaveBeenCalledWith("workflow-1");
   });
 
   it("sendA2uiAction targets the acted-on surface and no-op acks the rest", async () => {
-    mockWorkflowHistory([{ id: "m1", role: "user", content: "existing" }]);
+    mockHistory([{ id: "m1", role: "user", content: "existing" }]);
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     // Two surfaces pending: a display-only one and the one the user acts on.
     store.dispatch(addPendingRenderCall({ toolCallId: "tc-display", surfaceId: "s-display" }));
@@ -410,7 +230,7 @@ describe("useWorkflowSessionChat", () => {
     // After a page reload (or when another participant's run rendered the
     // surface), no live stream ever added the pending call — it must be
     // re-derived from the persisted history so the action is not dropped.
-    mockWorkflowHistory([
+    mockHistory([
       {
         id: "m1",
         role: "assistant",
@@ -428,10 +248,9 @@ describe("useWorkflowSessionChat", () => {
       },
     ]);
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() =>
       expect(store.getState().chat.pendingRenderCalls).toEqual([
         { toolCallId: "tc-from-history", surfaceId: "s1" },
@@ -457,12 +276,11 @@ describe("useWorkflowSessionChat", () => {
     // follow-up A2UI surface, the post-run resync replaces the live-streamed
     // pending id with the one persisted in the history (ADK can remap
     // long-running client-tool ids between the streamed and persisted events).
-    mockWorkflowHistoryOnce([{ id: "m1", role: "user", content: "existing" }]);
+    mockHistoryOnce([{ id: "m1", role: "user", content: "existing" }]);
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     store.dispatch(addPendingRenderCall({ toolCallId: "tc-a2ui-1", surfaceId: "s1" }));
 
@@ -473,7 +291,7 @@ describe("useWorkflowSessionChat", () => {
     });
     // The resync returns the persisted history: the acted-on call is answered,
     // the follow-up render call is not (and carries its persisted id).
-    mockWorkflowHistory([
+    mockHistory([
       { id: "m1", role: "user", content: "existing" },
       { id: "t1", role: "tool", toolCallId: "tc-a2ui-1", content: "acted" },
       {
@@ -505,118 +323,50 @@ describe("useWorkflowSessionChat", () => {
     );
   });
 
-  it("sendApprovalResult posts the decision as a tool result and resumes the run", async () => {
-    mockWorkflowHistory([{ id: "m1", role: "user", content: "existing" }]);
-    const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
-    await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
-    mockAgent.addMessage.mockClear();
-    mockAgent.runAgent.mockClear();
-    vi.mocked(api.getWorkflowSessionHistory).mockClear();
-
-    await result.current.sendApprovalResult("tool-call-1", "approved");
-
-    expect(mockAgent.addMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ role: "tool", toolCallId: "tool-call-1", content: "approved" })
-    );
-    // Same carrier requirement as the A2UI acks, under the approval tool's name.
-    const sent = mockAgent.addMessage.mock.calls.map(([m]) => m as { role: string });
-    expect(sent[0]).toMatchObject({
-      role: "assistant",
-      toolCalls: [{ id: "tool-call-1", function: { name: "render_approval" } }],
-    });
-    expect(sent[1]).toMatchObject({ role: "tool" });
-    expect(mockAgent.runAgent).toHaveBeenCalled();
-    // The decision is now persisted with its sender; the history is re-read so
-    // the approval bubble shows the decider's avatar right away.
-    expect(api.getWorkflowSessionHistory).toHaveBeenCalledWith("execution-1");
-  });
-
   it("exposes resolved message senders loaded on mount", async () => {
-    mockWorkflowHistory(
-      [{ id: "m1", role: "user", content: "existing" }],
-      new Map([["m1", "alice"]])
-    );
+    mockHistory([{ id: "m1", role: "user", content: "existing" }], new Map([["m1", "alice"]]));
     vi.mocked(api.getUsersByIds).mockResolvedValue(
       new Map([["alice", { id: "alice", username: "alice" } as never]])
     );
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() => expect(result.current.messageSenders.get("m1")).toBe("alice"));
     expect(api.getUsersByIds).toHaveBeenCalledWith(["owner-1", "alice"]);
     expect(result.current.senderUsers.get("alice")?.username).toBe("alice");
   });
 
   it("dispatches setError when runAgent throws during sendMessage", async () => {
-    mockWorkflowHistory([{ id: "m1", role: "user", content: "existing" }]);
+    mockHistory([{ id: "m1", role: "user", content: "existing" }]);
     mockAgent.runAgent.mockRejectedValueOnce(new Error("stream failure"));
     const store = makeStore();
-    const { result } = renderHook(
-      () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-      { wrapper: makeWrapper(store) }
-    );
+    const { result } = renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+      wrapper: makeWrapper(store),
+    });
     await waitFor(() => expect(store.getState().chat.messages).toHaveLength(1));
     await result.current.sendMessage("hi");
     await waitFor(() => expect(store.getState().chat.error).not.toBeNull());
   });
 
-  it("keeps the auto-sent prompt when the mount effect re-runs (StrictMode)", async () => {
-    // StrictMode mounts, unmounts, then remounts in development, re-invoking the
-    // mount effect. Its second run must not clear the freshly auto-sent prompt,
-    // so the workflow prompt does not vanish before the first poll.
-    // beforeEach does not clear this mock's call count, so reset it here to
-    // count only this test's history loads.
-    vi.mocked(api.getWorkflowSessionHistory).mockClear();
-    mockWorkflowHistory([]);
-    const store = makeStore();
-    renderHook(() => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"), {
-      wrapper: ({ children }: { children: ReactNode }) => (
-        <StrictMode>
-          <Provider store={store}>{children}</Provider>
-        </StrictMode>
-      ),
-    });
-    await waitFor(() => expect(mockAgent.runAgent).toHaveBeenCalledTimes(1));
-    // The guard makes the repeat mount run a no-op: the initial load (the only
-    // one made with the forbidden-toast suppressed) happens once, and the
-    // optimistic prompt survives (exactly one bubble, not wiped).
-    const initialLoads = vi
-      .mocked(api.getWorkflowSessionHistory)
-      .mock.calls.filter(([, config]) => config === api.SUPPRESS_FORBIDDEN_TOAST);
-    expect(initialLoads).toHaveLength(1);
-    const prompts = store
-      .getState()
-      .chat.messages.filter((m) => m.role === "user" && m.content === "Do the thing");
-    expect(prompts).toHaveLength(1);
-  });
-
   describe("polling", () => {
     it("re-fetches messages on the polling interval", async () => {
-      mockWorkflowHistory([{ id: "m1", role: "user", content: "existing" }]);
+      mockHistory([{ id: "m1", role: "user", content: "existing" }]);
       vi.useFakeTimers();
       try {
         const store = makeStore();
-        renderHook(
-          () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-          {
-            wrapper: makeWrapper(store),
-          }
-        );
+        renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+          wrapper: makeWrapper(store),
+        });
         // Flush the mount load (no auto-send: messages already exist).
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
         });
-        const afterMount = vi.mocked(api.getWorkflowSessionHistory).mock.calls.length;
+        const afterMount = vi.mocked(api.getDesignSessionHistory).mock.calls.length;
         await act(async () => {
           await vi.advanceTimersByTimeAsync(10_000);
         });
-        expect(vi.mocked(api.getWorkflowSessionHistory).mock.calls.length).toBeGreaterThan(
+        expect(vi.mocked(api.getDesignSessionHistory).mock.calls.length).toBeGreaterThan(
           afterMount
         );
       } finally {
@@ -625,20 +375,17 @@ describe("useWorkflowSessionChat", () => {
     });
 
     it("applies messages a poll discovers from another participant", async () => {
-      mockWorkflowHistoryOnce([{ id: "m1", role: "user", content: "mine" }]);
-      mockWorkflowHistory([
+      mockHistoryOnce([{ id: "m1", role: "user", content: "mine" }]);
+      mockHistory([
         { id: "m1", role: "user", content: "mine" },
         { id: "m2", role: "user", content: "from someone else" },
       ]);
       vi.useFakeTimers();
       try {
         const store = makeStore();
-        renderHook(
-          () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-          {
-            wrapper: makeWrapper(store),
-          }
-        );
+        renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+          wrapper: makeWrapper(store),
+        });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
         });
@@ -657,16 +404,13 @@ describe("useWorkflowSessionChat", () => {
     });
 
     it("skips re-applying an unchanged history", async () => {
-      mockWorkflowHistory([{ id: "m1", role: "user", content: "existing" }]);
+      mockHistory([{ id: "m1", role: "user", content: "existing" }]);
       vi.useFakeTimers();
       try {
         const store = makeStore();
-        renderHook(
-          () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-          {
-            wrapper: makeWrapper(store),
-          }
-        );
+        renderHook(() => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"), {
+          wrapper: makeWrapper(store),
+        });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
         });
@@ -693,14 +437,14 @@ describe("useWorkflowSessionChat", () => {
         { id: "adk-u", role: "user", content: "hi" },
         { id: "adk-a", role: "assistant", content: "hello" },
       ];
-      mockWorkflowHistoryOnce([]); // mount: empty session
-      mockWorkflowHistoryOnce(persisted); // post-run resync: attribution not written yet
-      mockWorkflowHistory(persisted, new Map([["adk-u", "alice"]]), new Map([["adk-u", "task-1"]]));
+      mockHistoryOnce([]); // mount: empty session
+      mockHistoryOnce(persisted); // post-run resync: attribution not written yet
+      mockHistory(persisted, new Map([["adk-u", "alice"]]), new Map([["adk-u", "task-1"]]));
       vi.useFakeTimers();
       try {
         const store = makeStore();
         const { result } = renderHook(
-          () => useWorkflowSessionChat("execution-1", "sess-abc", null, "owner-1"),
+          () => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"),
           { wrapper: makeWrapper(store) }
         );
         await act(async () => {
@@ -715,19 +459,18 @@ describe("useWorkflowSessionChat", () => {
           await vi.advanceTimersByTimeAsync(10_000);
         });
         expect(result.current.messageSenders.get("adk-u")).toBe("alice");
-        expect(result.current.messageTasks.get("adk-u")).toBe("task-1");
       } finally {
         vi.useRealTimers();
       }
     });
 
     it("does not poll while the viewer's own run is in flight", async () => {
-      mockWorkflowHistory([{ id: "m1", role: "user", content: "existing" }]);
+      mockHistory([{ id: "m1", role: "user", content: "existing" }]);
       vi.useFakeTimers();
       try {
         const store = makeStore();
         const { result } = renderHook(
-          () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
+          () => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"),
           { wrapper: makeWrapper(store) }
         );
         await act(async () => {
@@ -738,40 +481,42 @@ describe("useWorkflowSessionChat", () => {
         act(() => {
           void result.current.sendMessage("hi");
         });
-        const fetchesBefore = vi.mocked(api.getWorkflowSessionHistory).mock.calls.length;
+        const fetchesBefore = vi.mocked(api.getDesignSessionHistory).mock.calls.length;
 
         await act(async () => {
           await vi.advanceTimersByTimeAsync(10_000);
         });
-        expect(vi.mocked(api.getWorkflowSessionHistory).mock.calls.length).toBe(fetchesBefore);
+        expect(vi.mocked(api.getDesignSessionHistory).mock.calls.length).toBe(fetchesBefore);
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it("keeps the auto-sent prompt's bubble in place across the first poll", async () => {
-      // Mount finds an empty history (auto-sends the prompt); the first poll then
-      // returns the persisted prompt under a different, ADK-assigned id. The
+    it("keeps a sent message's bubble in place across the first poll", async () => {
+      // Mount finds an empty history and the user sends a message; the run's
+      // resync then returns it under a different, ADK-assigned id. The
       // message takes that persisted id (the attribution maps are keyed by it)
       // while its bubble keeps the key it was drawn under, so it is neither
       // remounted nor duplicated.
-      mockWorkflowHistoryOnce([]);
-      mockWorkflowHistory([
+      mockHistoryOnce([]);
+      mockHistory([
         { id: "adk-u", role: "user", content: "Do the thing" },
         { id: "adk-a", role: "assistant", content: "on it" },
       ]);
       vi.useFakeTimers();
       try {
         const store = makeStore();
-        renderHook(
-          () => useWorkflowSessionChat("execution-1", "sess-abc", "Do the thing", "owner-1"),
-          {
-            wrapper: makeWrapper(store),
-          }
+        const { result } = renderHook(
+          () => useDesignSessionChat("workflow-1", "sess-abc", "owner-1"),
+          { wrapper: makeWrapper(store) }
         );
-        // Flush the mount load + auto-send + (immediately resolving) run, whose
-        // own resync is the first fetch to return the persisted history.
         await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        // Send, and flush the (immediately resolving) run, whose own resync is
+        // the first fetch to return the persisted history.
+        await act(async () => {
+          await result.current.sendMessage("Do the thing");
           await vi.advanceTimersByTimeAsync(0);
         });
         const reconciled = store

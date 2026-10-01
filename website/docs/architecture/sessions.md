@@ -14,7 +14,7 @@ A session is a chat several parties share: the agent, the person who opened it, 
 | **Workflow session** | The run's initiator, and the designated approver of any of its [approvals](./approvals.md) | An Admin of the tenant sees it read-only; nobody else has access |
 | **Design session** | Every Developer in the tenant, plus Super Admins and the workflow's creator | No access |
 
-An approval addressed to a group brings in every member holding `approver`, so the chat follows the group's membership — deciding is what that access exists to enable. Because several people post into one conversation, every message carries a **sender avatar**, and the page refreshes itself every few seconds so each participant sees the others' messages and the agent's progress without reloading.
+An approval addressed to a group brings in every member holding `approver`, so the chat follows the group's membership — deciding is what that access exists to enable. Because several people post into one conversation, every message carries a **sender avatar**, and each participant sees every reply as it is written, without reloading.
 
 ## How a turn runs
 
@@ -23,7 +23,7 @@ An approval addressed to a group brings in every member holding `approver`, so t
 
 The backend bridges the AG-UI protocol to the agent: it translates events both ways, keeps the conversation in step, and streams events back to the browser as they arrive, so text appears incrementally rather than in one block at the end. Conversation state is kept under the chat's id, so reopening it continues where it left off.
 
-A workflow session does not need anyone's chat to be open. Two kinds of turn are run by A2Flow itself: the run's **kickoff**, as soon as the run is created, and the turn that **resumes** it once an [approval](../guides/approvals.md) is decided. A message someone types still starts a turn from their chat. Whoever starts it, a turn is the same conversation, and the chat shows it once it is there.
+A workflow session does not need anyone's chat to be open: every one of its turns is run by A2Flow itself. That is the run's **kickoff**, as soon as the run is created; the turn that **resumes** it once an [approval](../guides/approvals.md) is decided; and the turn that answers whatever a participant sends. The chat only hands A2Flow the message and shows the turn as it runs, to everyone watching, on whichever server it runs. (The design session is the exception: its turns are still run from the chat of the Developer who sent the message.)
 
 ## Interactive surfaces
 

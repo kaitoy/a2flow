@@ -14,7 +14,6 @@ model each participant.
 """
 
 from collections.abc import AsyncGenerator
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -26,12 +25,22 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.approval import Approval, ApprovalStatus
+from models.execution_session import (
+    ExecutionSession,
+    ExecutionSessionStatus,
+    SessionStreamEvent,
+)
 from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTask
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._seed import (
+    DEFAULT_TEST_TENANT_ID,
+    seed_branch_session,
+    seed_tenant,
+    seed_users,
+)
 from tests.conftest import FAKE_COMMIT_SHA, _install_auth_overrides
 
 #: Headers modeling the execution initiator without any role.
@@ -132,7 +141,13 @@ async def _seed_session(eng: AsyncEngine, *, user_id: str = "owner") -> str:
         db.add(execution)
         await db.commit()
         await db.refresh(execution)
-        return execution.id
+        execution_id = execution.id
+        # Tests that seed a second run reuse the session id; the first run's
+        # main-session row is the one the session endpoints resolve.
+        seeded = await db.get(ExecutionSession, "sess-1") is not None
+    if not seeded:
+        await seed_branch_session(eng, execution_id, "sess-1", user_id=user_id)
+    return execution_id
 
 
 async def _insert_approval(
@@ -178,23 +193,6 @@ async def _seed_task(eng: AsyncEngine, execution_id: str) -> str:
         db.add(task)
         await db.commit()
     return task_id
-
-
-def _run_agent_input() -> dict[str, Any]:
-    """Build a minimal RunAgentInput payload for the agent stream endpoint.
-
-    The thread id is the session :func:`_seed_session` records, since the route
-    refuses any other.
-    """
-    return {
-        "threadId": "sess-1",
-        "runId": "run-001",
-        "state": {},
-        "messages": [],
-        "tools": [],
-        "context": [],
-        "forwardedProps": {},
-    }
 
 
 # ---------- session read access ----------
@@ -368,7 +366,7 @@ async def test_execution_list_scoping_composes_with_filters(
     assert unrelated_id not in ids
 
 
-# ---------- messages / tasks / agent ----------
+# ---------- messages / tasks / input / stream ----------
 
 
 async def test_unrelated_user_cannot_get_messages(
@@ -377,7 +375,8 @@ async def test_unrelated_user_cannot_get_messages(
     client, eng = access_env
     execution_id = await _seed_session(eng)
     res = await client.get(
-        f"/api/v1/workflow-executions/{execution_id}/messages", headers=UNRELATED
+        f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/messages",
+        headers=UNRELATED,
     )
     assert_err(res, "FORBIDDEN", 403)
 
@@ -390,7 +389,8 @@ async def test_approver_can_get_messages(
     await _insert_approval(eng, workflow_execution_id=execution_id)
     assert_ok(
         await client.get(
-            f"/api/v1/workflow-executions/{execution_id}/messages", headers=APPROVER
+            f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/messages",
+            headers=APPROVER,
         )
     )
 
@@ -402,7 +402,8 @@ async def test_admin_can_get_messages(
     execution_id = await _seed_session(eng)
     assert_ok(
         await client.get(
-            f"/api/v1/workflow-executions/{execution_id}/messages", headers=ADMIN
+            f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/messages",
+            headers=ADMIN,
         )
     )
 
@@ -478,144 +479,138 @@ async def test_listing_tool_invocations_of_an_unknown_run_returns_404(
     assert_err(res, "NOT_FOUND", 404)
 
 
-async def test_unrelated_user_cannot_stream_agent(
+def _input_url(execution_id: str) -> str:
+    """URL of the main session's input endpoint for a run seeded by :func:`_seed_session`."""
+    return f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/input"
+
+
+async def _wait_on_a_form(eng: AsyncEngine) -> None:
+    """Leave the seeded main session paused on a ``render_a2ui`` call ``tc-1``."""
+    async with AsyncSession(eng) as db:
+        row = await db.get(ExecutionSession, "sess-1")
+        assert row is not None
+        row.status = ExecutionSessionStatus.waiting_for_input
+        row.waiting_on = [{"tool_call_id": "tc-1", "name": "render_a2ui"}]
+        db.add(row)
+        await db.commit()
+
+
+async def test_unrelated_user_cannot_send_input(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = access_env
     execution_id = await _seed_session(eng)
     res = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json=_run_agent_input(),
-        headers=UNRELATED,
+        _input_url(execution_id), json={"message": "hi"}, headers=UNRELATED
     )
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_admin_cannot_stream_agent(
+async def test_admin_cannot_send_input(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     """A plain admin can view an execution but must not be able to drive its agent."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
     res = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json=_run_agent_input(),
-        headers=ADMIN,
+        _input_url(execution_id), json={"message": "hi"}, headers=ADMIN
     )
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_approver_can_stream_agent(
+async def test_approver_can_send_a_message(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = access_env
     execution_id = await _seed_session(eng)
     await _insert_approval(eng, workflow_execution_id=execution_id)
     res = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json=_run_agent_input(),
-        headers=APPROVER,
+        _input_url(execution_id), json={"message": "hi"}, headers=APPROVER
     )
-    assert res.status_code == 200
+    assert assert_ok(res, status=202)["status"] == "queued"
 
 
-def _tool_result_messages(
-    name: str, tool_call_id: str, content: str
-) -> list[dict[str, Any]]:
-    """Build the carrier + tool-result pair the frontend sends to answer a client tool call."""
-    return [
-        {
-            "id": f"carrier-{tool_call_id}",
-            "role": "assistant",
-            "toolCalls": [
-                {
-                    "id": tool_call_id,
-                    "type": "function",
-                    "function": {"name": name, "arguments": "{}"},
-                }
-            ],
-        },
-        {
-            "id": f"result-{tool_call_id}",
-            "role": "tool",
-            "toolCallId": tool_call_id,
-            "content": content,
-        },
-    ]
+_FORM_ANSWER = {"a2uiAction": {"toolCallId": "tc-1", "content": "submitted"}}
 
 
-#: The tool result of a ``render_a2ui`` call the user submitted a form on.
-_A2UI_ACTION = '{"status":"action","name":"submit","surfaceId":"s1","context":{},"values":{"region":"x"}}'
-
-
-def _a2ui_action_input() -> dict[str, Any]:
-    """RunAgentInput carrying one A2UI form submission."""
-    return {
-        **_run_agent_input(),
-        "messages": _tool_result_messages("render_a2ui", "tc-1", _A2UI_ACTION),
-    }
-
-
-async def test_approver_cannot_submit_a2ui_action(
+async def test_approver_cannot_answer_a_form(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     """A designated approver may drive the chat but not submit a form the agent rendered."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
     await _insert_approval(eng, workflow_execution_id=execution_id)
+    await _wait_on_a_form(eng)
     res = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json=_a2ui_action_input(),
-        headers=APPROVER,
+        _input_url(execution_id), json=_FORM_ANSWER, headers=APPROVER
     )
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_super_admin_cannot_submit_a2ui_action(
+async def test_super_admin_cannot_answer_a_form(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = access_env
     execution_id = await _seed_session(eng)
+    await _wait_on_a_form(eng)
     res = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json=_a2ui_action_input(),
-        headers=SUPER_ADMIN,
+        _input_url(execution_id), json=_FORM_ANSWER, headers=SUPER_ADMIN
     )
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_owner_can_submit_a2ui_action(
+async def test_owner_can_answer_a_form(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
     client, eng = access_env
     execution_id = await _seed_session(eng)
-    res = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json=_a2ui_action_input(),
-        headers=OWNER,
+    await _wait_on_a_form(eng)
+    res = await client.post(_input_url(execution_id), json=_FORM_ANSWER, headers=OWNER)
+    assert assert_ok(res, status=202)["status"] == "queued"
+
+
+async def _finish_a_turn(eng: AsyncEngine) -> None:
+    """Record a finished turn on the seeded main session's stream."""
+    async with AsyncSession(eng) as db:
+        db.add(
+            SessionStreamEvent(
+                session_id="sess-1",
+                run_id="r",
+                payload={"type": "RUN_FINISHED", "threadId": "sess-1", "runId": "r"},
+            )
+        )
+        await db.commit()
+
+
+async def test_admin_can_watch_the_stream(
+    access_env: tuple[AsyncClient, AsyncEngine],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Watching is a read: a plain admin may follow a run they cannot drive."""
+    client, eng = access_env
+    # The stream outlives the request's database session, so it reads through
+    # the application engine.
+    monkeypatch.setattr("infrastructure.database.engine", eng)
+    execution_id = await _seed_session(eng)
+    await _finish_a_turn(eng)
+    res = await client.get(
+        f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/stream",
+        headers=ADMIN,
     )
     assert res.status_code == 200
+    assert "RUN_FINISHED" in res.text
 
 
-async def test_approver_can_send_render_ack_and_decision(
+async def test_unrelated_user_cannot_watch_the_stream(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:
-    """The no-op render ack and the approval decision are not form submissions."""
     client, eng = access_env
     execution_id = await _seed_session(eng)
-    await _insert_approval(eng, workflow_execution_id=execution_id)
-    res = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json={
-            **_run_agent_input(),
-            "messages": [
-                *_tool_result_messages("render_a2ui", "tc-1", '{"status": "rendered"}'),
-                *_tool_result_messages("render_approval", "tc-2", "approved"),
-            ],
-        },
-        headers=APPROVER,
+    res = await client.get(
+        f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/stream",
+        headers=UNRELATED,
     )
-    assert res.status_code == 200
+    assert_err(res, "FORBIDDEN", 403)
 
 
 # ---------- task status update ----------
@@ -804,7 +799,7 @@ async def test_group_approver_can_get_messages(
     await _insert_group_approval(eng, workflow_execution_id=execution_id)
     assert_ok(
         await client.get(
-            f"/api/v1/workflow-executions/{execution_id}/messages",
+            f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/messages",
             headers=GROUP_APPROVER,
         )
     )

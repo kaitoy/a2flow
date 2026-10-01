@@ -13,11 +13,11 @@ from fastapi import Depends
 from config import get_settings
 from infrastructure.secret_resolver import SecretResolver
 from repositories.session_file import SessionFileRepository
+from repositories.session_stream import SessionStreamRepository
 from services.agent_skill import AgentSkillService
 from services.agent_skill_sync import sync_agent_skill
 from services.approval import ApprovalService
 from services.approver_groups import ApproverGroupResolver
-from services.execution_session import ExecutionSessionService
 from services.impersonation_event import ImpersonationEventService
 from services.mcp_registry import MCPRegistryService
 from services.mcp_server import MCPServerService
@@ -475,6 +475,8 @@ def get_workflow_execution_service(
     registry: AgentRegistryDep,
     session_service: SessionServiceDep,
     access: WorkflowExecutionAccessPolicyDep,
+    sessions: ExecutionSessionRepositoryDep,
+    db: DBSessionDep,
 ) -> WorkflowExecutionService:
     """Create a WorkflowExecutionService wiring the repositories, skill store, agent registry, session store, and access policy.
 
@@ -493,6 +495,8 @@ def get_workflow_execution_service(
         session_service,
         APP_NAME,
         access,
+        sessions,
+        SessionStreamRepository(db),
     )
 
 
@@ -577,17 +581,3 @@ def get_approval_service(
 
 
 ApprovalServiceDep = Annotated[ApprovalService, Depends(get_approval_service)]
-
-
-def get_execution_session_service(
-    sessions: ExecutionSessionRepositoryDep,
-    approvals: ApprovalRepositoryDep,
-    executions: WorkflowExecutionRepositoryDep,
-) -> ExecutionSessionService:
-    """Create an ExecutionSessionService backed by the request's repositories."""
-    return ExecutionSessionService(sessions, approvals, executions)
-
-
-ExecutionSessionServiceDep = Annotated[
-    ExecutionSessionService, Depends(get_execution_session_service)
-]

@@ -41,6 +41,7 @@ from repositories.execution_session_queue import due_sessions
 from repositories.mcp_server import SqlMCPServerRepository
 from repositories.mcp_tool_invocation import SqlMcpToolInvocationRepository
 from repositories.message_meta import SqlMessageMetaRepository
+from repositories.session_stream import SessionStreamRepository
 from repositories.user import SqlUserRepository
 from repositories.user_group import SqlUserGroupRepository
 from repositories.workflow_execution import SqlWorkflowExecutionRepository
@@ -49,6 +50,7 @@ from services.approver_groups import ApproverGroupResolver
 from services.session_file import build_session_file_store, describe_session_files
 from services.session_inputs import SessionInput, WaitingCall, build_messages
 from services.session_queue import settle_turn, wait_for_wake
+from services.session_stream import StreamWriter
 from services.workflow_execution import WorkflowExecutionService
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 
@@ -153,10 +155,11 @@ class SessionRunner:
                 clear_input=True,
             )
             return
+        run_id = str(uuid.uuid4())
         input_data = with_user_id(
             RunAgentInput(
                 thread_id=session_id,
-                run_id=str(uuid.uuid4()),
+                run_id=run_id,
                 state={},
                 messages=build_messages(waiting, session_input),
                 tools=client_tools(),
@@ -164,15 +167,37 @@ class SessionRunner:
                 forwarded_props={},
             ),
             initiator,
-            acting_user_id=initiator,
+            # A person's own input runs with their authority -- an approver
+            # typing in the chat must not gain the initiator's. Input nobody
+            # typed (kickoff, a decision's resumption, recovery) runs as the
+            # initiator.
+            acting_user_id=session_input.acting_user_id or initiator,
         )
         prior_keys = await service.attributable_keys(execution.id)
+        adk_session = await self._session_service.get_session(
+            app_name=tenant_app_name(self._app_name, tenant_id),
+            user_id=initiator,
+            session_id=session_id,
+        )
+        await sessions.mark_run(
+            session_id,
+            run_id=run_id,
+            event_index=len(adk_session.events) if adk_session else 0,
+            user_id=initiator,
+        )
+        writer = StreamWriter(db, session_id, run_id)
+        await writer.start()
         events: list[BaseEvent] = []
         try:
             async for event in agent.run(input_data):
                 events.append(event)
+                await writer.write(event)
         finally:
             with anyio.CancelScope(shield=True):
+                await writer.flush()
+                await sessions.mark_run(
+                    session_id, run_id=None, event_index=0, user_id=initiator
+                )
                 if session_input.sender_id is not None:
                     await service.record_new_senders(
                         execution.id, prior_keys, session_input.sender_id
@@ -260,6 +285,8 @@ class SessionRunner:
                 approvals,
                 ApproverGroupResolver(groups, SqlEffectiveRoleRepository(db)),
             ),
+            SqlExecutionSessionRepository(db, tenant_id=tenant_id),
+            SessionStreamRepository(db),
         )
 
 

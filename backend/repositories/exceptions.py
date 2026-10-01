@@ -665,6 +665,40 @@ class SessionRunInProgressError(RepositoryError):
         return {"threadId": self.thread_id}
 
 
+class SessionAwaitingApprovalError(RepositoryError):
+    """Raised when a chat message is sent to a session paused on an approval.
+
+    The turn that requested the approval is still open on that call, and the
+    agent cannot take a new message until it is answered -- by the approver's
+    decision, not by the chat. Carries the session id for the envelope's
+    ``details`` block when returning HTTP 409.
+    """
+
+    code = "SESSION_AWAITING_APPROVAL"
+    http_status = 409
+
+    def __init__(self, session_id: str) -> None:
+        self.session_id = session_id
+        super().__init__(f"Session {session_id!r} is waiting for an approval decision")
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"sessionId": self.session_id}
+
+
+class SessionInputValidationError(ReasonError):
+    """Raised when input sent to a workflow session cannot be run.
+
+    Covers an empty message, a form answer for a call the session is not
+    waiting on, and input for a branch session that has already finished.
+    Carries a human-readable ``reason`` surfaced in the error envelope's
+    ``details`` block when returning HTTP 422.
+    """
+
+    code = "INVALID_SESSION_INPUT"
+    http_status = 422
+
+
 class OutboundEmailNotDeletableError(RepositoryError):
     """Raised when deleting an OutboundEmail row that is not in a terminal status.
 

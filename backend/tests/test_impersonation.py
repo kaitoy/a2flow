@@ -649,52 +649,24 @@ async def test_full_lifecycle_admin_impersonates_developer(
 
 
 @pytest.mark.asyncio
-async def test_impersonated_agent_run_stamps_acting_user_in_state(
-    impersonation_client: tuple[AsyncClient, Any], tmp_path: Any
+async def test_impersonated_input_acts_as_the_impersonation_target(
+    impersonation_client: tuple[AsyncClient, Any],
 ) -> None:
-    """A shared session's agent run attributes to the impersonation target.
+    """Input sent while impersonating runs as, and is attributed to, the target.
 
     ``admin-a2`` owns the WorkflowExecution (its ``initiator_id`` -- the ADK
-    session's fixed addressing key, unaffected by impersonation) and
-    ``dev-a`` is its designated approver. ``admin-a`` impersonates ``dev-a``
-    and drives the run: the tool-facing acting-user state must carry
-    ``dev-a`` -- the actual (impersonated) driver of this turn -- distinct
-    from the session's fixed owner, so tool-call writes during the run
-    attribute to ``dev-a``, not ``admin-a2``. Regression test for the gap
-    where agent-tool writes always attributed to the session's owner
-    regardless of who (or which impersonation) was actually driving.
+    session's fixed addressing key, unaffected by impersonation) and ``dev-a``
+    is its designated approver. ``admin-a`` impersonates ``dev-a`` and sends a
+    message: the turn the server runs on it must act as ``dev-a`` -- the actual
+    (impersonated) sender -- so tool-call writes during it attribute to
+    ``dev-a``, not to the session's fixed owner ``admin-a2``.
     """
-    from unittest.mock import MagicMock
-
-    from google.adk.sessions import InMemorySessionService
-
-    from dependencies.singletons import (
-        get_agent_registry,
-        get_session_service,
-        get_skill_manager,
-    )
-    from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
-    from main import app
-    from models.agent_skill import AgentSkill
     from models.approval import Approval
+    from models.execution_session import ExecutionSession
     from models.workflow_execution import WorkflowExecution
 
     client, engine = impersonation_client
-    commit_sha = "a" * 40
-
     async with AsyncSession(engine) as db:
-        db.add(
-            AgentSkill(
-                id="skill-1",
-                name="skill",
-                repo_url="https://example.com/repo",
-                repo_path=".",
-                commit_sha=commit_sha,
-                tenant_id=TENANT_A,
-                created_by="admin-a2",
-                updated_by="admin-a2",
-            )
-        )
         execution = WorkflowExecution(
             session_id="sess-imp",
             name="wf",
@@ -702,17 +674,23 @@ async def test_impersonated_agent_run_stamps_acting_user_in_state(
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            agent_skill_commit_sha=commit_sha,
             initiator_id="admin-a2",
             tenant_id=TENANT_A,
             created_by="admin-a2",
             updated_by="admin-a2",
         )
+        execution_id = execution.id
         db.add(execution)
         await db.commit()
-        await db.refresh(execution)
-        execution_id = execution.id
-
+        db.add(
+            ExecutionSession(
+                id="sess-imp",
+                workflow_execution_id=execution_id,
+                tenant_id=TENANT_A,
+                created_by="admin-a2",
+                updated_by="admin-a2",
+            )
+        )
         db.add(
             Approval(
                 workflow_execution_id=execution_id,
@@ -725,28 +703,6 @@ async def test_impersonated_agent_run_stamps_acting_user_in_state(
         )
         await db.commit()
 
-    skill_dir = tmp_path / "skill"
-    skill_dir.mkdir()
-    mock_skill_manager = MagicMock()
-    mock_skill_manager.skill_dir = MagicMock(return_value=skill_dir)
-    app.dependency_overrides[get_skill_manager] = lambda: mock_skill_manager
-
-    received_inputs: list[Any] = []
-
-    async def _capturing_run(input_data: Any, *args: Any, **kwargs: Any) -> Any:
-        received_inputs.append(input_data)
-        return
-        yield
-
-    mock_agent = MagicMock()
-    mock_agent.run = _capturing_run
-    mock_registry = MagicMock()
-    mock_registry.get.return_value = mock_agent
-    app.dependency_overrides[get_agent_registry] = lambda: mock_registry
-    app.dependency_overrides[get_session_service] = (
-        lambda: InMemorySessionService()  # type: ignore[no-untyped-call]
-    )
-
     await _login(client, "admin-a", tenant_name=TENANT_A)
     csrf = client.cookies.get(CSRF_COOKIE_NAME)
     assert csrf is not None
@@ -758,24 +714,18 @@ async def test_impersonated_agent_run_stamps_acting_user_in_state(
         )
     )
 
-    imp_headers = {IMPERSONATE_HEADER_NAME: "dev-a"}
     response = await client.post(
-        f"/api/v1/workflow-executions/{execution_id}/agent",
-        json={
-            "threadId": "sess-imp",
-            "runId": "run-1",
-            "state": {},
-            "messages": [],
-            "tools": [],
-            "context": [],
-            "forwardedProps": {},
-        },
-        headers={**imp_headers, CSRF_HEADER_NAME: csrf},
+        f"/api/v1/workflow-executions/{execution_id}/sessions/sess-imp/input",
+        json={"message": "go"},
+        headers={IMPERSONATE_HEADER_NAME: "dev-a", CSRF_HEADER_NAME: csrf},
     )
-    assert response.status_code == 200, response.text
-    assert len(received_inputs) == 1
-    assert received_inputs[0].forwarded_props["userId"] == "admin-a2"
-    assert received_inputs[0].state[ACTING_USER_STATE_KEY] == "dev-a"
+    assert response.status_code == 202, response.text
+
+    async with AsyncSession(engine) as db:
+        row = await db.get(ExecutionSession, "sess-imp")
+    assert row is not None and row.pending_input is not None
+    assert row.pending_input["acting_user_id"] == "dev-a"
+    assert row.pending_input["sender_id"] == "dev-a"
 
 
 @pytest.mark.asyncio

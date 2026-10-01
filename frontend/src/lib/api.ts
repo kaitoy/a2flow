@@ -1533,9 +1533,15 @@ export async function getWorkflowExecution(
   ) as Promise<WorkflowExecution>;
 }
 
+/** A workflow session's history, plus the cursor its live stream continues from. */
+export interface StreamedSessionHistory extends SessionHistory {
+  /** Id of the last streamed event the history covers; subscribe after it. */
+  streamCursor: number;
+}
+
 /**
- * Fetch the chat history of a WorkflowExecution's workflow session, with its
- * sender attribution and per-message task association.
+ * Fetch the chat history of one session of a WorkflowExecution, with its sender
+ * attribution, per-message task association, and stream cursor.
  *
  * Unlike {@link getSessionMessages}, the history is keyed by the execution's
  * initiator on the backend, so any viewer (for example a designated approver)
@@ -1544,15 +1550,55 @@ export async function getWorkflowExecution(
  * Agent messages and legacy history written before attribution existed are
  * absent from `senders`, so callers fall back to the execution's initiator.
  * `tasks` names, for each message, the WorkflowTask that was in progress when it
- * was produced; messages produced outside any task are absent.
+ * was produced; messages produced outside any task are absent. While a turn is
+ * under way the history stops where it began, and {@link createSessionStreamAgent}
+ * replays the turn from `streamCursor`.
  */
-export async function getWorkflowSessionHistory(
+export async function getExecutionSessionHistory(
   executionId: string,
+  sessionId: string,
   options?: CallOptions
-): Promise<SessionHistory> {
-  return fetchSessionHistory(
-    sdk.getWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdMessagesGet({
-      path: { execution_id: executionId },
+): Promise<StreamedSessionHistory> {
+  const data = (await unwrap(
+    sdk.getWorkflowSessionMessagesApiV1WorkflowExecutionsExecutionIdSessionsSessionIdMessagesGet({
+      path: { execution_id: executionId, session_id: sessionId },
+    }),
+    options
+  )) as { messages: SessionMessageRecord[]; streamCursor: number };
+  return {
+    messages: data.messages as unknown as Message[],
+    senders: sendersFrom(data.messages),
+    tasks: tasksFrom(data.messages),
+    streamCursor: data.streamCursor,
+  };
+}
+
+/**
+ * What a person sends to a workflow session: a chat message, or the answer to a
+ * form the agent rendered. The server runs the turn; it reaches the chat
+ * through the session's stream.
+ */
+export type SessionInput =
+  | { message: string }
+  | { a2uiAction: { toolCallId: string; content: string } };
+
+/**
+ * Queue input for a workflow session's next turn.
+ *
+ * Fails with 409 `SESSION_RUN_IN_PROGRESS` while the session already has a turn
+ * queued or running, and with 409 `SESSION_AWAITING_APPROVAL` for a message
+ * sent while it waits on an approval.
+ */
+export async function sendSessionInput(
+  executionId: string,
+  sessionId: string,
+  input: SessionInput,
+  options?: CallOptions
+): Promise<void> {
+  await unwrap(
+    sdk.sendWorkflowSessionInputApiV1WorkflowExecutionsExecutionIdSessionsSessionIdInputPost({
+      path: { execution_id: executionId, session_id: sessionId },
+      body: input,
     }),
     options
   );
@@ -1826,16 +1872,39 @@ export function createChatAgent(sessionId: string): HttpAgent {
 }
 
 /**
- * Create an HttpAgent scoped to one execution's workflow session endpoint,
- * pre-configured with the A2UI middleware so the agent can render interactive
- * surfaces.
+ * An agent that *watches* a turn rather than starting one: it reads a workflow
+ * session's live stream with a `GET`, where a regular agent `POST`s a run.
+ *
+ * The server runs every workflow-session turn itself, so the browser only
+ * subscribes. The stream carries the turn's AG-UI events -- whoever started it
+ * -- and ends with it.
  */
-export function createWorkflowSessionAgent(
+class SessionStreamAgent extends CredentialedHttpAgent {
+  /** Turn the run request into a plain `GET` of the stream, keeping the auth headers. */
+  protected requestInit(input: Parameters<HttpAgent["requestInit"]>[0]): RequestInit {
+    const { body: _body, ...init } = super.requestInit(input);
+    const headers = { ...(init.headers as Record<string, string> | undefined) };
+    delete headers["Content-Type"];
+    return { ...init, method: "GET", headers };
+  }
+}
+
+/**
+ * Create an agent that streams one workflow session's next turn, starting after
+ * the event `after` (a history's `streamCursor`).
+ *
+ * It carries the A2UI middleware like every agent, so a `render_a2ui` call in
+ * the stream still becomes a surface. `runAgent` resolves when the turn ends;
+ * re-read the history then and subscribe again for the next one.
+ */
+export function createSessionStreamAgent(
   workflowExecutionId: string,
-  sessionId: string
+  sessionId: string,
+  after: number
 ): HttpAgent {
-  const agent = new CredentialedHttpAgent({
-    url: `${API_BASE}/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}/agent`,
+  const base = `${API_BASE}/api/v1/workflow-executions/${encodeURIComponent(workflowExecutionId)}`;
+  const agent = new SessionStreamAgent({
+    url: `${base}/sessions/${encodeURIComponent(sessionId)}/stream?after=${after}`,
     threadId: sessionId,
   });
   agent.use(createA2UIMiddleware());
