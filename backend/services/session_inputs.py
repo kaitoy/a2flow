@@ -102,6 +102,28 @@ class WaitingCall(BaseModel):
     approval_id: str | None = None
 
 
+def answered_calls(
+    waiting_on: Sequence[WaitingCall], session_input: SessionInput
+) -> list[str]:
+    """Return the ids of the waited-on calls a turn on ``session_input`` closes.
+
+    That is every ``render_a2ui`` call -- :func:`build_messages` acknowledges
+    each one, so a form left unanswered by a typed reply is no longer waited
+    on -- plus the call a ``tool_result`` answers.
+
+    Args:
+        waiting_on: The calls the session's last turn left unanswered.
+        session_input: The input the turn runs on.
+
+    Returns:
+        The closed calls' ids.
+    """
+    ids = [c.tool_call_id for c in waiting_on if c.name == RENDER_A2UI_TOOL_NAME]
+    if session_input.kind == "tool_result" and session_input.tool_call_id:
+        ids.append(session_input.tool_call_id)
+    return ids
+
+
 def build_messages(
     waiting_on: Sequence[WaitingCall], session_input: SessionInput
 ) -> list[Message]:

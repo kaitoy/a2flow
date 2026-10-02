@@ -742,10 +742,20 @@ async def test_a_branch_point_forks_a_session_and_the_join_returns_to_main(
         join = await db.get(WorkflowTask, ids["D"])
         assert join is not None and join.session_id == main
 
-    # The main session's next turn is told what the branch reported.
-    agent = ScriptedAgent()
+    # The main session's next turn is told what the branch reported, and
+    # works the join -- finishing the run while the turn is still under way.
+    class WorksJoin(ScriptedAgent):
+        async def run(self, input_data: RunAgentInput) -> AsyncGenerator[Any, None]:
+            self.inputs.append(input_data)
+            start, finish = _finished()
+            yield start
+            await _work(ids["D"], main, initiator)
+            yield finish
+
+    agent = WorksJoin()
     registry.get.return_value = agent
     await runner.run_turn(main, DEFAULT_TEST_TENANT_ID)
     (sent,) = agent.inputs
     reports = {c.description: c.value for c in sent.context}
     assert "C went fine: 3 rows." in reports["Finished branch reports"]
+    assert (await _session(engine, main)).status is ExecutionSessionStatus.done

@@ -18,6 +18,7 @@ from services.session_inputs import (
     RECOVERY_PROMPT,
     SessionInput,
     WaitingCall,
+    answered_calls,
     build_messages,
     waiting_on_from_events,
 )
@@ -53,6 +54,15 @@ def test_a_decision_answers_its_call_and_acknowledges_open_forms() -> None:
         "adk-2": json.dumps({"status": "rendered"}),
         "adk-1": "approved",
     }
+
+
+def test_a_typed_reply_closes_the_open_form_but_not_the_approval() -> None:
+    """A form the reply acknowledged is no longer waited on; nobody answered the approval."""
+    reply = SessionInput(kind="message", text="Use t3.medium")
+    assert answered_calls([FORM, APPROVAL], reply) == ["adk-2"]
+
+    decision = SessionInput(kind="tool_result", tool_call_id="adk-1", content="ok")
+    assert answered_calls([FORM, APPROVAL], decision) == ["adk-2", "adk-1"]
 
 
 def test_recovery_sends_the_recovery_prompt() -> None:

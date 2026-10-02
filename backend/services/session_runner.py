@@ -50,7 +50,12 @@ from repositories.workflow_execution import SqlWorkflowExecutionRepository
 from repositories.workflow_task import SqlWorkflowTaskRepository
 from services.approver_groups import ApproverGroupResolver
 from services.session_file import build_session_file_store, describe_session_files
-from services.session_inputs import SessionInput, WaitingCall, build_messages
+from services.session_inputs import (
+    SessionInput,
+    WaitingCall,
+    answered_calls,
+    build_messages,
+)
 from services.session_queue import wait_for_wake
 from services.session_settle import settle_turn
 from services.session_stream import StreamWriter
@@ -260,6 +265,10 @@ class SessionRunner:
                 await service.record_message_tasks(
                     execution.id, session_id=session_id, start=fork_event_count
                 )
+                # The turn's tools wrote tasks and the run's outcome through
+                # sessions of their own; what this one cached is stale.
+                execution_id = execution.id
+                db.expire_all()
                 await settle_turn(
                     sessions=sessions,
                     approvals=self._approvals(db, tenant_id, executions),
@@ -268,11 +277,9 @@ class SessionRunner:
                     session_id=session_id,
                     turn_started=turn_started,
                     input_kind=session_input.kind,
-                    execution_id=execution.id,
+                    execution_id=execution_id,
                     previous=waiting,
-                    answered=[session_input.tool_call_id]
-                    if session_input.tool_call_id
-                    else [],
+                    answered=answered_calls(waiting, session_input),
                     events=events,
                     failed=any(isinstance(e, RunErrorEvent) for e in events)
                     or not any(e.type == EventType.RUN_FINISHED for e in events),
