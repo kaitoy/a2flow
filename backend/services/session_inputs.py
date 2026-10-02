@@ -64,7 +64,10 @@ class SessionInput(BaseModel):
         kind: ``message`` sends ``text`` as a user message; ``tool_result``
             answers the paused call ``tool_call_id`` with ``content``;
             ``recovery`` resumes a turn that was cut off (see
-            :data:`RECOVERY_PROMPT`).
+            :data:`RECOVERY_PROMPT`); ``assigned`` tells the session, in
+            ``text``, about tasks the server just assigned it -- sent like a
+            message, but never followed by another such note
+            (:func:`services.session_settle.settle_turn`).
         text: The user message, for ``message``.
         tool_call_id: The paused call being answered, for ``tool_result``.
         content: The answer, for ``tool_result``.
@@ -76,7 +79,7 @@ class SessionInput(BaseModel):
             approval decision, which resumes the run on the initiator's behalf.
     """
 
-    kind: Literal["message", "tool_result", "recovery"]
+    kind: Literal["message", "tool_result", "recovery", "assigned"]
     text: str | None = None
     tool_call_id: str | None = None
     content: str | None = None

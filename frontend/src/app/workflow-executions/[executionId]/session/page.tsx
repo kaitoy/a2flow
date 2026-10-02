@@ -9,12 +9,13 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
+import { ExecutionSessionTabs } from "@/components/ExecutionSessionTabs";
 import { MessageList } from "@/components/MessageList";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
@@ -26,18 +27,61 @@ import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useExecutionSessionChat } from "@/hooks/useExecutionSessionChat";
 import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
 import {
+  type ExecutionSession,
   getWorkflowExecution,
   isForbiddenError,
+  listExecutionSessions,
   SUPPRESS_FORBIDDEN_TOAST,
   type WorkflowExecution,
 } from "@/lib/api";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
+/** How often (ms) to re-read the run's sessions, so new branches and status changes show. */
+const SESSIONS_POLL_MS = 5_000;
+
+/**
+ * The run's sessions, re-read every {@link SESSIONS_POLL_MS}, and the one the
+ * viewer is looking at — kept in the `?session=` query parameter so a link can
+ * open a particular branch. Defaults to the main session.
+ */
+function useSessionSelection(execution: WorkflowExecution) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [sessions, setSessions] = useState<ExecutionSession[]>([]);
+  const selected = searchParams.get("session") ?? execution.sessionId;
+
+  useEffect(() => {
+    let active = true;
+    const load = () =>
+      listExecutionSessions(execution.id)
+        .then((list) => {
+          if (active) setSessions(list);
+        })
+        .catch((err: unknown) => console.error("failed to list sessions", err));
+    void load();
+    const id = setInterval(load, SESSIONS_POLL_MS);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [execution.id]);
+
+  const select = useCallback(
+    (sessionId: string) => {
+      const query = sessionId === execution.sessionId ? "" : `?session=${sessionId}`;
+      router.replace(`/workflow-executions/${execution.id}/session${query}`);
+    },
+    [router, execution.id, execution.sessionId]
+  );
+  return { sessions, selected, select };
+}
+
 /** Renders the chat UI for an already-loaded WorkflowExecution, including the task timeline and message list. */
 function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s) => s.auth.user);
+  const { sessions, selected, select } = useSessionSelection(execution);
   const {
     messages,
     isRunning,
@@ -53,7 +97,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     messageTasks,
     tasks,
     forbidden: chatForbidden,
-  } = useExecutionSessionChat(execution.id, execution.sessionId, execution.initiatorId);
+  } = useExecutionSessionChat(execution.id, selected, execution.initiatorId);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [timelineDrawerOpen, setTimelineDrawerOpen] = useState(false);
   // Focus state shared by the timeline and chat: a hovered entry wins over the
@@ -147,6 +191,12 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
               { label: execution.name, href: `/workflow-executions/${execution.id}` },
               { label: "Session" },
             ]}
+          />
+          <ExecutionSessionTabs
+            sessions={sessions}
+            mainSessionId={execution.sessionId}
+            value={selected}
+            onChange={select}
           />
         </div>
 

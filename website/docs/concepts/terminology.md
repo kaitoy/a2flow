@@ -13,6 +13,7 @@ The concepts that carry most of the domain, worth keeping straight:
 | **Design session** | The chat in which a workflow's task templates are produced and refined. Exactly one per workflow, and it exists before any run does. |
 | **[Workflow execution](../guides/workflow-executions.md)** | One run of a workflow: the workflow and skill metadata snapshotted at run time, and the parent of the run's `WorkflowTask`s, `Approval`s, and message metadata. |
 | **Workflow session** | The chat that one workflow execution happens in — the run-time counterpart of a design session. |
+| **Branch session** | A session forked from a workflow session when the run's task graph branches, so the branch is worked alongside the rest of the run. It finishes with a summary once its tasks are done. |
 | **[Tenant](./tenants.md)** | The top-level organizational boundary: nearly every record belongs to exactly one, and no request crosses from one into another. |
 | **[User group](../guides/users-and-groups.md#user-groups)** | A named bundle of users within a tenant, carrying a set of roles that every member inherits. |
 | **[Tag](../guides/tags.md)** | A tenant-wide label for classifying secrets, MCP servers, agent skills, workflows, tool mocks, and user groups — one vocabulary shared by all six. A tag flagged **Access control** also restricts the records it labels to members of groups carrying it. |

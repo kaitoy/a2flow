@@ -19,6 +19,7 @@ decision -- so the chat still shows who decided.
 import asyncio
 import logging
 import uuid
+from datetime import UTC, datetime
 
 import anyio
 from ag_ui.core import BaseEvent, Context, EventType, RunAgentInput, RunErrorEvent
@@ -30,6 +31,7 @@ from infrastructure import database
 from infrastructure.agent import AgentRegistry, tenant_app_name, with_user_id
 from infrastructure.client_tools import a2ui_context, client_tools
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from infrastructure.session_fork import fork_adk_session
 from infrastructure.skill_manager import SkillManager
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
 from models.workflow_execution import WorkflowExecution
@@ -49,7 +51,8 @@ from repositories.workflow_task import SqlWorkflowTaskRepository
 from services.approver_groups import ApproverGroupResolver
 from services.session_file import build_session_file_store, describe_session_files
 from services.session_inputs import SessionInput, WaitingCall, build_messages
-from services.session_queue import settle_turn, wait_for_wake
+from services.session_queue import wait_for_wake
+from services.session_settle import settle_turn
 from services.session_stream import StreamWriter
 from services.workflow_execution import WorkflowExecutionService
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
@@ -58,6 +61,22 @@ logger = logging.getLogger(__name__)
 
 #: How often the dispatcher looks for due sessions when nothing wakes it.
 POLL_INTERVAL_SECONDS = 2.0
+
+#: Most tasks read when describing finished branches; mirrors the scheduler.
+_MAX_TASKS = 1000
+
+#: Told to a branch session on every turn, so its agent keeps to its branch.
+_BRANCH_CONTEXT = (
+    "This is a branch session: it was forked from another session of this "
+    "run to work one branch of the workflow's task graph, while other "
+    "sessions work the other branches in parallel. Its history up to the "
+    "fork is the context it was forked with. Work only the tasks "
+    "list_workflow_tasks marks assigned_to_you; tasks assigned to other "
+    "sessions are theirs, and may progress while you work. When nothing is "
+    "assigned to you any more, reply with a short summary of what this branch "
+    "did and its results -- it is handed on to whoever continues from here -- "
+    "and stop."
+)
 
 #: Stands in for the input of a ``running`` session whose turn was cut off.
 _RECOVERY = SessionInput(kind="recovery")
@@ -155,7 +174,43 @@ class SessionRunner:
                 clear_input=True,
             )
             return
+        app_name = tenant_app_name(self._app_name, tenant_id)
+        parent_id = row.parent_id
+        fork_event_count = row.fork_event_count
+        adk_session = await self._session_service.get_session(
+            app_name=app_name, user_id=initiator, session_id=session_id
+        )
+        if parent_id is not None and adk_session is None:
+            # A branch's first turn: it starts from its parent's context as it
+            # stands now, not as it stood when the branch was planned.
+            fork_event_count = await fork_adk_session(
+                self._session_service,
+                app_name=app_name,
+                user_id=initiator,
+                parent_id=parent_id,
+                child_id=session_id,
+            )
+            await sessions.mark_forked(
+                session_id, event_count=fork_event_count, user_id=initiator
+            )
+            adk_session = await self._session_service.get_session(
+                app_name=app_name, user_id=initiator, session_id=session_id
+            )
+        context = await self._context(db, tenant_id, execution)
+        if parent_id is not None:
+            context.insert(
+                0, Context(description="Branch session", value=_BRANCH_CONTEXT)
+            )
+        else:
+            reports = await self._branch_reports(
+                db, tenant_id, executions, execution.id
+            )
+            if reports:
+                context.insert(
+                    0, Context(description="Finished branch reports", value=reports)
+                )
         run_id = str(uuid.uuid4())
+        turn_started = datetime.now(UTC)
         input_data = with_user_id(
             RunAgentInput(
                 thread_id=session_id,
@@ -163,7 +218,7 @@ class SessionRunner:
                 state={},
                 messages=build_messages(waiting, session_input),
                 tools=client_tools(),
-                context=await self._context(db, tenant_id, execution),
+                context=context,
                 forwarded_props={},
             ),
             initiator,
@@ -173,12 +228,7 @@ class SessionRunner:
             # initiator.
             acting_user_id=session_input.acting_user_id or initiator,
         )
-        prior_keys = await service.attributable_keys(execution.id)
-        adk_session = await self._session_service.get_session(
-            app_name=tenant_app_name(self._app_name, tenant_id),
-            user_id=initiator,
-            session_id=session_id,
-        )
+        prior_keys = await service.attributable_keys(execution.id, session_id)
         await sessions.mark_run(
             session_id,
             run_id=run_id,
@@ -200,14 +250,24 @@ class SessionRunner:
                 )
                 if session_input.sender_id is not None:
                     await service.record_new_senders(
-                        execution.id, prior_keys, session_input.sender_id
+                        execution.id,
+                        prior_keys,
+                        session_input.sender_id,
+                        session_id=session_id,
                     )
-                await service.record_message_tasks(execution.id)
+                # A branch's copied events belong to its parent's tasks; only
+                # its own are associated here.
+                await service.record_message_tasks(
+                    execution.id, session_id=session_id, start=fork_event_count
+                )
                 await settle_turn(
                     sessions=sessions,
                     approvals=self._approvals(db, tenant_id, executions),
                     executions=executions,
+                    tasks=self._task_repo(db, tenant_id, executions),
                     session_id=session_id,
+                    turn_started=turn_started,
+                    input_kind=session_input.kind,
                     execution_id=execution.id,
                     previous=waiting,
                     answered=[session_input.tool_call_id]
@@ -243,6 +303,59 @@ class SessionRunner:
                 )
             )
         return context + a2ui_context()
+
+    async def _branch_reports(
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        executions: SqlWorkflowExecutionRepository,
+        execution_id: str,
+    ) -> str:
+        """Describe what each finished branch session of a run did, for the main session.
+
+        A join is picked up by the main session, which did not see the branches
+        feeding it being worked; their summaries are how it learns the results.
+        Carried as context on every main-session turn rather than in the note
+        that assigns the join, so they arrive even when the main session was
+        busy at that moment.
+
+        Returns:
+            One line per finished branch -- the tasks it worked and its
+            summary -- or an empty string when no branch has finished.
+        """
+        sessions = SqlExecutionSessionRepository(db, tenant_id=tenant_id)
+        branches = [
+            s
+            for s in await sessions.list_for_execution(execution_id)
+            if s.parent_id is not None and s.summary
+        ]
+        if not branches:
+            return ""
+        tasks = await self._task_repo(db, tenant_id, executions).list(
+            limit=_MAX_TASKS, offset=0, workflow_execution_id=execution_id
+        )
+        lines = []
+        for branch in branches:
+            titles = ", ".join(t.title for t in tasks if t.session_id == branch.id)
+            lines.append(f"- {titles or 'a branch'}: {branch.summary}")
+        return (
+            "Branches of this run were worked in parallel in other sessions. "
+            "What each reported when it finished:\n" + "\n".join(lines)
+        )
+
+    def _task_repo(
+        self,
+        db: AsyncSession,
+        tenant_id: str,
+        executions: SqlWorkflowExecutionRepository,
+    ) -> SqlWorkflowTaskRepository:
+        """Build the task repository on the turn's database session."""
+        return SqlWorkflowTaskRepository(
+            db,
+            executions,
+            SqlMCPServerRepository(db, tenant_id=tenant_id),
+            tenant_id=tenant_id,
+        )
 
     def _approvals(
         self,

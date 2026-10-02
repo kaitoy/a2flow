@@ -191,5 +191,6 @@ An unrecognized name falls back to `UTC` rather than failing startup, so a typo 
 
 | Variable | Default | What it does |
 |---|---|---|
+| `EXECUTION_MAX_PARALLEL_SESSIONS` | `4` | Most sessions one workflow run works in at once — its main session plus the branch sessions forked when its task graph branches. At the limit, a ready task waits for its session instead of forking another. `1` turns forking off. At least `1` |
 | `ROLE_DESCRIPTION` | A generic assistant description | Role text the agent's system prompt is built around, alongside the workflow rules and the interface schema |
 | `SESSION_RUNNER_CONCURRENCY` | `4` | How many turns one replica runs at once on a run's own behalf — kickoffs, and resumptions after an approval is decided. Each is a live conversation with the model, so this bounds a replica's model calls for runs nobody is watching. At least `1` |

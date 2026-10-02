@@ -630,3 +630,122 @@ async def test_a_turn_is_told_which_files_the_session_holds(
 
     entries = {c.description: c.value for c in agent.inputs[0].context}
     assert "input.csv" in entries["Files attached to this session"]
+
+
+# ---------- parallel branches ----------
+
+
+def _says(text: str) -> list[Any]:
+    """A turn whose only output is one assistant message saying ``text``."""
+    from ag_ui.core import (
+        TextMessageContentEvent,
+        TextMessageEndEvent,
+        TextMessageStartEvent,
+    )
+
+    return [
+        RunStartedEvent(type=EventType.RUN_STARTED, thread_id="t", run_id="r"),
+        TextMessageStartEvent(
+            type=EventType.TEXT_MESSAGE_START, message_id="m", role="assistant"
+        ),
+        TextMessageContentEvent(
+            type=EventType.TEXT_MESSAGE_CONTENT, message_id="m", delta=text
+        ),
+        TextMessageEndEvent(type=EventType.TEXT_MESSAGE_END, message_id="m"),
+        RunFinishedEvent(type=EventType.RUN_FINISHED, thread_id="t", run_id="r"),
+    ]
+
+
+async def _execute_diamond(
+    client: AsyncClient,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Run a workflow A -> (B, C) -> D; return the run and its task ids by title."""
+    from tests._workflow import add_template, generate_workflow, publish_workflow
+
+    skill = await create_skill(client)
+    wf = await generate_workflow(client, skill["id"])
+    a = await add_template(client, wf["id"], title="A")
+    b = await add_template(client, wf["id"], title="B", depends_on_ids=[a["id"]])
+    c = await add_template(client, wf["id"], title="C", depends_on_ids=[a["id"]])
+    await add_template(client, wf["id"], title="D", depends_on_ids=[b["id"], c["id"]])
+    await publish_workflow(client, wf["id"])
+    execution: dict[str, Any] = assert_ok(
+        await client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
+    tasks = assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
+        )
+    )
+    return execution, {t["title"]: t["id"] for t in tasks}
+
+
+async def _work(task_id: str, session_id: str, initiator: str) -> None:
+    """Have the session's agent start and complete a task, through its tool."""
+    from types import SimpleNamespace
+
+    from infrastructure.workflow_task_tools import update_workflow_task
+
+    ctx = SimpleNamespace(
+        session=SimpleNamespace(id=session_id), user_id=initiator, state=None
+    )
+    for status in ("in_progress", "completed"):
+        result = await update_workflow_task(task_id, ctx, status=status)  # type: ignore[arg-type]
+        assert "error" not in result, result
+
+
+async def test_a_branch_point_forks_a_session_and_the_join_returns_to_main(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """A -> (B, C) -> D: C runs in a forked branch, and D waits for it in main."""
+    client, engine, runner, registry = runner_env
+    execution, ids = await _execute_diamond(client)
+    main, initiator = execution["sessionId"], execution["initiatorId"]
+    registry.get.return_value = ScriptedAgent()
+    await runner.run_turn(main, DEFAULT_TEST_TENANT_ID)  # kickoff
+
+    await _work(ids["A"], main, initiator)
+
+    sessions = assert_ok(
+        await client.get(f"/api/v1/workflow-executions/{execution['id']}/sessions")
+    )
+    (branch,) = [s for s in sessions if s["parentId"] == main]
+    assert branch["status"] == "queued"
+    owners = {
+        t["title"]: t["sessionId"]
+        for t in assert_ok(
+            await client.get(
+                f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
+            )
+        )
+    }
+    assert owners["B"] == main
+    assert owners["C"] == branch["id"]
+
+    # Both branches finish their task; the join still waits for the branch
+    # session itself to finish, so its summary exists.
+    await _work(ids["B"], main, initiator)
+    await _work(ids["C"], branch["id"], initiator)
+    async with AsyncSession(engine) as db:
+        from models.workflow_task import WorkflowTask
+
+        join = await db.get(WorkflowTask, ids["D"])
+        assert join is not None and join.session_id is None
+
+    registry.get.return_value = ScriptedAgent(_says("C went fine: 3 rows."))
+    await runner.run_turn(branch["id"], DEFAULT_TEST_TENANT_ID)
+
+    finished = await _session(engine, branch["id"])
+    assert finished.status is ExecutionSessionStatus.done
+    assert finished.summary == "C went fine: 3 rows."
+    async with AsyncSession(engine) as db:
+        join = await db.get(WorkflowTask, ids["D"])
+        assert join is not None and join.session_id == main
+
+    # The main session's next turn is told what the branch reported.
+    agent = ScriptedAgent()
+    registry.get.return_value = agent
+    await runner.run_turn(main, DEFAULT_TEST_TENANT_ID)
+    (sent,) = agent.inputs
+    reports = {c.description: c.value for c in sent.context}
+    assert "C went fine: 3 rows." in reports["Finished branch reports"]

@@ -263,6 +263,11 @@ class Settings(BaseSettings):
             :mod:`services.session_runner`). Each is a live LLM conversation,
             so this bounds a replica's concurrent model calls from runs nobody
             is watching.
+        execution_max_parallel_sessions: Most ADK sessions one workflow run
+            works in at once -- its main session plus the branch sessions
+            forked when its task graph branches (see
+            :mod:`services.execution_branching`). Once reached, further
+            branches queue behind the session they would have forked from.
         email_queue_batch_size: How many messages one drain pass claims.
         email_queue_poll_interval_seconds: How long the worker sleeps when the
             queue is empty.
@@ -355,6 +360,7 @@ class Settings(BaseSettings):
 
     email_worker_in_process: bool = True
     session_runner_concurrency: int = Field(default=4, ge=1)
+    execution_max_parallel_sessions: int = Field(default=4, ge=1)
     email_send_rate_per_second: float = _DEFAULT_EMAIL_RATE_PER_SECOND
     email_queue_batch_size: int = _DEFAULT_EMAIL_BATCH_SIZE
     email_queue_poll_interval_seconds: float = _DEFAULT_EMAIL_POLL_INTERVAL_SECONDS

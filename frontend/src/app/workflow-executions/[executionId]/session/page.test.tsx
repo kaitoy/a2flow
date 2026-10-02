@@ -1,5 +1,5 @@
 import { http } from "msw";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
@@ -108,6 +108,49 @@ describe("WorkflowSessionPage", () => {
       "href",
       "/workflow-executions/execution-1"
     );
+  });
+
+  it("shows a tab per session once the run branches, and follows the one in ?session=", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id/sessions", () =>
+        envelope(
+          [
+            { id: "executed-session-id", status: "idle", parentId: null },
+            { id: "branch-1", status: "waiting_for_approval", parentId: "executed-session-id" },
+          ].map((session) => ({
+            ...session,
+            workflowExecutionId: "execution-1",
+            tenantId: "tenant-1",
+            pendingInput: null,
+            waitingOn: [],
+            activeRunId: null,
+            runEventIndex: 0,
+            forkEventCount: 0,
+            summary: null,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "user",
+            updatedBy: "user",
+          }))
+        )
+      )
+    );
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams("session=branch-1") as never);
+    try {
+      render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+
+      expect(
+        await screen.findByRole("tab", { name: "Branch 1 · Waiting for approval" })
+      ).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: "Main · Idle" })).toBeInTheDocument();
+      expect(useExecutionSessionChatMock).toHaveBeenLastCalledWith(
+        "execution-1",
+        "branch-1",
+        "user"
+      );
+    } finally {
+      vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as never);
+    }
   });
 
   it("shows the access-denied state and no toast when loading the execution is FORBIDDEN", async () => {

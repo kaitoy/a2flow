@@ -18,6 +18,7 @@ import type {
   AvatarConfig,
   CertificateGrant,
   ExecuteWorkflowRequest,
+  ExecutionSession as ExecutionSessionModel,
   GenerateWorkflowRequest,
   ImpersonationEventRead,
   LoginRequest,
@@ -339,6 +340,11 @@ export type UserGroup = WithAudit<UserGroupModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowExecution = WithAudit<WorkflowExecutionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
+/**
+ * One ADK session a workflow execution is worked in: its main session, or a
+ * branch session forked from one when the task graph branched.
+ */
+export type ExecutionSession = WithAudit<ExecutionSessionModel>;
 export type WorkflowTaskTemplate = WithAudit<WorkflowTaskTemplateModel>;
 export type Session = SessionModel;
 /** One file attached to a workflow session, by a participant or by the agent. */
@@ -1670,6 +1676,22 @@ export async function listWorkflowTasks(
       query: listQuery(query),
     })
   ) as Promise<WorkflowTask[]>;
+}
+
+/**
+ * List the sessions a workflow execution is worked in, main session first, with
+ * the status of each (running, waiting for an approval or input, idle, done).
+ */
+export async function listExecutionSessions(
+  workflowExecutionId: string,
+  options?: CallOptions
+): Promise<ExecutionSession[]> {
+  return unwrap(
+    sdk.listWorkflowExecutionSessionsApiV1WorkflowExecutionsExecutionIdSessionsGet({
+      path: { execution_id: workflowExecutionId },
+    }),
+    options
+  ) as Promise<ExecutionSession[]>;
 }
 
 /**

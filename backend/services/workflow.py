@@ -949,8 +949,20 @@ class WorkflowService:
                 user_id=user,
             )
             template_to_task[template.id] = task.id
-        # Record the main session and assign it the root tasks now, so the
-        # agent's first turn already finds work marked as its own.
+        # The run starts on the server, not when someone opens its chat. Queued
+        # before the root tasks are assigned: assigning work to an idle session
+        # queues a note naming it, which would take the kickoff's place.
+        await self._sessions.ensure_main(
+            execution_id=execution_id, session_id=session_id, user_id=user
+        )
+        await queue_input(
+            self._sessions,
+            session_id,
+            SessionInput(kind="message", text=EXECUTION_KICKOFF_PROMPT, sender_id=user),
+            user_id=user,
+        )
+        # Assign the root tasks now, so the agent's first turn already finds
+        # work marked as its own -- and further roots forked to run alongside.
         await assign_runnable_tasks(
             tasks=self._tasks,
             sessions=self._sessions,
@@ -962,13 +974,6 @@ class WorkflowService:
                 workflow_execution_id=execution_id,
             ),
             acting_user_id=user,
-        )
-        # The run starts on the server, not when someone opens its chat.
-        await queue_input(
-            self._sessions,
-            session_id,
-            SessionInput(kind="message", text=EXECUTION_KICKOFF_PROMPT, sender_id=user),
-            user_id=user,
         )
         # Re-read after the last commit: each task commit on the shared request
         # session expires the ``execution`` instance, and serializing an expired one

@@ -18,7 +18,7 @@ from typing import Any
 
 from pydantic import model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import Column, ForeignKeyConstraint, Index
+from sqlalchemy import Column, ForeignKeyConstraint, Index, Text
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -101,6 +101,14 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
     active_run_id: str | None = None
     #: How many ADK events the session held when the active turn started.
     run_event_index: int = Field(default=0)
+    #: For a branch session, how many of its leading ADK events were copied from
+    #: the session it was forked from: the context it started with, which its
+    #: own chat does not show again. ``0`` for the main session, and for a
+    #: branch whose first turn has not run yet.
+    fork_event_count: int = Field(default=0)
+    #: What a finished branch session reported last -- handed to the main
+    #: session when it picks up the join the branch fed.
+    summary: str | None = Field(default=None, sa_type=Text)
 
 
 class SessionHistory(SQLModel):

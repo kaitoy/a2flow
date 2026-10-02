@@ -8,6 +8,7 @@ from sqlalchemy import ColumnElement, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from infrastructure.locks import advisory_lock
 from models.approval import Approval
 from models.tag import WorkflowExecutionTag
 from models.workflow_execution import (
@@ -290,8 +291,10 @@ class SqlWorkflowExecutionRepository(TenantScopedRepository[WorkflowExecution]):
         between replicas. It is stored on the run rather than in memory for that
         reason, and committed immediately so the next call sees it.
 
-        Concurrent calls within one run cannot race: agent runs for a session are
-        serialized by the advisory lock in :mod:`infrastructure.locks`.
+        A run's branch sessions call tools in parallel, so the read-increment-
+        write is serialized per run by an advisory lock (see
+        :mod:`infrastructure.locks`); without it two calls could read the same
+        count and both be handed the same ordinal.
 
         Args:
             execution_id: Primary key of the run whose counter to advance.
@@ -305,19 +308,23 @@ class SqlWorkflowExecutionRepository(TenantScopedRepository[WorkflowExecution]):
             NotFoundError: If no execution exists with the given ID in this tenant.
         """
         self._require_tenant()
-        execution = await self._get_scoped(execution_id)
-        if execution is None:
-            raise NotFoundError("WorkflowExecution", execution_id)
-        # Rebound rather than mutated in place: SQLAlchemy does not track
-        # mutation of a plain JSON column's contents, so an in-place increment
-        # would never be flushed.
-        counts = dict(execution.tool_mock_calls)
-        ordinal = counts.get(key, 0) + 1
-        counts[key] = ordinal
-        execution.tool_mock_calls = counts
-        self._db.add(execution)
-        await self._db.commit()
-        return ordinal
+        async with advisory_lock(f"mock-ordinal:{execution_id}"):
+            execution = await self._get_scoped(execution_id)
+            if execution is None:
+                raise NotFoundError("WorkflowExecution", execution_id)
+            # Re-read under the lock: another session may have counted since
+            # this database session last loaded the row.
+            await self._db.refresh(execution)
+            # Rebound rather than mutated in place: SQLAlchemy does not track
+            # mutation of a plain JSON column's contents, so an in-place
+            # increment would never be flushed.
+            counts = dict(execution.tool_mock_calls)
+            ordinal = counts.get(key, 0) + 1
+            counts[key] = ordinal
+            execution.tool_mock_calls = counts
+            self._db.add(execution)
+            await self._db.commit()
+            return ordinal
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]:
         """Return every skill revision that executions of this skill are pinned to.

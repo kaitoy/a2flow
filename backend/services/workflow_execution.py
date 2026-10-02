@@ -520,9 +520,10 @@ class WorkflowExecutionService:
         session = await self._adk_session(execution, session_id)
         if session is None:
             return SessionHistory(messages=[], stream_cursor=cursor)
-        events = session.events
-        if row.active_run_id is not None:
-            events = events[: row.run_event_index]
+        end = row.run_event_index if row.active_run_id is not None else None
+        # A branch's leading events are its parent's history, copied when it
+        # forked; its own chat starts after them.
+        events = session.events[row.fork_event_count : end]
         meta = await self._meta.meta_for_session(
             MessageScope.workflow_session(execution_id)
         )
@@ -665,7 +666,9 @@ class WorkflowExecutionService:
             session_id=session_id or execution.session_id,
         )
 
-    async def attributable_keys(self, execution_id: str) -> set[str]:
+    async def attributable_keys(
+        self, execution_id: str, session_id: str | None = None
+    ) -> set[str]:
         """Return the correlation keys of the workflow session's attributable events.
 
         Snapshotting this set before an agent run lets the router attribute
@@ -675,6 +678,7 @@ class WorkflowExecutionService:
 
         Args:
             execution_id: Identifier of the WorkflowExecution whose events to read.
+            session_id: The session to read; the main session when omitted.
 
         Returns:
             The set of correlation keys (event ids and tool_call_ids)
@@ -685,10 +689,17 @@ class WorkflowExecutionService:
             NotFoundError: If no WorkflowExecution exists with the given ID.
         """
         execution = await self._get(execution_id)
-        return session_attribution.attributable_keys(await self._adk_session(execution))
+        return session_attribution.attributable_keys(
+            await self._adk_session(execution, session_id)
+        )
 
     async def record_new_senders(
-        self, execution_id: str, prior_keys: set[str], sender_user_id: str
+        self,
+        execution_id: str,
+        prior_keys: set[str],
+        sender_user_id: str,
+        *,
+        session_id: str | None = None,
     ) -> None:
         """Attribute the workflow session's new events to ``sender_user_id``.
 
@@ -701,6 +712,9 @@ class WorkflowExecutionService:
             execution_id: Identifier of the WorkflowExecution that was run.
             prior_keys: The attributable keys present before the run.
             sender_user_id: The user who sent the new messages.
+            session_id: The session the run was in; the main session when
+                omitted. Attribution rows are keyed by event id, which is
+                unique across the run's sessions.
 
         Raises:
             NotFoundError: If no WorkflowExecution exists with the given ID.
@@ -710,12 +724,14 @@ class WorkflowExecutionService:
         await session_attribution.record_new_senders(
             self._meta,
             MessageScope.workflow_session(execution_id),
-            await self._adk_session(execution),
+            await self._adk_session(execution, session_id),
             prior_keys,
             sender_user_id,
         )
 
-    async def record_message_tasks(self, execution_id: str) -> None:
+    async def record_message_tasks(
+        self, execution_id: str, *, session_id: str | None = None, start: int = 0
+    ) -> None:
         """Associate each ADK event with the WorkflowTask in progress at the time.
 
         The agent drives the task lifecycle by calling ``update_workflow_task``
@@ -731,12 +747,16 @@ class WorkflowExecutionService:
 
         Args:
             execution_id: Identifier of the WorkflowExecution that was run.
+            session_id: The session the run was in; the main session when
+                omitted.
+            start: How many leading events to skip -- a branch session's
+                copy of its parent's history, already associated there.
 
         Raises:
             NotFoundError: If no WorkflowExecution exists with the given ID.
         """
         execution = await self._get(execution_id)
-        session = await self._adk_session(execution)
+        session = await self._adk_session(execution, session_id)
         if session is None:
             return
         # Capture the audit user before the loop: each set_task commit expires
@@ -744,7 +764,7 @@ class WorkflowExecutionService:
         # trigger a lazy load outside the async greenlet context.
         owner_id = execution.created_by
         current_task_id: str | None = None
-        for event in session.events:
+        for event in session.events[start:]:
             for call in event.get_function_calls():
                 if call.name != "update_workflow_task":
                     continue

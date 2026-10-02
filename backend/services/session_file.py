@@ -32,6 +32,7 @@ from collections.abc import Awaitable, Callable, Collection
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from infrastructure.locks import advisory_lock
 from models.session_file import SessionFile, SessionFileOrigin, SessionFileRead
 from models.user import User
 from repositories.exceptions import NotFoundError, SessionFileValidationError
@@ -235,17 +236,21 @@ class SessionFileStore:
             raise SessionFileValidationError(
                 f"File exceeds the {_format_mib(self.max_file_bytes)} MiB size limit"
             )
-        await self._assert_fits(execution_id, len(data))
-        resolved = await self._resolve_name(execution_id, sanitize_file_name(name))
         normalized = content_type.split(";", 1)[0].strip().lower()
-        stored = await self._files.create(
-            execution_id,
-            name=resolved,
-            data=data,
-            content_type=normalized or "application/octet-stream",
-            origin=origin,
-            user_id=user_id,
-        )
+        # A run's sessions write in parallel: without the lock two writers can
+        # both find the same name free, or both fit under the size limit that
+        # only one of them still fits under.
+        async with advisory_lock(f"session-files:{execution_id}"):
+            await self._assert_fits(execution_id, len(data))
+            resolved = await self._resolve_name(execution_id, sanitize_file_name(name))
+            stored = await self._files.create(
+                execution_id,
+                name=resolved,
+                data=data,
+                content_type=normalized or "application/octet-stream",
+                origin=origin,
+                user_id=user_id,
+            )
         return SessionFileRead.model_validate(stored)
 
     async def _assert_fits(self, execution_id: str, size: int) -> None:

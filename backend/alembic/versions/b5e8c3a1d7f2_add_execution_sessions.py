@@ -64,6 +64,8 @@ def upgrade() -> None:
         sa.Column("waiting_on", _json(), nullable=False, server_default="[]"),
         sa.Column("active_run_id", AutoString(), nullable=True),
         sa.Column("run_event_index", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("fork_event_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("summary", Text(), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),

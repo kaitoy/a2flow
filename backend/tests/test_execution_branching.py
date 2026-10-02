@@ -79,9 +79,78 @@ def _session(
 
 
 def _plan(
-    tasks: Sequence[WorkflowTaskRead], sessions: Sequence[ExecutionSession] = ()
+    tasks: Sequence[WorkflowTaskRead],
+    sessions: Sequence[ExecutionSession] = (),
+    *,
+    max_sessions: int = 1,
 ) -> list[Assignment]:
-    return plan_assignments(tasks, [_session(MAIN), *sessions], main_session_id=MAIN)
+    """Plan with the main session plus ``sessions``; serial (no forking) by default."""
+    return plan_assignments(
+        tasks,
+        [_session(MAIN), *sessions],
+        main_session_id=MAIN,
+        max_sessions=max_sessions,
+    )
+
+
+# ---------- forking ----------
+
+
+def test_a_branch_point_forks_the_extra_branches() -> None:
+    tasks = [
+        _task("a", completed, session_id=MAIN),
+        _task("b", deps=["a"]),
+        _task("c", deps=["a"]),
+        _task("d", deps=["a"]),
+    ]
+    assert _plan(tasks, max_sessions=4) == [
+        Assignment("b", MAIN),
+        Assignment("c", None, fork_from=MAIN),
+        Assignment("d", None, fork_from=MAIN),
+    ]
+
+
+def test_independent_roots_run_side_by_side() -> None:
+    assert _plan([_task("a"), _task("b")], max_sessions=4) == [
+        Assignment("a", MAIN),
+        Assignment("b", None, fork_from=MAIN),
+    ]
+
+
+def test_at_the_cap_a_branch_queues_on_its_target() -> None:
+    tasks = [
+        _task("a", completed, session_id=MAIN),
+        _task("b", deps=["a"]),
+        _task("c", deps=["a"]),
+    ]
+    # The main session and one live branch already fill a cap of two.
+    assert _plan(tasks, [_session(BRANCH)], max_sessions=2) == [
+        Assignment("b", MAIN),
+        Assignment("c", MAIN),
+    ]
+
+
+def test_a_branch_forks_from_itself_when_it_branches_again() -> None:
+    tasks = [
+        _task("c", completed, session_id=BRANCH),
+        _task("d", deps=["c"]),
+        _task("e", deps=["c"]),
+    ]
+    assert _plan(tasks, [_session(BRANCH)], max_sessions=4) == [
+        Assignment("d", BRANCH),
+        Assignment("e", None, fork_from=BRANCH),
+    ]
+
+
+def test_a_join_never_forks() -> None:
+    tasks = [
+        _task("a", completed, session_id=MAIN),
+        _task("busy", WorkflowTaskStatus.in_progress, session_id=MAIN),
+        _task("b", completed, session_id=BRANCH),
+        _task("join", deps=["a", "b"]),
+    ]
+    done = _session(BRANCH, ExecutionSessionStatus.done)
+    assert _plan(tasks, [done], max_sessions=4) == [Assignment("join", MAIN)]
 
 
 # ---------- plan_assignments ----------

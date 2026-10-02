@@ -71,6 +71,27 @@ A message you send waits for the agent: while it is still working on a turn, the
 
 The [design session](./workflows.md#adjusting-the-task-templates) is a shared chat too, with the same avatars. It is shared by the tenant's Developers rather than by a run's participants, and it refreshes itself every few seconds rather than showing other people's replies as they are written.
 
+### Branch sessions
+
+When the run's task graph branches, A2Flow may split the run across several sessions so the branches move forward together — see [Parallel branches](../architecture/workflow-execution.md#parallel-branches). A row of tabs then appears under the breadcrumbs, one per session, each labelled with its status:
+
+| Tab | What it is |
+|---|---|
+| **Main** | The session the run started in. It works the joins and the tasks that follow a finished branch |
+| **Branch 1**, **Branch 2**, … | A branch session, forked when a branch became ready while its session was busy |
+
+| Status | Meaning |
+|---|---|
+| Queued | A turn is about to start |
+| Running | The agent is working |
+| Waiting for input | An input form is waiting for an answer |
+| Waiting for approval | An approval this session requested is undecided |
+| Idle | Nothing to do right now; the session waits for its next task |
+| Done | The session finished its work. A finished branch leaves a summary for the main session |
+| Error | The last turn failed |
+
+Click a tab to open that session's chat; the view follows the selected session, and the URL keeps it, so a link to the page opens the same tab. A run that never branches shows no tabs.
+
 ### Suggested replies {#suggested-replies}
 
 When the agent stops to wait for you — it asked a question, wants a value, or needs a go-ahead — a row of **suggested replies** appears above the chat input: a few short answers it expects, such as `Yes, go ahead` or `Skip this step`.

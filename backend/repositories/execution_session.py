@@ -6,6 +6,7 @@ and branch sessions when the task graph forks.
 """
 
 import builtins
+import uuid
 from typing import Any, Protocol
 
 from sqlalchemy.exc import IntegrityError
@@ -40,10 +41,21 @@ class ExecutionSessionRepository(Protocol):
         user_id: str,
         waiting_on: builtins.list[dict[str, Any]] | None = None,
         clear_input: bool = False,
+        summary: str | None = None,
     ) -> None: ...
 
     async def mark_run(
         self, session_id: str, *, run_id: str | None, event_index: int, user_id: str
+    ) -> None: ...
+
+    async def create_branch(
+        self, *, execution_id: str, parent_id: str, user_id: str
+    ) -> ExecutionSession: ...
+
+    async def delete(self, session_id: str) -> None: ...
+
+    async def mark_forked(
+        self, session_id: str, *, event_count: int, user_id: str
     ) -> None: ...
 
 
@@ -156,6 +168,7 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
         user_id: str,
         waiting_on: builtins.list[dict[str, Any]] | None = None,
         clear_input: bool = False,
+        summary: str | None = None,
     ) -> None:
         """Record where a session stands after (or at the start of) a turn.
 
@@ -166,9 +179,61 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             waiting_on: The calls it is now paused on; left unchanged when
                 ``None``.
             clear_input: Whether the turn consumed its queued input.
+            summary: What a finishing branch reported; left unchanged when
+                ``None``.
         """
         values: dict[str, Any] = {"status": status, "updated_by": user_id}
+        if summary is not None:
+            values["summary"] = summary
         await self._update(session_id, values, waiting_on, clear_input)
+
+    async def create_branch(
+        self, *, execution_id: str, parent_id: str, user_id: str
+    ) -> ExecutionSession:
+        """Create a branch session forked from ``parent_id``, not yet due to run.
+
+        Its ADK session is copied from the parent on its first turn, not here
+        (:func:`infrastructure.session_fork.fork_adk_session`), so it starts
+        from the parent's context as it stands when the branch actually runs.
+
+        Args:
+            execution_id: Primary key of the workflow execution.
+            parent_id: The session it is forked from.
+            user_id: Recorded on the audit fields.
+
+        Returns:
+            The new ``idle`` row; queueing its first input is what makes it due.
+        """
+        row = ExecutionSession(
+            id=str(uuid.uuid4()),
+            workflow_execution_id=execution_id,
+            parent_id=parent_id,
+            tenant_id=self._require_tenant(),
+            created_by=user_id,
+            updated_by=user_id,
+        )
+        self._db.add(row)
+        await self._db.commit()
+        await self._db.refresh(row)
+        return row
+
+    async def delete(self, session_id: str) -> None:
+        """Delete a session row; a no-op when it does not exist in the tenant."""
+        row = await self._get_scoped(session_id)
+        if row is not None:
+            await self._db.delete(row)
+            await self._db.commit()
+
+    async def mark_forked(
+        self, session_id: str, *, event_count: int, user_id: str
+    ) -> None:
+        """Record how many leading ADK events a branch copied from its parent."""
+        await self._update(
+            session_id,
+            {"fork_event_count": event_count, "updated_by": user_id},
+            None,
+            False,
+        )
 
     async def mark_run(
         self, session_id: str, *, run_id: str | None, event_index: int, user_id: str
