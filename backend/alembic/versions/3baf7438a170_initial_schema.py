@@ -293,7 +293,7 @@ def upgrade() -> None:
         sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
             "transport",
-            sa.Enum("streamable_http", "stdio", name="mcptransport"),
+            sa.Enum("streamable_http", "stdio", "script", name="mcptransport"),
             nullable=False,
         ),
         sa.Column("url", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -316,6 +316,18 @@ def upgrade() -> None:
             "env",
             sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
             nullable=False,
+        ),
+        sa.Column(
+            "language",
+            sa.Enum("python", "javascript", name="scriptlanguage"),
+            nullable=True,
+        ),
+        sa.Column("source", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "packages",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+            server_default="[]",
         ),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
@@ -822,6 +834,100 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
+        "execution_sessions",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "workflow_execution_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.Column("parent_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "queued",
+                "running",
+                "waiting_for_input",
+                "waiting_for_approval",
+                "scheduled",
+                "idle",
+                "done",
+                "error",
+                name="executionsessionstatus",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "pending_input",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=True,
+        ),
+        sa.Column(
+            "waiting_on",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+            server_default="[]",
+        ),
+        sa.Column("active_run_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("run_event_index", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("fork_event_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("summary", Text(), nullable=True),
+        sa.Column("resume_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
+            ondelete="CASCADE",
+            name="fk_execution_sessions_workflow_execution_id",
+        ),
+        sa.ForeignKeyConstraint(
+            ["parent_id"],
+            ["execution_sessions.id"],
+            ondelete="CASCADE",
+            name="fk_execution_sessions_parent_id",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_execution_sessions_tenant_id", "execution_sessions", ["tenant_id"]
+    )
+    op.create_index(
+        "ix_execution_sessions_workflow_execution_id",
+        "execution_sessions",
+        ["workflow_execution_id"],
+    )
+    op.create_table(
+        "session_stream_events",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("run_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "payload",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["session_id"],
+            ["execution_sessions.id"],
+            ondelete="CASCADE",
+            name="fk_session_stream_events_session_id",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        # Ids are viewers' stream cursors; see the model for why SQLite needs this.
+        sqlite_autoincrement=True,
+    )
+    op.create_index(
+        "ix_session_stream_events_session_id_id",
+        "session_stream_events",
+        ["session_id", "id"],
+    )
+    op.create_table(
         "workflow_tasks",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -861,12 +967,19 @@ def upgrade() -> None:
         ),
         sa.Column("error_message", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["workflow_execution_id"], ["workflow_executions.id"], ondelete="CASCADE"
         ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["session_id"],
+            ["execution_sessions.id"],
+            name="fk_workflow_tasks_session_id",
+            ondelete="SET NULL",
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -885,6 +998,12 @@ def upgrade() -> None:
         "ix_workflow_tasks_tenant_id_status",
         "workflow_tasks",
         ["tenant_id", "status"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_workflow_tasks_session_id",
+        "workflow_tasks",
+        ["session_id"],
         unique=False,
     )
     op.create_table(
@@ -1518,7 +1637,17 @@ def downgrade() -> None:
     )
     op.drop_index("ix_workflow_tasks_tenant_id", table_name="workflow_tasks")
     op.drop_index("ix_workflow_tasks_tenant_id_status", table_name="workflow_tasks")
+    op.drop_index("ix_workflow_tasks_session_id", table_name="workflow_tasks")
     op.drop_table("workflow_tasks")
+    op.drop_index(
+        "ix_session_stream_events_session_id_id", table_name="session_stream_events"
+    )
+    op.drop_table("session_stream_events")
+    op.drop_index(
+        "ix_execution_sessions_workflow_execution_id", table_name="execution_sessions"
+    )
+    op.drop_index("ix_execution_sessions_tenant_id", table_name="execution_sessions")
+    op.drop_table("execution_sessions")
     op.drop_index("ix_outbound_emails_tenant_id", table_name="outbound_emails")
     op.drop_index("ix_outbound_emails_notification_id", table_name="outbound_emails")
     op.drop_index(

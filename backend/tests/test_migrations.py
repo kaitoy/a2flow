@@ -15,7 +15,6 @@ below sees exactly what the migrations built and nothing else.
 """
 
 import asyncio
-import sqlite3
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -144,74 +143,3 @@ def test_upgrade_head_matches_model_metadata(migration_db: str) -> None:
     for table in sorted(expected_tables):
         expected_columns = set(SQLModel.metadata.tables[table].columns.keys())
         assert actual_columns[table] == expected_columns, table
-
-
-def test_execution_sessions_backfill(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Existing runs get a main-session row, and their started or runnable tasks go to it.
-
-    Until ``execution_sessions`` existed, each run had exactly one ADK session,
-    so every task that already left ``pending`` was worked by it. A ``pending``
-    task whose dependencies are all completed is assigned too, so a run in
-    flight has work waiting; one still blocked is left for the scheduler.
-    """
-    db_file = tmp_path / "backfill.db"
-    monkeypatch.setenv("DB_URL", f"sqlite:///{db_file}")
-    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
-    command.upgrade(cfg, "9d4f1a7c2e63")
-
-    now = "2026-09-30 00:00:00"
-    # The raw connection enforces no foreign keys, so the tenant can name its
-    # creator before that user exists -- the user in turn needs the tenant.
-    with sqlite3.connect(db_file) as conn:
-        conn.execute(
-            "INSERT INTO tenants (id, created_at, updated_at, created_by, updated_by,"
-            " display_name, enabled, name) VALUES ('t1', ?, ?, 'u1', 'u1', 'T', 1, 't1')",
-            (now, now),
-        )
-        conn.execute(
-            "INSERT INTO users (id, created_at, updated_at, created_by, updated_by,"
-            " first_name, last_name, password, email, enabled, email_verified,"
-            " username, roles, tenant_id) VALUES ('u1', ?, ?, 'u1', 'u1', 'A', 'B',"
-            " 'x', 'a@b.c', 1, 1, 'u1', '[]', 't1')",
-            (now, now),
-        )
-        for exec_id, sess, finished in (("e1", "s1", None), ("e2", "s2", now)):
-            conn.execute(
-                "INSERT INTO workflow_executions (id, created_at, updated_at,"
-                " created_by, updated_by, tenant_id, session_id, name, agent_skill_id,"
-                " agent_skill_name, agent_skill_repo_url, agent_skill_repo_path,"
-                " initiator_id, is_draft, tool_mocks, tool_mock_calls, status,"
-                " finished_at) VALUES (?, ?, ?, 'u1', 'u1', 't1', ?, 'n', 'sk', 'sk',"
-                " 'r', '', 'u1', 0, '[]', '{}', 'running', ?)",
-                (exec_id, now, now, sess, finished),
-            )
-        for task_id, status in (
-            ("k1", "completed"),
-            ("k2", "pending"),
-            ("k3", "pending"),
-        ):
-            conn.execute(
-                "INSERT INTO workflow_tasks (id, created_at, updated_at, created_by,"
-                " updated_by, tenant_id, workflow_execution_id, title, status)"
-                " VALUES (?, ?, ?, 'u1', 'u1', 't1', 'e1', 'x', ?)",
-                (task_id, now, now, status),
-            )
-        conn.execute(
-            "INSERT INTO workflow_task_dependencies (task_id, depends_on_id)"
-            " VALUES ('k3', 'k2')"
-        )
-
-    command.upgrade(cfg, "head")
-
-    with sqlite3.connect(db_file) as conn:
-        sessions = set(
-            conn.execute(
-                "SELECT id, workflow_execution_id, parent_id, status"
-                " FROM execution_sessions"
-            )
-        )
-        tasks = dict(conn.execute("SELECT id, session_id FROM workflow_tasks"))
-    assert sessions == {("s1", "e1", None, "idle"), ("s2", "e2", None, "done")}
-    assert tasks == {"k1": "s1", "k2": "s1", "k3": None}
