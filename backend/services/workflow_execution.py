@@ -8,7 +8,9 @@ and agent-resolution business rules.
 
 import builtins
 import logging
+import uuid
 from collections.abc import Collection, Sequence
+from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.sessions import BaseSessionService, Session
@@ -495,7 +497,10 @@ class WorkflowExecutionService:
         turn began and the cursor points at the turn's first streamed event: a
         viewer joining mid-turn gets the turn from the stream, once, instead of
         half of it twice. The cursor is read before the history, so an event
-        written in between is streamed rather than lost.
+        written in between is streamed rather than lost. A turn's own message
+        is only in the history once the turn ends, so while one is queued or
+        running its message is appended (under a fresh id) and ``running``
+        is set.
 
         Args:
             execution_id: Identifier of the WorkflowExecution.
@@ -518,20 +523,33 @@ class WorkflowExecutionService:
         row = await self._session_of(execution_id, session_id)
         cursor = await self._stream.cursor_before_run(session_id, row.active_run_id)
         session = await self._adk_session(execution, session_id)
-        if session is None:
-            return SessionHistory(messages=[], stream_cursor=cursor)
-        end = row.run_event_index if row.active_run_id is not None else None
-        # A branch's leading events are its parent's history, copied when it
-        # forked; its own chat starts after them.
-        events = session.events[row.fork_event_count : end]
-        meta = await self._meta.meta_for_session(
-            MessageScope.workflow_session(execution_id)
-        )
-        return SessionHistory(
-            messages=session_attribution.merge_message_meta(
+        messages: list[dict[str, Any]] = []
+        if session is not None:
+            end = row.run_event_index if row.active_run_id is not None else None
+            # A branch's leading events are its parent's history, copied when it
+            # forked; its own chat starts after them.
+            events = session.events[row.fork_event_count : end]
+            meta = await self._meta.meta_for_session(
+                MessageScope.workflow_session(execution_id)
+            )
+            messages = session_attribution.merge_message_meta(
                 adk_events_to_messages(events), meta
-            ),
-            stream_cursor=cursor,
+            )
+        # The queued or running turn's message reaches the history only once
+        # the turn ends, and the stream never carries it: show it now.
+        pending = row.pending_input
+        if pending is not None and pending.get("text"):
+            messages.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "role": "user",
+                    "content": pending["text"],
+                    "senderUserId": pending.get("sender_id"),
+                    "workflowTaskId": None,
+                }
+            )
+        return SessionHistory(
+            messages=messages, stream_cursor=cursor, running=pending is not None
         )
 
     async def authorize_stream(

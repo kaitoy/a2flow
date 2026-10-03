@@ -45,7 +45,13 @@ class ExecutionSessionRepository(Protocol):
     ) -> None: ...
 
     async def mark_run(
-        self, session_id: str, *, run_id: str | None, event_index: int, user_id: str
+        self,
+        session_id: str,
+        *,
+        run_id: str | None,
+        event_index: int,
+        user_id: str,
+        clear_input: bool = False,
     ) -> None: ...
 
     async def create_branch(
@@ -236,7 +242,13 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
         )
 
     async def mark_run(
-        self, session_id: str, *, run_id: str | None, event_index: int, user_id: str
+        self,
+        session_id: str,
+        *,
+        run_id: str | None,
+        event_index: int,
+        user_id: str,
+        clear_input: bool = False,
     ) -> None:
         """Record which turn is under way and where its events start in the history.
 
@@ -245,6 +257,8 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             run_id: The turn's AG-UI run id, or ``None`` once it has ended.
             event_index: How many ADK events the session held when it started.
             user_id: Recorded on the row's ``updated_by``.
+            clear_input: Whether to drop the queued input too -- once a turn
+                has ended its input is in the history.
         """
         await self._update(
             session_id,
@@ -254,7 +268,7 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
                 "updated_by": user_id,
             },
             None,
-            False,
+            clear_input,
         )
 
     async def _update(

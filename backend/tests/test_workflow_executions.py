@@ -13,6 +13,7 @@ from infrastructure.agent import (
 )
 from models.user import SYSTEM_USER_ID
 from models.workflow_execution import WorkflowExecution
+from services.session_inputs import EXECUTION_KICKOFF_PROMPT
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import (
@@ -139,7 +140,7 @@ async def test_execute_assigns_the_root_tasks_to_the_main_session(
 # ---------- GET /workflow-executions/{id}/sessions/{sid}/messages ----------
 
 
-async def test_workflow_execution_messages_empty_before_first_run(
+async def test_workflow_execution_messages_show_the_queued_kickoff_before_first_run(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await _create_skill(workflow_client)
@@ -147,7 +148,10 @@ async def test_workflow_execution_messages_empty_before_first_run(
     response = await workflow_client.get(
         f"/api/v1/workflow-executions/{execution['id']}/sessions/{execution['sessionId']}/messages"
     )
-    assert assert_ok(response) == {"messages": [], "streamCursor": 0}
+    history = assert_ok(response)
+    assert history["streamCursor"] == 0
+    assert history["running"] is True
+    assert [m["content"] for m in history["messages"]] == [EXECUTION_KICKOFF_PROMPT]
 
 
 async def test_workflow_execution_messages_shared_across_users(
@@ -182,7 +186,11 @@ async def test_workflow_execution_messages_shared_across_users(
         headers={"X-User-Id": "alice"},
     )
     messages = assert_ok(response)["messages"]
-    assert [m["content"] for m in messages] == ["hello from owner"]
+    # The kickoff is still queued, so it follows the seeded history.
+    assert [m["content"] for m in messages] == [
+        "hello from owner",
+        EXECUTION_KICKOFF_PROMPT,
+    ]
     # A message with no attribution row (legacy history) reports no sender, so
     # the UI can fall back to the execution initiator.
     assert messages[0]["senderUserId"] is None

@@ -166,6 +166,9 @@ export function useExecutionSessionChat(
             ? resumeSession({ sessionId, messages: history.messages })
             : syncPolledMessages({ sessionId, messages: history.messages })
         );
+        // Both reducers clear isRunning; a queued or running turn shows the
+        // agent working now rather than once its first event streams in.
+        if (history.running) dispatch(startRun());
         void applyAttribution(history).catch((err: unknown) => {
           console.error("failed to load session attribution", err);
         });

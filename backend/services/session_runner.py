@@ -250,8 +250,15 @@ class SessionRunner:
         finally:
             with anyio.CancelScope(shield=True):
                 await writer.flush()
+                # Clearing the input with the run id keeps a history read in
+                # between from showing the turn's message twice: once from the
+                # history, once as still pending.
                 await sessions.mark_run(
-                    session_id, run_id=None, event_index=0, user_id=initiator
+                    session_id,
+                    run_id=None,
+                    event_index=0,
+                    user_id=initiator,
+                    clear_input=True,
                 )
                 if session_input.sender_id is not None:
                     await service.record_new_senders(

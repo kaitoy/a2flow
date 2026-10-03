@@ -19,9 +19,9 @@ vi.mock("@/lib/api", () => ({
   SUPPRESS_FORBIDDEN_TOAST: { suppressForbiddenToast: true },
 }));
 
-/** A history read returning no messages and the given stream cursor. */
-function history(streamCursor: number): api.StreamedSessionHistory {
-  return { messages: [], senders: new Map(), tasks: new Map(), streamCursor };
+/** A history read returning no messages, the given stream cursor, and no turn under way. */
+function history(streamCursor: number, running = false): api.StreamedSessionHistory {
+  return { messages: [], senders: new Map(), tasks: new Map(), streamCursor, running };
 }
 
 /** A stream agent whose `runAgent` stays open until the test settles it. */
@@ -68,6 +68,12 @@ beforeEach(() => {
 });
 
 describe("useExecutionSessionChat", () => {
+  it("shows the agent working as soon as the history says a turn is queued or running", async () => {
+    vi.mocked(api.getExecutionSessionHistory).mockResolvedValue(history(5, true));
+    const { result } = mount();
+    await waitFor(() => expect(result.current.isRunning).toBe(true));
+  });
+
   it("reads the history, then subscribes to the stream from its cursor", async () => {
     mount();
     await waitFor(() =>

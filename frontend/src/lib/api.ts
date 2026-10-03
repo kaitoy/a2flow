@@ -1543,6 +1543,11 @@ export async function getWorkflowExecution(
 export interface StreamedSessionHistory extends SessionHistory {
   /** Id of the last streamed event the history covers; subscribe after it. */
   streamCursor: number;
+  /**
+   * Whether a turn is queued or under way. Its message is already the last of
+   * `messages`, though the history itself only gains it when the turn ends.
+   */
+  running: boolean;
 }
 
 /**
@@ -1558,7 +1563,8 @@ export interface StreamedSessionHistory extends SessionHistory {
  * `tasks` names, for each message, the WorkflowTask that was in progress when it
  * was produced; messages produced outside any task are absent. While a turn is
  * under way the history stops where it began, and {@link createSessionStreamAgent}
- * replays the turn from `streamCursor`.
+ * replays the turn from `streamCursor`. While one is queued or under way,
+ * `running` is set and the turn's message is appended under a fresh id.
  */
 export async function getExecutionSessionHistory(
   executionId: string,
@@ -1570,12 +1576,13 @@ export async function getExecutionSessionHistory(
       path: { execution_id: executionId, session_id: sessionId },
     }),
     options
-  )) as { messages: SessionMessageRecord[]; streamCursor: number };
+  )) as { messages: SessionMessageRecord[]; streamCursor: number; running?: boolean };
   return {
     messages: data.messages as unknown as Message[],
     senders: sendersFrom(data.messages),
     tasks: tasksFrom(data.messages),
     streamCursor: data.streamCursor,
+    running: data.running ?? false,
   };
 }
 

@@ -572,6 +572,31 @@ async def test_the_history_stops_where_a_running_turn_began(
     assert [m.get("content") for m in history["messages"]] == ["before"]
 
 
+async def test_the_history_shows_a_queued_turn_and_its_message_once(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+    real_session_service: InMemorySessionService,
+) -> None:
+    """A viewer sees the kickoff and that the agent is busy before the turn runs."""
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+
+    queued = assert_ok(await client.get(f"{_base(execution)}/messages"))
+    assert queued["running"] is True
+    assert [(m["role"], m["content"]) for m in queued["messages"]] == [
+        ("user", EXECUTION_KICKOFF_PROMPT)
+    ]
+    assert queued["messages"][0]["senderUserId"] == execution["initiatorId"]
+
+    registry.get.return_value = AppendingAgent(
+        real_session_service, execution, [_user_event(EXECUTION_KICKOFF_PROMPT)]
+    )
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    done = assert_ok(await client.get(f"{_base(execution)}/messages"))
+    assert done["running"] is False
+    assert [m.get("content") for m in done["messages"]] == [EXECUTION_KICKOFF_PROMPT]
+
+
 async def test_input_is_refused_while_the_session_is_busy_or_awaiting_approval(
     runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
 ) -> None:

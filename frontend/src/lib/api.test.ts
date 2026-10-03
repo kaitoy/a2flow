@@ -98,13 +98,14 @@ describe("getExecutionSessionHistory", () => {
         `${BASE}/api/v1/workflow-executions/:executionId/sessions/:sessionId/messages`,
         ({ request }) => {
           calledUrl = request.url;
-          return envelope({ messages: [], streamCursor: 7 });
+          return envelope({ messages: [], streamCursor: 7, running: true });
         }
       )
     );
     const result = await getExecutionSessionHistory("execution-1", "sess-1");
     expect(Array.isArray(result.messages)).toBe(true);
     expect(result.streamCursor).toBe(7);
+    expect(result.running).toBe(true);
     expect(calledUrl).toContain("/workflow-executions/execution-1/sessions/sess-1/messages");
   });
 

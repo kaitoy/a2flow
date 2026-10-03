@@ -119,11 +119,14 @@ class SessionHistory(SQLModel):
             attribution merged in.
         stream_cursor: The id of the last streamed event the history already
             covers; a viewer subscribes to the session's stream after it.
+        running: Whether a turn is queued or under way, so a viewer can show
+            the agent working before the turn's first streamed event.
     """
 
     model_config = _alias_config
     messages: list[dict[str, Any]]
     stream_cursor: int
+    running: bool = False
 
 
 class A2uiActionInput(SQLModel):
