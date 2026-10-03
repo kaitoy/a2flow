@@ -364,7 +364,7 @@ async def test_metrics_reports_decisions_and_failures(
     client, eng = metrics_env
     workflow_id = await _seed_workflow(eng, name="Invoices")
     now = datetime.now(UTC)
-    # Clamped to today's UTC midnight (METRICS_TIMEZONE defaults to UTC, see
+    # Clamped to today's UTC midnight (TIMEZONE defaults to UTC, see
     # MetricsService._day_start): a plain `now - timedelta(...)` would fall on
     # the previous day, and drop out of the "today" gauges below, whenever the
     # suite runs within a couple of hours of UTC midnight.

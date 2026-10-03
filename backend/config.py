@@ -63,11 +63,11 @@ _DEFAULT_SESSION_FILE_MAX_BYTES = 20 * 1024 * 1024
 #: without a ceiling a long-running session could grow without bound.
 _DEFAULT_SESSION_FILES_MAX_TOTAL_BYTES = 200 * 1024 * 1024
 
-#: Timezone the operations metrics use to decide where a calendar day starts,
-#: used when reporting "today" counts and when bucketing the lead-time trend.
-#: UTC is the safe default; an operations team reading these numbers against
-#: their own working day will want their local zone instead.
-_DEFAULT_METRICS_TIMEZONE = "UTC"
+#: The deployment's local timezone. The operations metrics use it to decide
+#: where a calendar day starts ("today" counts, the lead-time trend's daily
+#: buckets), and the workflow agent reads a time written without an offset in
+#: it. UTC is the safe default; a team working in one zone will want theirs.
+_DEFAULT_TIMEZONE = "UTC"
 
 #: Rate, in messages per second, at which the email queue worker hands messages
 #: to the SMTP relay. Five a second is comfortably below what a typical relay
@@ -228,8 +228,9 @@ class Settings(BaseSettings):
             attribute.
         session_idle_timeout_seconds: Sliding idle timeout, in seconds, for a
             login session.
-        metrics_timezone: IANA timezone name deciding where a calendar day
-            starts for the operations metrics.
+        timezone: IANA name of the deployment's local timezone: where a
+            calendar day starts for the operations metrics, and the zone a
+            workflow task's time requirement without an offset is read in.
         app_base_url: Base URL at which users reach this deployment in a
             browser, used to build the deep links embedded in outgoing
             notification email. Applied to the ``system_settings`` row on
@@ -345,7 +346,7 @@ class Settings(BaseSettings):
     session_cookie_secure: bool = False
     session_idle_timeout_seconds: int = _DEFAULT_IDLE_TIMEOUT_SECONDS
 
-    metrics_timezone: str = _DEFAULT_METRICS_TIMEZONE
+    timezone: str = _DEFAULT_TIMEZONE
 
     app_base_url: str | None = None
 
@@ -391,22 +392,21 @@ class Settings(BaseSettings):
         except (TypeError, ValueError):
             return _DEFAULT_IDLE_TIMEOUT_SECONDS
 
-    @field_validator("metrics_timezone", mode="before")
+    @field_validator("timezone", mode="before")
     @classmethod
-    def _fallback_metrics_timezone(cls, value: Any) -> Any:
+    def _fallback_timezone(cls, value: Any) -> Any:
         """Fall back to UTC on an unset or unrecognized IANA timezone name.
 
         Follows :meth:`_fallback_idle_timeout` in preferring a working default
-        over a hard validation failure: a typo in this setting should skew the
-        day boundary of a dashboard, not stop the whole application from
-        starting.
+        over a hard validation failure: a typo in this setting should skew
+        local times, not stop the whole application from starting.
         """
         if not isinstance(value, str) or not value:
-            return _DEFAULT_METRICS_TIMEZONE
+            return _DEFAULT_TIMEZONE
         try:
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError):
-            return _DEFAULT_METRICS_TIMEZONE
+            return _DEFAULT_TIMEZONE
         return value
 
     @field_validator(

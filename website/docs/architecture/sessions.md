@@ -23,7 +23,7 @@ An approval addressed to a group brings in every member holding `approver`, so t
 
 The backend bridges the AG-UI protocol to the agent: it translates events both ways, keeps the conversation in step, and streams events back to the browser as they arrive, so text appears incrementally rather than in one block at the end. Conversation state is kept under the chat's id, so reopening it continues where it left off.
 
-A workflow session does not need anyone's chat to be open: every one of its turns is run by A2Flow itself. That is the run's **kickoff**, as soon as the run is created; the turn that **resumes** it once an [approval](../guides/approvals.md) is decided; and the turn that answers whatever a participant sends. The chat only hands A2Flow the message and shows the turn as it runs, to everyone watching, on whichever server it runs. (The design session is the exception: its turns are still run from the chat of the Developer who sent the message.)
+A workflow session does not need anyone's chat to be open: every one of its turns is run by A2Flow itself. That is the run's **kickoff**, as soon as the run is created; the turn that **resumes** it once an [approval](../guides/approvals.md) is decided; the turn that resumes it once the time a task [had to wait for](../guides/workflows.md#how-the-agent-works-through-the-tasks) has come; and the turn that answers whatever a participant sends. The chat only hands A2Flow the message and shows the turn as it runs, to everyone watching, on whichever server it runs. (The design session is the exception: its turns are still run from the chat of the Developer who sent the message.)
 
 ## Interactive surfaces
 

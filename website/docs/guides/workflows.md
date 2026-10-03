@@ -145,6 +145,8 @@ The execution agent lists the run's tasks, picks the next runnable one — a `pe
 
 You can watch the statuses update live in the read-only **Workflow Tasks** view of the run, as a Table or a Graph. The run's task list is fixed — it is the one frozen when the workflow was published — so the agent only moves each task through its statuses, never adds or removes one.
 
+**Tasks that must wait for a time.** Write the requirement into the task's description in plain words — "run after 9:00 tomorrow", "not before the 1st of the month". When the agent reaches that task before the time has come, it leaves the task `pending`, says in the chat when the run will continue, and stops. Its session shows **Scheduled** until then, and at that time A2Flow resumes it on its own — nobody needs to have the chat open. A time written without a time zone is read in the deployment's local time zone. Branches worked in other sessions keep moving while one waits, and a message sent to the waiting session resumes it straight away.
+
 ## MCP tools for tasks {#mcp-tools-for-tasks}
 
 Tasks can use tools from the servers registered under [MCP Servers](./mcp-servers.md). Tools are bound at design time and enforced at execution time.

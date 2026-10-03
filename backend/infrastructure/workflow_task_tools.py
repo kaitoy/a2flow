@@ -15,6 +15,10 @@ designated approver of the run, a status change is accepted only for a task an
 approval addressed to them governs, mirroring
 :meth:`services.workflow_task.WorkflowTaskService._assert_status_change_allowed`.
 
+:func:`wait_until` lets the agent honor a task's time requirement: it records
+when the calling session is to resume, and settling the turn leaves the session
+``scheduled`` until then (:mod:`services.session_settle`).
+
 Two facts shape the implementation:
 
 * The tools run *during* the AG-UI SSE stream, outside FastAPI's per-request
@@ -39,11 +43,14 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from zoneinfo import ZoneInfo
 
 from google.adk.tools.tool_context import ToolContext
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure import database
 from infrastructure.approval_scope import (
     active_approval_by_task,
@@ -811,3 +818,53 @@ async def update_workflow_task(
             return _task_to_dict(task, calling)
     except NoTenantSessionError:
         return {"error": _NO_SESSION}
+
+
+async def wait_until(resume_at: str, tool_context: ToolContext) -> dict[str, Any]:
+    """Pause this session until ``resume_at``; the server resumes it then.
+
+    Call this when a task must not run before a certain time and that time has
+    not come yet: leave the task ``pending``, call this, say when you will
+    continue, and end your turn. The session shows as ``scheduled`` until then,
+    and the server starts a new turn at that time. A message someone sends in
+    the meantime resumes it early.
+
+    Args:
+        resume_at: When to resume, as an ISO 8601 date-time such as
+            ``2026-10-04T09:00:00+09:00``. Without an offset it is read in the
+            local time zone shown under "Current time" in your context.
+        tool_context: Injected by ADK; identifies the current session. Not shown
+            to the model.
+
+    Returns:
+        ``{"resume_at", "message"}`` once scheduled, or ``{"error": <message>}``
+        when the time cannot be read, has already passed, or the session cannot
+        be resolved.
+    """
+    try:
+        at = datetime.fromisoformat(resume_at)
+    except ValueError:
+        return {"error": f"cannot read {resume_at!r} as an ISO 8601 date-time"}
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=ZoneInfo(get_settings().timezone))
+    at = at.astimezone(UTC)
+    now = datetime.now(UTC)
+    if at <= now:
+        return {
+            "error": "that time has already passed; continue the task now",
+            "now": now.isoformat(timespec="seconds"),
+        }
+    calling = _calling_session_id(tool_context)
+    try:
+        async with _repos(tool_context) as s:
+            if calling is None:
+                return {"error": _NO_SESSION}
+            await s.session_repo.set_resume_at(
+                calling, at, user_id=_user_id(tool_context)
+            )
+    except NoTenantSessionError:
+        return {"error": _NO_SESSION}
+    return {
+        "resume_at": at.isoformat(timespec="seconds"),
+        "message": "End your turn now; the server resumes this session at that time.",
+    }

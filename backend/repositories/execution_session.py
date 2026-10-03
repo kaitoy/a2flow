@@ -7,6 +7,7 @@ and branch sessions when the task graph forks.
 
 import builtins
 import uuid
+from datetime import datetime
 from typing import Any, Protocol
 
 from sqlalchemy.exc import IntegrityError
@@ -62,6 +63,10 @@ class ExecutionSessionRepository(Protocol):
 
     async def mark_forked(
         self, session_id: str, *, event_count: int, user_id: str
+    ) -> None: ...
+
+    async def set_resume_at(
+        self, session_id: str, at: datetime, *, user_id: str
     ) -> None: ...
 
 
@@ -159,6 +164,8 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             .values(
                 status=ExecutionSessionStatus.queued,
                 pending_input=pending_input,
+                # Input wakes a ``scheduled`` session early: it no longer waits.
+                resume_at=None,
                 updated_by=user_id,
             )
         )
@@ -187,8 +194,13 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             clear_input: Whether the turn consumed its queued input.
             summary: What a finishing branch reported; left unchanged when
                 ``None``.
+
+        Any status but ``scheduled`` also clears ``resume_at``: only a
+        ``scheduled`` session waits on a time.
         """
         values: dict[str, Any] = {"status": status, "updated_by": user_id}
+        if status is not ExecutionSessionStatus.scheduled:
+            values["resume_at"] = None
         if summary is not None:
             values["summary"] = summary
         await self._update(session_id, values, waiting_on, clear_input)
@@ -239,6 +251,20 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             {"fork_event_count": event_count, "updated_by": user_id},
             None,
             False,
+        )
+
+    async def set_resume_at(
+        self, session_id: str, at: datetime, *, user_id: str
+    ) -> None:
+        """Record when a session is to run again; settling its turn schedules it.
+
+        Args:
+            session_id: The session whose agent called ``wait_until``.
+            at: When it is due again, timezone-aware.
+            user_id: Recorded on the row's ``updated_by``.
+        """
+        await self._update(
+            session_id, {"resume_at": at, "updated_by": user_id}, None, False
         )
 
     async def mark_run(

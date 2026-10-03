@@ -69,7 +69,7 @@ class LeadTimeBucket(BaseModel):
     """One day's worth of finished runs on the lead-time trend line.
 
     Buckets are keyed by the calendar day the run *finished*, in the timezone
-    configured by ``METRICS_TIMEZONE``. Days with no finished run are still
+    configured by ``TIMEZONE``. Days with no finished run are still
     present, with ``count`` zero and ``avg_lead_time_seconds`` ``None``, so a
     client can plot the series without filling gaps itself.
     """
@@ -77,7 +77,7 @@ class LeadTimeBucket(BaseModel):
     model_config = _alias_config
 
     bucket_start: datetime
-    """Midnight at the start of the day, in the configured metrics timezone."""
+    """Midnight at the start of the day, in the configured ``TIMEZONE``."""
 
     count: int
     """Runs that finished during the day."""

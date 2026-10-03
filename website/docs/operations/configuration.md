@@ -14,6 +14,7 @@ Every setting below is an environment variable. The backend reads them from `bac
 | `HOST` | `0.0.0.0` | Address the backend binds to |
 | `PORT` | `8000` | Port the backend binds to |
 | `RELOAD` | `false` | uvicorn autoreload for local development. Only read when the backend is started as `python -m backend.main`; the Docker image's own start command is unaffected either way |
+| `TIMEZONE` | `UTC` | IANA name of the deployment's local time zone. It decides where a calendar day starts for the [operations metrics](./metrics.md) — the "today" counts and the daily buckets of the lead-time trend — and is the zone the workflow agent reads a task's time requirement in when the requirement names no time zone. An unrecognized name falls back to `UTC` rather than failing startup, so a typo skews local times instead of stopping the app |
 
 ## Frontend settings
 
@@ -178,14 +179,6 @@ These are the knobs for the queue that drains into the relay — see [The delive
 | `EMAIL_QUEUE_BATCH_SIZE` / `EMAIL_QUEUE_POLL_INTERVAL_SECONDS` | `20` / `5.0` | How many messages one drain pass claims, and how long the worker sleeps when the queue is empty. The poll interval is the floor on delivery latency for a notification produced while the worker is asleep |
 | `EMAIL_MAX_ATTEMPTS` | `9` | Delivery attempts before a message becomes a dead letter. The backoff runs 15s, 30s, 1m, 2m and so on, capped at an hour, so the default rides out roughly an hour of relay downtime. A failure the relay reports as permanent is written off on the first attempt regardless |
 | `EMAIL_SENT_RETENTION_DAYS` | `30` | How long delivered messages are kept before the worker purges them. They are a record of what went out, not queue state. Dead letters are never purged |
-
-## Operations metrics
-
-| Variable | Default | What it does |
-|---|---|---|
-| `METRICS_TIMEZONE` | `UTC` | IANA timezone name deciding where a calendar day starts for the [operations metrics](./metrics.md) — the "today" counts and the daily buckets of the lead-time trend |
-
-An unrecognized name falls back to `UTC` rather than failing startup, so a typo skews a dashboard's day boundary instead of stopping the app.
 
 ## Agent
 

@@ -40,7 +40,7 @@ sidebar_position: 6
 | `a2flow_email_queue_depth{status}` | [送信キュー](../guides/notifications.md#the-delivery-queue)にあるメールを `pending` / `sending` / `sent` / `failed` 別に集計 |
 | `a2flow_email_queue_oldest_pending_age_seconds` | 未配信のメールのうち最も長く待っているものの待ち時間。リレーに到達できないと増えます |
 
-`?thresholdHours=` で滞留承認の区切りを上書きできます。「今日」がどこで始まるかは `METRICS_TIMEZONE`(IANA の名前。既定は `UTC`)が決めます。認識できない名前は起動を止めず UTC にフォールバックします。
+`?thresholdHours=` で滞留承認の区切りを上書きできます。「今日」がどこで始まるかは `TIMEZONE`(IANA の名前。既定は `UTC`。[サーバーの設定](./configuration.md#server-settings)を参照)が決めます。認識できない名前は起動を止めず UTC にフォールバックします。
 
 このエンドポイントは通常のセッションクッキーで保護されているので、スクレイプの設定にもクッキーが要ります。`GET` は安全なメソッドなので CSRF トークンは不要です。
 

@@ -124,7 +124,7 @@ async def workflow_execution_lead_time_trend(
 ) -> ApiResponse[list[LeadTimeBucket]]:
     """Return the daily average lead time of runs finishing in a time window.
 
-    One bucket per calendar day in the configured ``METRICS_TIMEZONE``,
+    One bucket per calendar day in the configured ``TIMEZONE``,
     including days on which nothing finished, so the series can be plotted as
     is.
     """

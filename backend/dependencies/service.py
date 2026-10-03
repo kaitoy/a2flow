@@ -209,7 +209,7 @@ def get_metrics_service(
     repo: MetricsRepositoryDep, emails: OutboundEmailRepositoryDep
 ) -> MetricsService:
     """Create a MetricsService, resolving the day-boundary timezone from settings."""
-    return MetricsService(repo, emails, timezone=get_settings().metrics_timezone)
+    return MetricsService(repo, emails, timezone=get_settings().timezone)
 
 
 MetricsServiceDep = Annotated[MetricsService, Depends(get_metrics_service)]

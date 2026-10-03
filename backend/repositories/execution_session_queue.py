@@ -2,7 +2,8 @@
 
 The session runner (:mod:`services.session_runner`) is one per process and
 serves every tenant: it runs the turns nobody's browser is driving -- a run's
-kickoff, its resumption after an approval is decided. It starts from nothing
+kickoff, its resumption after an approval is decided or once a time it
+waited for has come. It starts from nothing
 but "which sessions have work?", so the question has to be asked across
 tenants; each row it gets back carries its ``tenant_id``, and everything the
 runner does *for* that session is built scoped to that tenant.
@@ -10,7 +11,9 @@ runner does *for* that session is built scoped to that tenant.
 This is the one query here and it returns ids only, never a session's content.
 """
 
-from sqlmodel import col, select
+from datetime import UTC, datetime
+
+from sqlmodel import and_, col, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
@@ -26,7 +29,7 @@ async def due_sessions(db: AsyncSession) -> list[tuple[str, str]]:
     That is a ``queued`` session, and a ``running`` one: a turn in progress
     holds the session's run lock, so the runner skips it, while a ``running``
     row whose lock is free belongs to a process that died mid-turn and is
-    resumed.
+    resumed. A ``scheduled`` session is due once its ``resume_at`` has come.
 
     Args:
         db: The database session to query.
@@ -37,8 +40,14 @@ async def due_sessions(db: AsyncSession) -> list[tuple[str, str]]:
     stmt = (
         select(ExecutionSession.id, ExecutionSession.tenant_id)
         .where(
-            col(ExecutionSession.status).in_(
-                (ExecutionSessionStatus.queued, ExecutionSessionStatus.running)
+            or_(
+                col(ExecutionSession.status).in_(
+                    (ExecutionSessionStatus.queued, ExecutionSessionStatus.running)
+                ),
+                and_(
+                    col(ExecutionSession.status) == ExecutionSessionStatus.scheduled,
+                    col(ExecutionSession.resume_at) <= datetime.now(UTC),
+                ),
             )
         )
         .order_by(col(ExecutionSession.updated_at))

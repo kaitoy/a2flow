@@ -65,7 +65,7 @@ The two are linked both ways:
 
 ### Live updates
 
-Every participant watching the run sees each reply as it is written — whoever's message started it, and also the turns A2Flow runs on its own, such as the kickoff and the resumption after an approval. The view follows new messages to the bottom only when you are already scrolled near the bottom.
+Every participant watching the run sees each reply as it is written — whoever's message started it, and also the turns A2Flow runs on its own, such as the kickoff, the resumption after an approval, and the resumption of a session that was waiting for a time. The view follows new messages to the bottom only when you are already scrolled near the bottom.
 
 A message you send waits for the agent: while it is still working on a turn, the message is refused and you can send it again once the reply has finished. While the run is waiting for an approval, the chat takes no messages at all — the approval's decision is what moves it on.
 
@@ -86,6 +86,7 @@ When the run's task graph branches, A2Flow may split the run across several sess
 | Running | The agent is working |
 | Waiting for input | An input form is waiting for an answer |
 | Waiting for approval | An approval this session requested is undecided |
+| Scheduled until … | A task must wait for a time; the session resumes on its own at the time shown. A message sent to it resumes it early |
 | Idle | Nothing to do right now; the session waits for its next task |
 | Done | The session finished its work. A finished branch leaves a summary for the main session |
 | Error | The last turn failed |

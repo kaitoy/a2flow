@@ -16,13 +16,13 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import model_validator
+from pydantic import field_serializer, model_validator
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Column, ForeignKeyConstraint, Index, Text
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity, JSONColumn, TZDateTime
+from models.base import BaseEntity, JSONColumn, TZDateTime, iso_z_or_none
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -42,6 +42,9 @@ class ExecutionSessionStatus(StrEnum):
 
     waiting_for_approval = "waiting_for_approval"
     """Paused on an approval (``render_approval``) someone has to decide."""
+
+    scheduled = "scheduled"
+    """Paused until ``resume_at``, the time its agent chose with ``wait_until``."""
 
     idle = "idle"
     """Alive, with nothing to run and nothing pending."""
@@ -109,6 +112,15 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
     #: What a finished branch session reported last -- handed to the main
     #: session when it picks up the join the branch fed.
     summary: str | None = Field(default=None, sa_type=Text)
+    #: When a ``scheduled`` session is due to run again. Set by the agent's
+    #: ``wait_until`` tool during a turn, kept while the session is
+    #: ``scheduled``, and cleared by any other state or by queued input.
+    resume_at: datetime | None = Field(default=None, sa_type=TZDateTime)
+
+    @field_serializer("resume_at", when_used="json")
+    def _serialize_resume_at(self, dt: datetime | None) -> str | None:
+        """Serialize ``resume_at`` as ISO-8601 with a ``Z`` suffix, or ``None``."""
+        return iso_z_or_none(dt)
 
 
 class SessionHistory(SQLModel):

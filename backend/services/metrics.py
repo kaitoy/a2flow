@@ -15,7 +15,7 @@ its own.
 Two conventions run through the whole module. Durations are whole-second
 ``float``s, never interval objects, so no client has to parse a format. And
 "today" and the daily buckets are resolved in the timezone named by
-``METRICS_TIMEZONE`` rather than UTC, because a completion count is read against
+``TIMEZONE`` rather than UTC, because a completion count is read against
 somebody's working day.
 """
 

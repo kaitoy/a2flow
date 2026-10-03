@@ -9,10 +9,22 @@ const STATUS_LABEL: Record<string, string> = {
   running: "Running",
   waiting_for_input: "Waiting for input",
   waiting_for_approval: "Waiting for approval",
+  scheduled: "Scheduled",
   idle: "Idle",
   done: "Done",
   error: "Error",
 };
+
+/** A session's status as its tab reads it, with the resume time of a scheduled one. */
+function statusLabel(session: ExecutionSession): string {
+  const label = STATUS_LABEL[session.status ?? ""] ?? session.status ?? "";
+  if (session.status !== "scheduled" || !session.resumeAt) return label;
+  const at = new Date(session.resumeAt).toLocaleString(undefined, {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  return `${label} until ${at}`;
+}
 
 /** Props for {@link ExecutionSessionTabs}. */
 export interface ExecutionSessionTabsProps {
@@ -45,7 +57,7 @@ export function ExecutionSessionTabs({
   let branch = 0;
   const options = sessions.map((session) => {
     const name = session.id === mainSessionId ? "Main" : `Branch ${++branch}`;
-    const status = STATUS_LABEL[session.status ?? ""] ?? session.status ?? "";
+    const status = statusLabel(session);
     return { value: session.id ?? "", label: status ? `${name} · ${status}` : name };
   });
   return (

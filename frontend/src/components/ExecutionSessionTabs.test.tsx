@@ -49,6 +49,25 @@ describe("ExecutionSessionTabs", () => {
     );
   });
 
+  it("shows when a scheduled session resumes", () => {
+    const resumeAt = "2026-10-04T00:00:00Z";
+    render(
+      <ExecutionSessionTabs
+        sessions={[session("main", "idle"), { ...session("b1", "scheduled", "main"), resumeAt }]}
+        mainSessionId="main"
+        value="main"
+        onChange={() => {}}
+      />
+    );
+    const at = new Date(resumeAt).toLocaleString(undefined, {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+    expect(
+      screen.getByRole("tab", { name: `Branch 1 · Scheduled until ${at}` })
+    ).toBeInTheDocument();
+  });
+
   it("reports the session the viewer switches to", () => {
     const onChange = vi.fn();
     render(

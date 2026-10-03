@@ -1,8 +1,9 @@
 """The server side of a workflow session: runs the turns no browser is driving.
 
-A run no longer depends on someone keeping its chat open. Its kickoff, and its
+A run no longer depends on someone keeping its chat open. Its kickoff, its
 resumption once an approval is decided -- from the chat or from the approvals
-list -- are queued on the session (:mod:`services.session_queue`) and run here,
+list -- and its resumption once a time its agent waited for has come
+(``scheduled``) are queued on the session (:mod:`services.session_queue`) and run here,
 in the API process, by one dispatcher per process.
 
 Each turn runs under the session's run lock -- the same cross-process lock a
@@ -20,6 +21,7 @@ import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import anyio
 from ag_ui.core import BaseEvent, Context, EventType, RunAgentInput, RunErrorEvent
@@ -157,6 +159,7 @@ class SessionRunner:
         if row is None or row.status not in (
             ExecutionSessionStatus.queued,
             ExecutionSessionStatus.running,
+            ExecutionSessionStatus.scheduled,
         ):
             return
         session_input = _input_of(row)
@@ -304,7 +307,7 @@ class SessionRunner:
             max_file_bytes=settings.session_file_max_bytes,
             max_total_bytes=settings.session_files_max_total_bytes,
         ).list(execution.id)
-        context: list[Context] = []
+        context = [Context(description="Current time", value=current_time())]
         if execution.description:
             context.append(
                 Context(description="Workflow description", value=execution.description)
@@ -417,13 +420,42 @@ class SessionRunner:
         )
 
 
+def current_time() -> str:
+    """Describe the current time for the agent, in UTC and the deployment's zone.
+
+    The agent needs it to turn a task's time requirement ("not before 9:00
+    tomorrow") into the absolute time it passes to ``wait_until``. The
+    deployment's zone is ``TIMEZONE``, which ``wait_until`` also reads
+    a time without an offset in.
+    """
+    now = datetime.now(UTC)
+    zone = get_settings().timezone
+    local = now.astimezone(ZoneInfo(zone))
+    return (
+        f"{now.isoformat(timespec='seconds')} (UTC); "
+        f"{local.isoformat(timespec='seconds')} ({zone}, the local time zone)"
+    )
+
+
 def _input_of(row: ExecutionSession) -> SessionInput:
     """Return the input a due session's turn runs on.
 
     A ``running`` row is only due when the process running it died -- a live
     turn holds the lock -- so it is resumed with the recovery prompt, whatever
-    input it was given.
+    input it was given. A ``scheduled`` row is due because its ``resume_at``
+    has come, and is told so.
     """
+    if row.status is ExecutionSessionStatus.scheduled:
+        # SQLite hands timestamps back naive; they are stored in UTC.
+        resume_at = row.resume_at or datetime.now(UTC)
+        at = resume_at.replace(tzinfo=resume_at.tzinfo or UTC).isoformat(
+            timespec="seconds"
+        )
+        return SessionInput(
+            kind="scheduled",
+            text=f"It is now past {at}, the time you chose to wait until with "
+            "wait_until. Continue the workflow from where you paused.",
+        )
     if row.status is ExecutionSessionStatus.running or row.pending_input is None:
         return _RECOVERY
     return SessionInput.model_validate(row.pending_input)

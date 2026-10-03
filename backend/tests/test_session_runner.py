@@ -9,8 +9,11 @@ these tests pin down what the runner sends and how it reads what comes back.
 
 import json
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
 from ag_ui.core import (
@@ -30,11 +33,14 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from dependencies.context import APP_NAME
 from infrastructure.agent import tenant_app_name
 from infrastructure.locks import advisory_lock, agent_run_key
+from infrastructure.workflow_task_tools import wait_until
 from models.approval import Approval, ApprovalStatus
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from repositories.execution_session_queue import due_sessions
 from services.session_inputs import EXECUTION_KICKOFF_PROMPT, RECOVERY_PROMPT
 from services.session_runner import SessionRunner
 from tests._envelope import assert_ok
@@ -784,3 +790,122 @@ async def test_a_branch_point_forks_a_session_and_the_join_returns_to_main(
     reports = {c.description: c.value for c in sent.context}
     assert "C went fine: 3 rows." in reports["Finished branch reports"]
     assert (await _session(engine, main)).status is ExecutionSessionStatus.done
+
+
+# ---------- waiting until a time ----------
+
+
+class WaitingAgent(ScriptedAgent):
+    """A scripted agent that calls the real ``wait_until`` tool on its first turn."""
+
+    def __init__(self, session_id: str, user_id: str, resume_at: str) -> None:
+        super().__init__()
+        self.context: Any = SimpleNamespace(
+            session=SimpleNamespace(id=session_id), user_id=user_id, state=None
+        )
+        self.resume_at = resume_at
+        self.results: list[dict[str, Any]] = []
+
+    async def run(self, input_data: RunAgentInput) -> AsyncGenerator[Any, None]:
+        if not self.inputs:
+            self.results.append(await wait_until(self.resume_at, self.context))
+        async for event in super().run(input_data):
+            yield event
+
+
+async def _due(engine: AsyncEngine) -> list[str]:
+    async with AsyncSession(engine) as db:
+        return [sid for sid, _tid in await due_sessions(db)]
+
+
+async def _set_resume_at(engine: AsyncEngine, session_id: str, at: datetime) -> None:
+    async with AsyncSession(engine) as db:
+        row = await db.get(ExecutionSession, session_id)
+        assert row is not None
+        row.resume_at = at
+        db.add(row)
+        await db.commit()
+
+
+async def test_waiting_until_a_time_schedules_the_session_and_resumes_it_then(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    sid = execution["sessionId"]
+    later = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    agent = WaitingAgent(sid, execution["initiatorId"], later)
+    registry.get.return_value = agent
+
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    assert "resume_at" in agent.results[0]
+    assert any(c.description == "Current time" for c in agent.inputs[0].context)
+    row = await _session(engine, sid)
+    assert row.status is ExecutionSessionStatus.scheduled
+    assert row.resume_at is not None
+    assert sid not in await _due(engine)
+
+    await _set_resume_at(engine, sid, datetime.now(UTC) - timedelta(seconds=1))
+    assert sid in await _due(engine)
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    (wake,) = [m for m in agent.inputs[1].messages if isinstance(m, UserMessage)]
+    assert "wait_until" in str(wake.content)
+    row = await _session(engine, sid)
+    assert row.status is ExecutionSessionStatus.idle
+    assert row.resume_at is None
+
+
+async def test_a_message_wakes_a_scheduled_session_early(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    sid = execution["sessionId"]
+    later = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    registry.get.return_value = WaitingAgent(sid, execution["initiatorId"], later)
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    assert_ok(
+        await client.post(f"{_base(execution)}/input", json={"message": "go now"}),
+        status=202,
+    )
+
+    row = await _session(engine, sid)
+    assert row.status is ExecutionSessionStatus.queued
+    assert row.resume_at is None
+
+
+async def test_wait_until_refuses_a_time_that_has_passed(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    sid = execution["sessionId"]
+    earlier = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+    agent = WaitingAgent(sid, execution["initiatorId"], earlier)
+    registry.get.return_value = agent
+
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    assert "error" in agent.results[0]
+    assert (await _session(engine, sid)).status is ExecutionSessionStatus.idle
+
+
+async def test_wait_until_reads_a_time_without_an_offset_in_the_local_zone(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    sid = execution["sessionId"]
+    zone = ZoneInfo(get_settings().timezone)
+    local = (datetime.now(zone) + timedelta(days=1)).replace(microsecond=0)
+    agent = WaitingAgent(
+        sid, execution["initiatorId"], local.replace(tzinfo=None).isoformat()
+    )
+    registry.get.return_value = agent
+
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    assert agent.results[0]["resume_at"] == local.astimezone(UTC).isoformat()

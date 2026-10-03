@@ -67,7 +67,9 @@ class SessionInput(BaseModel):
             :data:`RECOVERY_PROMPT`); ``assigned`` tells the session, in
             ``text``, about tasks the server just assigned it -- sent like a
             message, but never followed by another such note
-            (:func:`services.session_settle.settle_turn`).
+            (:func:`services.session_settle.settle_turn`); ``scheduled``
+            wakes a session whose ``wait_until`` time has come, telling it so
+            in ``text``.
         text: The user message, for ``message``.
         tool_call_id: The paused call being answered, for ``tool_result``.
         content: The answer, for ``tool_result``.
@@ -79,7 +81,7 @@ class SessionInput(BaseModel):
             approval decision, which resumes the run on the initiator's behalf.
     """
 
-    kind: Literal["message", "tool_result", "recovery", "assigned"]
+    kind: Literal["message", "tool_result", "recovery", "assigned", "scheduled"]
     text: str | None = None
     tool_call_id: str | None = None
     content: str | None = None

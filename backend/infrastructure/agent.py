@@ -43,6 +43,7 @@ from infrastructure.workflow_task_tools import (
     get_workflow_task,
     list_workflow_tasks,
     update_workflow_task,
+    wait_until,
 )
 
 ToolUnion = Callable[..., Any] | BaseTool | BaseToolset
@@ -302,6 +303,15 @@ EXECUTION_AGENT_INSTRUCTION = (
     "fixed -- it was copied from the workflow's published templates -- so you "
     "cannot add, remove, or restructure tasks; you only advance their statuses. "
     "Use `list_workflow_tasks` and `get_workflow_task` to inspect them.\n\n"
+    "Timing requirements: when the task you are about to start -- its "
+    "description, or the Skill -- says it must not run before a certain time "
+    '(for example "after 9:00 tomorrow" or "not before the 1st"), compare that '
+    'time with "Current time" in your context. If it has not come yet, leave '
+    "the task `pending`, call `wait_until(resume_at)` with that time, tell the "
+    "user in one line when the run will continue, and end your turn without "
+    "calling `suggest_replies`. The server resumes this session at that time; "
+    "then continue from step 1. Read a time that names no time zone in the "
+    'local time zone shown under "Current time".\n\n'
     "Human approval: when a task requires a person's explicit go-ahead before you "
     "act (for example a destructive or irreversible operation), call "
     "`request_approval(title, description, workflow_task_id, ...)` to record a "
@@ -533,6 +543,7 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
         read_session_file,
         write_session_file,
         suggest_replies,
+        wait_until,
     ],
 }
 

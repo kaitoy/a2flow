@@ -40,7 +40,7 @@ Notification email:
 | `a2flow_email_queue_depth{status}` | Emails in the [outgoing queue](../guides/notifications.md#the-delivery-queue), by `pending` / `sending` / `sent` / `failed` |
 | `a2flow_email_queue_oldest_pending_age_seconds` | How long the longest-waiting undelivered email has waited — rises when the relay is unreachable |
 
-`?thresholdHours=` overrides the stalled-approval cutoff. `METRICS_TIMEZONE` (an IANA name, default `UTC`) decides where "today" starts; an unrecognized name falls back to UTC rather than failing startup.
+`?thresholdHours=` overrides the stalled-approval cutoff. `TIMEZONE` (an IANA name, default `UTC`; see [Server settings](./configuration.md#server-settings)) decides where "today" starts; an unrecognized name falls back to UTC rather than failing startup.
 
 The endpoint is protected by the ordinary session cookie, so a scrape config has to carry one. `GET` is a safe method, so no CSRF token is needed:
 

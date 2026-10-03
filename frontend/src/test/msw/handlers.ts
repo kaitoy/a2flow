@@ -562,6 +562,8 @@ export const handlers = [
 
   http.get(`${BASE}/api/v1/workflow-executions/:executionId/messages`, () => envelope([])),
 
+  http.get(`${BASE}/api/v1/workflow-executions/:executionId/sessions`, () => envelope([])),
+
   http.get(`${BASE}/api/v1/workflow-executions/:executionId/workflow-tasks`, () =>
     envelope([WORKFLOW_TASK_1])
   ),
