@@ -72,7 +72,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   <TabItem value="aws" label="AWS">
 
   ```text
-  Ask the requester for the parameters they want, get approval from the Demo Approvers group, then launch an EC2 instance.
+  Ask the requester for the parameters they want and the date and time to launch, get approval from the Demo Approvers group, then launch an EC2 instance at that time.
   Have them choose the instance type from:
   - t4g.nano
   - t4g.micro
@@ -94,6 +94,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   Use the default VPC, subnet, and security group.
   Do not create a key pair.
   Resolve the AMI, VPC, and subnet IDs before requesting approval.
+  Do not launch the instance before the requested time.
   ```
 
   </TabItem>
@@ -128,7 +129,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  Choose an instance type from the ten in the prompt and a region from the three, and answer whatever else it asks, such as a name for the instance. The agent then looks up the latest Amazon Linux 2023 image in that region and the default VPC and subnet, summarizes the configuration, and sends it off for approval.
+  Choose an instance type from the ten in the prompt and a region from the three, give a launch time a few minutes from now so the tour does not stall, and answer whatever else it asks, such as a name for the instance. The agent then looks up the latest Amazon Linux 2023 image in that region and the default VPC and subnet, summarizes the configuration and the launch time, and sends it off for approval.
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
@@ -150,7 +151,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  The call on the **AWS MCP Server** that launches the instance. Check it against the configuration the requester chose — the image, VPC, and subnet look-ups are not listed, since they ran before the request and needed no approval.
+  The call on the **AWS MCP Server** that launches the instance. Check it, and the launch time in the summary, against what the requester chose — the image, VPC, and subnet look-ups are not listed, since they ran before the request and needed no approval.
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
@@ -161,6 +162,20 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 </Tabs>
 
 4. Leave a **Comment** if you like and press **Approve**. The run resumes in the same chat and the agent does the work, then asks the requester to confirm the outcome. That question is the requester's to answer: for you the input is read-only, with "Waiting for the initiator to respond." beneath it.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  If the launch time has not come yet, the agent leaves the launch waiting, says in one line when it will continue, and pauses. The session resumes on its own at that time — nobody needs to keep the chat open — and the agent launches the instance ([The workflow session screen](../guides/workflow-executions.md#the-workflow-session-screen)).
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  The agent restarts the workload right away.
+
+  </TabItem>
+</Tabs>
+
 5. **Stop**.
 
 ## 6. Back as the requester: confirm the result \{#6-back-as-the-requester-confirm-the-result\}
@@ -172,7 +187,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  The instance id and its state. Check the instance in the AWS console if you like, then confirm in the chat.
+  The instance id and its state, once the launch time you gave has passed. Check the instance in the AWS console if you like, then confirm in the chat.
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">

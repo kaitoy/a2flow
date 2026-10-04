@@ -72,7 +72,7 @@ import TabItem from '@theme/TabItem';
   <TabItem value="aws" label="AWS">
 
   ```text
-  申請者から希望のパラメーターをヒアリングして、Demo Approversグループの承認を得て、EC2インスタンスを起動する。
+  申請者から希望のパラメーターと起動日時をヒアリングして、Demo Approversグループの承認を得て、指定された日時にEC2インスタンスを起動する。
   インスタンスタイプは以下のいずれかから選んでもらう:
   - t4g.nano
   - t4g.micro
@@ -94,6 +94,7 @@ import TabItem from '@theme/TabItem';
   VPCとサブネットとセキュリティグループはデフォルトを使う。
   キーペアは作成しない。
   AMIとVPCとサブネットのIDは承認依頼前に解決しておく。
+  指定された日時になるまではインスタンスを起動しない。
   ```
 
   </TabItem>
@@ -128,7 +129,7 @@ import TabItem from '@theme/TabItem';
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  プロンプトの 10 種からインスタンスタイプを、3 つからリージョンを選び、インスタンスの名前など、ほかに聞かれたことにも答えます。エージェントはそのリージョンの Amazon Linux 2023 の最新イメージと、デフォルトの VPC とサブネットを調べ、構成を要約して承認に回します。
+  プロンプトの 10 種からインスタンスタイプを、3 つからリージョンを選び、起動日時には数分後の時刻を伝え(ツアーが止まらないように)、インスタンスの名前など、ほかに聞かれたことにも答えます。エージェントはそのリージョンの Amazon Linux 2023 の最新イメージと、デフォルトの VPC とサブネットを調べ、構成と起動日時を要約して承認に回します。
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
@@ -150,7 +151,7 @@ import TabItem from '@theme/TabItem';
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  **AWS MCP Server** の、インスタンスを起動する呼び出しです。申請者が選んだ構成と突き合わせてください。イメージ、VPC、サブネットの検索は並びません。依頼の前に済んでいて、承認の要らない呼び出しだからです。
+  **AWS MCP Server** の、インスタンスを起動する呼び出しです。この呼び出しと要約にある起動日時を、申請者が選んだ内容と突き合わせてください。イメージ、VPC、サブネットの検索は並びません。依頼の前に済んでいて、承認の要らない呼び出しだからです。
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
@@ -161,6 +162,20 @@ import TabItem from '@theme/TabItem';
 </Tabs>
 
 4. 必要なら **Comment** を書いて、**Approve** を押します。同じチャットで実行が再開し、エージェントが作業を終えると、申請者に結果の確認を求めます。この質問に答えるのは申請者です。承認者には入力欄が読み取り専用で出て、下に「Waiting for the initiator to respond.」と表示されます。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  起動日時がまだ来ていなければ、エージェントは起動を待たせたまま、いつ再開するかを 1 行で伝えて一時停止します。その時刻になるとセッションは自動で再開し、エージェントがインスタンスを起動します。チャットを開いておく必要はありません([ワークフローセッション画面](../guides/workflow-executions.md#the-workflow-session-screen))。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  エージェントはすぐにワークロードを再起動します。
+
+  </TabItem>
+</Tabs>
+
 5. **Stop** します。
 
 ## 6. requester に戻って、結果を確認する \{#6-back-as-the-requester-confirm-the-result\}
@@ -172,7 +187,7 @@ import TabItem from '@theme/TabItem';
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  インスタンス ID と状態です。気になれば AWS コンソールでインスタンスを確かめてから、チャットで確認した旨を返します。
+  伝えた起動日時を過ぎていれば、インスタンス ID と状態です。気になれば AWS コンソールでインスタンスを確かめてから、チャットで確認した旨を返します。
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
