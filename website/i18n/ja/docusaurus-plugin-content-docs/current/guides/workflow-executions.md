@@ -22,10 +22,12 @@ sidebar_position: 4
 
 ## 実行のステータス {#run-status}
 
-![実行が running で始まり、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。](./img/workflow-executions-status.svg#gh-light-mode-only)
-![実行が running で始まり、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。](./img/workflow-executions-status-dark.svg#gh-dark-mode-only)
+![実行が running で始まり、時刻を待つだけの間は scheduled になって再開すると running に戻り、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。](./img/workflow-executions-status.svg#gh-light-mode-only)
+![実行が running で始まり、時刻を待つだけの間は scheduled になって再開すると running に戻り、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。](./img/workflow-executions-status-dark.svg#gh-dark-mode-only)
 
 実行は `running` で始まり、タスクが 1 つ以上あり、そのすべてが終端の状態 — `completed`、`failed`、`skipped` — に達した時点で確定します。失敗したタスクを含む実行は `failed` で終わります。終了時刻はそのときに刻まれ、あとから編集しても動きません。タスクが 1 つもない実行は `running` のままです。[運用メトリクス](../operations/metrics.md)が数えるのはこの値です。
+
+終わっていない実行が時刻を待つ以外に何もしていない間 — タスクが待機を求めてそのセッションが **Scheduled until …** と表示され、ほかのセッションがすべて idle か done のとき — 実行は `running` ではなく `scheduled` と表示されます。時刻が来るか、誰かがメッセージを送ってセッションが再開すると、すぐに `running` に戻ります。[運用メトリクス](../operations/metrics.md)では、`scheduled` の実行も `running` と同じく進行中として数えます。
 
 タスクが失敗すると、それを待っているタスク — 直接でも連鎖の先でも — はすべて `skipped` になります。もう動けないからです。これが、決して始まらないタスクに引っかからず実行を確定させる仕組みです。失敗したタスクに依存していないブランチのタスクは影響を受けないので、失敗のあとも、それらが終わるまで実行が `running` のままということはあります。
 

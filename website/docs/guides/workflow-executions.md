@@ -22,10 +22,12 @@ The [**Columns** menu](./admin-ui.md#choosing-columns) offers two more columns t
 
 ## Run status
 
-![State machine showing a run starting as running, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.](./img/workflow-executions-status.svg#gh-light-mode-only)
-![State machine showing a run starting as running, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.](./img/workflow-executions-status-dark.svg#gh-dark-mode-only)
+![State machine showing a run starting as running, moving to scheduled while it only waits on a time and back when it resumes, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.](./img/workflow-executions-status.svg#gh-light-mode-only)
+![State machine showing a run starting as running, moving to scheduled while it only waits on a time and back when it resumes, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.](./img/workflow-executions-status-dark.svg#gh-dark-mode-only)
 
 A run starts `running` and settles once it has at least one task and every task has reached a terminal state — `completed`, `failed` or `skipped`. A run whose tasks include a failure ends `failed`. The finish time is stamped at that moment and is never moved by a later edit, and a run with no tasks at all stays `running`. These are the numbers the [operations metrics](../operations/metrics.md) count.
+
+While an unfinished run has nothing to do but wait for a time — a task asked to wait, its session shows **Scheduled until …**, and every other session is idle or done — the run shows `scheduled` instead of `running`. It goes back to `running` as soon as a session resumes, whether the time has come or someone sent it a message. The [operations metrics](../operations/metrics.md) count a `scheduled` run as active, just like a `running` one.
 
 When a task fails, any task still waiting on it — directly or down the chain — is set to `skipped`, since it can no longer run; that is what lets the run settle rather than hang on a task that will never start. Tasks on branches that do not depend on the failed one are unaffected, so a run can still be `running` for a while after a failure until they too finish.
 

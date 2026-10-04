@@ -98,6 +98,7 @@ function buildColumns(
       filterOp: "eq",
       filterOptions: [
         { label: "Running", value: "running" },
+        { label: "Scheduled", value: "scheduled" },
         { label: "Completed", value: "completed" },
         { label: "Failed", value: "failed" },
       ],

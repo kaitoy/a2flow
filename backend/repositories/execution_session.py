@@ -10,10 +10,12 @@ import uuid
 from datetime import datetime
 from typing import Any, Protocol
 
+from sqlalchemy import Enum, and_, case, literal
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select, update
 
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from repositories._scoped import TenantScopedRepository
 
 
@@ -152,6 +154,9 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
         Returns:
             ``True`` when the input was queued, ``False`` when the session was
             busy or not found.
+
+        Queued input also recomputes the run's status (see
+        :meth:`_sync_execution_status`), in the same commit.
         """
         busy = (ExecutionSessionStatus.queued, ExecutionSessionStatus.running)
         stmt = (
@@ -170,6 +175,8 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             )
         )
         result = await self._db.exec(stmt)
+        if result.rowcount:
+            await self._sync_execution_status(session_id)
         await self._db.commit()
         return bool(result.rowcount)
 
@@ -196,14 +203,17 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
                 ``None``.
 
         Any status but ``scheduled`` also clears ``resume_at``: only a
-        ``scheduled`` session waits on a time.
+        ``scheduled`` session waits on a time. The run's status is recomputed
+        in the same commit (see :meth:`_sync_execution_status`).
         """
         values: dict[str, Any] = {"status": status, "updated_by": user_id}
         if status is not ExecutionSessionStatus.scheduled:
             values["resume_at"] = None
         if summary is not None:
             values["summary"] = summary
-        await self._update(session_id, values, waiting_on, clear_input)
+        await self._update(
+            session_id, values, waiting_on, clear_input, sync_execution=True
+        )
 
     async def create_branch(
         self, *, execution_id: str, parent_id: str, user_id: str
@@ -303,8 +313,13 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
         values: dict[str, Any],
         waiting_on: builtins.list[dict[str, Any]] | None,
         clear_input: bool,
+        *,
+        sync_execution: bool = False,
     ) -> None:
-        """Write ``values`` (plus the optional waiting list and input reset) to one row."""
+        """Write ``values`` (plus the optional waiting list and input reset) to one row.
+
+        With ``sync_execution``, the run's status is recomputed before the commit.
+        """
         if waiting_on is not None:
             values["waiting_on"] = waiting_on
         if clear_input:
@@ -317,4 +332,54 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             )
             .values(**values)
         )
+        if sync_execution:
+            await self._sync_execution_status(session_id)
         await self._db.commit()
+
+    async def _sync_execution_status(self, session_id: str) -> None:
+        """Set the session's run to ``scheduled`` or ``running`` from its sessions.
+
+        The run is ``scheduled`` when at least one of its sessions is
+        ``scheduled`` and every other one is ``idle`` or ``done`` -- nothing
+        is happening but a wait on a time -- and ``running`` otherwise. A
+        finished run (``finished_at`` set) is never touched. Runs as one
+        ``UPDATE`` and leaves the commit to the caller.
+
+        Args:
+            session_id: Any session of the run to recompute.
+        """
+        siblings = select(ExecutionSession.id).where(
+            col(ExecutionSession.workflow_execution_id) == WorkflowExecution.id
+        )
+        quiet = (
+            ExecutionSessionStatus.scheduled,
+            ExecutionSessionStatus.idle,
+            ExecutionSessionStatus.done,
+        )
+        waiting = and_(
+            siblings.where(
+                col(ExecutionSession.status) == ExecutionSessionStatus.scheduled
+            ).exists(),
+            ~siblings.where(col(ExecutionSession.status).not_in(quiet)).exists(),
+        )
+        owner = (
+            select(ExecutionSession.workflow_execution_id)
+            .where(col(ExecutionSession.id) == session_id)
+            .scalar_subquery()
+        )
+        # Typed so PostgreSQL casts the CASE to its native enum, not VARCHAR.
+        status_type = Enum(WorkflowExecutionStatus)
+        await self._db.exec(
+            update(WorkflowExecution)
+            .where(
+                col(WorkflowExecution.id) == owner,
+                col(WorkflowExecution.tenant_id) == self._require_tenant(),
+                col(WorkflowExecution.finished_at).is_(None),
+            )
+            .values(
+                status=case(
+                    (waiting, literal(WorkflowExecutionStatus.scheduled, status_type)),
+                    else_=literal(WorkflowExecutionStatus.running, status_type),
+                )
+            )
+        )

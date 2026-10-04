@@ -26,7 +26,7 @@ sidebar_position: 6
 
 | メトリクス | 意味 |
 |---|---|
-| `a2flow_workflow_executions_active` | 進行中の実行 |
+| `a2flow_workflow_executions_active` | 進行中の実行(`running` または `scheduled`) |
 | `a2flow_workflow_executions_finished_today{status}` | 今日終了した実行を終了ステータス別に集計 |
 | `a2flow_workflow_executions_started_recently{window,workflow}` | 直近 24 時間に開始された実行をワークフロー別に集計 |
 | `a2flow_workflow_executions_failed_recently{window}` | 直近 24 時間に失敗で終わった実行 |
@@ -59,7 +59,7 @@ sidebar_position: 6
 
 | エンドポイント | 返すもの |
 |---|---|
-| `GET /api/v1/workflow-executions/by-workflow` | ワークフローごとの実行件数(`total` / `running` / `completed` / `failed`)と平均リードタイム |
+| `GET /api/v1/workflow-executions/by-workflow` | ワークフローごとの実行件数(`total` / `running` / `completed` / `failed`。`running` には `scheduled` の実行も含む)と平均リードタイム |
 | `GET /api/v1/workflow-executions/lead-time-trend` | 日ごとの平均リードタイム。空の日も含めて 1 日 1 バケット |
 | `GET /api/v1/workflow-executions/failures` | 調査が必要な実行。失敗したタスクと記録された原因つき |
 | `GET /api/v1/approvals/by-approver` | 指名された承認者ごとの、承認待ちの滞留 |

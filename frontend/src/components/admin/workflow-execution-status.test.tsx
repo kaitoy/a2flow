@@ -10,6 +10,7 @@ function dot(container: HTMLElement) {
 describe("WorkflowExecutionStatusLabel", () => {
   it.each([
     ["running", "bg-accent"],
+    ["scheduled", "bg-on-surface-variant"],
     ["completed", "bg-success/80"],
     ["failed", "bg-error"],
   ] as const)("marks %s with a %s dot", (status, dotClass) => {

@@ -26,7 +26,7 @@ Workflow executions:
 
 | Metric | Meaning |
 |---|---|
-| `a2flow_workflow_executions_active` | Runs currently in progress |
+| `a2flow_workflow_executions_active` | Runs currently in progress (`running` or `scheduled`) |
 | `a2flow_workflow_executions_finished_today{status}` | Runs that finished today, by terminal status |
 | `a2flow_workflow_executions_started_recently{window,workflow}` | Runs started in the last 24h, by workflow |
 | `a2flow_workflow_executions_failed_recently{window}` | Runs that finished in failure in the last 24h |
@@ -59,7 +59,7 @@ Anything whose natural key is a user id, a run id, or a free-text error message 
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/v1/workflow-executions/by-workflow` | Per-workflow run counts (`total` / `running` / `completed` / `failed`) and average lead time |
+| `GET /api/v1/workflow-executions/by-workflow` | Per-workflow run counts (`total` / `running` / `completed` / `failed`; `running` includes `scheduled` runs) and average lead time |
 | `GET /api/v1/workflow-executions/lead-time-trend` | Daily average lead time, one bucket per calendar day including empty ones |
 | `GET /api/v1/workflow-executions/failures` | Runs needing triage, each with its failed tasks and their recorded cause |
 | `GET /api/v1/approvals/by-approver` | Pending-approval backlog per designated approver |

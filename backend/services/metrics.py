@@ -49,6 +49,9 @@ UNKNOWN_WORKFLOW = "unknown"
 #: gauges. Matches the 24-hour framing the operations view is built around.
 RECENT_WINDOW_HOURS = 24
 
+#: Statuses of a run that has not finished yet; counted together as "active".
+_UNFINISHED = (WorkflowExecutionStatus.running, WorkflowExecutionStatus.scheduled)
+
 
 @dataclass(frozen=True)
 class MetricsWindow:
@@ -171,9 +174,7 @@ class MetricsService:
                 workflow_id=workflow_id,
                 workflow_name=group[0].workflow_name,
                 total=len(group),
-                running=sum(
-                    1 for r in group if r.status == WorkflowExecutionStatus.running
-                ),
+                running=sum(1 for r in group if r.status in _UNFINISHED),
                 completed=sum(
                     1 for r in group if r.status == WorkflowExecutionStatus.completed
                 ),
@@ -471,7 +472,7 @@ class MetricsService:
             approvals_pending=len(pending),
             approvals_pending_over_threshold=sum(1 for w in waits if w > threshold),
             approval_pending_age_seconds_max=max(waits, default=0.0),
-            executions_active=by_status.get(WorkflowExecutionStatus.running, 0),
+            executions_active=sum(by_status.get(s, 0) for s in _UNFINISHED),
             executions_finished_today=dict(finished_today_counts),
             approvals_decided_today=dict(decided_counts),
             executions_failed_recently=sum(

@@ -40,6 +40,8 @@ from infrastructure.locks import advisory_lock, agent_run_key
 from infrastructure.workflow_task_tools import wait_until
 from models.approval import Approval, ApprovalStatus
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
+from repositories.execution_session import SqlExecutionSessionRepository
 from repositories.execution_session_queue import due_sessions
 from services.session_inputs import EXECUTION_KICKOFF_PROMPT, RECOVERY_PROMPT
 from services.session_runner import SessionRunner
@@ -827,6 +829,15 @@ async def _set_resume_at(engine: AsyncEngine, session_id: str, at: datetime) -> 
         await db.commit()
 
 
+async def _run_status(
+    engine: AsyncEngine, execution_id: str
+) -> WorkflowExecutionStatus:
+    async with AsyncSession(engine) as db:
+        row = await db.get(WorkflowExecution, execution_id)
+        assert row is not None
+        return row.status
+
+
 async def test_waiting_until_a_time_schedules_the_session_and_resumes_it_then(
     runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
 ) -> None:
@@ -845,6 +856,9 @@ async def test_waiting_until_a_time_schedules_the_session_and_resumes_it_then(
     assert row.status is ExecutionSessionStatus.scheduled
     assert row.resume_at is not None
     assert sid not in await _due(engine)
+    assert (
+        await _run_status(engine, execution["id"]) is WorkflowExecutionStatus.scheduled
+    )
 
     await _set_resume_at(engine, sid, datetime.now(UTC) - timedelta(seconds=1))
     assert sid in await _due(engine)
@@ -855,6 +869,7 @@ async def test_waiting_until_a_time_schedules_the_session_and_resumes_it_then(
     row = await _session(engine, sid)
     assert row.status is ExecutionSessionStatus.idle
     assert row.resume_at is None
+    assert await _run_status(engine, execution["id"]) is WorkflowExecutionStatus.running
 
 
 async def test_a_message_wakes_a_scheduled_session_early(
@@ -875,6 +890,35 @@ async def test_a_message_wakes_a_scheduled_session_early(
     row = await _session(engine, sid)
     assert row.status is ExecutionSessionStatus.queued
     assert row.resume_at is None
+    assert await _run_status(engine, execution["id"]) is WorkflowExecutionStatus.running
+
+
+async def test_a_finished_run_keeps_its_status_when_a_session_is_scheduled(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    sid = execution["sessionId"]
+    registry.get.return_value = WaitingAgent(sid, execution["initiatorId"], "")
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+    async with AsyncSession(engine) as db:
+        run = await db.get(WorkflowExecution, execution["id"])
+        assert run is not None
+        run.status = WorkflowExecutionStatus.completed
+        run.finished_at = datetime.now(UTC)
+        db.add(run)
+        await db.commit()
+        await SqlExecutionSessionRepository(
+            db, tenant_id=DEFAULT_TEST_TENANT_ID
+        ).set_state(
+            sid,
+            status=ExecutionSessionStatus.scheduled,
+            user_id=execution["initiatorId"],
+        )
+
+    assert (
+        await _run_status(engine, execution["id"]) is WorkflowExecutionStatus.completed
+    )
 
 
 async def test_wait_until_refuses_a_time_that_has_passed(

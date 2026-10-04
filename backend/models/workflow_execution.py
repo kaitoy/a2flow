@@ -37,6 +37,10 @@ class WorkflowExecutionStatus(StrEnum):
     :meth:`services.workflow_execution.WorkflowExecutionService.evaluate_completion`,
     which both the agent's task tools and the REST task endpoints call after
     every task write.
+
+    While a run is unfinished it moves between ``running`` and ``scheduled``
+    as its sessions do: :class:`repositories.execution_session.SqlExecutionSessionRepository`
+    recomputes it on every session status write.
     """
 
     running = "running"
@@ -45,6 +49,11 @@ class WorkflowExecutionStatus(StrEnum):
     A run with no tasks at all stays ``running`` — an empty task list is
     indistinguishable from a run whose agent has not registered its tasks yet.
     """
+
+    scheduled = "scheduled"
+    """Unfinished, and only waiting on a time: at least one session is
+    ``scheduled`` (its agent called ``wait_until``) and every other session is
+    ``idle`` or ``done``. It goes back to ``running`` when a session resumes."""
 
     completed = "completed"
     """Every task reached a terminal state and none of them failed."""

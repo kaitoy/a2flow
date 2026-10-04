@@ -7,11 +7,13 @@ import type { WorkflowExecutionStatus as WorkflowExecutionStatusValue } from "@/
  * keyed by the wire value.
  *
  * Mirrors the palette convention shared with `lib/workflow-status.ts` and
- * `lib/workflow-task-status.ts`: accent for an in-progress state, green for a
- * successful terminal state, red for a failed one.
+ * `lib/workflow-task-status.ts`: accent for an in-progress state, neutral for a
+ * run only waiting on a time, green for a successful terminal state, red for a
+ * failed one.
  */
 const STATUS_DOT_CLASS: Record<WorkflowExecutionStatusValue, string> = {
   running: "bg-accent",
+  scheduled: "bg-on-surface-variant",
   completed: "bg-success/80",
   failed: "bg-error",
 };

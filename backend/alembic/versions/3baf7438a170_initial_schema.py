@@ -620,6 +620,7 @@ def upgrade() -> None:
             "status",
             sa.Enum(
                 "running",
+                "scheduled",
                 "completed",
                 "failed",
                 name="workflowexecutionstatus",

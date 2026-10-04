@@ -212,13 +212,15 @@ SPECS["guides/users-groups-relationship"] = head(
 # ---------------------------------------------------------------- guides/workflow-executions-status
 SPECS["guides/workflow-executions-status"] = head(
     "Run status", "実行のステータス",
-    "State machine showing a run starting as running, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.",
-    "実行が running で始まり、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。",
+    "State machine showing a run starting as running, moving to scheduled while it only waits on a time and back when it resumes, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.",
+    "実行が running で始まり、時刻を待つだけの間は scheduled になって再開すると running に戻り、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。",
 ) + [
     mask(244, 130, 72, 56),
     label("NONE FAILED", "失敗なし"),
     mask(404, 130, 72, 80),
     label("1+ FAILED", "1 つ以上失敗"),
+    label("WAITS ON A TIME", "時刻を待つ"),
+    label("RESUMES", "再開"),
 ]
 
 # ---------------------------------------------------------------- guides/workflow-executions-layout

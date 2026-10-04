@@ -19,9 +19,9 @@
     <p class="eyebrow">State machine · Diagram Design</p>
     <h1>Run status</h1>
 
-    <svg viewBox="0 0 660 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-executions-status-dark-title workflow-executions-status-dark-desc">
+    <svg viewBox="0 0 780 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-executions-status-dark-title workflow-executions-status-dark-desc">
       <title id="workflow-executions-status-dark-title">Run status</title>
-      <desc id="workflow-executions-status-dark-desc">State machine showing a run starting as running, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.</desc>
+      <desc id="workflow-executions-status-dark-desc">State machine showing a run starting as running, moving to scheduled while it only waits on a time and back when it resumes, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
       </defs>
@@ -33,7 +33,15 @@
       <path d="M330,116 L330,144 Q330,152 322,152 L238,152 Q230,152 230,160 L230,200" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
       <path d="M390,116 L390,144 Q390,152 398,152 L482,152 Q490,152 490,160 L490,200" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
 
+      <line x1="450" y1="74" x2="558" y2="74" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="560" y1="96" x2="452" y2="96" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
       <!-- Labels -->
+      <rect x="460" y="67" width="90" height="14" rx="2" fill="#030711"/>
+      <text x="505" y="78" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">WAITS ON A TIME</text>
+
+      <rect x="475" y="89" width="60" height="14" rx="2" fill="#030711"/>
+      <text x="505" y="100" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">RESUMES</text>
       <rect x="244" y="130" width="72" height="14" rx="2" fill="#030711"/>
       <text x="280" y="141" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">NONE FAILED</text>
 
@@ -46,6 +54,10 @@
       <!-- running (focal) -->
       <rect x="270" y="52" width="180" height="64" rx="8" fill="rgba(59,245,196,0.10)" stroke="#3bf5c4" stroke-width="1"/>
       <text x="360" y="91" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">running</text>
+
+      <!-- scheduled -->
+      <rect x="560" y="52" width="180" height="64" rx="8" fill="#242526" stroke="#9aa1ab" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="650" y="91" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">scheduled</text>
 
       <!-- completed -->
       <rect x="140" y="200" width="180" height="56" rx="8" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
