@@ -99,14 +99,18 @@ def test_build_llm_uses_litellm_for_prefixed_models(
     assert llm._additional_args["drop_params"] is True
 
 
-def test_build_llm_leaves_thinking_default_for_non_openai_routes(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "model", ["litellm:anthropic/claude-sonnet-5-5", "litellm:openai/gpt-6.1-sol"]
+)
+def test_build_llm_leaves_thinking_default_for_non_gpt5_routes(
+    monkeypatch: pytest.MonkeyPatch, model: str
 ) -> None:
-    """Only ``openai/`` routes get the reasoning_effort="none" pin; other
-    providers keep their own thinking default."""
+    """Only ``openai/gpt-5*`` routes get the reasoning_effort="none" pin;
+    gpt-6 rejects "none", and other providers keep their own thinking
+    default."""
     from google.adk.models.lite_llm import LiteLlm
 
-    monkeypatch.setenv("LLM_MODEL", "litellm:anthropic/claude-sonnet-5")
+    monkeypatch.setenv("LLM_MODEL", model)
     from config import get_settings
 
     get_settings.cache_clear()

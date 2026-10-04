@@ -466,16 +466,17 @@ def resolve_model() -> LiteLlm | str:
     - Gemini model name (e.g. "gemini-*"): returned as-is, so ADK uses
       Google AI / Vertex AI directly.
     - "litellm:<provider>/<model>" format: wrapped in :class:`LiteLlm` so any
-      LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-5.6-terra``.
+      LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-6.1-sol``.
 
-    ``reasoning_effort="none"`` is pinned for ``openai/`` routes only: some
-    OpenAI reasoning-tier models (e.g. gpt-5.4+) apply a non-"none"
+    ``reasoning_effort="none"`` is pinned for ``openai/gpt-5*`` routes only:
+    some gpt-5 reasoning-tier models (e.g. gpt-5.4+) apply a non-"none"
     server-side default whenever the field is omitted, which that upstream
     then rejects when combined with function-tool calling on
-    ``/v1/chat/completions``. Other providers keep their own thinking
-    default -- for Anthropic, litellm maps ``"none"`` to "send no
-    ``thinking``", which turns thinking off on models such as Claude Sonnet
-    4.6. ``drop_params=True`` makes litellm silently drop arguments a
+    ``/v1/chat/completions``. gpt-6 models reject ``"none"`` outright but
+    accept tools with the field omitted, so they get no pin. Other
+    providers keep their own thinking default -- for Anthropic, litellm
+    maps ``"none"`` to "send no ``thinking``", which turns thinking off on
+    models such as Claude Sonnet 4.6. ``drop_params=True`` makes litellm silently drop arguments a
     provider/model doesn't accept.
 
     Shared by :func:`create_agent` and the one-shot summarizer
@@ -485,7 +486,7 @@ def resolve_model() -> LiteLlm | str:
     if model_env.startswith(LITELLM_PREFIX):
         litellm_model = model_env[len(LITELLM_PREFIX) :]
         extra: dict[str, Any] = {}
-        if litellm_model.startswith("openai/"):
+        if litellm_model.startswith("openai/gpt-5"):
             extra["reasoning_effort"] = "none"
         return LiteLlm(model=litellm_model, drop_params=True, **extra)
     return model_env
