@@ -23,6 +23,11 @@ Pick a provider here. Every provider-specific block on this page follows the cho
   You will rolling-restart a workload on a GKE cluster from the `Demo GKE Pod Restart` skill.
 
   </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  You will rotate a secret in an Azure Key Vault from the `Demo Azure Key Vault Secret Rotation` skill.
+
+  </TabItem>
 </Tabs>
 
 ## Before you start \{#before-you-start\}
@@ -42,18 +47,23 @@ Pick a provider here. Every provider-specific block on this page follows the cho
   The `demo-gcp-credentials` [secret](../guides/secrets.md) holds a Google Cloud credential whose identity can reach a GKE cluster: either `DEMO_GCP_CREDENTIALS_JSON` was set before the first start, or you edit the secret under **Secrets**. Have a project, a cluster, its region, and a workload you may restart ready — the run **really rolling-restarts it**.
 
   </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  The `demo-azure-credentials` [secret](../guides/secrets.md) holds a real service principal: either `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET` were set before the first start, or you edit the secret under **Secrets**. The principal needs the **Key Vault Secrets Officer** role on a vault. Have that vault and a secret in it you may rotate ready — the run **really writes a new version of the secret**, and anything that reads its current version picks up the new value.
+
+  </TabItem>
 </Tabs>
 
 No account to spare? The seeded [tool mocks](./demo-data.md#trying-it-out) let the same workflow play through without reaching a provider. That path runs the workflow while it is still a `draft`, so it skips the publish step below.
 
 ## The cast \{#the-cast\}
 
-| Step | AWS | Google Cloud | Role |
-|---|---|---|---|
-| Generate the workflow | `demo-aws-developer` | `demo-gcp-developer` | `developer` |
-| Publish it | `demo-aws-reviewer` | `demo-gcp-reviewer` | `reviewer` |
-| Run it, and confirm the result | `demo-aws-requester` | `demo-gcp-requester` | `requester` |
-| Approve the request | `demo-approver-1` | `demo-approver-1` | `approver` |
+| Step | AWS | Google Cloud | Azure | Role |
+|---|---|---|---|---|
+| Generate the workflow | `demo-aws-developer` | `demo-gcp-developer` | `demo-azure-developer` | `developer` |
+| Publish it | `demo-aws-reviewer` | `demo-gcp-reviewer` | `demo-azure-reviewer` | `reviewer` |
+| Run it, and confirm the result | `demo-aws-requester` | `demo-gcp-requester` | `demo-azure-requester` | `requester` |
+| Approve the request | `demo-approver-1` | `demo-approver-1` | `demo-approver-1` | `approver` |
 
 Every step below starts with **Impersonate** on the **Users** list and ends with **Stop** on the "Acting as" chip in the header. The stop is not optional: while you act as one of these accounts you are held to that account's roles, and none of them may impersonate, so **Impersonate** is not offered again until you have stopped. From a chat screen, the **A2Flow** logo in the app bar takes you back to the welcome page and its sidebar.
 
@@ -65,7 +75,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 ## 2. Act as the developer and generate the workflow \{#2-act-as-the-developer-and-generate-the-workflow\}
 
 1. Open **Users** in the admin sidebar and press **Impersonate** on the developer's row. Confirm with **Impersonate** in the **Impersonate User** dialog. You are back on the welcome page, and the header chip reads "Acting as `demo-…-developer`".
-2. Open **Agent Skills**. Only this provider's skill is listed — the other one is hidden by its [access-control tag](../guides/tags.md#access-control-tags). Wait until its **Status** reads `ready`, refreshing the list while it still says `Cloning`; **Generate workflow** stays disabled until then.
+2. Open **Agent Skills**. Only this provider's skill is listed — the others are hidden by their [access-control tags](../guides/tags.md#access-control-tags). Wait until its **Status** reads `ready`, refreshing the list while it still says `Cloning`; **Generate workflow** stays disabled until then.
 3. Press **Generate workflow** on the row. Leave **Workflow Name** as it is, paste the prompt below into **Prompt**, and press **Generate**.
 
 <Tabs groupId="provider" queryString>
@@ -108,6 +118,17 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   ```
 
   </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  Replace the placeholder with your vault's name.
+
+  ```text
+  Rotate a secret in the <your vault name> Key Vault after approval from Demo Approvers.
+  List the vault's secrets and have the requester choose the one to rotate.
+  Generate the new value with the Secret Value Generator, and never show it in the chat.
+  ```
+
+  </TabItem>
 </Tabs>
 
 4. You land on the new workflow's detail page with the status `generating`. The page refreshes itself; in a minute or two the status becomes `draft` and the bell shows a "draft ready" notification. Open its **Task Templates** to see the steps the design agent wrote — gathering the parameters, asking for approval, doing the work, and reporting back ([Generating a workflow](../guides/workflows.md#generating-a-workflow)).
@@ -137,6 +158,11 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   Choose a namespace from the list the agent fetched from the cluster, and name the Deployment or StatefulSet to restart. The agent looks the workload up, confirms its kind, summarizes the target, and sends it off for approval.
 
   </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  Choose the secret to rotate from the list the agent fetched from the vault. The agent summarizes the vault and the secret and sends them off for approval.
+
+  </TabItem>
 </Tabs>
 
 4. The request is addressed to the **Demo Approvers** group, and under it the chat reads "Waiting for a decision from the approver group." — the requester cannot decide it. The run now waits.
@@ -159,6 +185,11 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   The `patch_k8s_resource` call on the **GKE MCP Server**, pointed at the namespace and workload the requester chose.
 
   </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  The `keyvault_secret_create` call on the **Azure MCP Server**, pointed at the vault and secret the requester chose. The new value is not in the request: the agent generates it only after you approve.
+
+  </TabItem>
 </Tabs>
 
 4. Leave a **Comment** if you like and press **Approve**. The run resumes in the same chat and the agent does the work, then asks the requester to confirm the outcome. That question is the requester's to answer: for you the input is read-only, with "Waiting for the initiator to respond." beneath it.
@@ -172,6 +203,11 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   <TabItem value="gcp" label="Google Cloud">
 
   The agent restarts the workload right away.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  The agent generates a new value and writes it as the secret's new version right away.
 
   </TabItem>
 </Tabs>
@@ -195,6 +231,11 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   How many pods were replaced, once the rollout it watched has finished. Confirm in the chat.
 
   </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  The new version id — never the value itself. Check the secret's versions in the Azure portal if you like, then confirm in the chat.
+
+  </TabItem>
 </Tabs>
 
 4. The agent closes with its summary, the last task completes, the run turns `completed`, and the bell shows a completion notification.
@@ -211,6 +252,11 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   <TabItem value="gcp" label="Google Cloud">
 
   Nothing to clean up: the workload is back at its replica count with fresh pods.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  The previous version of the secret is still enabled. Once everything that reads the secret uses the new value, disable the old version in the Azure portal. The new value passed through the agent's conversation on its way to Key Vault ([Demo data](./demo-data.md)), so treat this run's chat as you would the secret.
 
   </TabItem>
 </Tabs>

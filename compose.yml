@@ -56,21 +56,25 @@ services:
       # tenant. Optional: same generate-and-log-once fallback as
       # ROOT_PASSWORD when unset.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      # Set DEMO_DATA=true to register the sample "launch an EC2 instance" and
-      # "restart a GKE pod" datasets (secrets, AWS MCP server, GKE MCP server,
-      # agent skills, approver/requester users) in the Default tenant on
-      # startup; unsetting it removes those records again on the next startup.
+      # Set DEMO_DATA=true to register the sample "launch an EC2 instance",
+      # "restart a GKE pod", and "rotate a Key Vault secret" datasets
+      # (secrets, AWS, GKE, and Azure MCP servers, agent skills,
+      # approver/requester users) in the Default tenant on startup; unsetting
+      # it removes those records again on the next startup.
       # DEMO_PASSWORD has the same generate-and-log-once fallback as the
-      # passwords above. The AWS credentials and the Google Cloud API key are
+      # passwords above. The AWS, Google Cloud, and Azure credentials are
       # optional -- a placeholder is stored when they are unset -- but note
-      # both the demo AWS MCP server and the demo GKE MCP server can run
-      # mutating operations, not only reads.
+      # the demo AWS, GKE, and Azure MCP servers can all run mutating
+      # operations, not only reads.
       DEMO_DATA: ${DEMO_DATA:-true}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       DEMO_AWS_ACCESS_KEY_ID: ${DEMO_AWS_ACCESS_KEY_ID:-}
       DEMO_AWS_SECRET_ACCESS_KEY: ${DEMO_AWS_SECRET_ACCESS_KEY:-}
       DEMO_AWS_REGION: ${DEMO_AWS_REGION:-us-east-1}
       DEMO_GCP_CREDENTIALS_JSON: ${DEMO_GCP_CREDENTIALS_JSON:-}
+      DEMO_AZURE_TENANT_ID: ${DEMO_AZURE_TENANT_ID:-}
+      DEMO_AZURE_CLIENT_ID: ${DEMO_AZURE_CLIENT_ID:-}
+      DEMO_AZURE_CLIENT_SECRET: ${DEMO_AZURE_CLIENT_SECRET:-}
       CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
       # Store of cloned skill repositories, one directory per published
       # revision. Durable state, not a cache: a workflow execution pins the

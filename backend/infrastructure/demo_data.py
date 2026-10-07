@@ -1,69 +1,87 @@
 """Startup registration and removal of the optional demo dataset.
 
 Gated by ``Settings.demo_data`` (the ``DEMO_DATA`` environment variable),
-this module keeps a small, self-contained example of everything two
-approval-gated, mutating workflows need -- "launch an EC2 instance" and
-"restart a GKE pod" -- all inside the seeded ``Default`` tenant (see
-:mod:`infrastructure.bootstrap`):
+this module keeps a small, self-contained example of everything three
+approval-gated, mutating workflows need -- "launch an EC2 instance",
+"restart a GKE pod", and "rotate an Azure Key Vault secret" -- all inside the
+seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 
-* two Secrets -- one holding the AWS access key id and secret access key as
-  two entries, and one holding a Google Cloud credential JSON (a service
+* three Secrets -- one holding the AWS access key id and secret access key as
+  two entries, one holding a Google Cloud credential JSON (a service
   account key, or the authorized-user JSON ``gcloud`` writes) as a single
-  entry, both described for the admin UI,
-* four MCPServers -- one stdio server reaching the managed AWS MCP Server
+  entry, and one holding an Azure service principal's tenant id, client id,
+  and client secret as three entries, all described for the admin UI,
+* six MCPServers -- one stdio server reaching the managed AWS MCP Server
   through the ``mcp-proxy-for-aws`` proxy launched with ``uvx``, referencing
   the AWS entries from its ``env`` via ``${secret:NAME/KEY}``, one
   ``streamable_http`` server reaching the Google-managed GKE (Google
   Kubernetes Engine) remote MCP server, sending an OAuth 2.0 access token
   minted from that credential as its ``Authorization: Bearer`` header via a
-  ``${gcp-token:NAME/KEY}`` placeholder, and two read-only ``script``
-  servers showing off in-app scripts: the Python "EC2 Cost Estimator",
-  pricing instance types through the AWS Price List Query API with ``boto3``
-  and the same AWS secret entries, and the JavaScript "Kubernetes Manifest
-  Toolkit", validating manifests and building rolling-restart patches with
-  ``js-yaml``; all four described,
-* five MCPToolMocks that stub the demo run's side-effecting tools so a
+  ``${gcp-token:NAME/KEY}`` placeholder, one stdio server launching
+  Microsoft's Azure MCP Server with ``npx``, limited to its Key Vault tools
+  and referencing the Azure entries from its ``env``, and three read-only
+  ``script`` servers showing off in-app scripts: the Python "EC2 Cost
+  Estimator", pricing instance types through the AWS Price List Query API
+  with ``boto3`` and the same AWS secret entries, the JavaScript
+  "Kubernetes Manifest Toolkit", validating manifests and building
+  rolling-restart patches with ``js-yaml``, and the JavaScript "Secret Value
+  Generator", producing random secret values with ``node:crypto``; all six
+  described,
+* seven MCPToolMocks that stub the demo run's side-effecting tools so a
   ``draft`` workflow run plays through without reaching AWS, a real GKE
-  cluster, or waiting on a human -- ``call_aws`` and ``run_script`` on the AWS
-  MCP server, each returning a successful EC2 launch, ``patch_k8s_resource``
-  and ``delete_k8s_resource`` on the GKE MCP server, returning a successful
-  rolling restart and a successful pod deletion respectively, and the
-  built-in ``request_approval``, returning ``approved``,
-* two AgentSkills pointing at ``sample_skills/aws-ec2-launch`` and
-  ``sample_skills/gke-pod-restart`` in this repository,
-* three Tags -- ``AWS`` (an **access-control** tag: visible, and its
+  cluster, a real Key Vault, or waiting on a human -- ``call_aws`` and
+  ``run_script`` on the AWS MCP server, each returning a successful EC2
+  launch, ``patch_k8s_resource`` and ``delete_k8s_resource`` on the GKE MCP
+  server, returning a successful rolling restart and a successful pod
+  deletion respectively, ``keyvault_secret_get`` and
+  ``keyvault_secret_create`` on the Azure MCP server, returning a list of a
+  vault's secrets and a new secret version respectively, and the built-in
+  ``request_approval``,
+  returning ``approved``,
+* three AgentSkills pointing at ``sample_skills/aws-ec2-launch``,
+  ``sample_skills/gke-pod-restart``, and
+  ``sample_skills/azure-keyvault-secret-rotation`` in this repository,
+* four Tags -- ``AWS`` (an **access-control** tag: visible, and its
   attachments usable, only to ``Demo AWS Group`` members and ``admin``/
   ``super_admin``; attached to the AWS secret, AWS MCP server, EC2 Cost
-  Estimator, the EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks,
-  showing that one tag classifies across resource types), ``GCP`` (also
-  access-control, gated the same way by ``Demo GCP Group``; attached to the
-  Google Cloud secret, the GKE MCP server, the Kubernetes Manifest Toolkit,
-  the pod-restart agent skill, and the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks -- GKE is
-  a Google Cloud product, so the same provider tag still applies), and
-  ``Approval Required`` (a plain, non-gating tag attached to
-  both agent skills, calling out their approval gate),
-* eight Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
+  Estimator, the EC2-launch agent skill, and the ``call_aws`` and
+  ``run_script`` tool mocks, showing that one tag classifies across resource
+  types), ``GCP`` (also access-control, gated the same way by
+  ``Demo GCP Group``; attached to the Google Cloud secret, the GKE MCP
+  server, the Kubernetes Manifest Toolkit, the pod-restart agent skill, and
+  the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks -- GKE
+  is a Google Cloud product, so the same provider tag still applies),
+  ``Azure`` (also access-control, gated by ``Demo Azure Group``; attached to
+  the Azure secret, the Azure MCP server, the Secret Value Generator, the
+  secret-rotation agent skill, and the ``keyvault_secret_get`` and
+  ``keyvault_secret_create`` tool mocks), and ``Approval Required`` (a plain, non-gating tag attached to all
+  three agent skills, calling out their approval gate),
+* eleven Users -- two managers, ``demo-approver-1`` and ``demo-approver-2``,
   either of whom the skill can ask for approval, an AWS trio
   (``demo-aws-developer``, ``demo-aws-reviewer``, ``demo-aws-requester``) who
-  build, publish, and run the EC2-launch workflow, and a GCP trio
+  build, publish, and run the EC2-launch workflow, a GCP trio
   (``demo-gcp-developer``, ``demo-gcp-reviewer``, ``demo-gcp-requester``) who
-  do the same for the GKE-pod-restart workflow -- each holding **no direct
-  role at all**,
-* six UserGroups -- ``Demo Approvers``, ``Demo Requesters``,
+  do the same for the GKE-pod-restart workflow, and an Azure trio
+  (``demo-azure-developer``, ``demo-azure-reviewer``,
+  ``demo-azure-requester``) who do the same for the secret-rotation
+  workflow -- each holding **no direct role at all**,
+* seven UserGroups -- ``Demo Approvers``, ``Demo Requesters``,
   ``Demo Developers``, and ``Demo Reviewers`` each grant one role to their
   members, so every demo account gets its role purely by inheritance
-  (each of the four holds two accounts, showing that a group's membership
-  need not be a single user). ``Demo AWS Group`` and ``Demo GCP Group``
-  grant no role at all -- they exist solely to hold the matching
-  access-control tag, so their members (the AWS or GCP developer, reviewer,
-  and requester) can see the AWS- or GCP-tagged records and everyone else
-  cannot -- except ``admin``/``super_admin``, who bypass access-control tags
-  entirely regardless of group membership (see
+  (each of the four holds several accounts, showing that a group's
+  membership need not be a single user). ``Demo AWS Group``,
+  ``Demo GCP Group``, and ``Demo Azure Group`` grant no role at all -- they
+  exist solely to hold the matching access-control tag, so their members
+  (that provider's developer, reviewer, and requester) can see that
+  provider's tagged records and everyone else cannot -- except
+  ``admin``/``super_admin``, who bypass access-control tags entirely
+  regardless of group membership (see
   ``dependencies.auth.get_access_tag_ids``). That makes both the
   role-inheritance and the access-control side of the group feature visible
   in the demo dataset itself: remove a user from their role group and their
-  access disappears on the next request; remove one of the trio from their
-  AC group instead and the AWS/GCP records disappear from what they can see.
+  access disappears on the next request; remove one of a trio from their
+  AC group instead and that provider's records disappear from what they can
+  see.
 
 The Workflow itself is deliberately *not* seeded — these records are the
 ingredients an operator assembles one into. Every tag stays unattached to any
@@ -153,6 +171,18 @@ DEMO_AWS_REVIEWER_USER_ID = "00000000-0000-0000-0000-00000000d007"
 #: GKE-pod-restart workflow the GCP developer built).
 DEMO_GCP_REVIEWER_USER_ID = "00000000-0000-0000-0000-00000000d008"
 
+#: Fixed identifier of the demo Azure ``developer`` user (who builds the
+#: secret-rotation workflow).
+DEMO_AZURE_DEVELOPER_USER_ID = "00000000-0000-0000-0000-00000000d009"
+
+#: Fixed identifier of the demo Azure ``reviewer`` user (who publishes the
+#: secret-rotation workflow the Azure developer built).
+DEMO_AZURE_REVIEWER_USER_ID = "00000000-0000-0000-0000-00000000d00a"
+
+#: Fixed identifier of the demo Azure ``requester`` user (who runs the
+#: secret-rotation workflow).
+DEMO_AZURE_REQUESTER_USER_ID = "00000000-0000-0000-0000-00000000d00b"
+
 #: Fixed identifier of the demo ``Demo Approvers`` user group.
 DEMO_APPROVERS_GROUP_ID = "00000000-0000-0000-0000-00000000d401"
 
@@ -173,11 +203,18 @@ DEMO_GCP_GROUP_ID = "00000000-0000-0000-0000-00000000d405"
 #: Fixed identifier of the demo ``Demo Reviewers`` user group.
 DEMO_REVIEWERS_GROUP_ID = "00000000-0000-0000-0000-00000000d406"
 
+#: Fixed identifier of the demo ``Demo Azure Group`` user group, which grants
+#: no role and exists solely to hold the access-control ``Azure`` tag.
+DEMO_AZURE_GROUP_ID = "00000000-0000-0000-0000-00000000d407"
+
 #: Fixed identifier of the demo Secret holding the AWS credentials.
 DEMO_AWS_SECRET_ID = "00000000-0000-0000-0000-00000000d101"
 
 #: Fixed identifier of the demo Secret holding the Google Cloud API key.
 DEMO_GCP_SECRET_ID = "00000000-0000-0000-0000-00000000d102"
+
+#: Fixed identifier of the demo Secret holding the Azure service principal.
+DEMO_AZURE_SECRET_ID = "00000000-0000-0000-0000-00000000d103"
 
 #: Fixed identifier of the demo AWS MCP server.
 DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
@@ -191,11 +228,20 @@ DEMO_COST_ESTIMATOR_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d203"
 #: Fixed identifier of the demo Kubernetes Manifest Toolkit script MCP server.
 DEMO_K8S_TOOLKIT_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d204"
 
+#: Fixed identifier of the demo Azure MCP server.
+DEMO_AZURE_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d205"
+
+#: Fixed identifier of the demo Secret Value Generator script MCP server.
+DEMO_SECRET_GENERATOR_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d206"
+
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
 
 #: Fixed identifier of the demo ``gke-pod-restart`` agent skill.
 DEMO_GKE_SKILL_ID = "00000000-0000-0000-0000-00000000d302"
+
+#: Fixed identifier of the demo ``azure-keyvault-secret-rotation`` agent skill.
+DEMO_AZURE_SKILL_ID = "00000000-0000-0000-0000-00000000d303"
 
 #: Fixed identifier of the demo ``AWS`` tag.
 DEMO_AWS_TAG_ID = "00000000-0000-0000-0000-00000000d501"
@@ -205,6 +251,9 @@ DEMO_APPROVAL_TAG_ID = "00000000-0000-0000-0000-00000000d502"
 
 #: Fixed identifier of the demo ``GCP`` tag.
 DEMO_GCP_TAG_ID = "00000000-0000-0000-0000-00000000d503"
+
+#: Fixed identifier of the demo ``Azure`` tag.
+DEMO_AZURE_TAG_ID = "00000000-0000-0000-0000-00000000d504"
 
 #: Fixed identifier of the demo ``call_aws`` tool mock (AWS MCP server).
 DEMO_CALL_AWS_MOCK_ID = "00000000-0000-0000-0000-00000000d601"
@@ -221,11 +270,22 @@ DEMO_DELETE_POD_MOCK_ID = "00000000-0000-0000-0000-00000000d604"
 #: Fixed identifier of the demo ``patch_k8s_resource`` tool mock (GKE MCP server).
 DEMO_PATCH_WORKLOAD_MOCK_ID = "00000000-0000-0000-0000-00000000d605"
 
+#: Fixed identifier of the demo ``keyvault_secret_create`` tool mock (Azure MCP
+#: server).
+DEMO_SECRET_CREATE_MOCK_ID = "00000000-0000-0000-0000-00000000d606"
+
+#: Fixed identifier of the demo ``keyvault_secret_get`` tool mock (Azure MCP
+#: server).
+DEMO_SECRET_LIST_MOCK_ID = "00000000-0000-0000-0000-00000000d607"
+
 #: Name of the demo tag shared by the secret, MCP server, and agent skill.
 DEMO_AWS_TAG_NAME = "AWS"
 
 #: Name of the demo tag shared by the Google Cloud secret and MCP server.
 DEMO_GCP_TAG_NAME = "GCP"
+
+#: Name of the demo tag shared by the Azure secret, MCP servers, and skill.
+DEMO_AZURE_TAG_NAME = "Azure"
 
 #: Name of the demo tag attached only to the agent skill.
 DEMO_APPROVAL_TAG_NAME = "Approval Required"
@@ -250,6 +310,24 @@ DEMO_GCP_SECRET_NAME = "demo-gcp-credentials"
 #: :data:`DEMO_GCP_SECRET_NAME`.
 DEMO_GCP_CREDENTIALS_ENTRY_KEY = "GOOGLE_CREDENTIALS_JSON"
 
+#: Name of the demo Secret holding the Azure service principal. Its three
+#: entries are embedded in the demo Azure MCP server's ``env`` as
+#: ``${secret:NAME/KEY}`` placeholders, under the same names the Azure SDK's
+#: ``EnvironmentCredential`` reads.
+DEMO_AZURE_SECRET_NAME = "demo-azure-credentials"
+
+#: Entry key of the Microsoft Entra tenant id within
+#: :data:`DEMO_AZURE_SECRET_NAME`.
+DEMO_AZURE_TENANT_ENTRY_KEY = "AZURE_TENANT_ID"
+
+#: Entry key of the service principal's client id within
+#: :data:`DEMO_AZURE_SECRET_NAME`.
+DEMO_AZURE_CLIENT_ID_ENTRY_KEY = "AZURE_CLIENT_ID"
+
+#: Entry key of the service principal's client secret within
+#: :data:`DEMO_AZURE_SECRET_NAME`.
+DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY = "AZURE_CLIENT_SECRET"
+
 #: Name of the demo MCP server as shown in the admin UI.
 DEMO_MCP_SERVER_NAME = "AWS MCP Server"
 
@@ -262,11 +340,20 @@ DEMO_COST_ESTIMATOR_MCP_SERVER_NAME = "EC2 Cost Estimator"
 #: Name of the demo Kubernetes Manifest Toolkit script server in the admin UI.
 DEMO_K8S_TOOLKIT_MCP_SERVER_NAME = "Kubernetes Manifest Toolkit"
 
+#: Name of the demo Azure MCP server as shown in the admin UI.
+DEMO_AZURE_MCP_SERVER_NAME = "Azure MCP Server"
+
+#: Name of the demo Secret Value Generator script server in the admin UI.
+DEMO_SECRET_GENERATOR_MCP_SERVER_NAME = "Secret Value Generator"
+
 #: Name of the demo agent skill as shown in the admin UI.
 DEMO_AGENT_SKILL_NAME = "Demo AWS EC2 Launch"
 
 #: Name of the demo GKE pod-restart agent skill in the admin UI.
 DEMO_GKE_SKILL_NAME = "Demo GKE Pod Restart"
+
+#: Name of the demo Azure Key Vault secret-rotation agent skill in the admin UI.
+DEMO_AZURE_SKILL_NAME = "Demo Azure Key Vault Secret Rotation"
 
 #: Name of the demo ``call_aws`` tool mock as shown in the admin UI.
 DEMO_CALL_AWS_MOCK_NAME = "Demo AWS call_aws (EC2 launch success)"
@@ -282,6 +369,12 @@ DEMO_DELETE_POD_MOCK_NAME = "Demo GKE delete_k8s_resource (pod restart success)"
 
 #: Name of the demo ``patch_k8s_resource`` tool mock as shown in the admin UI.
 DEMO_PATCH_WORKLOAD_MOCK_NAME = "Demo GKE patch_k8s_resource (rolling restart success)"
+
+#: Name of the demo ``keyvault_secret_create`` tool mock as shown in the admin UI.
+DEMO_SECRET_CREATE_MOCK_NAME = "Demo Azure keyvault_secret_create (rotation success)"
+
+#: Name of the demo ``keyvault_secret_get`` tool mock as shown in the admin UI.
+DEMO_SECRET_LIST_MOCK_NAME = "Demo Azure keyvault_secret_get (secret list)"
 
 #: Proxy package the demo MCP server is launched from. Pinned to an exact
 #: version rather than ``@latest``, which is what the upstream migration guide
@@ -311,11 +404,45 @@ _DEMO_GKE_MCP_ENDPOINT = "https://container.googleapis.com/mcp"
 #: neither the credential nor a token ever lands in the ``mcp_servers`` row.
 _DEMO_GCP_AUTH_HEADER = "Authorization"
 
+#: Package the demo Azure MCP server is launched from, pinned for the same
+#: reason as :data:`_DEMO_MCP_PROXY_PACKAGE`. npm publishes the 3.x line only
+#: under prerelease versions, which ``latest`` points at.
+_DEMO_AZURE_MCP_PACKAGE = "@azure/mcp@3.0.0-beta.50"
+
+#: Arguments after ``-y <package>`` that start the demo Azure MCP server.
+#: ``--namespace keyvault`` keeps it to the Key Vault tools; ``--mode all``
+#: exposes each operation as its own tool (``keyvault_secret_create``,
+#: ``keyvault_secret_get``, ...) rather than one ``keyvault`` tool taking a
+#: command, so a tool mock or an approval can single out the write.
+#: ``--dangerously-disable-elicitation`` is required because A2Flow's MCP
+#: client does not answer elicitation requests yet: without it the server
+#: asks for consent before every secret operation, the request is refused,
+#: and the call fails. The consent it would ask for is given by the manager
+#: who approves the rotation instead -- the sample skill writes nothing until
+#: that approval comes back. Drop the flag once elicitation can be answered
+#: in the chat.
+_DEMO_AZURE_MCP_ARGS = (
+    "server",
+    "start",
+    "--namespace",
+    "keyvault",
+    "--mode",
+    "all",
+    "--dangerously-disable-elicitation",
+)
+
+#: Azure SDK credential the demo Azure MCP server is told to use. Pinning it to
+#: ``EnvironmentCredential`` makes the server read the service principal from
+#: its ``env`` and nothing else, instead of probing a developer sign-in
+#: (Azure CLI, Visual Studio Code, a browser) that a headless sandbox lacks.
+_DEMO_AZURE_TOKEN_CREDENTIALS = "EnvironmentCredential"
+
 #: Repository the demo agent skills are cloned from, and the path within it to
 #: each one's ``SKILL.md``.
 _DEMO_SKILL_REPO_URL = "https://github.com/kaitoy/a2flow"
 _DEMO_AWS_SKILL_REPO_PATH = "sample_skills/aws-ec2-launch"
 _DEMO_GKE_SKILL_REPO_PATH = "sample_skills/gke-pod-restart"
+_DEMO_AZURE_SKILL_REPO_PATH = "sample_skills/azure-keyvault-secret-rotation"
 
 #: Stored in place of an AWS credential or Google Cloud credential JSON when
 #: the matching ``DEMO_*`` variable is unset. The demo is then complete in shape
@@ -336,6 +463,12 @@ _DEMO_GCP_SECRET_DESCRIPTION = (
     "server mints its OAuth 2.0 access token from."
 )
 
+#: Description shown on the demo Azure secret in the admin UI.
+_DEMO_AZURE_SECRET_DESCRIPTION = (
+    "Azure service principal (tenant id, client id, and client secret) the "
+    "demo Azure MCP server authenticates to Key Vault with."
+)
+
 #: Description shown on the demo MCP server in the admin UI.
 _DEMO_MCP_SERVER_DESCRIPTION = (
     "Managed AWS MCP Server reached through the mcp-proxy-for-aws bridge, "
@@ -351,6 +484,14 @@ _DEMO_GKE_MCP_SERVER_DESCRIPTION = (
     "deleting a pod."
 )
 
+#: Description shown on the demo Azure MCP server in the admin UI.
+_DEMO_AZURE_MCP_SERVER_DESCRIPTION = (
+    "Microsoft's Azure MCP Server, limited to its Key Vault tools, for "
+    "listing and writing Key Vault secrets, keys, and certificates. Started "
+    "with user confirmation (elicitation) disabled: a manager's approval "
+    "stands in for it."
+)
+
 #: Description shown on the demo EC2 Cost Estimator server in the admin UI.
 _DEMO_COST_ESTIMATOR_DESCRIPTION = (
     "Python script server that estimates the monthly On-Demand cost of EC2 "
@@ -364,6 +505,12 @@ _DEMO_K8S_TOOLKIT_DESCRIPTION = (
     "JavaScript script server that validates Kubernetes manifests and builds "
     "the patch that rolling-restarts a workload. Computes only; it never "
     "reaches a cluster."
+)
+
+#: Description shown on the demo Secret Value Generator server in the admin UI.
+_DEMO_SECRET_GENERATOR_DESCRIPTION = (
+    "JavaScript script server that generates a cryptographically random "
+    "secret value. Computes only; it never reaches Azure."
 )
 
 #: Packages the EC2 Cost Estimator installs, pinned for the same reason as
@@ -533,6 +680,34 @@ build_restart_patch.inputSchema = {
 };
 """
 
+#: Source of the Secret Value Generator. Like the Kubernetes Manifest Toolkit,
+#: the exported function takes the call's arguments object and carries its own
+#: ``description`` and ``inputSchema``. It needs no packages: ``node:crypto``
+#: is built in.
+_DEMO_SECRET_GENERATOR_SOURCE = """\
+import { randomBytes } from "node:crypto";
+
+export function generate_secret_value({ length = 32 }) {
+  if (!Number.isInteger(length) || length < 16 || length > 256) {
+    throw new Error("length must be an integer from 16 to 256");
+  }
+  // base64url of ceil(length * 3 / 4) random bytes, cut to the exact length.
+  const value = randomBytes(Math.ceil((length * 3) / 4))
+    .toString("base64url")
+    .slice(0, length);
+  return { value, length, alphabet: "base64url (A-Z a-z 0-9 - _)" };
+}
+generate_secret_value.description =
+  "Generate a cryptographically random secret value of the given length, " +
+  "using URL-safe base64 characters.";
+generate_secret_value.inputSchema = {
+  type: "object",
+  properties: {
+    length: { type: "integer", minimum: 16, maximum: 256, default: 32 },
+  },
+};
+"""
+
 #: Description shown on the demo ``AWS`` tag in the admin UI.
 _DEMO_AWS_TAG_DESCRIPTION = (
     "Resources that talk to AWS: credentials, MCP servers, and agent skills "
@@ -543,6 +718,12 @@ _DEMO_AWS_TAG_DESCRIPTION = (
 _DEMO_GCP_TAG_DESCRIPTION = (
     "Resources that talk to Google Cloud: credentials, MCP servers, and agent "
     "skills scoped to the GCP provider."
+)
+
+#: Description shown on the demo ``Azure`` tag in the admin UI.
+_DEMO_AZURE_TAG_DESCRIPTION = (
+    "Resources that talk to Azure: credentials, MCP servers, and agent skills "
+    "scoped to the Azure provider."
 )
 
 #: Description shown on the demo ``Approval Required`` tag in the admin UI.
@@ -648,6 +829,24 @@ _DEMO_USERS = (
         first_name="Henry",
         last_name="Ito",
     ),
+    _DemoUserSpec(
+        id=DEMO_AZURE_DEVELOPER_USER_ID,
+        username="demo-azure-developer",
+        first_name="Isabel",
+        last_name="Novak",
+    ),
+    _DemoUserSpec(
+        id=DEMO_AZURE_REVIEWER_USER_ID,
+        username="demo-azure-reviewer",
+        first_name="Jonas",
+        last_name="Keller",
+    ),
+    _DemoUserSpec(
+        id=DEMO_AZURE_REQUESTER_USER_ID,
+        username="demo-azure-requester",
+        first_name="Kai",
+        last_name="Lindqvist",
+    ),
 )
 
 #: The demo user groups. ``Demo Approvers``, ``Demo Requesters``,
@@ -657,16 +856,16 @@ _DEMO_USERS = (
 #: workflow; ``developer`` is the role that may build and register a
 #: workflow, MCP server, or agent skill; ``reviewer`` is the role that may
 #: publish or deactivate one. Granting each through a group rather than
-#: directly is what makes the demo exercise role inheritance; all four hold
-#: two members, showing that a group's role reaches every one of its
-#: members, not just a single account.
+#: directly is what makes the demo exercise role inheritance; every one of
+#: the four holds several members, showing that a group's role reaches every
+#: one of its members, not just a single account.
 #:
-#: ``Demo AWS Group`` and ``Demo GCP Group`` grant no role at all (``role=
-#: None``) -- their only purpose is to hold the matching access-control tag
-#: (see :func:`_seed_demo_tags`), so their members, and only their members,
-#: can see the AWS- or GCP-tagged records. Each demo developer/requester/
-#: reviewer therefore belongs to two groups: one for their role, one for
-#: their provider's access.
+#: ``Demo AWS Group``, ``Demo GCP Group``, and ``Demo Azure Group`` grant no
+#: role at all (``role=None``) -- their only purpose is to hold the matching
+#: access-control tag (see :func:`_seed_demo_tags`), so their members, and
+#: only their members, can see that provider's tagged records. Each demo
+#: developer/requester/reviewer therefore belongs to two groups: one for
+#: their role, one for their provider's access.
 _DEMO_GROUPS = (
     _DemoGroupSpec(
         id=DEMO_APPROVERS_GROUP_ID,
@@ -680,21 +879,33 @@ _DEMO_GROUPS = (
         name="Demo Requesters",
         description="People who can run published workflows.",
         role=Role.requester,
-        member_ids=(DEMO_AWS_REQUESTER_USER_ID, DEMO_GCP_REQUESTER_USER_ID),
+        member_ids=(
+            DEMO_AWS_REQUESTER_USER_ID,
+            DEMO_GCP_REQUESTER_USER_ID,
+            DEMO_AZURE_REQUESTER_USER_ID,
+        ),
     ),
     _DemoGroupSpec(
         id=DEMO_DEVELOPERS_GROUP_ID,
         name="Demo Developers",
         description="People who can build workflows, MCP servers, and agent skills.",
         role=Role.developer,
-        member_ids=(DEMO_AWS_DEVELOPER_USER_ID, DEMO_GCP_DEVELOPER_USER_ID),
+        member_ids=(
+            DEMO_AWS_DEVELOPER_USER_ID,
+            DEMO_GCP_DEVELOPER_USER_ID,
+            DEMO_AZURE_DEVELOPER_USER_ID,
+        ),
     ),
     _DemoGroupSpec(
         id=DEMO_REVIEWERS_GROUP_ID,
         name="Demo Reviewers",
         description="People who can publish or deactivate a workflow.",
         role=Role.reviewer,
-        member_ids=(DEMO_AWS_REVIEWER_USER_ID, DEMO_GCP_REVIEWER_USER_ID),
+        member_ids=(
+            DEMO_AWS_REVIEWER_USER_ID,
+            DEMO_GCP_REVIEWER_USER_ID,
+            DEMO_AZURE_REVIEWER_USER_ID,
+        ),
     ),
     _DemoGroupSpec(
         id=DEMO_AWS_GROUP_ID,
@@ -718,6 +929,19 @@ _DEMO_GROUPS = (
             DEMO_GCP_REVIEWER_USER_ID,
         ),
     ),
+    _DemoGroupSpec(
+        id=DEMO_AZURE_GROUP_ID,
+        name="Demo Azure Group",
+        description=(
+            "Holds the access-control 'Azure' tag; grants no role of its own."
+        ),
+        role=None,
+        member_ids=(
+            DEMO_AZURE_DEVELOPER_USER_ID,
+            DEMO_AZURE_REQUESTER_USER_ID,
+            DEMO_AZURE_REVIEWER_USER_ID,
+        ),
+    ),
 )
 
 #: The tool of the demo AWS MCP server that runs one AWS CLI command.
@@ -739,6 +963,27 @@ _DEMO_PATCH_WORKLOAD_TOOL = "patch_k8s_resource"
 #: used here as the single-pod fallback restart path. Connected the same way
 #: as :data:`_DEMO_PATCH_WORKLOAD_TOOL`.
 _DEMO_DELETE_POD_TOOL = "delete_k8s_resource"
+
+#: The tool of the demo Azure MCP server that writes a Key Vault secret.
+#: Writing under an existing name adds a new version, which is how the sample
+#: skill rotates one. Launched with ``--mode all`` and connected over stdio
+#: with no proxy in between, so the tool carries the bare name the server
+#: itself declares.
+_DEMO_SECRET_CREATE_TOOL = "keyvault_secret_create"
+
+#: The tool of the demo Azure MCP server that reads Key Vault secrets. Called
+#: with no ``secret`` name it lists the vault's secrets, which is the only way
+#: the sample skill uses it -- named, it would return the value.
+_DEMO_SECRET_LIST_TOOL = "keyvault_secret_get"
+
+#: Secret name shared by the Azure mocks' list and write results, so the story
+#: they tell is self-consistent: the secret the run picks from the list is the
+#: one that gets a new version.
+_DEMO_MOCK_SECRET_NAME = "db-password"
+
+#: Version id of the new secret version the ``keyvault_secret_create`` mock
+#: reports.
+_DEMO_MOCK_SECRET_VERSION = "3f0c2a9d8b7e4f6a9c1d2e3f4a5b6c7d"
 
 #: Instance id shared by the ``call_aws`` and ``run_script`` mock results, so a
 #: run that happens to call both still tells one consistent story.
@@ -819,6 +1064,33 @@ _DEMO_DELETE_POD_RESULT: dict[str, Any] = {
     ),
 }
 
+#: Structured result of the demo ``keyvault_secret_create`` mock: the
+#: identity and attributes of the new secret version, as the Azure MCP server
+#: reports a successful write. The value is deliberately absent -- the sample
+#: skill never repeats a secret value, and a mock has no reason to make one up.
+_DEMO_SECRET_CREATE_RESULT: dict[str, Any] = {
+    "name": _DEMO_MOCK_SECRET_NAME,
+    "version": _DEMO_MOCK_SECRET_VERSION,
+    "id": (
+        "https://demo-kv.vault.azure.net/secrets/"
+        f"{_DEMO_MOCK_SECRET_NAME}/{_DEMO_MOCK_SECRET_VERSION}"
+    ),
+    "enabled": True,
+    "createdOn": "2026-01-01T00:00:00+00:00",
+    "updatedOn": "2026-01-01T00:00:00+00:00",
+}
+
+#: Structured result of the demo ``keyvault_secret_get`` mock: a listing of a
+#: vault's secrets -- names and attributes, never values -- so a draft run has
+#: something to pick the secret to rotate from.
+_DEMO_SECRET_LIST_RESULT: dict[str, Any] = {
+    "secrets": [
+        {"name": _DEMO_MOCK_SECRET_NAME, "enabled": True},
+        {"name": "storage-connection-string", "enabled": True},
+        {"name": "third-party-api-key", "enabled": True},
+    ]
+}
+
 #: Description shown on the demo ``call_aws`` tool mock in the admin UI.
 _DEMO_CALL_AWS_MOCK_DESCRIPTION = (
     "Stubs the AWS MCP Server's call_aws tool with a successful ec2 "
@@ -831,6 +1103,22 @@ _DEMO_RUN_SCRIPT_MOCK_DESCRIPTION = (
     "Stubs the AWS MCP Server's run_script tool with a successful EC2 launch, "
     "so a draft run of the demo workflow completes its launch step without "
     "reaching AWS."
+)
+
+#: Description shown on the demo ``keyvault_secret_create`` tool mock in the
+#: admin UI.
+_DEMO_SECRET_CREATE_MOCK_DESCRIPTION = (
+    "Stubs the Azure MCP Server's keyvault_secret_create tool with a new "
+    "secret version, so a draft run of the demo workflow completes its "
+    "rotation step without reaching a real Key Vault."
+)
+
+#: Description shown on the demo ``keyvault_secret_get`` tool mock in the
+#: admin UI.
+_DEMO_SECRET_LIST_MOCK_DESCRIPTION = (
+    "Stubs the Azure MCP Server's keyvault_secret_get tool with a made-up list "
+    "of a vault's secrets, so a draft run of the demo workflow can choose the "
+    "secret to rotate without reaching a real Key Vault."
 )
 
 #: Description shown on the demo ``request_approval`` tool mock in the admin UI.
@@ -883,10 +1171,12 @@ class _DemoToolMockSpec:
 #: third and fourth stub the demo GKE MCP server's tools (see
 #: :func:`_seed_demo_gke_mcp_server`) -- rolling-restarting a Deployment/
 #: StatefulSet, and, as a fallback, deleting a single pod; the fifth stubs the
-#: built-in :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`. Checked in a
-#: draft run's Run dialog, together they let either sample workflow -- "launch
-#: an EC2 instance" or "restart a GKE pod" -- run end to end without reaching
-#: AWS, a real GKE cluster, or an approver.
+#: demo Azure MCP server's secret listing and write (see
+#: :func:`_seed_demo_azure_mcp_server`); the seventh stubs the built-in
+#: :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`. Checked in a draft
+#: run's Run dialog, together they let any of the three sample workflows run
+#: end to end without reaching AWS, a real GKE cluster, a real Key Vault, or
+#: an approver.
 _DEMO_TOOL_MOCKS = (
     _DemoToolMockSpec(
         id=DEMO_CALL_AWS_MOCK_ID,
@@ -919,6 +1209,22 @@ _DEMO_TOOL_MOCKS = (
         mcp_server_id=DEMO_GKE_MCP_SERVER_ID,
         tool_name=_DEMO_DELETE_POD_TOOL,
         response={"kind": "structured", "value": _DEMO_DELETE_POD_RESULT},
+    ),
+    _DemoToolMockSpec(
+        id=DEMO_SECRET_CREATE_MOCK_ID,
+        name=DEMO_SECRET_CREATE_MOCK_NAME,
+        description=_DEMO_SECRET_CREATE_MOCK_DESCRIPTION,
+        mcp_server_id=DEMO_AZURE_MCP_SERVER_ID,
+        tool_name=_DEMO_SECRET_CREATE_TOOL,
+        response={"kind": "structured", "value": _DEMO_SECRET_CREATE_RESULT},
+    ),
+    _DemoToolMockSpec(
+        id=DEMO_SECRET_LIST_MOCK_ID,
+        name=DEMO_SECRET_LIST_MOCK_NAME,
+        description=_DEMO_SECRET_LIST_MOCK_DESCRIPTION,
+        mcp_server_id=DEMO_AZURE_MCP_SERVER_ID,
+        tool_name=_DEMO_SECRET_LIST_TOOL,
+        response={"kind": "structured", "value": _DEMO_SECRET_LIST_RESULT},
     ),
     _DemoToolMockSpec(
         id=DEMO_REQUEST_APPROVAL_MOCK_ID,
@@ -979,12 +1285,15 @@ async def _seed_demo_data(session: AsyncSession) -> list[str]:
     await _seed_demo_gke_mcp_server(session, tenant_id)
     await _seed_demo_cost_estimator_mcp_server(session, tenant_id)
     await _seed_demo_k8s_toolkit_mcp_server(session, tenant_id)
+    await _seed_demo_azure_mcp_server(session, tenant_id)
+    await _seed_demo_secret_generator_mcp_server(session, tenant_id)
     await _seed_demo_tool_mocks(session, tenant_id)
     new_skill_ids = [
         skill_id
         for skill_id in (
             await _seed_demo_agent_skill(session, tenant_id),
             await _seed_demo_gke_agent_skill(session, tenant_id),
+            await _seed_demo_azure_agent_skill(session, tenant_id),
         )
         if skill_id is not None
     ]
@@ -1003,7 +1312,9 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     which would otherwise block its removal. A record that other data has come
     to depend on (a Workflow built on a demo skill, a task tool binding on
     one of the demo MCP servers) cannot be deleted; that is logged and skipped
-    rather than allowed to fail startup.
+    rather than allowed to fail startup. The same holds for the
+    ``keyvault_secret_get`` and ``keyvault_secret_create`` mocks and the
+    Azure MCP server.
 
     Deleting a tag has no such protection — the join tables cascade rather
     than restrict, by design (see the module docstring of ``models.tag``) —
@@ -1032,6 +1343,12 @@ async def _remove_demo_data(session: AsyncSession) -> None:
         label="GKE pod-restart agent skill",
     )
     await _delete_demo_row(
+        session,
+        AgentSkill,
+        DEMO_AZURE_SKILL_ID,
+        label="Azure secret-rotation agent skill",
+    )
+    await _delete_demo_row(
         session, MCPServer, DEMO_MCP_SERVER_ID, label="AWS MCP server"
     )
     await _delete_demo_row(
@@ -1050,16 +1367,31 @@ async def _remove_demo_data(session: AsyncSession) -> None:
         label="Kubernetes Manifest Toolkit MCP server",
     )
     await _delete_demo_row(
+        session, MCPServer, DEMO_AZURE_MCP_SERVER_ID, label="Azure MCP server"
+    )
+    await _delete_demo_row(
+        session,
+        MCPServer,
+        DEMO_SECRET_GENERATOR_MCP_SERVER_ID,
+        label="Secret Value Generator MCP server",
+    )
+    await _delete_demo_row(
         session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
     )
     await _delete_demo_row(
         session, Secret, DEMO_GCP_SECRET_ID, label="Google Cloud API key secret"
     )
     await _delete_demo_row(
+        session, Secret, DEMO_AZURE_SECRET_ID, label="Azure credentials secret"
+    )
+    await _delete_demo_row(
         session, Tag, DEMO_AWS_TAG_ID, label=f"tag '{DEMO_AWS_TAG_NAME}'"
     )
     await _delete_demo_row(
         session, Tag, DEMO_GCP_TAG_ID, label=f"tag '{DEMO_GCP_TAG_NAME}'"
+    )
+    await _delete_demo_row(
+        session, Tag, DEMO_AZURE_TAG_ID, label=f"tag '{DEMO_AZURE_TAG_NAME}'"
     )
     await _delete_demo_row(
         session, Tag, DEMO_APPROVAL_TAG_ID, label=f"tag '{DEMO_APPROVAL_TAG_NAME}'"
@@ -1310,13 +1642,16 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
 
 
 async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo AWS credentials and Google Cloud credential secrets.
+    """Create the demo AWS, Google Cloud, and Azure credential secrets.
 
     The AWS access key and secret key live in a single secret as two entries,
     the way a Vault KV path holds several keys; the Google Cloud credential
-    JSON is a second secret with a single entry. Values come from
-    ``DEMO_AWS_ACCESS_KEY_ID`` / ``DEMO_AWS_SECRET_ACCESS_KEY`` /
-    ``DEMO_GCP_CREDENTIALS_JSON`` when set, so a fully working demo is one
+    JSON is a second secret with a single entry; the Azure service
+    principal's tenant id, client id, and client secret are a third secret
+    with three entries. Values come from ``DEMO_AWS_ACCESS_KEY_ID`` /
+    ``DEMO_AWS_SECRET_ACCESS_KEY`` / ``DEMO_GCP_CREDENTIALS_JSON`` /
+    ``DEMO_AZURE_TENANT_ID`` / ``DEMO_AZURE_CLIENT_ID`` /
+    ``DEMO_AZURE_CLIENT_SECRET`` when set, so a fully working demo is one
     restart away, and fall back to a placeholder otherwise.
     They are stored as Fernet ciphertext, the same as any secret created through
     the API — the encryption lives in the service layer, which this
@@ -1370,6 +1705,31 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
                 updated_by=SYSTEM_USER_ID,
             ),
             label=f"secret '{DEMO_GCP_SECRET_NAME}'",
+        )
+    if await session.get(Secret, DEMO_AZURE_SECRET_ID) is None:
+        await _insert(
+            session,
+            Secret(
+                id=DEMO_AZURE_SECRET_ID,
+                tenant_id=tenant_id,
+                name=DEMO_AZURE_SECRET_NAME,
+                description=_DEMO_AZURE_SECRET_DESCRIPTION,
+                type=SecretType.local,
+                entries={
+                    DEMO_AZURE_TENANT_ENTRY_KEY: cipher.encrypt(
+                        settings.demo_azure_tenant_id or _PLACEHOLDER_SECRET_VALUE
+                    ),
+                    DEMO_AZURE_CLIENT_ID_ENTRY_KEY: cipher.encrypt(
+                        settings.demo_azure_client_id or _PLACEHOLDER_SECRET_VALUE
+                    ),
+                    DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY: cipher.encrypt(
+                        settings.demo_azure_client_secret or _PLACEHOLDER_SECRET_VALUE
+                    ),
+                },
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            ),
+            label=f"secret '{DEMO_AZURE_SECRET_NAME}'",
         )
 
 
@@ -1557,23 +1917,106 @@ async def _seed_demo_k8s_toolkit_mcp_server(
     )
 
 
+async def _seed_demo_azure_mcp_server(session: AsyncSession, tenant_id: str) -> None:
+    """Create the demo Azure MCP server.
+
+    Microsoft ships the Azure MCP Server as an npm package, so the row is a
+    ``stdio`` server launched with ``npx`` (see :data:`_DEMO_AZURE_MCP_ARGS`
+    for the flags, including why elicitation is disabled). It authenticates
+    as a service principal: the three ``env`` entries are
+    ``${secret:NAME/KEY}`` placeholders resolved at connection time, under the
+    variable names the Azure SDK's ``EnvironmentCredential`` reads, so the
+    plaintext never lands in the ``mcp_servers`` row. Its Key Vault tools can
+    write secrets, keys, and certificates, not only read them.
+
+    Args:
+        session: Database session used to read and insert the server.
+        tenant_id: Id of the ``Default`` tenant the server belongs to.
+    """
+    if await session.get(MCPServer, DEMO_AZURE_MCP_SERVER_ID) is not None:
+        return
+    await _insert(
+        session,
+        MCPServer(
+            id=DEMO_AZURE_MCP_SERVER_ID,
+            tenant_id=tenant_id,
+            name=DEMO_AZURE_MCP_SERVER_NAME,
+            description=_DEMO_AZURE_MCP_SERVER_DESCRIPTION,
+            transport=McpTransport.stdio,
+            command=McpCommand.npx,
+            args=["-y", _DEMO_AZURE_MCP_PACKAGE, *_DEMO_AZURE_MCP_ARGS],
+            headers={},
+            env={
+                key: f"${{secret:{DEMO_AZURE_SECRET_NAME}/{key}}}"
+                for key in (
+                    DEMO_AZURE_TENANT_ENTRY_KEY,
+                    DEMO_AZURE_CLIENT_ID_ENTRY_KEY,
+                    DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY,
+                )
+            }
+            | {"AZURE_TOKEN_CREDENTIALS": _DEMO_AZURE_TOKEN_CREDENTIALS},
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"MCP server '{DEMO_AZURE_MCP_SERVER_NAME}'",
+    )
+
+
+async def _seed_demo_secret_generator_mcp_server(
+    session: AsyncSession, tenant_id: str
+) -> None:
+    """Create the demo Secret Value Generator, a JavaScript script MCP server.
+
+    Its one tool draws a random value with the built-in ``node:crypto``, so
+    the row declares no packages. It needs no credentials and never reaches
+    Azure, so it has no tool mocks.
+
+    Args:
+        session: Database session used to read and insert the server.
+        tenant_id: Id of the ``Default`` tenant the server belongs to.
+    """
+    if await session.get(MCPServer, DEMO_SECRET_GENERATOR_MCP_SERVER_ID) is not None:
+        return
+    await _insert(
+        session,
+        MCPServer(
+            id=DEMO_SECRET_GENERATOR_MCP_SERVER_ID,
+            tenant_id=tenant_id,
+            name=DEMO_SECRET_GENERATOR_MCP_SERVER_NAME,
+            description=_DEMO_SECRET_GENERATOR_DESCRIPTION,
+            transport=McpTransport.script,
+            language=ScriptLanguage.javascript,
+            source=_DEMO_SECRET_GENERATOR_SOURCE,
+            packages=[],
+            headers={},
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"MCP server '{DEMO_SECRET_GENERATOR_MCP_SERVER_NAME}'",
+    )
+
+
 async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
     """Create the demo tool mocks that let a draft run play through unattended.
 
-    Five stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
+    Seven stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
     ``run_script`` on the demo AWS MCP server, each returning a successful EC2
     launch, ``patch_k8s_resource`` and ``delete_k8s_resource`` on the demo GKE
     MCP server, returning a successful rolling restart and a successful pod
-    deletion respectively, and the built-in
+    deletion respectively, ``keyvault_secret_get`` and
+    ``keyvault_secret_create`` on the demo Azure MCP server, returning a list
+    of a vault's secrets and a new secret version respectively, and the
+    built-in
     :data:`~models.mcp_tool_mock.REQUEST_APPROVAL_TOOL`, returning ``approved``.
-    Selected in a draft run's Run dialog, they let either sample workflow --
-    "launch an EC2 instance" or "restart a GKE pod" -- run end to end without
-    reaching AWS, a real GKE cluster, or waiting on an approver.
+    Selected in a draft run's Run dialog, they let any of the three sample
+    workflows run end to end without reaching AWS, a real GKE cluster, a real
+    Key Vault, or waiting on an approver.
 
-    Must run after :func:`_seed_demo_mcp_server` and
-    :func:`_seed_demo_gke_mcp_server`: the first four mocks reference
-    ``mcp_servers.id``. Each mock defines a single response, so it behaves as a
-    constant however many times the run calls the tool. ``responses`` is stored
+    Must run after :func:`_seed_demo_mcp_server`,
+    :func:`_seed_demo_gke_mcp_server`, and :func:`_seed_demo_azure_mcp_server`:
+    the first six mocks reference ``mcp_servers.id``. Each mock defines a
+    single response, so it behaves as a constant however many times the run
+    calls the tool. ``responses`` is stored
     as plain ``{"kind", "value"}`` dicts because the table column cannot carry
     the :class:`~models.mcp_tool_mock.MockResponse` type (see
     :class:`~models.mcp_tool_mock.MCPToolMock`).
@@ -1681,25 +2124,73 @@ async def _seed_demo_gke_agent_skill(
     return DEMO_GKE_SKILL_ID if created else None
 
 
+async def _seed_demo_azure_agent_skill(
+    session: AsyncSession, tenant_id: str
+) -> str | None:
+    """Create the demo agent skill pointing at the ``azure-keyvault-secret-rotation`` sample.
+
+    A third sample skill: it agrees the Key Vault and the existing secret to
+    rotate with the user, gets a manager's explicit approval of that exact
+    target, then writes a freshly generated value as the secret's new version
+    through the Azure MCP server -- never repeating the value in the chat.
+    Registered exactly like :func:`_seed_demo_agent_skill` -- built as a table
+    model directly, left ``pending`` for the caller to clone.
+
+    Args:
+        session: Database session used to read and insert the skill.
+        tenant_id: Id of the ``Default`` tenant the skill belongs to.
+
+    Returns:
+        The skill's id when this call created it, else ``None``.
+    """
+    if await session.get(AgentSkill, DEMO_AZURE_SKILL_ID) is not None:
+        return None
+    created = await _insert(
+        session,
+        AgentSkill(
+            id=DEMO_AZURE_SKILL_ID,
+            tenant_id=tenant_id,
+            name=DEMO_AZURE_SKILL_NAME,
+            repo_url=_DEMO_SKILL_REPO_URL,
+            repo_path=_DEMO_AZURE_SKILL_REPO_PATH,
+            description=(
+                "Rotate an Azure Key Vault secret to a freshly generated value "
+                "through the Azure MCP server, gated by a manager's explicit "
+                "approval of the exact vault and secret."
+            ),
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"agent skill '{DEMO_AZURE_SKILL_NAME}'",
+    )
+    return DEMO_AZURE_SKILL_ID if created else None
+
+
 async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo tags and attach them across four of the six taggable kinds.
+    """Create the demo tags and attach them across five of the six taggable kinds.
 
     ``AWS`` lands on the AWS secret, AWS MCP server, EC2 Cost Estimator, the
     EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks;
     ``GCP`` lands on the Google Cloud secret, the GKE MCP server, the
     Kubernetes Manifest Toolkit, the pod-restart agent skill, and the
-    ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks;
-    ``Approval Required`` lands on both agent skills. ``AWS`` and ``GCP`` are
-    also each attached to their matching user group (``Demo AWS Group`` /
-    ``Demo GCP Group``) as access-control tags, which is what gates the
-    records above to that group's members. Both are additionally attached to
-    ``Demo Approvers`` directly, so either demo approver is an eligible
-    destination for a request_approval call whose session carries either
-    tag, regardless of which of the two demo skills the workflow came from.
+    ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks; ``Azure``
+    lands on the Azure secret, the Azure MCP server, the Secret Value
+    Generator, the secret-rotation agent skill, and the
+    ``keyvault_secret_get`` and ``keyvault_secret_create`` tool mocks; ``Approval Required`` lands on all
+    three agent skills. ``AWS``, ``GCP``, and ``Azure`` are also each
+    attached to their matching user group (``Demo AWS Group`` /
+    ``Demo GCP Group`` / ``Demo Azure Group``) as access-control tags, which
+    is what gates the records above to that group's members. All three are
+    additionally attached to ``Demo Approvers`` directly, so either demo
+    approver is an eligible destination for a request_approval call whose
+    session carries any of them, regardless of which of the three demo skills
+    the workflow came from.
 
     Must run after :func:`_seed_demo_secrets`, :func:`_seed_demo_mcp_server`,
-    :func:`_seed_demo_gke_mcp_server`, :func:`_seed_demo_agent_skill`,
-    :func:`_seed_demo_gke_agent_skill`, :func:`_seed_demo_tool_mocks`, and
+    :func:`_seed_demo_gke_mcp_server`, :func:`_seed_demo_azure_mcp_server`,
+    :func:`_seed_demo_secret_generator_mcp_server`,
+    :func:`_seed_demo_agent_skill`, :func:`_seed_demo_gke_agent_skill`,
+    :func:`_seed_demo_azure_agent_skill`, :func:`_seed_demo_tool_mocks`, and
     :func:`_seed_demo_groups`: attaching a tag looks up the record it attaches
     to, including the two user groups. The demo Workflow does not exist — see
     the module docstring — so no tag is attached to one; an operator is free
@@ -1874,6 +2365,70 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     if await _ensure_demo_tag(
         session,
         tenant_id,
+        DEMO_AZURE_TAG_ID,
+        DEMO_AZURE_TAG_NAME,
+        TagColor.violet,
+        _DEMO_AZURE_TAG_DESCRIPTION,
+        access_control=True,
+    ):
+        await _link_tag(
+            session,
+            SecretTag,
+            resource_model=Secret,
+            resource_id=DEMO_AZURE_SECRET_ID,
+            tag_id=DEMO_AZURE_TAG_ID,
+            label=f"tag '{DEMO_AZURE_TAG_NAME}' on secret '{DEMO_AZURE_SECRET_NAME}'",
+        )
+        for server_id, server_name in (
+            (DEMO_AZURE_MCP_SERVER_ID, DEMO_AZURE_MCP_SERVER_NAME),
+            (
+                DEMO_SECRET_GENERATOR_MCP_SERVER_ID,
+                DEMO_SECRET_GENERATOR_MCP_SERVER_NAME,
+            ),
+        ):
+            await _link_tag(
+                session,
+                McpServerTag,
+                resource_model=MCPServer,
+                resource_id=server_id,
+                tag_id=DEMO_AZURE_TAG_ID,
+                label=f"tag '{DEMO_AZURE_TAG_NAME}' on MCP server '{server_name}'",
+            )
+        await _link_tag(
+            session,
+            AgentSkillTag,
+            resource_model=AgentSkill,
+            resource_id=DEMO_AZURE_SKILL_ID,
+            tag_id=DEMO_AZURE_TAG_ID,
+            label=f"tag '{DEMO_AZURE_TAG_NAME}' on agent skill '{DEMO_AZURE_SKILL_NAME}'",
+        )
+        for mock_id, mock_name in (
+            (DEMO_SECRET_CREATE_MOCK_ID, DEMO_SECRET_CREATE_MOCK_NAME),
+            (DEMO_SECRET_LIST_MOCK_ID, DEMO_SECRET_LIST_MOCK_NAME),
+        ):
+            await _link_tag(
+                session,
+                McpToolMockTag,
+                resource_model=MCPToolMock,
+                resource_id=mock_id,
+                tag_id=DEMO_AZURE_TAG_ID,
+                label=f"tag '{DEMO_AZURE_TAG_NAME}' on tool mock '{mock_name}'",
+            )
+        for group_id, group_name in (
+            (DEMO_AZURE_GROUP_ID, "Demo Azure Group"),
+            (DEMO_APPROVERS_GROUP_ID, "Demo Approvers"),
+        ):
+            await _link_tag(
+                session,
+                UserGroupTag,
+                resource_model=UserGroup,
+                resource_id=group_id,
+                tag_id=DEMO_AZURE_TAG_ID,
+                label=f"tag '{DEMO_AZURE_TAG_NAME}' on user group '{group_name}'",
+            )
+    if await _ensure_demo_tag(
+        session,
+        tenant_id,
         DEMO_APPROVAL_TAG_ID,
         DEMO_APPROVAL_TAG_NAME,
         TagColor.amber,
@@ -1898,6 +2453,17 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             tag_id=DEMO_APPROVAL_TAG_ID,
             label=(
                 f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill '{DEMO_GKE_SKILL_NAME}'"
+            ),
+        )
+        await _link_tag(
+            session,
+            AgentSkillTag,
+            resource_model=AgentSkill,
+            resource_id=DEMO_AZURE_SKILL_ID,
+            tag_id=DEMO_APPROVAL_TAG_ID,
+            label=(
+                f"tag '{DEMO_APPROVAL_TAG_NAME}' on agent skill "
+                f"'{DEMO_AZURE_SKILL_NAME}'"
             ),
         )
 

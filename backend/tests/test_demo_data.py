@@ -36,6 +36,21 @@ from infrastructure.demo_data import (
     DEMO_AWS_SECRET_NAME,
     DEMO_AWS_TAG_ID,
     DEMO_AWS_TAG_NAME,
+    DEMO_AZURE_CLIENT_ID_ENTRY_KEY,
+    DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY,
+    DEMO_AZURE_DEVELOPER_USER_ID,
+    DEMO_AZURE_GROUP_ID,
+    DEMO_AZURE_MCP_SERVER_ID,
+    DEMO_AZURE_MCP_SERVER_NAME,
+    DEMO_AZURE_REQUESTER_USER_ID,
+    DEMO_AZURE_REVIEWER_USER_ID,
+    DEMO_AZURE_SECRET_ID,
+    DEMO_AZURE_SECRET_NAME,
+    DEMO_AZURE_SKILL_ID,
+    DEMO_AZURE_SKILL_NAME,
+    DEMO_AZURE_TAG_ID,
+    DEMO_AZURE_TAG_NAME,
+    DEMO_AZURE_TENANT_ENTRY_KEY,
     DEMO_CALL_AWS_MOCK_ID,
     DEMO_COST_ESTIMATOR_MCP_SERVER_ID,
     DEMO_COST_ESTIMATOR_MCP_SERVER_NAME,
@@ -63,7 +78,11 @@ from infrastructure.demo_data import (
     DEMO_REQUESTERS_GROUP_ID,
     DEMO_REVIEWERS_GROUP_ID,
     DEMO_RUN_SCRIPT_MOCK_ID,
+    DEMO_SECRET_CREATE_MOCK_ID,
+    DEMO_SECRET_GENERATOR_MCP_SERVER_ID,
+    DEMO_SECRET_GENERATOR_MCP_SERVER_NAME,
     DEMO_SECRET_KEY_ENTRY_KEY,
+    DEMO_SECRET_LIST_MOCK_ID,
     sync_demo_data,
 )
 from infrastructure.password import verify_password
@@ -153,6 +172,9 @@ def _demo_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "DEMO_AWS_SECRET_ACCESS_KEY",
         "DEMO_AWS_REGION",
         "DEMO_GCP_CREDENTIALS_JSON",
+        "DEMO_AZURE_TENANT_ID",
+        "DEMO_AZURE_CLIENT_ID",
+        "DEMO_AZURE_CLIENT_SECRET",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -232,21 +254,25 @@ async def test_sync_demo_data_seeds_the_full_dataset(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 8
-    assert len(await _rows(engine, Secret)) == 2
-    assert len(await _rows(engine, MCPServer)) == 4
-    assert len(await _rows(engine, MCPToolMock)) == 5
-    assert len(await _rows(engine, AgentSkill)) == 2
-    assert len(await _rows(engine, Tag)) == 3
-    assert len(await _rows(engine, UserGroup)) == 6
+    assert len(await _demo_users(engine)) == 11
+    assert len(await _rows(engine, Secret)) == 3
+    assert len(await _rows(engine, MCPServer)) == 6
+    assert len(await _rows(engine, MCPToolMock)) == 7
+    assert len(await _rows(engine, AgentSkill)) == 3
+    assert len(await _rows(engine, Tag)) == 4
+    assert len(await _rows(engine, UserGroup)) == 7
 
 
 async def test_sync_demo_data_returns_the_new_skill_ids(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The caller schedules the clones, so both ids come back on first seed."""
+    """The caller schedules the clones, so every skill id comes back on first seed."""
     _enable(monkeypatch)
-    assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GKE_SKILL_ID}
+    assert set(await _sync(engine)) == {
+        DEMO_AGENT_SKILL_ID,
+        DEMO_GKE_SKILL_ID,
+        DEMO_AZURE_SKILL_ID,
+    }
 
 
 async def test_sync_demo_data_returns_no_skill_ids_on_a_second_run(
@@ -264,29 +290,35 @@ async def test_sync_demo_data_is_idempotent(
     _enable(monkeypatch)
     await _sync(engine)
     await _sync(engine)
-    assert len(await _demo_users(engine)) == 8
-    assert len(await _rows(engine, Secret)) == 2
-    assert len(await _rows(engine, MCPServer)) == 4
-    assert len(await _rows(engine, MCPToolMock)) == 5
-    assert len(await _rows(engine, AgentSkill)) == 2
-    assert len(await _rows(engine, Tag)) == 3
-    assert len(await _rows(engine, UserGroup)) == 6
-    assert len(await _rows(engine, SecretTag)) == 2
-    assert len(await _rows(engine, McpServerTag)) == 4
-    assert len(await _rows(engine, AgentSkillTag)) == 4
-    assert len(await _rows(engine, McpToolMockTag)) == 4
-    assert len(await _rows(engine, UserGroupTag)) == 4
+    assert len(await _demo_users(engine)) == 11
+    assert len(await _rows(engine, Secret)) == 3
+    assert len(await _rows(engine, MCPServer)) == 6
+    assert len(await _rows(engine, MCPToolMock)) == 7
+    assert len(await _rows(engine, AgentSkill)) == 3
+    assert len(await _rows(engine, Tag)) == 4
+    assert len(await _rows(engine, UserGroup)) == 7
+    assert len(await _rows(engine, SecretTag)) == 3
+    assert len(await _rows(engine, McpServerTag)) == 6
+    assert len(await _rows(engine, AgentSkillTag)) == 6
+    assert len(await _rows(engine, McpToolMockTag)) == 6
+    assert len(await _rows(engine, UserGroupTag)) == 6
 
 
-async def test_demo_tags_classify_records_across_four_taggable_kinds(
+async def test_demo_tags_classify_records_across_five_taggable_kinds(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
     tags = {tag.id: tag for tag in await _rows(engine, Tag)}
-    assert set(tags) == {DEMO_AWS_TAG_ID, DEMO_GCP_TAG_ID, DEMO_APPROVAL_TAG_ID}
+    assert set(tags) == {
+        DEMO_AWS_TAG_ID,
+        DEMO_GCP_TAG_ID,
+        DEMO_AZURE_TAG_ID,
+        DEMO_APPROVAL_TAG_ID,
+    }
     assert tags[DEMO_AWS_TAG_ID].name == DEMO_AWS_TAG_NAME
     assert tags[DEMO_GCP_TAG_ID].name == DEMO_GCP_TAG_NAME
+    assert tags[DEMO_AZURE_TAG_ID].name == DEMO_AZURE_TAG_NAME
     assert tags[DEMO_APPROVAL_TAG_ID].name == DEMO_APPROVAL_TAG_NAME
     secret_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, SecretTag)
@@ -294,6 +326,7 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
     assert secret_tags == {
         (DEMO_AWS_SECRET_ID, DEMO_AWS_TAG_ID),
         (DEMO_GCP_SECRET_ID, DEMO_GCP_TAG_ID),
+        (DEMO_AZURE_SECRET_ID, DEMO_AZURE_TAG_ID),
     }
     mcp_server_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, McpServerTag)
@@ -303,6 +336,8 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
         (DEMO_GKE_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
         (DEMO_COST_ESTIMATOR_MCP_SERVER_ID, DEMO_AWS_TAG_ID),
         (DEMO_K8S_TOOLKIT_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
+        (DEMO_AZURE_MCP_SERVER_ID, DEMO_AZURE_TAG_ID),
+        (DEMO_SECRET_GENERATOR_MCP_SERVER_ID, DEMO_AZURE_TAG_ID),
     }
     agent_skill_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, AgentSkillTag)
@@ -312,6 +347,8 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
         (DEMO_AGENT_SKILL_ID, DEMO_APPROVAL_TAG_ID),
         (DEMO_GKE_SKILL_ID, DEMO_GCP_TAG_ID),
         (DEMO_GKE_SKILL_ID, DEMO_APPROVAL_TAG_ID),
+        (DEMO_AZURE_SKILL_ID, DEMO_AZURE_TAG_ID),
+        (DEMO_AZURE_SKILL_ID, DEMO_APPROVAL_TAG_ID),
     }
     tool_mock_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, McpToolMockTag)
@@ -321,6 +358,8 @@ async def test_demo_tags_classify_records_across_four_taggable_kinds(
         (DEMO_RUN_SCRIPT_MOCK_ID, DEMO_AWS_TAG_ID),
         (DEMO_PATCH_WORKLOAD_MOCK_ID, DEMO_GCP_TAG_ID),
         (DEMO_DELETE_POD_MOCK_ID, DEMO_GCP_TAG_ID),
+        (DEMO_SECRET_CREATE_MOCK_ID, DEMO_AZURE_TAG_ID),
+        (DEMO_SECRET_LIST_MOCK_ID, DEMO_AZURE_TAG_ID),
     }
 
 
@@ -329,42 +368,21 @@ async def test_demo_users_hold_no_direct_roles(
 ) -> None:
     _enable(monkeypatch)
     await _sync(engine)
-    (
-        approver,
-        approver_2,
-        aws_developer,
-        aws_requester,
-        aws_reviewer,
-        gcp_developer,
-        gcp_requester,
-        gcp_reviewer,
-    ) = await _demo_users(engine)
-    assert approver.id == DEMO_APPROVER_USER_ID
-    assert approver.username == "demo-approver-1"
-    assert approver_2.id == DEMO_APPROVER_2_USER_ID
-    assert approver_2.username == "demo-approver-2"
-    assert aws_developer.id == DEMO_AWS_DEVELOPER_USER_ID
-    assert aws_developer.username == "demo-aws-developer"
-    assert aws_requester.id == DEMO_AWS_REQUESTER_USER_ID
-    assert aws_requester.username == "demo-aws-requester"
-    assert aws_reviewer.id == DEMO_AWS_REVIEWER_USER_ID
-    assert aws_reviewer.username == "demo-aws-reviewer"
-    assert gcp_developer.id == DEMO_GCP_DEVELOPER_USER_ID
-    assert gcp_developer.username == "demo-gcp-developer"
-    assert gcp_requester.id == DEMO_GCP_REQUESTER_USER_ID
-    assert gcp_requester.username == "demo-gcp-requester"
-    assert gcp_reviewer.id == DEMO_GCP_REVIEWER_USER_ID
-    assert gcp_reviewer.username == "demo-gcp-reviewer"
-    for user in (
-        approver,
-        approver_2,
-        aws_developer,
-        aws_requester,
-        aws_reviewer,
-        gcp_developer,
-        gcp_requester,
-        gcp_reviewer,
-    ):
+    users = {user.id: user for user in await _demo_users(engine)}
+    assert {user_id: user.username for user_id, user in users.items()} == {
+        DEMO_APPROVER_USER_ID: "demo-approver-1",
+        DEMO_APPROVER_2_USER_ID: "demo-approver-2",
+        DEMO_AWS_DEVELOPER_USER_ID: "demo-aws-developer",
+        DEMO_AWS_REQUESTER_USER_ID: "demo-aws-requester",
+        DEMO_AWS_REVIEWER_USER_ID: "demo-aws-reviewer",
+        DEMO_GCP_DEVELOPER_USER_ID: "demo-gcp-developer",
+        DEMO_GCP_REQUESTER_USER_ID: "demo-gcp-requester",
+        DEMO_GCP_REVIEWER_USER_ID: "demo-gcp-reviewer",
+        DEMO_AZURE_DEVELOPER_USER_ID: "demo-azure-developer",
+        DEMO_AZURE_REQUESTER_USER_ID: "demo-azure-requester",
+        DEMO_AZURE_REVIEWER_USER_ID: "demo-azure-reviewer",
+    }
+    for user in users.values():
         assert user.roles == []
         assert user.tenant_id == TENANT_ID
         assert user.enabled is True
@@ -377,7 +395,7 @@ async def test_demo_groups_grant_the_approver_requester_developer_and_reviewer_r
     _enable(monkeypatch)
     await _sync(engine)
     groups = {group.id: group for group in await _rows(engine, UserGroup)}
-    assert len(groups) == 6
+    assert len(groups) == 7
     expected: dict[str, tuple[str, Role | None]] = {
         DEMO_APPROVERS_GROUP_ID: ("Demo Approvers", Role.approver),
         DEMO_REQUESTERS_GROUP_ID: ("Demo Requesters", Role.requester),
@@ -385,6 +403,7 @@ async def test_demo_groups_grant_the_approver_requester_developer_and_reviewer_r
         DEMO_REVIEWERS_GROUP_ID: ("Demo Reviewers", Role.reviewer),
         DEMO_AWS_GROUP_ID: ("Demo AWS Group", None),
         DEMO_GCP_GROUP_ID: ("Demo GCP Group", None),
+        DEMO_AZURE_GROUP_ID: ("Demo Azure Group", None),
     }
     for group_id, (name, role) in expected.items():
         group = groups[group_id]
@@ -407,16 +426,22 @@ async def test_demo_groups_hold_their_expected_members(
         (DEMO_APPROVERS_GROUP_ID, DEMO_APPROVER_2_USER_ID),
         (DEMO_REQUESTERS_GROUP_ID, DEMO_AWS_REQUESTER_USER_ID),
         (DEMO_REQUESTERS_GROUP_ID, DEMO_GCP_REQUESTER_USER_ID),
+        (DEMO_REQUESTERS_GROUP_ID, DEMO_AZURE_REQUESTER_USER_ID),
         (DEMO_DEVELOPERS_GROUP_ID, DEMO_AWS_DEVELOPER_USER_ID),
         (DEMO_DEVELOPERS_GROUP_ID, DEMO_GCP_DEVELOPER_USER_ID),
+        (DEMO_DEVELOPERS_GROUP_ID, DEMO_AZURE_DEVELOPER_USER_ID),
         (DEMO_REVIEWERS_GROUP_ID, DEMO_AWS_REVIEWER_USER_ID),
         (DEMO_REVIEWERS_GROUP_ID, DEMO_GCP_REVIEWER_USER_ID),
+        (DEMO_REVIEWERS_GROUP_ID, DEMO_AZURE_REVIEWER_USER_ID),
         (DEMO_AWS_GROUP_ID, DEMO_AWS_DEVELOPER_USER_ID),
         (DEMO_AWS_GROUP_ID, DEMO_AWS_REQUESTER_USER_ID),
         (DEMO_AWS_GROUP_ID, DEMO_AWS_REVIEWER_USER_ID),
         (DEMO_GCP_GROUP_ID, DEMO_GCP_DEVELOPER_USER_ID),
         (DEMO_GCP_GROUP_ID, DEMO_GCP_REQUESTER_USER_ID),
         (DEMO_GCP_GROUP_ID, DEMO_GCP_REVIEWER_USER_ID),
+        (DEMO_AZURE_GROUP_ID, DEMO_AZURE_DEVELOPER_USER_ID),
+        (DEMO_AZURE_GROUP_ID, DEMO_AZURE_REQUESTER_USER_ID),
+        (DEMO_AZURE_GROUP_ID, DEMO_AZURE_REVIEWER_USER_ID),
     }
 
 
@@ -436,6 +461,9 @@ async def test_demo_users_effective_roles_come_from_their_group(
                 DEMO_GCP_DEVELOPER_USER_ID,
                 DEMO_AWS_REVIEWER_USER_ID,
                 DEMO_GCP_REVIEWER_USER_ID,
+                DEMO_AZURE_REQUESTER_USER_ID,
+                DEMO_AZURE_DEVELOPER_USER_ID,
+                DEMO_AZURE_REVIEWER_USER_ID,
             ]
         )
     assert inherited == {
@@ -447,10 +475,13 @@ async def test_demo_users_effective_roles_come_from_their_group(
         DEMO_GCP_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
         DEMO_AWS_REVIEWER_USER_ID: frozenset({Role.reviewer.value}),
         DEMO_GCP_REVIEWER_USER_ID: frozenset({Role.reviewer.value}),
+        DEMO_AZURE_REQUESTER_USER_ID: frozenset({Role.requester.value}),
+        DEMO_AZURE_DEVELOPER_USER_ID: frozenset({Role.developer.value}),
+        DEMO_AZURE_REVIEWER_USER_ID: frozenset({Role.reviewer.value}),
     }
 
 
-async def test_demo_aws_and_gcp_tags_are_access_control(
+async def test_demo_provider_tags_are_access_control(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -458,15 +489,16 @@ async def test_demo_aws_and_gcp_tags_are_access_control(
     tags = {tag.id: tag for tag in await _rows(engine, Tag)}
     assert tags[DEMO_AWS_TAG_ID].access_control is True
     assert tags[DEMO_GCP_TAG_ID].access_control is True
+    assert tags[DEMO_AZURE_TAG_ID].access_control is True
     assert tags[DEMO_APPROVAL_TAG_ID].access_control is False
 
 
 async def test_demo_access_control_tag_groups_hold_their_tags(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AWS/GCP Group hold their matching tag; Demo Approvers holds both, so
-    either demo approver is an eligible destination regardless of which demo
-    skill's workflow requested the approval."""
+    """Each provider group holds its matching tag; Demo Approvers holds all
+    three, so either demo approver is an eligible destination regardless of
+    which demo skill's workflow requested the approval."""
     _enable(monkeypatch)
     await _sync(engine)
     group_tags = {
@@ -477,6 +509,8 @@ async def test_demo_access_control_tag_groups_hold_their_tags(
         (DEMO_GCP_GROUP_ID, DEMO_GCP_TAG_ID),
         (DEMO_APPROVERS_GROUP_ID, DEMO_AWS_TAG_ID),
         (DEMO_APPROVERS_GROUP_ID, DEMO_GCP_TAG_ID),
+        (DEMO_AZURE_GROUP_ID, DEMO_AZURE_TAG_ID),
+        (DEMO_APPROVERS_GROUP_ID, DEMO_AZURE_TAG_ID),
     }
 
 
@@ -837,6 +871,122 @@ async def test_demo_gke_agent_skill_points_at_the_sample_skill(
     assert skill.commit_sha is None
 
 
+async def test_demo_azure_secret_stores_the_configured_principal_encrypted(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    monkeypatch.setenv("DEMO_AZURE_TENANT_ID", "tenant-guid")
+    monkeypatch.setenv("DEMO_AZURE_CLIENT_ID", "client-guid")
+    monkeypatch.setenv("DEMO_AZURE_CLIENT_SECRET", "client-s3cr3t")
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        secret = await session.get(Secret, DEMO_AZURE_SECRET_ID)
+    assert secret is not None
+    assert secret.name == DEMO_AZURE_SECRET_NAME
+    assert secret.description
+    assert secret.type is SecretType.local
+    assert secret.tenant_id == TENANT_ID
+    cipher = get_secret_cipher()
+    assert {key: cipher.decrypt(value) for key, value in secret.entries.items()} == {
+        DEMO_AZURE_TENANT_ENTRY_KEY: "tenant-guid",
+        DEMO_AZURE_CLIENT_ID_ENTRY_KEY: "client-guid",
+        DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY: "client-s3cr3t",
+    }
+    assert secret.entries[DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY] != "client-s3cr3t"
+
+
+async def test_demo_azure_secret_falls_back_to_a_placeholder(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        secret = await session.get(Secret, DEMO_AZURE_SECRET_ID)
+    assert secret is not None
+    cipher = get_secret_cipher()
+    assert {cipher.decrypt(value) for value in secret.entries.values()} == {
+        "REPLACE_ME"
+    }
+
+
+async def test_demo_azure_mcp_server_launches_the_key_vault_tools_with_npx(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        server = await session.get(MCPServer, DEMO_AZURE_MCP_SERVER_ID)
+    assert server is not None
+    assert server.name == DEMO_AZURE_MCP_SERVER_NAME
+    assert server.description
+    assert server.tenant_id == TENANT_ID
+    assert server.transport is McpTransport.stdio
+    assert server.command is McpCommand.npx
+    assert server.args == [
+        "-y",
+        "@azure/mcp@3.0.0-beta.50",
+        "server",
+        "start",
+        "--namespace",
+        "keyvault",
+        "--mode",
+        "all",
+        # A2Flow cannot answer elicitation yet; the manager's approval stands
+        # in for the consent the server would otherwise ask for.
+        "--dangerously-disable-elicitation",
+    ]
+    assert server.url is None
+    assert server.headers == {}
+    assert server.env == {
+        "AZURE_TENANT_ID": (
+            f"${{secret:{DEMO_AZURE_SECRET_NAME}/{DEMO_AZURE_TENANT_ENTRY_KEY}}}"
+        ),
+        "AZURE_CLIENT_ID": (
+            f"${{secret:{DEMO_AZURE_SECRET_NAME}/{DEMO_AZURE_CLIENT_ID_ENTRY_KEY}}}"
+        ),
+        "AZURE_CLIENT_SECRET": (
+            f"${{secret:{DEMO_AZURE_SECRET_NAME}/{DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY}}}"
+        ),
+        "AZURE_TOKEN_CREDENTIALS": "EnvironmentCredential",
+    }
+
+
+async def test_demo_secret_generator_is_a_javascript_script_server(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        server = await session.get(MCPServer, DEMO_SECRET_GENERATOR_MCP_SERVER_ID)
+    assert server is not None
+    assert server.name == DEMO_SECRET_GENERATOR_MCP_SERVER_NAME
+    assert server.description
+    assert server.transport is McpTransport.script
+    assert server.language is ScriptLanguage.javascript
+    assert server.packages == []
+    assert server.source is not None
+    assert "export function generate_secret_value" in server.source
+    assert "generate_secret_value.inputSchema" in server.source
+    assert server.env == {}
+
+
+async def test_demo_azure_agent_skill_points_at_the_sample_skill(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        skill = await session.get(AgentSkill, DEMO_AZURE_SKILL_ID)
+    assert skill is not None
+    assert skill.name == DEMO_AZURE_SKILL_NAME
+    assert skill.tenant_id == TENANT_ID
+    assert skill.repo_url == "https://github.com/kaitoy/a2flow"
+    assert skill.repo_path == "sample_skills/azure-keyvault-secret-rotation"
+    assert skill.repo_auth_password is None
+    assert skill.sync_status is SkillSyncStatus.pending
+    assert skill.commit_sha is None
+
+
 async def test_seeding_without_the_default_tenant_is_skipped(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -873,8 +1023,12 @@ async def test_a_name_collision_is_skipped_without_failing(
         )
         await session.commit()
     with caplog.at_level(logging.WARNING, logger=_DEMO_LOGGER):
-        # Only the AWS secret name collided; both demo skills still register.
-        assert set(await _sync(engine)) == {DEMO_AGENT_SKILL_ID, DEMO_GKE_SKILL_ID}
+        # Only the AWS secret name collided; every demo skill still registers.
+        assert set(await _sync(engine)) == {
+            DEMO_AGENT_SKILL_ID,
+            DEMO_GKE_SKILL_ID,
+            DEMO_AZURE_SKILL_ID,
+        }
     async with AsyncSession(engine) as session:
         assert await session.get(Secret, DEMO_AWS_SECRET_ID) is None
         assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None
@@ -888,7 +1042,10 @@ async def test_a_name_collision_is_skipped_without_failing(
     secret_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, SecretTag)
     }
-    assert secret_tags == {(DEMO_GCP_SECRET_ID, DEMO_GCP_TAG_ID)}
+    assert secret_tags == {
+        (DEMO_GCP_SECRET_ID, DEMO_GCP_TAG_ID),
+        (DEMO_AZURE_SECRET_ID, DEMO_AZURE_TAG_ID),
+    }
     mcp_server_tags = {
         (row.resource_id, row.tag_id) for row in await _rows(engine, McpServerTag)
     }
@@ -897,6 +1054,8 @@ async def test_a_name_collision_is_skipped_without_failing(
         (DEMO_GKE_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
         (DEMO_COST_ESTIMATOR_MCP_SERVER_ID, DEMO_AWS_TAG_ID),
         (DEMO_K8S_TOOLKIT_MCP_SERVER_ID, DEMO_GCP_TAG_ID),
+        (DEMO_AZURE_MCP_SERVER_ID, DEMO_AZURE_TAG_ID),
+        (DEMO_SECRET_GENERATOR_MCP_SERVER_ID, DEMO_AZURE_TAG_ID),
     }
 
 
@@ -1083,6 +1242,8 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
         DEMO_RUN_SCRIPT_MOCK_ID,
         DEMO_PATCH_WORKLOAD_MOCK_ID,
         DEMO_DELETE_POD_MOCK_ID,
+        DEMO_SECRET_CREATE_MOCK_ID,
+        DEMO_SECRET_LIST_MOCK_ID,
         DEMO_REQUEST_APPROVAL_MOCK_ID,
     }
     targets = {(mock.mcp_server_id, mock.tool_name) for mock in mocks.values()}
@@ -1091,6 +1252,8 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
         (DEMO_MCP_SERVER_ID, "aws___run_script"),
         (DEMO_GKE_MCP_SERVER_ID, "patch_k8s_resource"),
         (DEMO_GKE_MCP_SERVER_ID, "delete_k8s_resource"),
+        (DEMO_AZURE_MCP_SERVER_ID, "keyvault_secret_create"),
+        (DEMO_AZURE_MCP_SERVER_ID, "keyvault_secret_get"),
         (None, "request_approval"),
     }
     for mock in mocks.values():
@@ -1107,6 +1270,14 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     assert workload_restart.responses[0]["value"]["status"] == "patched"
     pod_restart = mocks[DEMO_DELETE_POD_MOCK_ID]
     assert pod_restart.responses[0]["value"]["status"] == "deleted"
+    rotation = mocks[DEMO_SECRET_CREATE_MOCK_ID]
+    assert rotation.responses[0]["value"]["version"]
+    # A mock never carries a secret value, made up or otherwise.
+    assert "value" not in rotation.responses[0]["value"]
+    listing = mocks[DEMO_SECRET_LIST_MOCK_ID].responses[0]["value"]["secrets"]
+    # The secret the write reports is one the listing offers to choose.
+    assert rotation.responses[0]["value"]["name"] in {s["name"] for s in listing}
+    assert all("value" not in secret for secret in listing)
 
 
 async def test_disabling_removes_tool_mocks_before_the_mcp_server(
