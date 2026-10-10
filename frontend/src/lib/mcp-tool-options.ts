@@ -41,14 +41,36 @@ export function valueToBinding(value: string): ToolBinding {
  *
  * @param values - Composite values of every bound tool.
  * @param exempt - Composite values of the tools whose input needs no approval.
+ * @param asking - Composite values of the tools that ask the initiator mid-call
+ *   (see {@link askingValues}); none by default.
  * @returns The bindings to send.
  */
-export function toBindings(values: string[], exempt: string[]): ToolBinding[] {
+export function toBindings(
+  values: string[],
+  exempt: string[],
+  asking: string[] = []
+): ToolBinding[] {
   const exemptSet = new Set(exempt);
+  const askingSet = new Set(asking);
   return values.map((value) => ({
     ...valueToBinding(value),
     requiresInputApproval: !exemptSet.has(value),
+    elicits: askingSet.has(value),
   }));
+}
+
+/**
+ * The composite values of the bindings whose tool asks the run's initiator
+ * questions mid-call (`elicits`).
+ *
+ * The forms do not edit this flag — the design agent sets it — but the edit
+ * form carries it through so that saving a template does not clear it.
+ *
+ * @param bindings - The bindings as the API returned them.
+ * @returns Composite values of the asking ones, in the given order.
+ */
+export function askingValues(bindings: ToolBinding[]): string[] {
+  return bindings.filter((b) => b.elicits === true).map(bindingToValue);
 }
 
 /**

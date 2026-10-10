@@ -43,6 +43,10 @@ class ExecutionSessionStatus(StrEnum):
     waiting_for_approval = "waiting_for_approval"
     """Paused on an approval (``render_approval``) someone has to decide."""
 
+    waiting_for_initiator = "waiting_for_initiator"
+    """Paused before a task whose tool asks its initiator questions mid-call
+    (``initiator_task_id``), until the initiator resumes it from the chat."""
+
     scheduled = "scheduled"
     """Paused until ``resume_at``, the time its agent chose with ``wait_until``."""
 
@@ -116,6 +120,13 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
     #: ``wait_until`` tool during a turn, kept while the session is
     #: ``scheduled``, and cleared by any other state or by queued input.
     resume_at: datetime | None = Field(default=None, sa_type=TZDateTime)
+    #: The task a ``waiting_for_initiator`` session holds back: it binds a tool
+    #: that asks the run's initiator questions mid-call, so it starts only on a
+    #: turn the initiator drove. Set by ``update_workflow_task`` during a turn,
+    #: kept while the session waits, and cleared by any other state or by
+    #: queued input. Not a foreign key: it names a task of the same run, which
+    #: goes with the run.
+    initiator_task_id: str | None = None
 
     @field_serializer("resume_at", when_used="json")
     def _serialize_resume_at(self, dt: datetime | None) -> str | None:

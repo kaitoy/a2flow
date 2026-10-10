@@ -30,6 +30,10 @@ from repositories.mcp_ca import (
     McpCertificateAuthorityRepository,
     SqlMcpCertificateAuthorityRepository,
 )
+from repositories.mcp_elicitation import (
+    MCPElicitationRepository,
+    SqlMCPElicitationRepository,
+)
 from repositories.mcp_server import MCPServerRepository, SqlMCPServerRepository
 from repositories.mcp_tool_certificate import (
     McpToolCertificateRepository,
@@ -435,6 +439,18 @@ def get_session_file_repository(
 
 SessionFileRepositoryDep = Annotated[
     SessionFileRepository, Depends(get_session_file_repository)
+]
+
+
+def get_mcp_elicitation_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> MCPElicitationRepository:
+    """Create an MCPElicitationRepository backed by the current database session."""
+    return SqlMCPElicitationRepository(db, tenant_id=tenant_id)
+
+
+MCPElicitationRepositoryDep = Annotated[
+    MCPElicitationRepository, Depends(get_mcp_elicitation_repository)
 ]
 
 

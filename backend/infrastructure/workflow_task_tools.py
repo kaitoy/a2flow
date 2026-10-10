@@ -409,6 +409,7 @@ def _task_to_dict(
                 "server_id": b.mcp_server_id,
                 "tool_name": b.tool_name,
                 "requires_input_approval": b.requires_input_approval,
+                "elicits": b.elicits,
             }
             for b in task.tool_bindings
         ],
@@ -420,7 +421,7 @@ def _parse_tool_bindings(raw: object) -> list[ToolBinding] | None:
 
     ``requires_input_approval`` is optional and defaults to ``True``, the safe
     reading: a binding written without an opinion is one whose arguments an
-    approver still bounds.
+    approver still bounds. ``elicits`` is optional and defaults to ``False``.
 
     Args:
         raw: The model-supplied tool list to validate.
@@ -428,7 +429,7 @@ def _parse_tool_bindings(raw: object) -> list[ToolBinding] | None:
     Returns:
         The parsed bindings, or ``None`` when ``raw`` is not a list of objects
         with non-empty string ``server_id`` and ``tool_name`` fields and, where
-        present, a boolean ``requires_input_approval``.
+        present, booleans ``requires_input_approval`` and ``elicits``.
     """
     if not isinstance(raw, list):
         return None
@@ -439,12 +440,14 @@ def _parse_tool_bindings(raw: object) -> list[ToolBinding] | None:
         server_id = entry.get("server_id")
         tool_name = entry.get("tool_name")
         requires_input_approval = entry.get("requires_input_approval", True)
+        elicits = entry.get("elicits", False)
         if (
             not isinstance(server_id, str)
             or not server_id
             or not isinstance(tool_name, str)
             or not tool_name
             or not isinstance(requires_input_approval, bool)
+            or not isinstance(elicits, bool)
         ):
             return None
         bindings.append(
@@ -452,6 +455,7 @@ def _parse_tool_bindings(raw: object) -> list[ToolBinding] | None:
                 mcp_server_id=server_id,
                 tool_name=tool_name,
                 requires_input_approval=requires_input_approval,
+                elicits=elicits,
             )
         )
     return bindings
@@ -462,7 +466,8 @@ def _invalid_tools_error(label: str) -> dict[str, Any]:
     return {
         "error": f"{label} must be a list of "
         '{"server_id": <registered MCP server id>, "tool_name": <tool name>, '
-        '"requires_input_approval": <true|false, optional, default true>} objects'
+        '"requires_input_approval": <true|false, optional, default true>, '
+        '"elicits": <true|false, optional, default false>} objects'
     }
 
 
@@ -717,6 +722,60 @@ async def _session_denied_reason(
     return None
 
 
+async def _hold_for_initiator(
+    s: _Scope,
+    task: WorkflowTaskRead,
+    calling_session_id: str | None,
+    acting_user_id: str,
+) -> bool:
+    """Hold back a task whose tool asks the initiator, unless they drove this turn.
+
+    A bound tool marked ``elicits`` stops mid-call to ask the run's initiator
+    something. Starting it on a turn nobody is watching would leave the call
+    waiting for someone to notice. So the task starts only on a turn the
+    initiator drove from the chat -- a message they sent, which the resume
+    button on the session screen is. Otherwise the session records the task,
+    which leaves it ``waiting_for_initiator`` once the turn settles
+    (:mod:`services.session_settle`), and the initiator is notified.
+
+    Args:
+        s: The current tool call's resolved run and repositories.
+        task: The task about to start.
+        calling_session_id: The ADK session the tool is called from.
+        acting_user_id: Recorded on the session's ``updated_by``.
+
+    Returns:
+        ``True`` when the task was held back and must not start yet.
+    """
+    if calling_session_id is None or not any(b.elicits for b in task.tool_bindings):
+        return False
+    execution = await s.execution_repo.get(s.execution_id)
+    row = await s.session_repo.get(calling_session_id)
+    if execution is None or row is None:
+        return False
+    initiator_id = execution.initiator_id
+    turn_input = row.pending_input or {}
+    if (
+        turn_input.get("kind") == "message"
+        and turn_input.get("acting_user_id") == initiator_id
+    ):
+        return False
+    await s.session_repo.set_initiator_task(
+        calling_session_id, task.id, user_id=acting_user_id
+    )
+    await _notify(
+        s.execution_repo,
+        s.notifications,
+        s.execution_id,
+        NotificationType.elicitation_request,
+        f"Task “{task.title}” needs you",
+        "It will ask you questions while it runs. Open the run's chat and "
+        "resume it when you are ready to answer.",
+        recipient=initiator_id,
+    )
+    return True
+
+
 async def update_workflow_task(
     task_id: str,
     tool_context: ToolContext,
@@ -742,6 +801,13 @@ async def update_workflow_task(
     ``list_workflow_tasks``) may be changed; a task another session of the run
     is working is refused. A task cannot be set ``in_progress`` until every
     task in its ``depends_on_ids`` is ``completed``.
+
+    A task binding a tool marked ``elicits`` -- one that asks the person who
+    started the run questions mid-call -- starts only on a turn that person
+    drove from the chat. On any other turn the start is answered with
+    ``{"waiting_for_initiator": <task id>, "message"}``: the task stays
+    ``pending``, the person is notified, and the session waits for them to
+    resume it. End the turn then.
 
     When the person driving this turn is only a designated approver of the run
     (not its initiator), a status change is accepted only for a task an approval
@@ -773,7 +839,9 @@ async def update_workflow_task(
         The updated task dict, or ``{"error": <message>}`` on an invalid status
         or error kind, unknown task, cross-session task, unresolved session, a
         task assigned to another session, a start before the dependencies are
-        completed, or a status change the acting approver is not allowed to make.
+        completed, or a status change the acting approver is not allowed to make;
+        or ``{"waiting_for_initiator", "message"}`` for a start held back for
+        the run's initiator.
     """
     status_enum = _parse_status(status)
     if status is not None and status_enum is None:
@@ -801,6 +869,16 @@ async def update_workflow_task(
                 ) or await _status_change_denied_reason(s, existing, acting_user_id)
                 if denied is not None:
                     return {"error": denied}
+                if status_enum is WorkflowTaskStatus.in_progress and (
+                    await _hold_for_initiator(s, existing, calling, acting_user_id)
+                ):
+                    return {
+                        "waiting_for_initiator": task_id,
+                        "message": "This task asks the person who started the run "
+                        "questions while it runs, so it starts only once they "
+                        "resume this session from the chat. They have been "
+                        "notified. End your turn now.",
+                    }
             elif existing.session_id not in (None, calling):
                 return {"error": _assigned_elsewhere_error(task_id)}
             try:

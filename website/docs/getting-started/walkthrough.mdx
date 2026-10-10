@@ -160,7 +160,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  Choose the secret to rotate from the list the agent fetched from the vault. The agent summarizes the vault and the secret and sends them off for approval.
+  Before the agent lists the vault's secrets, the run waits for you: a note above the chat input says the task will ask you questions. Press **Resume**. The Azure MCP Server then asks you to confirm: a card titled "Azure MCP Server asks for confirmation" appears in the chat. Choose **Approve** and press **Accept** ([Confirmations from an MCP server](../guides/workflow-executions.md#mcp-server-confirmations)). Then choose the secret to rotate from the list the agent fetched. The agent summarizes the vault and the secret and sends them off for approval.
 
   </TabItem>
 </Tabs>
@@ -207,7 +207,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  The agent generates a new value and writes it as the secret's new version right away.
+  The write asks the requester for a confirmation, so the run waits for them to come back to the chat before it starts — the session shows **Waiting for initiator**, and the requester is notified.
 
   </TabItem>
 </Tabs>
@@ -233,7 +233,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  The new version id — never the value itself. Check the secret's versions in the Azure portal if you like, then confirm in the chat.
+  First the run waits for you before the write: press **Resume** in the note above the chat input. The agent generates a new value and starts the write, and the Azure MCP Server's confirmation card appears: choose **Approve** and press **Accept**. The agent then reports the new version id — never the value itself. Check the secret's versions in the Azure portal if you like, then confirm in the chat.
 
   </TabItem>
 </Tabs>

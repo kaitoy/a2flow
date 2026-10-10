@@ -214,4 +214,41 @@ describe("WorkflowSessionPage", () => {
     render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
     expect(await screen.findByTestId("message-list-mock")).toHaveAttribute("data-can-act", "false");
   });
+
+  it("lets the initiator resume a session held back for them, by sending a message", async () => {
+    const sendMessage = vi.fn();
+    useExecutionSessionChatMock.mockReturnValue({
+      ...useExecutionSessionChatMock(),
+      sendMessage,
+      tasks: [{ id: "task-1", title: "Rotate secret", status: "pending" }],
+    });
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id", () =>
+        envelope({ ...WORKFLOW_EXECUTION_1, initiatorId: "user-1" })
+      ),
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id/sessions", () =>
+        envelope([
+          {
+            id: "executed-session-id",
+            status: "waiting_for_initiator",
+            initiatorTaskId: "task-1",
+            parentId: null,
+            workflowExecutionId: "execution-1",
+            tenantId: "tenant-1",
+            waitingOn: [],
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+            createdBy: "user",
+            updatedBy: "user",
+          },
+        ])
+      )
+    );
+    render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+
+    expect(await screen.findByText(/“Rotate secret” will ask you/)).toBeInTheDocument();
+    screen.getByRole("button", { name: "Resume" }).click();
+
+    expect(sendMessage).toHaveBeenCalledWith("I'm here — resume the workflow.");
+  });
 });

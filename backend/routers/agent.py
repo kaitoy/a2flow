@@ -22,6 +22,7 @@ from infrastructure.agent import (
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from models.user import Role
 from repositories.exceptions import SessionRunInProgressError
+from services.session_stream import SSE_HEADERS
 
 router = APIRouter()
 
@@ -108,5 +109,5 @@ async def agent_endpoint(
     return StreamingResponse(
         event_generator(),
         media_type=encoder.get_content_type(),
-        headers={"X-Accel-Buffering": "no"},
+        headers=SSE_HEADERS,
     )

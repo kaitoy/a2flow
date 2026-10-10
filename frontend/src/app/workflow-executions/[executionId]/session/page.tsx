@@ -16,6 +16,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { ExecutionSessionTabs } from "@/components/ExecutionSessionTabs";
+import { InitiatorResumeNotice } from "@/components/InitiatorResumeNotice";
 import { MessageList } from "@/components/MessageList";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
@@ -142,6 +143,11 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
   // The backend rejects anyone else's submission, so this only keeps the UI honest.
   const canActOnSurfaces = currentUser?.id === execution.initiatorId;
 
+  // The selected session, while it holds a task back for its initiator.
+  const waitingForInitiator = sessions.find(
+    (s) => s.id === selected && s.status === "waiting_for_initiator"
+  );
+
   if (chatForbidden) {
     return <AccessDeniedState fill="screen" />;
   }
@@ -222,6 +228,15 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
           pendingRenderCalls={pendingRenderCalls}
           canActOnSurfaces={canActOnSurfaces}
         />
+        {waitingForInitiator && !isRunning && (
+          <div className="shrink-0 mx-4 mb-2">
+            <InitiatorResumeNotice
+              taskTitle={tasksById.get(waitingForInitiator.initiatorTaskId ?? "")?.title ?? null}
+              canResume={canActOnSurfaces}
+              onSend={sendMessage}
+            />
+          </div>
+        )}
         <ChatInput
           onSend={sendMessage}
           disabled={isRunning}

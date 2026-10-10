@@ -19,6 +19,14 @@ The new value is a secret from the moment it is generated:
 - Pass it only to the write in step 3. Never write it in a chat message, a summary, an approval request, or a task status, and never echo it back to confirm it.
 - Never read a secret's value: do not call `keyvault_secret_get` with a `secret` name, since that returns the value. Calling it **without** a `secret` name lists the vault's secrets, and that is the only read you need.
 
+## Confirmations from the Azure MCP Server
+
+The Azure MCP Server itself asks for consent before every operation on a secret -- listing a vault's secrets as well as writing one. The question appears in the chat as a form the user answers with **Approve** or **Reject**; the tool call waits until they do. This is separate from, and in addition to, the manager's approval in step 2.
+
+- Every Key Vault tool asks these questions, so mark each binding of `keyvault_secret_get` and `keyvault_secret_create` as asking (`"elicits": true`). A task that uses one then waits, before it starts, for the user who started the rotation to resume it from the chat, so they are there to answer.
+- The write in step 3 comes after the manager's decision, which may take a while. When the run pauses for the user before it, tell them in plain text that the rotation continues once they resume it.
+- If a call comes back with "Operation cancelled by user.", the user rejected or dismissed the confirmation, or let it expire. Do not retry on your own; tell the user and ask whether to try again.
+
 ## Workflow
 
 ### 1. Agree the target

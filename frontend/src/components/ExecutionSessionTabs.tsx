@@ -9,6 +9,7 @@ const STATUS_LABEL: Record<string, string> = {
   running: "Running",
   waiting_for_input: "Waiting for input",
   waiting_for_approval: "Waiting for approval",
+  waiting_for_initiator: "Waiting for initiator",
   scheduled: "Scheduled",
   idle: "Idle",
   done: "Done",

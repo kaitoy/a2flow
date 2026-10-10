@@ -224,6 +224,12 @@ _DESIGN_REGISTRATION_RULES = (
     "for it; only the argument bounds fall away. Leave the default of `true` "
     "for anything that writes, deletes, spends, or sends. Judge this from the "
     "tool's own description in `list_mcp_tools`, not its name.\n\n"
+    "Some tools stop in the middle of a call to ask the person running the "
+    "workflow a question. When the user tells you which task's tool does this "
+    '-- or the Skill says so -- add `"elicits": true` to that tool\'s binding. '
+    "At run time the task then waits, before it starts, for the person who "
+    "started the run to resume it from the chat, so they are there to answer. "
+    "A tool not marked this way may not ask anything.\n\n"
     "Express the steps "
     "as a DAG and register them in a single call to `register_task_templates`, using "
     "each task's `key` and `depends_on` to encode ordering.\n\n"
@@ -312,6 +318,12 @@ EXECUTION_AGENT_INSTRUCTION = (
     "calling `suggest_replies`. The server resumes this session at that time; "
     "then continue from step 1. Read a time that names no time zone in the "
     'local time zone shown under "Current time".\n\n'
+    "Waiting for the initiator: when `update_workflow_task` answers a start "
+    "with `waiting_for_initiator`, the task binds a tool that will ask the "
+    "person who started the run questions, and it starts only once they are "
+    "here. Tell the user in one line that the run continues when they resume "
+    "it from this chat, and end your turn without calling `suggest_replies`. "
+    "When they resume it, start that task again.\n\n"
     "Human approval: when a task requires a person's explicit go-ahead before you "
     "act (for example a destructive or irreversible operation), call "
     "`request_approval(title, description, workflow_task_id, ...)` to record a "
@@ -711,7 +723,8 @@ class AgentRegistry:
     ) -> ADKAgent:
         """Return the ADKAgent for one tenant's revision of a skill.
 
-        Builds and caches it on first use.
+        Builds and caches it on first use, with each turn bounded by
+        ``AGENT_TURN_TIMEOUT_SECONDS`` rather than ag-ui-adk's default.
 
         Args:
             agent_skill_id: Id of the skill, or ``None`` for the default
@@ -750,6 +763,10 @@ class AgentRegistry:
             use_thread_id_as_session_id=True,
             emit_messages_snapshot=True,
             session_timeout_seconds=None,
+            # ag-ui-adk ends a turn 600 s after it started, waiting tool call or
+            # not; a tool call held open for a person's answer to an MCP
+            # elicitation needs far longer than that.
+            execution_timeout_seconds=get_settings().agent_turn_timeout_seconds,
         )
         tenant_cache[key] = agent
         if len(tenant_cache) > _AGENT_CACHE_MAX_ENTRIES:

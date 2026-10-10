@@ -413,14 +413,13 @@ _DEMO_AZURE_MCP_PACKAGE = "@azure/mcp@3.0.0-beta.50"
 #: ``--namespace keyvault`` keeps it to the Key Vault tools; ``--mode all``
 #: exposes each operation as its own tool (``keyvault_secret_create``,
 #: ``keyvault_secret_get``, ...) rather than one ``keyvault`` tool taking a
-#: command, so a tool mock or an approval can single out the write.
-#: ``--dangerously-disable-elicitation`` is required because A2Flow's MCP
-#: client does not answer elicitation requests yet: without it the server
-#: asks for consent before every secret operation, the request is refused,
-#: and the call fails. The consent it would ask for is given by the manager
-#: who approves the rotation instead -- the sample skill writes nothing until
-#: that approval comes back. Drop the flag once elicitation can be answered
-#: in the chat.
+#: command, so a tool mock or an approval can single out the write. The server
+#: asks for consent before every operation that touches a secret (an MCP
+#: elicitation), and that question is put to the run's initiator in the chat
+#: (see :mod:`infrastructure.mcp_elicitation`) -- on top of the manager's
+#: approval the sample skill waits for before it writes anything. The sample
+#: skill tells the design agent to bind these tools with ``elicits``, so each
+#: task using one waits for the initiator to resume it before it starts.
 _DEMO_AZURE_MCP_ARGS = (
     "server",
     "start",
@@ -428,8 +427,12 @@ _DEMO_AZURE_MCP_ARGS = (
     "keyvault",
     "--mode",
     "all",
-    "--dangerously-disable-elicitation",
 )
+
+#: The flag earlier versions of this module launched the demo Azure MCP server
+#: with, from before A2Flow could answer the server's consent questions. Taken
+#: back out of an existing row on the next startup.
+_RETIRED_AZURE_MCP_FLAG = "--dangerously-disable-elicitation"
 
 #: Azure SDK credential the demo Azure MCP server is told to use. Pinning it to
 #: ``EnvironmentCredential`` makes the server read the service principal from
@@ -487,9 +490,9 @@ _DEMO_GKE_MCP_SERVER_DESCRIPTION = (
 #: Description shown on the demo Azure MCP server in the admin UI.
 _DEMO_AZURE_MCP_SERVER_DESCRIPTION = (
     "Microsoft's Azure MCP Server, limited to its Key Vault tools, for "
-    "listing and writing Key Vault secrets, keys, and certificates. Started "
-    "with user confirmation (elicitation) disabled: a manager's approval "
-    "stands in for it."
+    "listing and writing Key Vault secrets, keys, and certificates. Asks the "
+    "run's initiator to confirm in the chat before each operation on a secret, "
+    "so bind its tools as asking the initiator."
 )
 
 #: Description shown on the demo EC2 Cost Estimator server in the admin UI.
@@ -1922,18 +1925,32 @@ async def _seed_demo_azure_mcp_server(session: AsyncSession, tenant_id: str) -> 
 
     Microsoft ships the Azure MCP Server as an npm package, so the row is a
     ``stdio`` server launched with ``npx`` (see :data:`_DEMO_AZURE_MCP_ARGS`
-    for the flags, including why elicitation is disabled). It authenticates
+    for the flags). It authenticates
     as a service principal: the three ``env`` entries are
     ``${secret:NAME/KEY}`` placeholders resolved at connection time, under the
     variable names the Azure SDK's ``EnvironmentCredential`` reads, so the
     plaintext never lands in the ``mcp_servers`` row. Its Key Vault tools can
     write secrets, keys, and certificates, not only read them.
 
+    An existing row still launched with :data:`_RETIRED_AZURE_MCP_FLAG` has it
+    removed -- the same way :func:`_ensure_demo_tag` brings an older tag's
+    flag in line -- so upgrading with ``DEMO_DATA`` left on starts asking for
+    consent without a manual edit.
+
     Args:
         session: Database session used to read and insert the server.
         tenant_id: Id of the ``Default`` tenant the server belongs to.
     """
-    if await session.get(MCPServer, DEMO_AZURE_MCP_SERVER_ID) is not None:
+    existing = await session.get(MCPServer, DEMO_AZURE_MCP_SERVER_ID)
+    if existing is not None:
+        if _RETIRED_AZURE_MCP_FLAG in existing.args:
+            existing.args = [
+                arg for arg in existing.args if arg != _RETIRED_AZURE_MCP_FLAG
+            ]
+            existing.description = _DEMO_AZURE_MCP_SERVER_DESCRIPTION
+            existing.updated_by = SYSTEM_USER_ID
+            session.add(existing)
+            await session.commit()
         return
     await _insert(
         session,

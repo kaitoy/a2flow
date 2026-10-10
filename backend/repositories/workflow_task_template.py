@@ -205,6 +205,7 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
                     mcp_server_id=binding.mcp_server_id,
                     tool_name=binding.tool_name,
                     requires_input_approval=binding.requires_input_approval,
+                    elicits=binding.elicits,
                 )
             )
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -347,6 +348,7 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
                         mcp_server_id=binding.mcp_server_id,
                         tool_name=binding.tool_name,
                         requires_input_approval=binding.requires_input_approval,
+                        elicits=binding.elicits,
                     )
                 )
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -365,6 +367,7 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
                     mcp_server_id=row.mcp_server_id,
                     tool_name=row.tool_name,
                     requires_input_approval=row.requires_input_approval,
+                    elicits=row.elicits,
                 )
                 for row in result.all()
             ]
@@ -387,6 +390,7 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
                     mcp_server_id=row.mcp_server_id,
                     tool_name=row.tool_name,
                     requires_input_approval=row.requires_input_approval,
+                    elicits=row.elicits,
                 )
             )
         return {tid: _sorted_bindings(bindings) for tid, bindings in out.items()}
@@ -407,6 +411,7 @@ class SqlWorkflowTaskTemplateRepository(TenantScopedRepository[WorkflowTaskTempl
                     mcp_server_id=binding.mcp_server_id,
                     tool_name=binding.tool_name,
                     requires_input_approval=binding.requires_input_approval,
+                    elicits=binding.elicits,
                 )
             )
 

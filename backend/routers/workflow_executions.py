@@ -40,6 +40,7 @@ from dependencies.context import (
     SortDep,
 )
 from dependencies.service import (
+    MCPElicitationServiceDep,
     MetricsServiceDep,
     SessionFileServiceDep,
     WorkflowExecutionServiceDep,
@@ -50,6 +51,7 @@ from models.execution_session import (
     SessionHistory,
     SessionInputCreate,
 )
+from models.mcp_elicitation import MCPElicitation, MCPElicitationAnswer
 from models.mcp_tool_invocation import MCPToolInvocation
 from models.metrics import (
     FailedExecutionEntry,
@@ -62,7 +64,7 @@ from models.user import Role
 from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task import WorkflowTaskRead
 from services.metrics import MetricsWindow
-from services.session_stream import stream_events
+from services.session_stream import SSE_HEADERS, stream_events
 
 router = APIRouter(prefix="/workflow-executions", tags=["workflow-executions"])
 
@@ -430,6 +432,63 @@ async def send_workflow_session_input(
     return ApiResponse(meta=meta, data=session)
 
 
+@router.get(
+    "/{execution_id}/sessions/{session_id}/elicitations/{elicitation_id}",
+    response_model=ApiResponse[MCPElicitation],
+)
+async def get_session_elicitation(
+    execution_id: str,
+    session_id: str,
+    elicitation_id: str,
+    service: MCPElicitationServiceDep,
+    caller: CurrentUserDep,
+    caller_roles: EffectiveRolesDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[MCPElicitation]:
+    """Return a question an MCP server asked during one of the session's turns.
+
+    Readable by anyone who may read the run, so the chat can show the
+    question's state -- still open, answered, or expired -- after a reload.
+    """
+    question = await service.get(
+        execution_id,
+        session_id,
+        elicitation_id,
+        caller=caller,
+        caller_roles=caller_roles,
+    )
+    return ApiResponse(meta=meta, data=question)
+
+
+@router.post(
+    "/{execution_id}/sessions/{session_id}/elicitations/{elicitation_id}/answer",
+    response_model=ApiResponse[MCPElicitation],
+)
+async def answer_session_elicitation(
+    execution_id: str,
+    session_id: str,
+    elicitation_id: str,
+    data: MCPElicitationAnswer,
+    service: MCPElicitationServiceDep,
+    caller: CurrentUserDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[MCPElicitation]:
+    """Answer a question an MCP server asked in the middle of a tool call.
+
+    Unlike ``/input``, accepted while the session's turn is running -- that
+    turn's tool call is what is waiting on the answer, and it continues by
+    itself once the answer is recorded. The initiator's alone.
+
+    403 for anyone else, 422 ``INVALID_SESSION_INPUT`` when an accept's values
+    do not fit the question's form, and 409 ``ELICITATION_ALREADY_ANSWERED``
+    once the question has been answered or has expired.
+    """
+    question = await service.answer(
+        execution_id, session_id, elicitation_id, data, caller=caller
+    )
+    return ApiResponse(meta=meta, data=question)
+
+
 @router.get("/{execution_id}/sessions/{session_id}/stream", include_in_schema=False)
 async def stream_workflow_session(
     execution_id: str,
@@ -459,5 +518,5 @@ async def stream_workflow_session(
             disconnected=request.is_disconnected,
         ),
         media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+        headers=SSE_HEADERS,
     )

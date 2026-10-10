@@ -535,6 +535,7 @@ def upgrade() -> None:
         sa.Column("mcp_server_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("tool_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("requires_input_approval", sa.Boolean(), nullable=False),
+        sa.Column("elicits", sa.Boolean(), nullable=False),
         sa.ForeignKeyConstraint(
             ["mcp_server_id"], ["mcp_servers.id"], ondelete="RESTRICT"
         ),
@@ -706,6 +707,75 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
+        "mcp_elicitations",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "workflow_execution_id",
+            sqlmodel.sql.sqltypes.AutoString(),
+            nullable=False,
+        ),
+        sa.Column("session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("mcp_server_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("server_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tool_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("message", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "requested_schema",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "pending",
+                "accepted",
+                "declined",
+                "cancelled",
+                "expired",
+                name="mcpelicitationstatus",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "content",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=True,
+        ),
+        sa.Column("answered_by", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("answered_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["workflow_execution_id"],
+            ["workflow_executions.id"],
+            name="fk_mcp_elicitations_workflow_execution_id",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["answered_by"],
+            ["users.id"],
+            name="fk_mcp_elicitations_answered_by",
+            ondelete="RESTRICT",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_mcp_elicitations_tenant_id", "mcp_elicitations", ["tenant_id"], unique=False
+    )
+    op.create_index(
+        "ix_mcp_elicitations_workflow_execution_id",
+        "mcp_elicitations",
+        ["workflow_execution_id"],
+        unique=False,
+    )
+    op.create_table(
         "notifications",
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -721,6 +791,7 @@ def upgrade() -> None:
                 "execution_completed",
                 "workflow_draft_ready",
                 "workflow_generation_failed",
+                "elicitation_request",
                 name="notificationtype",
             ),
             nullable=False,
@@ -853,6 +924,7 @@ def upgrade() -> None:
                 "running",
                 "waiting_for_input",
                 "waiting_for_approval",
+                "waiting_for_initiator",
                 "scheduled",
                 "idle",
                 "done",
@@ -877,6 +949,9 @@ def upgrade() -> None:
         sa.Column("fork_event_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("summary", Text(), nullable=True),
         sa.Column("resume_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "initiator_task_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
@@ -1224,6 +1299,7 @@ def upgrade() -> None:
         sa.Column("mcp_server_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("tool_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("requires_input_approval", sa.Boolean(), nullable=False),
+        sa.Column("elicits", sa.Boolean(), nullable=False),
         sa.ForeignKeyConstraint(
             ["mcp_server_id"], ["mcp_servers.id"], ondelete="RESTRICT"
         ),
@@ -1660,6 +1736,11 @@ def downgrade() -> None:
     op.drop_index("ix_notifications_user_id", table_name="notifications")
     op.drop_index("ix_notifications_tenant_id", table_name="notifications")
     op.drop_table("notifications")
+    op.drop_index(
+        "ix_mcp_elicitations_workflow_execution_id", table_name="mcp_elicitations"
+    )
+    op.drop_index("ix_mcp_elicitations_tenant_id", table_name="mcp_elicitations")
+    op.drop_table("mcp_elicitations")
     op.drop_index("ix_session_files_workflow_execution_id", table_name="session_files")
     op.drop_index("ix_session_files_tenant_id", table_name="session_files")
     op.drop_table("session_files")

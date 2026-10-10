@@ -35,7 +35,7 @@ import {
   updateWorkflowTaskTemplate,
   type WorkflowTaskTemplate,
 } from "@/lib/api";
-import { bindingToValue, exemptValues, toBindings } from "@/lib/mcp-tool-options";
+import { askingValues, bindingToValue, exemptValues, toBindings } from "@/lib/mcp-tool-options";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -45,7 +45,9 @@ import { showToast } from "@/store/toastSlice";
 // bindings as plain string arrays (encoded values), so omit those and re-add
 // them in the form's shape. `inputApprovalExempt` is the checkbox-group half of
 // the tool picker — a subset of `toolBindings` — folded back into the bindings
-// on submit by `toBindings`.
+// on submit by `toBindings`. `asksInitiator` is the subset the design agent
+// marked as asking the initiator mid-call; nothing on the form edits it, it is
+// only carried through so saving does not clear it.
 const schema = zWorkflowTaskTemplateCreate
   .omit({
     workflowId: true,
@@ -56,6 +58,7 @@ const schema = zWorkflowTaskTemplateCreate
     dependsOnIds: z.array(z.string()),
     toolBindings: z.array(z.string()),
     inputApprovalExempt: z.array(z.string()),
+    asksInitiator: z.array(z.string()),
   });
 
 type FormValues = z.infer<typeof schema>;
@@ -109,6 +112,7 @@ export default function WorkflowTaskTemplateDetailPage() {
       dependsOnIds: [] as string[],
       toolBindings: [] as string[],
       inputApprovalExempt: [] as string[],
+      asksInitiator: [] as string[],
     },
   });
 
@@ -122,6 +126,7 @@ export default function WorkflowTaskTemplateDetailPage() {
           dependsOnIds: template.dependsOnIds ?? [],
           toolBindings: (template.toolBindings ?? []).map(bindingToValue),
           inputApprovalExempt: exemptValues(template.toolBindings ?? []),
+          asksInitiator: askingValues(template.toolBindings ?? []),
         });
         setAudit({
           createdBy: template.createdBy,
@@ -164,7 +169,11 @@ export default function WorkflowTaskTemplateDetailPage() {
           title: values.title,
           description: values.description || null,
           dependsOnIds: values.dependsOnIds,
-          toolBindings: toBindings(values.toolBindings, values.inputApprovalExempt),
+          toolBindings: toBindings(
+            values.toolBindings,
+            values.inputApprovalExempt,
+            values.asksInitiator
+          ),
         });
         dispatch(showToast({ message: "Template updated" }));
         router.push(`/workflows/${workflowId}/task-templates`);

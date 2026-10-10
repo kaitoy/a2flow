@@ -274,6 +274,7 @@ async def test_call_bound_tool_forwards_to_server(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         seen.update(connection=connection, tool_name=tool_name, arguments=arguments)
         return _tool_result("found it", structured={"hits": 1})
@@ -302,6 +303,7 @@ async def test_call_accepts_json_string_arguments(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         seen["arguments"] = arguments
         return _tool_result()
@@ -333,6 +335,7 @@ async def test_call_unreachable_server_errors(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         raise McpConnectionError(connection.label, "connection refused")
 
@@ -354,6 +357,7 @@ async def test_call_tool_error_result_becomes_error_dict(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         return _tool_result("boom", is_error=True)
 
@@ -376,6 +380,7 @@ async def test_call_validates_against_union_of_in_progress_tasks(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         return _tool_result()
 
@@ -405,6 +410,7 @@ async def test_call_forwards_a_stdio_server_as_a_stdio_connection(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         seen["connection"] = connection
         return _tool_result()
@@ -561,6 +567,7 @@ async def test_call_resolves_secret_placeholder_in_headers(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         seen["connection"] = connection
         return _tool_result()
@@ -589,6 +596,7 @@ async def test_call_with_missing_secret_returns_error(
         connection: McpConnection,
         tool_name: str,
         arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         called.append(connection.label)
         return _tool_result()

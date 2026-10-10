@@ -5,8 +5,10 @@ with its own guarantee, and every check this module covers is deliberately one
 that does *not* depend on it — uvicorn does not expose the peer certificate to a
 handler, so the app's rules have to stand on the request body alone.
 
-The last test closes that gap the only way it can be closed: it starts the real
-listener with the real material and drives it through ``RemoteMcpExecutor``.
+The last tests close that gap the only way it can be closed: they start the
+real listener with the real material and drive it through ``RemoteMcpExecutor``,
+including a call that stops to ask a question (an MCP elicitation) and is
+answered over a second request.
 """
 
 import asyncio
@@ -75,6 +77,25 @@ SERVER_ID = "srv-1"
 TOOL_NAME = "read_file"
 ARGUMENTS: dict[str, Any] = {"path": "/etc/hosts"}
 CONNECTION = HttpConnection(url="https://mcp.example.com/mcp")
+
+#: The question the fake server asks when the caller lets it: the shape the
+#: Azure MCP Server uses before touching a secret.
+QUESTION = types.ElicitRequestFormParams(
+    message="Do you want to continue?",
+    requestedSchema={
+        "type": "object",
+        "properties": {
+            "decision": {
+                "type": "string",
+                "oneOf": [
+                    {"const": "accept", "title": "Approve"},
+                    {"const": "reject", "title": "Reject"},
+                ],
+            }
+        },
+        "required": ["decision"],
+    },
+)
 
 
 @pytest.fixture
@@ -263,12 +284,51 @@ def reachable(monkeypatch: pytest.MonkeyPatch) -> None:
         return [types.Tool(name=TOOL_NAME, inputSchema={})]
 
     async def _call(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        *,
+        on_elicit: mcp_client.ElicitHandler | None = None,
     ) -> types.CallToolResult:
-        return types.CallToolResult(content=[types.TextContent(type="text", text="ok")])
+        text = "ok"
+        if on_elicit is not None:
+            answer = await on_elicit(QUESTION)
+            text = f"ok:{answer.action}:{(answer.content or {}).get('decision')}"
+        return types.CallToolResult(content=[types.TextContent(type="text", text=text)])
 
     monkeypatch.setattr(mcp_client, "list_server_tools", _list)
     monkeypatch.setattr(mcp_client, "call_server_tool", _call)
+
+
+def _call_frames(
+    client: TestClient,
+    body: dict[str, Any],
+    answer: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Make a /call-tool call over its WebSocket and return every frame it sent.
+
+    Each ``elicit`` frame is answered with ``answer`` (decline by default) on
+    the same socket, as the backend does.
+    """
+    frames: list[dict[str, Any]] = []
+    with client.websocket_connect("/call-tool") as websocket:
+        websocket.send_json(body)
+        while True:
+            frame = websocket.receive_json()
+            frames.append(frame)
+            if frame["type"] != "elicit":
+                return frames
+            websocket.send_json(
+                {"key": frame["key"], "result": answer or {"action": "decline"}}
+            )
+
+
+def _refused(frames: list[dict[str, Any]]) -> str:
+    """Assert a call was refused before it started and return the reason."""
+    (frame,) = frames
+    assert frame["type"] == "error"
+    assert frame["code"] == "MCP_PROXY_FORBIDDEN"
+    return str(frame["message"])
 
 
 def _forbidden(response: Any) -> str:
@@ -378,9 +438,9 @@ def test_a_listing_signature_cannot_be_replayed_as_a_call(
         ca, operation=LIST_OPERATION, tool_name=TOOL_NAME, arguments=ARGUMENTS
     )
 
-    response = client.post("/call-tool", json=body)
+    frames = _call_frames(client, body)
 
-    assert "signature does not verify" in _forbidden(response)
+    assert "signature does not verify" in _refused(frames)
 
 
 # --------------------------------------------------------------------------
@@ -463,21 +523,22 @@ def test_a_call_signature_cannot_be_replayed_as_a_test_call(
 def test_a_granted_call_reaches_the_server(
     client: TestClient, ca: RootCertificateAuthority, reachable: None
 ) -> None:
-    response = client.post(
-        "/call-tool", json=_call_body(ca, credential=_credential(_tool_leaf(ca)))
+    frames = _call_frames(
+        client, _call_body(ca, credential=_credential(_tool_leaf(ca)))
     )
 
-    assert response.status_code == 200
-    assert response.json()["data"]["result"]["content"][0]["text"] == "ok"
+    (frame,) = frames
+    assert frame["type"] == "result"
+    assert frame["result"]["content"][0]["text"] == "ok"
 
 
 def test_a_call_without_a_tool_certificate_is_refused(
     client: TestClient, ca: RootCertificateAuthority, reachable: None
 ) -> None:
     """Being the backend is not the same as holding a task's grant."""
-    response = client.post("/call-tool", json=_call_body(ca, credential=None))
+    frames = _call_frames(client, _call_body(ca, credential=None))
 
-    assert "tool certificate is required" in _forbidden(response)
+    assert "tool certificate is required" in _refused(frames)
 
 
 def test_a_call_the_certificate_does_not_grant_is_refused(
@@ -485,11 +546,9 @@ def test_a_call_the_certificate_does_not_grant_is_refused(
 ) -> None:
     certificate = _tool_leaf(ca, tools=((SERVER_ID, "write_file"),))
 
-    response = client.post(
-        "/call-tool", json=_call_body(ca, credential=_credential(certificate))
-    )
+    frames = _call_frames(client, _call_body(ca, credential=_credential(certificate)))
 
-    assert "does not grant" in _forbidden(response)
+    assert "does not grant" in _refused(frames)
 
 
 def test_an_expired_tool_certificate_is_refused(
@@ -497,11 +556,9 @@ def test_an_expired_tool_certificate_is_refused(
 ) -> None:
     certificate = _tool_leaf(ca, not_after=datetime.now(UTC) - timedelta(seconds=30))
 
-    response = client.post(
-        "/call-tool", json=_call_body(ca, credential=_credential(certificate))
-    )
+    frames = _call_frames(client, _call_body(ca, credential=_credential(certificate)))
 
-    assert "has expired" in _forbidden(response)
+    assert "has expired" in _refused(frames)
 
 
 def test_a_stale_proof_of_possession_is_refused(
@@ -512,9 +569,9 @@ def test_a_stale_proof_of_possession_is_refused(
         _tool_leaf(ca), timestamp=datetime.now(UTC) - timedelta(hours=1)
     )
 
-    response = client.post("/call-tool", json=_call_body(ca, credential=credential))
+    frames = _call_frames(client, _call_body(ca, credential=credential))
 
-    assert "outside the accepted time window" in _forbidden(response)
+    assert "outside the accepted time window" in _refused(frames)
 
 
 def test_a_credential_signed_for_different_arguments_is_refused(
@@ -523,20 +580,20 @@ def test_a_credential_signed_for_different_arguments_is_refused(
     """The proof covers the arguments, so swapping them invalidates it."""
     credential = _credential(_tool_leaf(ca), arguments={"path": "/etc/shadow"})
 
-    response = client.post("/call-tool", json=_call_body(ca, credential=credential))
+    frames = _call_frames(client, _call_body(ca, credential=credential))
 
-    assert "not proven to belong to this caller" in _forbidden(response)
+    assert "not proven to belong to this caller" in _refused(frames)
 
 
 def test_a_service_certificate_cannot_stand_in_for_a_grant(
     client: TestClient, ca: RootCertificateAuthority, reachable: None
 ) -> None:
     """It authenticates a component; it authorizes no tool at all."""
-    response = client.post(
-        "/call-tool", json=_call_body(ca, credential=_credential(_service_leaf(ca)))
+    frames = _call_frames(
+        client, _call_body(ca, credential=_credential(_service_leaf(ca)))
     )
 
-    assert "tool certificate is not valid" in _forbidden(response)
+    assert "tool certificate is not valid" in _refused(frames)
 
 
 def test_a_valid_grant_pointed_at_another_command_is_refused(
@@ -553,9 +610,9 @@ def test_a_valid_grant_pointed_at_another_command_is_refused(
         StdioConnection(command="npx", args=["-y", "attacker-package"])
     ).model_dump(mode="json", by_alias=True)
 
-    response = client.post("/call-tool", json=body)
+    frames = _call_frames(client, body)
 
-    assert "signature does not verify" in _forbidden(response)
+    assert "signature does not verify" in _refused(frames)
 
 
 def test_an_unreachable_server_is_reported_as_a_bad_gateway(
@@ -564,18 +621,100 @@ def test_an_unreachable_server_is_reported_as_a_bad_gateway(
     """A transport failure is not an authorization failure and must not read as one."""
 
     async def _call(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         raise McpConnectionError("srv", "connection refused")
 
     monkeypatch.setattr(mcp_client, "call_server_tool", _call)
 
-    response = client.post(
-        "/call-tool", json=_call_body(ca, credential=_credential(_tool_leaf(ca)))
+    frames = _call_frames(
+        client, _call_body(ca, credential=_credential(_tool_leaf(ca)))
     )
 
-    assert response.status_code == 502
-    assert response.json()["error"]["code"] == "MCP_UNREACHABLE"
+    (frame,) = frames
+    assert frame["type"] == "error"
+    assert frame["code"] == "MCP_UNREACHABLE"
+    assert frame["message"] == "connection refused"
+
+
+def test_an_unexpected_failure_still_ends_the_stream(
+    client: TestClient, ca: RootCertificateAuthority, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without a closing frame the backend would wait on the stream forever."""
+
+    async def _call(*args: Any, **kwargs: Any) -> types.CallToolResult:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(mcp_client, "call_server_tool", _call)
+
+    frames = _call_frames(
+        client, _call_body(ca, credential=_credential(_tool_leaf(ca)))
+    )
+
+    (frame,) = frames
+    assert frame["type"] == "error"
+    assert frame["code"] == "INTERNAL_ERROR"
+    assert "boom" not in frame["message"]
+
+
+def test_the_server_is_not_let_ask_unless_the_backend_will_answer(
+    client: TestClient, ca: RootCertificateAuthority, reachable: None
+) -> None:
+    """``elicit`` defaults off, so the capability is not advertised."""
+    frames = _call_frames(
+        client, _call_body(ca, credential=_credential(_tool_leaf(ca)))
+    )
+
+    (frame,) = frames
+    assert frame["result"]["content"][0]["text"] == "ok"
+
+
+# --------------------------------------------------------------------------
+# Relaying a server's question
+# --------------------------------------------------------------------------
+
+
+def test_a_question_is_relayed_and_answered_on_the_same_socket(
+    client: TestClient, ca: RootCertificateAuthority, reachable: None
+) -> None:
+    """Nothing but the connection ties the answer to the call."""
+    body = _call_body(ca, credential=_credential(_tool_leaf(ca)))
+    body["elicit"] = True
+
+    elicit, result = _call_frames(
+        client, body, {"action": "accept", "content": {"decision": "accept"}}
+    )
+
+    assert elicit["type"] == "elicit"
+    assert elicit["params"]["message"] == QUESTION.message
+    assert result["result"]["content"][0]["text"] == "ok:accept:accept"
+
+
+def test_something_that_is_not_an_answer_abandons_the_call(
+    client: TestClient, ca: RootCertificateAuthority, reachable: None
+) -> None:
+    body = _call_body(ca, credential=_credential(_tool_leaf(ca)))
+    body["elicit"] = True
+
+    with client.websocket_connect("/call-tool") as websocket:
+        websocket.send_json(body)
+        assert websocket.receive_json()["type"] == "elicit"
+        websocket.send_json({"nonsense": True})
+        frame = websocket.receive_json()
+
+    assert frame["type"] == "error"
+    assert frame["code"] == "VALIDATION_ERROR"
+
+
+def test_a_first_message_that_is_not_a_call_is_refused(client: TestClient) -> None:
+    with client.websocket_connect("/call-tool") as websocket:
+        websocket.send_json({"tool": "x"})
+        frame = websocket.receive_json()
+
+    assert frame["code"] == "VALIDATION_ERROR"
 
 
 # --------------------------------------------------------------------------
@@ -798,6 +937,7 @@ async def listener(
                 ssl_keyfile=str(tls_dir / SERVER_KEY_FILE),
                 ssl_ca_certs=str(tls_dir / CA_FILE),
                 ssl_cert_reqs=ssl.CERT_REQUIRED,
+                ws="websockets-sansio",
                 log_config=None,
                 lifespan="on",
             )
@@ -874,6 +1014,50 @@ async def test_a_real_mutually_authenticated_call_round_trips(
 
     assert isinstance(result.content[0], types.TextContent)
     assert result.content[0].text == "ok"
+
+
+async def test_a_question_the_server_asks_mid_call_is_answered_over_the_hop(
+    listener: str, ca: RootCertificateAuthority
+) -> None:
+    """The ``elicit`` frame goes out, the answer comes back, the call finishes."""
+    pem, key = _tool_leaf(ca)
+    timestamp = datetime.now(UTC)
+    credential = McpClientCredential(
+        certificate_pem=pem,
+        signature=sign_pop_digest(
+            key,
+            pop_digest(
+                session_id=SESSION_ID,
+                mcp_server_id=SERVER_ID,
+                tool_name=TOOL_NAME,
+                arguments=ARGUMENTS,
+                nonce="live-nonce",
+                timestamp=timestamp,
+            ),
+        ),
+        nonce="live-nonce",
+        timestamp=timestamp,
+        private_key_pem=private_key_to_pem(key),
+    )
+    asked: list[types.ElicitRequestParams] = []
+
+    async def answer(params: types.ElicitRequestParams) -> types.ElicitResult:
+        asked.append(params)
+        return types.ElicitResult(action="accept", content={"decision": "accept"})
+
+    result = await RemoteMcpExecutor(listener).call_tool(
+        CONNECTION,
+        TOOL_NAME,
+        ARGUMENTS,
+        mcp_server_id=SERVER_ID,
+        session_id=SESSION_ID,
+        credential=credential,
+        on_elicit=answer,
+    )
+
+    assert [params.message for params in asked] == [QUESTION.message]
+    assert isinstance(result.content[0], types.TextContent)
+    assert result.content[0].text == "ok:accept:accept"
 
 
 async def test_a_client_without_a_certificate_cannot_even_connect(

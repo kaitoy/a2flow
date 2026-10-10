@@ -25,6 +25,12 @@ Design notes:
 * **Two transports.** Streamable HTTP for remote servers; stdio for servers
   launched as a child process. SSE-transport servers are not supported in this
   version.
+* **Elicitation, when the caller asks for it.** :func:`call_server_tool` takes
+  an optional :data:`ElicitHandler`. Only then does the session advertise the
+  elicitation capability, and the server may stop mid-call to ask a person
+  something (``elicitation/create``). The operation's timeout is paused for as
+  long as the handler takes -- it is waiting on a human, not on the server --
+  so the handler must bound that wait itself.
 * Any connection, protocol, or timeout failure is normalized to
   :class:`repositories.exceptions.McpConnectionError` so callers map it to one
   error shape (HTTP 502 for the API, an ``{"error": ...}`` dict for the agent).
@@ -37,7 +43,7 @@ Design notes:
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -45,8 +51,10 @@ from typing import Any
 import httpx
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from mcp import ClientSession, StdioServerParameters, types
+from mcp.client.session import ElicitationFnT
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.shared.context import RequestContext
 from mcp.shared.message import SessionMessage
 
 from infrastructure.url_safety import assert_public_http_url
@@ -63,6 +71,12 @@ MCP_TIMEOUT_SECONDS = 30.0
 #: ``npx -y pkg@version`` or ``uvx pkg`` downloads the package before the
 #: server process even starts, which routinely outlasts 30 seconds.
 MCP_STDIO_TIMEOUT_SECONDS = 120.0
+
+#: Answers one ``elicitation/create`` request a server sends while a tool call
+#: is in flight. It receives the request's parameters (a form or a URL request)
+#: and returns the person's answer. It may take minutes; it is expected to
+#: bound that wait itself and answer ``cancel`` when it gives up.
+ElicitHandler = Callable[[types.ElicitRequestParams], Awaitable[types.ElicitResult]]
 
 _ReadStream = MemoryObjectReceiveStream[SessionMessage | Exception]
 _WriteStream = MemoryObjectSendStream[SessionMessage]
@@ -215,11 +229,17 @@ async def _transport_streams(
 
 
 @asynccontextmanager
-async def mcp_session(connection: McpConnection) -> AsyncIterator[ClientSession]:
+async def mcp_session(
+    connection: McpConnection, *, on_elicit: ElicitationFnT | None = None
+) -> AsyncIterator[ClientSession]:
     """Open an initialized MCP client session against a registered server.
 
     Args:
         connection: The server to connect to, with secrets already resolved.
+        on_elicit: SDK-shaped callback answering the server's
+            ``elicitation/create`` requests. When given, the session advertises
+            the elicitation capability during ``initialize``; when omitted, it
+            does not, and the SDK refuses any such request.
 
     Yields:
         An initialized :class:`mcp.ClientSession`; the connection is closed
@@ -230,7 +250,9 @@ async def mcp_session(connection: McpConnection) -> AsyncIterator[ClientSession]
     """
     async with (
         _transport_streams(connection) as (read_stream, write_stream),
-        ClientSession(read_stream, write_stream) as session,
+        ClientSession(
+            read_stream, write_stream, elicitation_callback=on_elicit
+        ) as session,
     ):
         await session.initialize()
         yield session
@@ -284,10 +306,45 @@ async def list_server_tools(connection: McpConnection) -> list[types.Tool]:
         raise McpConnectionError(connection.label, reason) from e
 
 
+def _pausing_timeout(
+    timeout: asyncio.Timeout, handler: ElicitHandler
+) -> ElicitationFnT:
+    """Wrap ``handler`` so ``timeout`` stands still while it waits on a person.
+
+    The operation's budget is meant for the server, not for whoever answers
+    the server's question, so the deadline is lifted for the duration of the
+    handler and put back afterwards with exactly the time that was left.
+
+    Args:
+        timeout: The ``asyncio.timeout`` guarding the whole operation.
+        handler: The caller's elicitation handler.
+
+    Returns:
+        A callback in the shape :class:`mcp.ClientSession` expects.
+    """
+
+    async def callback(
+        context: RequestContext[ClientSession, Any],
+        params: types.ElicitRequestParams,
+    ) -> types.ElicitResult | types.ErrorData:
+        loop = asyncio.get_running_loop()
+        deadline = timeout.when()
+        remaining = None if deadline is None else max(deadline - loop.time(), 0.0)
+        timeout.reschedule(None)
+        try:
+            return await handler(params)
+        finally:
+            timeout.reschedule(None if remaining is None else loop.time() + remaining)
+
+    return callback
+
+
 async def call_server_tool(
     connection: McpConnection,
     tool_name: str,
     arguments: dict[str, Any],
+    *,
+    on_elicit: ElicitHandler | None = None,
 ) -> types.CallToolResult:
     """Invoke ``tool_name`` with ``arguments`` on the server behind ``connection``.
 
@@ -299,6 +356,9 @@ async def call_server_tool(
         connection: The server to call.
         tool_name: Name of the tool to invoke.
         arguments: JSON-serializable arguments matching the tool's input schema.
+        on_elicit: Answers the server's ``elicitation/create`` requests during
+            the call. The connection's timeout budget is paused while it runs.
+            Omit it to keep the elicitation capability unadvertised.
 
     Returns:
         The raw ``tools/call`` result.
@@ -309,8 +369,11 @@ async def call_server_tool(
             timeout budget.
     """
     try:
-        async with asyncio.timeout(connection.timeout_seconds):
-            async with mcp_session(connection) as session:
+        async with asyncio.timeout(connection.timeout_seconds) as timeout:
+            callback = (
+                None if on_elicit is None else _pausing_timeout(timeout, on_elicit)
+            )
+            async with mcp_session(connection, on_elicit=callback) as session:
                 return await session.call_tool(tool_name, arguments=arguments)
     except Exception as e:
         reason = _describe_failure(e)

@@ -414,6 +414,7 @@ async def test_register_with_tools_binds_them(engine: AsyncEngine) -> None:
             "server_id": server_id,
             "tool_name": "search",
             "requires_input_approval": True,
+            "elicits": False,
         }
     ]
 
@@ -457,7 +458,12 @@ async def test_update_replaces_tool_bindings(engine: AsyncEngine) -> None:
         tool_bindings=[{"server_id": server_id, "tool_name": "fetch"}],
     )
     assert result["tool_bindings"] == [
-        {"server_id": server_id, "tool_name": "fetch", "requires_input_approval": True}
+        {
+            "server_id": server_id,
+            "tool_name": "fetch",
+            "requires_input_approval": True,
+            "elicits": False,
+        }
     ]
 
 
@@ -776,7 +782,7 @@ async def test_register_can_exempt_a_tool_from_input_approval(
                         "tool_name": "list_instances",
                         "requires_input_approval": False,
                     },
-                    {"server_id": server_id, "tool_name": "launch"},
+                    {"server_id": server_id, "tool_name": "launch", "elicits": True},
                 ],
             }
         ],
@@ -790,11 +796,13 @@ async def test_register_can_exempt_a_tool_from_input_approval(
             "server_id": server_id,
             "tool_name": "launch",
             "requires_input_approval": True,
+            "elicits": True,
         },
         {
             "server_id": server_id,
             "tool_name": "list_instances",
             "requires_input_approval": False,
+            "elicits": False,
         },
     ]
 

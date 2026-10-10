@@ -61,6 +61,7 @@ from models.workflow import (
 from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task_template import WorkflowTaskTemplateRead
 from repositories.exceptions import NotFoundError, SessionRunInProgressError
+from services.session_stream import SSE_HEADERS
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -298,7 +299,7 @@ async def design_session_agent(
     return StreamingResponse(
         event_generator(),
         media_type=encoder.get_content_type(),
-        headers={"X-Accel-Buffering": "no"},
+        headers=SSE_HEADERS,
     )
 
 

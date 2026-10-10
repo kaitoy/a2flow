@@ -20,6 +20,7 @@ A **bell icon** sits in the top toolbar, on both the chat header and the admin s
 | `workflow_generation_failed` | That same design run failed. It runs unattended with no client watching, so this is how you find out; the reason is on the workflow's detail page and in its design chat. | Whoever started the generation |
 | `approval_request` | The agent asks for a mid-execution decision and waits. | The [designated approver](./approvals.md#human-approval) — one per eligible member, for a group destination |
 | `execution_completed` | Every task in a run has reached a terminal state. Raised once per run. | Whoever started the run |
+| `elicitation_request` | A task whose MCP server will ask for [confirmations](./workflow-executions.md#mcp-server-confirmations) is about to start, and the run waits for you to resume it from the chat. | Whoever started the run |
 
 Clicking a notification marks it read and takes you where it points: run-scoped events to the run's chat, workflow-scoped ones to the workflow's detail page.
 

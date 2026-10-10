@@ -38,6 +38,10 @@ The `render_a2ui` tool is attached by the frontend — or, on a turn A2Flow runs
 
 Clicking a button sends the surface's **whole data model** back — every value typed or selected, not just the button that was pressed. That is what lets the agent respond to what the user actually entered, and what lets a reloaded chat redisplay an answered surface filled in with the user's own values rather than the agent's defaults.
 
+### A server's question, mid-call {#a-servers-question-mid-call}
+
+One surface is not drawn by the agent at all. An MCP server may stop partway through a tool call to ask a person something — an *elicitation* — and the call stays open while it waits. Only a tool the workflow's design marks as asking may do this, and a task that uses one does not start until the run's initiator is in the chat: the session pauses in **Waiting for initiator**, the initiator is notified, and the task starts on the turn their **Resume** begins. A2Flow then records the question and appends it to the running turn's stream as an activity of its own, so every viewer sees it at once. The answer goes through a dedicated route rather than the chat input, because the session is still mid-turn: it is the waiting tool call, not a new turn, that picks it up. See [Confirmations from an MCP server](../guides/workflow-executions.md#mcp-server-confirmations) for what the person sees.
+
 ## Agent activity in the chat {#agent-activity-in-the-chat}
 
 So you can see what the agent is doing between replies, its intermediate work is surfaced inline in the chat stream:

@@ -36,6 +36,13 @@ extension. The proof of possession is what ties the certificate to the specific
 server, tool, and arguments being asked for, which is the property that
 actually matters.
 
+**A call is a WebSocket.** The server may stop mid-call to ask a person
+something (an MCP elicitation). The proxy relays each such question as an
+``elicit`` frame on ``/call-tool``'s socket; the backend answers it on the same
+socket and keeps reading until the ``result`` frame. Nothing ties a call to a
+proxy process beyond its own connection, so the proxy may run as any number of
+replicas.
+
 Every failure normalizes to :class:`repositories.exceptions.McpConnectionError`,
 the same exception the local path raises, so the gateway's error handling does
 not care which executor it is holding.
@@ -54,6 +61,8 @@ from typing import Any, Protocol
 
 import httpx
 from mcp import types
+from websockets.asyncio.client import connect
+from websockets.exceptions import WebSocketException
 
 from config import get_settings
 from infrastructure import mcp_client
@@ -64,12 +73,14 @@ from infrastructure.mcp_certificate import (
     request_digest,
     sign_pop_digest,
 )
-from infrastructure.mcp_client import McpConnection
+from infrastructure.mcp_client import ElicitHandler, McpConnection
 from infrastructure.mcp_transport_tls import backend_client_credentials
 from models.mcp_execution import (
     ConnectionSpec,
+    ExecutorCallFrame,
     ExecutorCallToolRequest,
     ExecutorCredential,
+    ExecutorElicitationAnswer,
     ExecutorListToolsRequest,
     ExecutorSender,
     ExecutorTestCallToolRequest,
@@ -132,6 +143,7 @@ class McpExecutor(Protocol):
         mcp_server_id: str,
         session_id: str,
         credential: McpClientCredential | None,
+        on_elicit: ElicitHandler | None = None,
     ) -> types.CallToolResult:
         """Invoke one tool on the server behind ``connection``.
 
@@ -149,6 +161,8 @@ class McpExecutor(Protocol):
                 reaches here without one, so ``None`` only occurs where no
                 policy chain is configured — a directly constructed gateway in
                 a test.
+            on_elicit: Answers the questions the server asks mid-call (MCP
+                elicitations). Omitted, the server is not told it may ask.
 
         Returns:
             The raw ``tools/call`` result. A tool that reports a failure does so
@@ -219,6 +233,7 @@ class LocalMcpExecutor:
         mcp_server_id: str,
         session_id: str,
         credential: McpClientCredential | None,
+        on_elicit: ElicitHandler | None = None,
     ) -> types.CallToolResult:
         """Invoke the tool directly.
 
@@ -230,6 +245,7 @@ class LocalMcpExecutor:
                 grant names it.
             session_id: Unused; there is no far side to prove anything to.
             credential: Unused, for the same reason.
+            on_elicit: Answers the server's mid-call questions, if given.
 
         Returns:
             The raw ``tools/call`` result.
@@ -237,7 +253,11 @@ class LocalMcpExecutor:
         Raises:
             McpConnectionError: If the server cannot be reached or launched.
         """
-        return await mcp_client.call_server_tool(connection, tool_name, arguments)
+        if on_elicit is None:
+            return await mcp_client.call_server_tool(connection, tool_name, arguments)
+        return await mcp_client.call_server_tool(
+            connection, tool_name, arguments, on_elicit=on_elicit
+        )
 
     async def test_call_tool(
         self,
@@ -390,13 +410,33 @@ class RemoteMcpExecutor:
             self._contexts.popitem(last=False)
         return context
 
+    def _client(
+        self, context: ssl.SSLContext, timeout: float | httpx.Timeout
+    ) -> httpx.AsyncClient:
+        """Build the HTTP client one exchange with the proxy is made over.
+
+        Args:
+            context: The TLS context to connect under.
+            timeout: The exchange's timeout.
+
+        Returns:
+            A client that verifies the proxy by its internal name and never
+            follows a redirect.
+        """
+        return httpx.AsyncClient(
+            verify=context,
+            timeout=timeout,
+            follow_redirects=False,
+            headers={"Host": get_settings().mcp_proxy_server_name},
+        )
+
     async def _post(
         self, path: str, body: dict[str, Any], context: ssl.SSLContext, timeout: float
     ) -> dict[str, Any]:
         """Send one request to the proxy and unwrap its envelope.
 
         Args:
-            path: Endpoint path, e.g. ``/call-tool``.
+            path: Endpoint path, e.g. ``/list-tools``.
             body: JSON request body.
             context: The TLS context to connect under.
             timeout: Upper bound for the whole exchange, taken from the
@@ -409,33 +449,12 @@ class RemoteMcpExecutor:
             McpConnectionError: If the proxy cannot be reached, refuses the
                 request, or answers with an error envelope.
         """
-        verify_name = get_settings().mcp_proxy_server_name
         try:
-            async with httpx.AsyncClient(
-                verify=context,
-                timeout=timeout,
-                follow_redirects=False,
-                headers={"Host": verify_name},
-            ) as client:
+            async with self._client(context, timeout) as client:
                 response = await client.post(f"{self._base_url}{path}", json=body)
         except httpx.HTTPError as exc:
             raise McpConnectionError(_PROXY_LABEL, str(exc)) from exc
-
-        try:
-            envelope = response.json()
-        except ValueError as exc:
-            raise McpConnectionError(
-                _PROXY_LABEL, f"answered with a non-JSON body ({response.status_code})"
-            ) from exc
-        error = envelope.get("error")
-        if error is not None:
-            raise McpConnectionError(_PROXY_LABEL, str(error.get("message", error)))
-        if response.status_code >= 400:
-            raise McpConnectionError(_PROXY_LABEL, f"answered {response.status_code}")
-        data = envelope.get("data")
-        if not isinstance(data, dict):
-            raise McpConnectionError(_PROXY_LABEL, "answered without a result")
-        return data
+        return _envelope_data(response)
 
     def _sign(
         self,
@@ -521,8 +540,17 @@ class RemoteMcpExecutor:
         mcp_server_id: str,
         session_id: str,
         credential: McpClientCredential | None,
+        on_elicit: ElicitHandler | None = None,
     ) -> types.CallToolResult:
-        """Ask the proxy to invoke one tool.
+        """Ask the proxy to invoke one tool, answering its questions on the way.
+
+        The call is a WebSocket (see
+        :class:`models.mcp_execution.ExecutorCallFrame`): each ``elicit`` frame
+        is answered through ``on_elicit`` on the same socket, and the last
+        frame carries the result. Only opening the connection is timed here,
+        since the socket is legitimately silent while a person is answering;
+        the proxy bounds the call itself, pausing only for that wait, which
+        ``on_elicit`` bounds.
 
         Args:
             connection: The server to call, with secrets already resolved.
@@ -532,13 +560,15 @@ class RemoteMcpExecutor:
                 grant names it.
             session_id: The ADK session, needed to recompute the signed digest.
             credential: The tool certificate backing the call.
+            on_elicit: Answers the server's mid-call questions. Omitted, the
+                proxy is asked not to let the server ask any.
 
         Returns:
             The raw ``tools/call`` result.
 
         Raises:
-            McpConnectionError: If the proxy refuses the call, or the server
-                cannot be reached.
+            McpConnectionError: If the proxy refuses the call, the server
+                cannot be reached, or the socket closes without a result.
         """
         spec = connection_to_spec(connection)
         request = ExecutorCallToolRequest(
@@ -563,14 +593,30 @@ class RemoteMcpExecutor:
                     timestamp=credential.timestamp,
                 )
             ),
+            elicit=on_elicit is not None,
         )
-        data = await self._post(
-            "/call-tool",
-            request.model_dump(mode="json", by_alias=True),
-            self._context_for(credential),
-            connection.timeout_seconds,
-        )
-        return types.CallToolResult.model_validate(data["result"])
+        try:
+            async with connect(
+                "ws" + self._base_url.removeprefix("http") + "/call-tool",
+                ssl=self._context_for(credential),
+                server_hostname=get_settings().mcp_proxy_server_name,
+                open_timeout=connection.timeout_seconds,
+                max_size=None,
+            ) as websocket:
+                await websocket.send(request.model_dump_json(by_alias=True))
+                async for message in websocket:
+                    frame = _parse_frame(message)
+                    if frame.type == "elicit":
+                        await websocket.send(await _answer(frame, on_elicit))
+                    elif frame.type == "result" and frame.result is not None:
+                        return types.CallToolResult.model_validate(frame.result)
+                    else:
+                        raise McpConnectionError(
+                            _PROXY_LABEL, frame.message or "answered with an error"
+                        )
+        except (OSError, TimeoutError, WebSocketException) as exc:
+            raise McpConnectionError(_PROXY_LABEL, str(exc) or repr(exc)) from exc
+        raise McpConnectionError(_PROXY_LABEL, "closed the call without a result")
 
     async def test_call_tool(
         self,
@@ -611,6 +657,92 @@ class RemoteMcpExecutor:
             connection.timeout_seconds,
         )
         return types.CallToolResult.model_validate(data["result"])
+
+
+def _envelope_data(response: httpx.Response) -> dict[str, Any]:
+    """Unwrap a fully read proxy envelope, raising on any kind of failure.
+
+    Args:
+        response: The proxy's response, body already read.
+
+    Returns:
+        The envelope's ``data`` object.
+
+    Raises:
+        McpConnectionError: If the body is not an envelope, carries an error,
+            or has no ``data`` object.
+    """
+    try:
+        envelope = response.json()
+    except ValueError as exc:
+        raise McpConnectionError(
+            _PROXY_LABEL, f"answered with a non-JSON body ({response.status_code})"
+        ) from exc
+    error = envelope.get("error")
+    if error is not None:
+        raise McpConnectionError(_PROXY_LABEL, str(error.get("message", error)))
+    if response.status_code >= 400:
+        raise McpConnectionError(_PROXY_LABEL, f"answered {response.status_code}")
+    data = envelope.get("data")
+    if not isinstance(data, dict):
+        raise McpConnectionError(_PROXY_LABEL, "answered without a result")
+    return data
+
+
+def _parse_frame(message: str | bytes) -> ExecutorCallFrame:
+    """Parse one message of ``/call-tool``'s socket.
+
+    Args:
+        message: One WebSocket message.
+
+    Returns:
+        The frame.
+
+    Raises:
+        McpConnectionError: If the message is not a frame.
+    """
+    try:
+        return ExecutorCallFrame.model_validate_json(message)
+    except ValueError as exc:
+        raise McpConnectionError(
+            _PROXY_LABEL, f"sent something that is not a frame: {exc}"
+        ) from exc
+
+
+async def _answer(frame: ExecutorCallFrame, on_elicit: ElicitHandler | None) -> str:
+    """Answer one ``elicit`` frame.
+
+    Args:
+        frame: The ``elicit`` frame.
+        on_elicit: Who answers. Without one the question is declined -- the
+            proxy relays questions only when asked to, so this is a defensive
+            fallback rather than an expected path.
+
+    Returns:
+        The :class:`models.mcp_execution.ExecutorElicitationAnswer` to send
+        back on the call's socket.
+
+    Raises:
+        McpConnectionError: If the frame is malformed.
+    """
+    if frame.key is None:
+        raise McpConnectionError(_PROXY_LABEL, "relayed a question without a key")
+    if on_elicit is None:
+        result = types.ElicitResult(action="decline")
+    else:
+        try:
+            request = types.ElicitRequest.model_validate(
+                {"method": "elicitation/create", "params": frame.params or {}}
+            )
+        except ValueError as exc:
+            raise McpConnectionError(
+                _PROXY_LABEL, f"relayed a malformed question: {exc}"
+            ) from exc
+        result = await on_elicit(request.params)
+    return ExecutorElicitationAnswer(
+        key=frame.key,
+        result=result.model_dump(mode="json", by_alias=True, exclude_none=True),
+    ).model_dump_json(by_alias=True)
 
 
 def get_mcp_executor() -> McpExecutor:

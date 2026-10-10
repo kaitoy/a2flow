@@ -182,6 +182,7 @@ class SqlWorkflowTaskRepository(TenantScopedRepository[WorkflowTask]):
                     mcp_server_id=binding.mcp_server_id,
                     tool_name=binding.tool_name,
                     requires_input_approval=binding.requires_input_approval,
+                    elicits=binding.elicits,
                 )
             )
         await commit_or_translate_user_fk(self._db, user_id=user_id)
@@ -270,6 +271,7 @@ class SqlWorkflowTaskRepository(TenantScopedRepository[WorkflowTask]):
                     mcp_server_id=row.mcp_server_id,
                     tool_name=row.tool_name,
                     requires_input_approval=row.requires_input_approval,
+                    elicits=row.elicits,
                 )
                 for row in result.all()
             ]
@@ -292,6 +294,7 @@ class SqlWorkflowTaskRepository(TenantScopedRepository[WorkflowTask]):
                     mcp_server_id=row.mcp_server_id,
                     tool_name=row.tool_name,
                     requires_input_approval=row.requires_input_approval,
+                    elicits=row.elicits,
                 )
             )
         return {tid: _sorted_bindings(bindings) for tid, bindings in out.items()}
@@ -421,7 +424,9 @@ def _dedupe_bindings(bindings: Iterable[ToolBinding]) -> list[ToolBinding]:
     Where a pair appears twice with disagreeing ``requires_input_approval``, the
     survivor requires it. A duplicate is a caller mistake either way, and
     resolving it towards the stricter reading is what keeps the mistake from
-    quietly widening what a run may call without an approver's say.
+    quietly widening what a run may call without an approver's say. ``elicits``
+    likewise survives if either copy sets it, so the task still waits for its
+    initiator.
 
     Args:
         bindings: The bindings to deduplicate.
@@ -433,8 +438,13 @@ def _dedupe_bindings(bindings: Iterable[ToolBinding]) -> list[ToolBinding]:
     for binding in bindings:
         key = (binding.mcp_server_id, binding.tool_name)
         kept = seen.setdefault(key, binding)
-        if binding.requires_input_approval and not kept.requires_input_approval:
-            seen[key] = binding
+        seen[key] = kept.model_copy(
+            update={
+                "requires_input_approval": kept.requires_input_approval
+                or binding.requires_input_approval,
+                "elicits": kept.elicits or binding.elicits,
+            }
+        )
     return list(seen.values())
 
 

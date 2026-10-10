@@ -98,7 +98,14 @@ class ToolBinding(SQLModel):
     at the moment the request is made, so demanding a declaration would only
     produce a dishonest one.
 
-    The flag is set on the workflow's task templates and copied onto a run's
+    ``elicits`` marks a tool that asks the run's initiator questions in the
+    middle of a call (an MCP elicitation). A task binding one does not start
+    until the initiator resumes the session from its chat
+    (:func:`infrastructure.workflow_task_tools.update_workflow_task`), and only
+    calls to such a tool may ask at all
+    (:meth:`infrastructure.mcp_gateway.McpGateway.call_tool`).
+
+    Both flags are set on the workflow's task templates and copied onto a run's
     tasks at execute time. A run cannot set it: the execution agent may change
     only a task's ``status`` (:func:`infrastructure.workflow_task_tools.update_workflow_task`),
     and :meth:`services.workflow_task.WorkflowTaskService._assert_tool_bindings_change_allowed`
@@ -111,6 +118,10 @@ class ToolBinding(SQLModel):
     #: Whether a call to this tool must fit the approver's declaration. ``False``
     #: exempts its arguments from that check; the approval itself still applies.
     requires_input_approval: bool = True
+    #: Whether the tool stops mid-call to ask the run's initiator something (an
+    #: MCP elicitation). A task binding such a tool starts only on a turn the
+    #: initiator drove from the chat, so they are there to answer at once.
+    elicits: bool = False
 
 
 class WorkflowTaskUpdate(SQLModel):
@@ -296,3 +307,4 @@ class WorkflowTaskToolBinding(SQLModel, table=True):
     mcp_server_id: str = Field(primary_key=True)
     tool_name: str = Field(primary_key=True)
     requires_input_approval: bool = Field(default=True)
+    elicits: bool = Field(default=False)

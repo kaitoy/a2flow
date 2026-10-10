@@ -132,6 +132,8 @@ MCP ツールの呼び出しはどれも、そのタスク向けに発行され�
 | `MCP_TOOL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | プロキシ経由の各呼び出しに付く所持証明の署名について、許容する時刻のずれ |
 | `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | 生成されるルートのサブジェクトと有効期間。ルートの初回生成時にだけ読まれ、あとから変えても既存のルートには影響しません |
 | `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | [レジストリを見る](../guides/mcp-servers.md#registering-from-the-mcp-registry)ダイアログが検索するレジストリのベース URL |
+| `MCP_ELICITATION_TIMEOUT_SECONDS` | `900` | MCP サーバーが求める[確認](../guides/workflow-executions.md#mcp-server-confirmations)に実行の申請者が答えるのを、ツール呼び出しが待つ時間。過ぎると質問は期限切れになります。申請者はタスクを再開した直後なので、これが効くのは放置された質問だけです |
+| `AGENT_TURN_TIMEOUT_SECONDS` | `3600` | 実行のエージェントの 1 ターンが続けられる最長の時間で、待ち時間も含みます。ツール呼び出しが人を待っている間もターンは実行中なので、`MCP_ELICITATION_TIMEOUT_SECONDS` より十分長くしてください |
 
 ## MCP プロキシ {#mcp-sandbox}
 

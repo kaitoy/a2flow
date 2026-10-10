@@ -35,7 +35,55 @@ vi.mock("./ApprovalControls", () => ({
   ),
 }));
 
+vi.mock("./ElicitationControls", () => ({
+  ELICITATION_ACTIVITY_TYPE: "mcp_elicitation",
+  ElicitationControls: ({
+    elicitationId,
+    canAnswer,
+  }: {
+    elicitationId: string;
+    canAnswer: boolean;
+  }) => (
+    <div
+      data-testid="elicitation-controls-mock"
+      data-elicitation-id={elicitationId}
+      data-can-answer={String(canAnswer)}
+    />
+  ),
+}));
+
 describe("ActivityMessageBubble", () => {
+  it("renders ElicitationControls for a question an MCP server asked", () => {
+    render(
+      <ActivityMessageBubble
+        message={{
+          id: "q1",
+          role: "activity",
+          activityType: "mcp_elicitation",
+          content: { elicitationId: "q1", sessionId: "s1", executionId: "e1" },
+        }}
+        canActOnSurfaces={false}
+      />
+    );
+    const controls = screen.getByTestId("elicitation-controls-mock");
+    expect(controls).toHaveAttribute("data-elicitation-id", "q1");
+    expect(controls).toHaveAttribute("data-can-answer", "false");
+  });
+
+  it("renders nothing for a question missing the ids it is read by", () => {
+    const { container } = render(
+      <ActivityMessageBubble
+        message={{
+          id: "q1",
+          role: "activity",
+          activityType: "mcp_elicitation",
+          content: { elicitationId: "q1" },
+        }}
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("renders A2uiRenderer for matching activityType", () => {
     render(
       <ActivityMessageBubble

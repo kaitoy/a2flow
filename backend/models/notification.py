@@ -36,6 +36,7 @@ class NotificationType(StrEnum):
     execution_completed = "execution_completed"
     workflow_draft_ready = "workflow_draft_ready"
     workflow_generation_failed = "workflow_generation_failed"
+    elicitation_request = "elicitation_request"
 
 
 class NotificationUpdate(SQLModel):
@@ -110,7 +111,11 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
 #: Notification kinds that concern a single workflow execution and deep-link to
 #: its session chat (see :func:`build_notification_link`).
 _EXECUTION_KINDS = frozenset(
-    {NotificationType.approval_request, NotificationType.execution_completed}
+    {
+        NotificationType.approval_request,
+        NotificationType.execution_completed,
+        NotificationType.elicitation_request,
+    }
 )
 #: Notification kinds that concern a workflow (not a specific run) and deep-link
 #: to the workflow's admin page.
@@ -127,8 +132,8 @@ def build_notification_link(
 ) -> str | None:
     """Resolve the relative in-app path this notification deep-links to.
 
-    Run-scoped kinds (``approval_request``, ``execution_completed``) point at the
-    execution's session chat; workflow-scoped kinds (``workflow_draft_ready``,
+    Run-scoped kinds (``approval_request``, ``execution_completed``,
+    ``elicitation_request``) point at the execution's session chat; workflow-scoped kinds (``workflow_draft_ready``,
     ``workflow_generation_failed``) point at the workflow. This is the single
     place that decides the target path; the email dispatcher and the web UI both
     read the ``link`` this produces rather than re-deriving it.

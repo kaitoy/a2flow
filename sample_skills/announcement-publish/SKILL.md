@@ -1,6 +1,6 @@
 ---
 name: announcement-publish
-description: Draft an announcement and publish it after human approval. Use this skill whenever the user wants to write and put out a notice, announcement, or heads-up, or describes a message (a release, an outage, a policy change, an event) they want written up and communicated to others. This skill produces text only: nothing is sent anywhere, and "publishing" means presenting the finalized text.
+description: Draft an announcement and publish it after human approval. Use this skill whenever the user wants to write and put out a notice, announcement, or heads-up, or describes a message (a release, an outage, a policy change, an event) they want written up and communicated to others. This skill produces text only -- nothing is sent anywhere, and "publishing" means presenting the finalized text.
 ---
 
 # Announcement Publish

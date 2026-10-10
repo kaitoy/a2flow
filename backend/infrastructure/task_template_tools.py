@@ -195,6 +195,7 @@ def _template_to_dict(template: WorkflowTaskTemplateRead) -> dict[str, Any]:
                 "server_id": b.mcp_server_id,
                 "tool_name": b.tool_name,
                 "requires_input_approval": b.requires_input_approval,
+                "elicits": b.elicits,
             }
             for b in template.tool_bindings
         ],
@@ -224,7 +225,8 @@ async def register_task_templates(
           "depends_on": ["t0"],        # optional, other entries' "key" values
           "tools": [                   # optional MCP tools this task will use
             {"server_id": "<registered MCP server id>", "tool_name": "<tool>",
-             "requires_input_approval": true}   # optional, default true
+             "requires_input_approval": true,   # optional, default true
+             "elicits": false}                  # optional, default false
           ]
         }
 
@@ -251,6 +253,13 @@ async def register_task_templates(
     covered by the approval and still waits for it; only the argument bounds
     fall away. Leave the default of ``true`` for anything that writes, deletes,
     spends, or sends.
+
+    Set ``"elicits": true`` on a bound tool that stops in the middle of a call
+    to ask the person running the workflow something -- when the user tells you
+    a task's tool will ask them questions while it runs. At run time such a
+    task waits, before it starts, for its initiator to resume the session from
+    the chat, so they are there to answer. A tool not marked this way is not
+    allowed to ask anything.
 
     Moves a ``published`` parent workflow to ``modified``.
 
@@ -382,7 +391,8 @@ async def create_task_template(
         tool_bindings: Optional MCP tools to bind to the task, each
             ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
             optionally with ``"requires_input_approval": false`` for a tool that
-            only reads -- see ``register_task_templates`` for when that applies.
+            only reads, and ``"elicits": true`` for one that asks the initiator
+            questions mid-call -- see ``register_task_templates`` for both.
 
     Returns:
         The created task dict, or ``{"error": <message>}`` on an unknown
@@ -425,7 +435,8 @@ async def list_task_templates(tool_context: ToolContext) -> dict[str, Any]:
     Returns:
         ``{"tasks": [{"id", "title", "description", "depends_on_ids",
         "tool_bindings"}, ...]}`` ordered by creation time -- each binding
-        carrying ``server_id``, ``tool_name`` and ``requires_input_approval`` --
+        carrying ``server_id``, ``tool_name``, ``requires_input_approval``
+        and ``elicits`` --
         or
         ``{"error": <message>}`` if the session cannot be resolved.
     """
@@ -495,7 +506,8 @@ async def update_task_template(
         tool_bindings: Replacement MCP tool bindings, each
             ``{"server_id": <registered MCP server id>, "tool_name": <tool>}``,
             optionally with ``"requires_input_approval": false`` for a tool that
-            only reads, if changing.
+            only reads and ``"elicits": true`` for one that asks the initiator
+            questions mid-call, if changing.
 
     Returns:
         The updated task dict, or ``{"error": <message>}`` on an unknown

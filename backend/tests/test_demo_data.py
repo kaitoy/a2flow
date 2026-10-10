@@ -931,9 +931,6 @@ async def test_demo_azure_mcp_server_launches_the_key_vault_tools_with_npx(
         "keyvault",
         "--mode",
         "all",
-        # A2Flow cannot answer elicitation yet; the manager's approval stands
-        # in for the consent the server would otherwise ask for.
-        "--dangerously-disable-elicitation",
     ]
     assert server.url is None
     assert server.headers == {}
@@ -949,6 +946,28 @@ async def test_demo_azure_mcp_server_launches_the_key_vault_tools_with_npx(
         ),
         "AZURE_TOKEN_CREDENTIALS": "EnvironmentCredential",
     }
+
+
+async def test_an_older_azure_server_stops_skipping_consent_on_restart(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A row seeded with the retired flag loses it, so the server asks again."""
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        legacy = await session.get(MCPServer, DEMO_AZURE_MCP_SERVER_ID)
+        assert legacy is not None
+        legacy.args = [*legacy.args, "--dangerously-disable-elicitation"]
+        session.add(legacy)
+        await session.commit()
+
+    await _sync(engine)
+
+    async with AsyncSession(engine) as session:
+        migrated = await session.get(MCPServer, DEMO_AZURE_MCP_SERVER_ID)
+    assert migrated is not None
+    assert "--dangerously-disable-elicitation" not in migrated.args
+    assert migrated.args[-2:] == ["--mode", "all"]
 
 
 async def test_demo_secret_generator_is_a_javascript_script_server(

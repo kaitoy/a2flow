@@ -23,8 +23,10 @@ export interface TaskToolsDialogProps {
  * server.
  *
  * A tool the workflow's design exempted from input approval is labelled as
- * such: it is the one thing about a binding that a reader cannot infer from the
- * tool's name, and it changes what an approval covering the task bounds.
+ * such: it is one of the things about a binding that a reader cannot infer from
+ * the tool's name, and it changes what an approval covering the task bounds.
+ * So is a tool that asks the run's initiator questions mid-call, which makes
+ * its task wait for the initiator to resume it.
  */
 export function TaskToolsDialog({
   task,
@@ -102,6 +104,11 @@ export function TaskToolsDialog({
                       {binding.requiresInputApproval === false && (
                         <p className="mt-0.5 text-xs text-on-surface-variant">
                           Input needs no approval
+                        </p>
+                      )}
+                      {binding.elicits && (
+                        <p className="mt-0.5 text-xs text-on-surface-variant">
+                          Asks the initiator mid-call
                         </p>
                       )}
                     </li>

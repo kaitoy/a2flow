@@ -625,6 +625,7 @@ async def test_task_tool_bindings_round_trip(
             "mcpServerId": server["id"],
             "toolName": "search",
             "requiresInputApproval": True,
+            "elicits": False,
         }
     ]
     assert body["toolBindings"] == expected

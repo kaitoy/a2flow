@@ -31,6 +31,7 @@ const TYPE_OPTIONS = [
   { value: "execution_completed", label: "execution_completed" },
   { value: "workflow_draft_ready", label: "workflow_draft_ready" },
   { value: "workflow_generation_failed", label: "workflow_generation_failed" },
+  { value: "elicitation_request", label: "elicitation_request" },
 ];
 
 /** Yes/No options for the Read column's boolean `eq` filter. */

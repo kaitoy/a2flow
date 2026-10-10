@@ -296,6 +296,34 @@ class ApprovalAlreadyResolvedError(RepositoryError):
         return {"approvalId": self.approval_id, "status": self.status}
 
 
+class ElicitationAlreadyAnsweredError(RepositoryError):
+    """Raised when an answer arrives for a question that is no longer open.
+
+    A question an MCP server asked mid-call is answered once: the waiting tool
+    call reads the first answer and moves on. A second answer -- a double
+    click, a second tab -- or one that arrives after the question expired has
+    nothing left to affect, and saying so beats silently dropping it.
+
+    Carries the ``elicitation_id`` and the ``status`` already recorded so the
+    HTTP layer can surface both in the error envelope's ``details`` block when
+    returning HTTP 409.
+    """
+
+    code = "ELICITATION_ALREADY_ANSWERED"
+    http_status = 409
+
+    def __init__(self, elicitation_id: str, status: str) -> None:
+        self.elicitation_id = elicitation_id
+        self.status = status
+        super().__init__(
+            f"Question {elicitation_id!r} is no longer open (status {status!r})"
+        )
+
+    def details(self) -> dict[str, Any]:
+        """Return the envelope's ``details`` block."""
+        return {"elicitationId": self.elicitation_id, "status": self.status}
+
+
 class WorkflowNotModifiedError(RepositoryError):
     """Raised when a Workflow has no unpublished changes to discard.
 

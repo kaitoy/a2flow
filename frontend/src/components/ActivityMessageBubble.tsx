@@ -19,6 +19,7 @@ import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
 import { parseSessionFileResult, SESSION_FILE_ACTIVITY_TYPE } from "@/lib/sessionFileTool";
 import { A2uiRenderer } from "./A2uiRenderer";
 import { ApprovalControls } from "./ApprovalControls";
+import { ELICITATION_ACTIVITY_TYPE, ElicitationControls } from "./ElicitationControls";
 import { ReasoningBubble } from "./ReasoningBubble";
 import { SessionFileCard } from "./SessionFileCard";
 import { ToolActivityBubble } from "./ToolActivityBubble";
@@ -39,6 +40,8 @@ function surfaceRowClass(avatar: ReactNode, isOwn: boolean): string {
 /**
  * Render an activity message by delegating to the renderer for its type: A2UI
  * surfaces to {@link A2uiRenderer}, approval requests to {@link ApprovalControls},
+ * questions an MCP server asked mid-call to {@link ElicitationControls} (which
+ * `canActOnSurfaces` gates exactly like an A2UI form),
  * files the agent wrote to {@link SessionFileCard}, tool-call status lines to
  * {@link ToolActivityBubble}, and streamed reasoning to {@link ReasoningBubble}.
  * Ignores unknown activity types.
@@ -171,6 +174,26 @@ export function ActivityMessageBubble({
           />
         </div>
         {isOwn && avatar}
+      </div>
+    );
+  }
+  if (message.activityType === ELICITATION_ACTIVITY_TYPE) {
+    const content = message.content as {
+      elicitationId?: string;
+      sessionId?: string;
+      executionId?: string;
+    };
+    if (!content.elicitationId || !content.sessionId || !content.executionId) return null;
+    return (
+      <div className="mb-3 flex justify-start">
+        <div className="max-w-[85%] w-full">
+          <ElicitationControls
+            executionId={content.executionId}
+            sessionId={content.sessionId}
+            elicitationId={content.elicitationId}
+            canAnswer={canActOnSurfaces}
+          />
+        </div>
       </div>
     );
   }

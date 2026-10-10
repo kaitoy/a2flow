@@ -45,7 +45,7 @@ A run's chat is **shared by its participants**, not private to whoever started i
 | Who | What they get |
 |---|---|
 | The **initiator** who started the run | The full conversation, and the chat input |
-| A **designated approver** of one of its [approvals](./approvals.md) | The same conversation and state — approving resumes the original run rather than starting a fresh, empty one. Their approval is the one thing that is theirs to act on: an input form the agent renders for any other step is read-only for them, with a "Waiting for the initiator to respond." note beneath it |
+| A **designated approver** of one of its [approvals](./approvals.md) | The same conversation and state — approving resumes the original run rather than starting a fresh, empty one. Their approval is the one thing that is theirs to act on: an input form the agent renders for any other step — or a [confirmation an MCP server asks for](#mcp-server-confirmations) — is read-only for them, with a "Waiting for the initiator to respond." note beneath it |
 | An **Admin** of the tenant | Read-only visibility |
 | Anyone else | No access |
 
@@ -88,6 +88,7 @@ When the run's task graph branches, A2Flow may split the run across several sess
 | Running | The agent is working |
 | Waiting for input | An input form is waiting for an answer |
 | Waiting for approval | An approval this session requested is undecided |
+| Waiting for initiator | The next task will [ask the initiator questions](#mcp-server-confirmations) while it runs, so it waits for them to resume it from the chat |
 | Scheduled until … | A task must wait for a time; the session resumes on its own at the time shown. A message sent to it resumes it early |
 | Idle | Nothing to do right now; the session waits for its next task |
 | Done | The session finished its work. A finished branch leaves a summary for the main session |
@@ -107,6 +108,29 @@ When the agent stops to wait for you — it asked a question, wants a value, or 
 | **After a reload** | The same row is there, for every participant who can send |
 
 The suggestions are the agent's guess at what you would type, not a menu of the only allowed answers — a question with a fixed set of answers is asked as a choice inside the message instead. The row is a workflow session feature; the design session has none.
+
+### Confirmations from an MCP server {#mcp-server-confirmations}
+
+Some MCP servers stop in the middle of a tool call to ask a person something before they go on — the Azure MCP Server, for one, asks for consent before every operation on a Key Vault secret. A tool like that is marked as **asking the initiator** in the workflow's design: tell the design agent which task's tool asks, when you generate the workflow or in its design session. A tool that is not marked is not allowed to ask, and its call fails instead of waiting.
+
+A task that uses a marked tool waits for the run's initiator before it starts, so they are there when the questions come:
+
+1. When the run reaches the task, its session shows **Waiting for initiator**, and the initiator gets an `elicitation_request` [notification](./notifications.md). Nothing waits on a clock in the meantime.
+2. The initiator opens the run's chat. Above the chat input, a note names the task, with a **Resume** button. Others see only that the run waits for the initiator.
+3. **Resume** sends a message in the initiator's name, and the task starts. Typing any message of their own does the same.
+4. Each question appears in the chat as a card titled "*server* asks for confirmation", naming the tool that is waiting on it, with a small form underneath.
+
+
+| | |
+|---|---|
+| **Who answers** | The run's initiator only. Approvers and Admins see the question with "Waiting for the initiator to respond." beneath it |
+| **Accept** | Sends the form's values. What they mean is up to the server — the Azure MCP Server's form is a choice between **Approve** and **Reject** |
+| **Decline** | Refuses to answer |
+| **Cancel** | Dismisses the question without choosing |
+| **While it waits** | The agent's turn is still running, so the chat input stays disabled |
+| **If nobody answers** | The question expires — after 15 minutes unless the deployment [says otherwise](../operations/configuration.md#mcp-tools-and-approvals) — and the server is told it was dismissed |
+
+The card belongs to the turn that asked. Once that turn has ended, the tool call's own line in the chat is what records the outcome.
 
 ### Files in the session {#files-in-the-session}
 

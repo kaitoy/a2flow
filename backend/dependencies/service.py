@@ -19,6 +19,7 @@ from services.agent_skill_sync import sync_agent_skill
 from services.approval import ApprovalService
 from services.approver_groups import ApproverGroupResolver
 from services.impersonation_event import ImpersonationEventService
+from services.mcp_elicitation import MCPElicitationService
 from services.mcp_registry import MCPRegistryService
 from services.mcp_server import MCPServerService
 from services.mcp_tool_certificate import McpToolCertificateService
@@ -53,6 +54,7 @@ from .repository import (
     ExecutionSessionRepositoryDep,
     ImpersonationEventRepositoryDep,
     McpCertificateAuthorityRepositoryDep,
+    MCPElicitationRepositoryDep,
     MCPServerRepositoryDep,
     McpToolCertificateRepositoryDep,
     McpToolInvocationRepositoryDep,
@@ -463,6 +465,20 @@ def get_session_file_service(
 
 
 SessionFileServiceDep = Annotated[SessionFileService, Depends(get_session_file_service)]
+
+
+def get_mcp_elicitation_service(
+    elicitations: MCPElicitationRepositoryDep,
+    executions: WorkflowExecutionRepositoryDep,
+    access: WorkflowExecutionAccessPolicyDep,
+) -> MCPElicitationService:
+    """Create an MCPElicitationService for a route that reads or answers a question."""
+    return MCPElicitationService(elicitations, executions, access)
+
+
+MCPElicitationServiceDep = Annotated[
+    MCPElicitationService, Depends(get_mcp_elicitation_service)
+]
 
 
 def get_workflow_execution_service(

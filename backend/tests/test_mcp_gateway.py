@@ -208,8 +208,12 @@ async def _seed_task(
     *,
     status: WorkflowTaskStatus = WorkflowTaskStatus.in_progress,
     bindings: list[tuple[str, str]] | None = None,
+    elicits: bool = False,
 ) -> str:
-    """Insert a WorkflowTask with optional ``(server_id, tool_name)`` bindings."""
+    """Insert a WorkflowTask with optional ``(server_id, tool_name)`` bindings.
+
+    ``elicits`` marks every binding as one whose tool may ask the initiator.
+    """
     async with AsyncSession(eng) as db:
         task = WorkflowTask(
             workflow_execution_id=execution_id,
@@ -226,7 +230,10 @@ async def _seed_task(
         for server_id, tool_name in bindings or []:
             db.add(
                 WorkflowTaskToolBinding(
-                    task_id=task_id, mcp_server_id=server_id, tool_name=tool_name
+                    task_id=task_id,
+                    mcp_server_id=server_id,
+                    tool_name=tool_name,
+                    elicits=elicits,
                 )
             )
         await db.commit()
@@ -348,7 +355,10 @@ async def test_empty_chain_allows_an_unbound_tool(
     await _seed_session(engine)
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         return _tool_result()
 
@@ -387,7 +397,10 @@ async def test_a_denial_never_opens_a_connection(
     called: list[str] = []
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         called.append(connection.label)
         return _tool_result()
@@ -499,7 +512,10 @@ async def test_binding_policy_allows_the_union_of_in_progress_tasks(
     await _seed_task(engine, execution_id, bindings=[(server_id, "beta")])
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         return _tool_result()
 
@@ -570,7 +586,10 @@ async def test_call_tool_reports_an_unresolvable_secret_without_connecting(
     called: list[str] = []
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         called.append(connection.label)
         return _tool_result()
@@ -593,7 +612,10 @@ async def test_call_tool_wraps_an_unreachable_server_naming_it(
     await _seed_session(engine)
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         raise McpConnectionError(connection.label, "connection refused")
 
@@ -616,7 +638,10 @@ async def test_call_tool_returns_a_tool_level_error_untouched(
     await _seed_session(engine)
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         return _tool_result("boom", is_error=True)
 
@@ -642,7 +667,10 @@ async def test_call_tool_expands_secrets_and_env_placeholders_for_stdio(
     seen: dict[str, Any] = {}
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         seen["connection"] = connection
         return _tool_result()
@@ -675,7 +703,10 @@ async def test_call_tool_closes_the_session_before_the_outbound_call(
         closed.append(True)
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         assert closed == [True]
         return _tool_result()
@@ -749,7 +780,10 @@ async def test_call_tool_reaches_the_server_when_nothing_is_stubbed(
     called: list[str] = []
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         called.append(tool_name)
         return _tool_result()
@@ -846,6 +880,148 @@ async def test_the_stub_is_not_consulted_for_a_listing(engine: AsyncEngine) -> N
     stub = _RecordingStub(stubbed=True)
     await McpGateway(policies=[], stub=stub).list_tools(ListToolsRequest(_principal()))
     assert stub.asked == []
+
+
+# ---------- a server's mid-call question ----------
+
+
+class _RecordingElicitor:
+    """Test elicitor that approves every question, recording who it was asked for."""
+
+    def __init__(self) -> None:
+        """Start with no questions asked."""
+        self.asked: list[dict[str, Any]] = []
+
+    async def elicit(self, **kwargs: Any) -> types.ElicitResult:
+        """Record the question and approve it."""
+        self.asked.append(kwargs)
+        return types.ElicitResult(action="accept", content={"decision": "accept"})
+
+
+_QUESTION = types.ElicitRequestFormParams(
+    message="Continue?",
+    requestedSchema={"type": "object", "properties": {"decision": {"type": "string"}}},
+)
+
+
+async def test_a_servers_question_goes_to_the_elicitor_with_the_run(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_session(engine)
+    await _seed_task(
+        engine, execution_id, bindings=[(server_id, "search")], elicits=True
+    )
+
+    async def fake_call_server_tool(
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        *,
+        on_elicit: Any = None,
+    ) -> types.CallToolResult:
+        assert on_elicit is not None
+        answer = await on_elicit(_QUESTION)
+        return _tool_result(answer.action)
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
+    )
+    elicitor = _RecordingElicitor()
+    result = await McpGateway(policies=[], elicitor=elicitor).call_tool(
+        CallToolRequest(_principal(), server_id, "search", {})
+    )
+
+    assert isinstance(result.content[0], types.TextContent)
+    assert result.content[0].text == "accept"
+    assert elicitor.asked == [
+        {
+            "tenant_id": DEFAULT_TEST_TENANT_ID,
+            "execution_id": execution_id,
+            "session_id": "sess-abc",
+            "user_id": "tester",
+            "server_id": server_id,
+            "server_name": "srv",
+            "tool_name": "search",
+            "params": _QUESTION,
+        }
+    ]
+
+
+async def test_a_stubbed_call_is_never_asked_anything(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mock reaches no server, so no server is there to ask."""
+    server_id = await _seed_server(engine)
+    await _seed_session(engine)
+
+    async def _explode(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("a stubbed call must not reach the MCP client")
+
+    monkeypatch.setattr("infrastructure.mcp_client.call_server_tool", _explode)
+    elicitor = _RecordingElicitor()
+    await McpGateway(
+        policies=[], stub=_RecordingStub(stubbed=True), elicitor=elicitor
+    ).call_tool(CallToolRequest(_principal(), server_id, "search", {}))
+
+    assert elicitor.asked == []
+
+
+async def test_a_tool_not_bound_as_asking_may_not_ask(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only a task that waited for its initiator may put a question to them."""
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
+    handed: list[dict[str, Any]] = []
+
+    async def fake_call_server_tool(
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
+    ) -> types.CallToolResult:
+        handed.append(kwargs)
+        return _tool_result()
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
+    )
+    elicitor = _RecordingElicitor()
+    await McpGateway(policies=[], elicitor=elicitor).call_tool(
+        CallToolRequest(_principal(), server_id, "search", {})
+    )
+
+    assert handed == [{}]
+    assert elicitor.asked == []
+
+
+async def test_without_an_elicitor_no_server_may_ask(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing is handed down, so the capability is never advertised."""
+    server_id = await _seed_server(engine)
+    await _seed_session(engine)
+    handed: list[dict[str, Any]] = []
+
+    async def fake_call_server_tool(
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
+    ) -> types.CallToolResult:
+        handed.append(kwargs)
+        return _tool_result()
+
+    monkeypatch.setattr(
+        "infrastructure.mcp_client.call_server_tool", fake_call_server_tool
+    )
+    await McpGateway(policies=[]).call_tool(
+        CallToolRequest(_principal(), server_id, "search", {})
+    )
+
+    assert handed == [{}]
 
 
 # ---------- list_tools ----------

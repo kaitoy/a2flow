@@ -112,7 +112,10 @@ def _fake_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make every proxied call succeed without touching a real MCP server."""
 
     async def fake_call_server_tool(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         return types.CallToolResult(
             content=[types.TextContent(type="text", text="ok")], isError=False

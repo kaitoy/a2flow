@@ -228,6 +228,14 @@ calls you observed, not on the ones you hoped for.
   connection with `502 MCP_UNREACHABLE`.
 - The Chrome extension may refuse `localhost:<port>`; if browser automation
   returns `Permission denied by user`, the UI cannot be driven from here.
+- **A streamed turn that shows nothing until it ends** means something gzipped
+  the SSE: `next start` compresses what it proxies unless the response says
+  `Cache-Control: no-transform`, which every SSE route sets through
+  `services/session_stream.py::SSE_HEADERS`. Check with
+  `curl -N --compressed -D -` against port 3099 — `Content-Encoding: gzip` on a
+  `text/event-stream` is the bug.
+- **Filter the backend log with `grep --line-buffered`**, or the file lags
+  minutes behind and reads as "the request never came".
 - **An agent run's SSE sometimes never closes client-side.** The backend log
   shows `🏁 Streaming completed via final response` and `Runner closed.`, but the
   page stays on "Agent is thinking…" forever and — since polling pauses during a

@@ -47,9 +47,22 @@ _TERMINAL = frozenset({EventType.RUN_FINISHED.value, EventType.RUN_ERROR.value})
 
 _written = asyncio.Event()
 
+#: Headers every SSE response carries. ``no-transform`` keeps an intermediary
+#: from compressing the stream: the Next.js server in front of the API gzips
+#: what it proxies unless told not to, and a gzip stream reaches the browser
+#: only when it closes -- so a turn waiting on a person (an MCP elicitation)
+#: would never show the question it is waiting on. ``X-Accel-Buffering`` asks
+#: nginx not to buffer it either.
+SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache, no-transform"}
 
-def _notify() -> None:
-    """Wake this process's viewers: there are new events to read."""
+
+def notify_viewers() -> None:
+    """Wake this process's viewers: there are new events to read.
+
+    Called by whatever appends to a session's stream -- the turn's own writer,
+    or a question an MCP server asked mid-turn (see
+    :mod:`infrastructure.mcp_elicitation`).
+    """
     _written.set()
     _written.clear()
 
@@ -100,7 +113,7 @@ class StreamWriter:
         if self._buffer:
             await self._repo.append(self._session_id, self._run_id, self._buffer)
             self._buffer = []
-            _notify()
+            notify_viewers()
         self._last_flush = time.monotonic()
 
 

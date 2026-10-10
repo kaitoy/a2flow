@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  askingValues,
   bindingLabel,
   bindingToValue,
   exemptValues,
@@ -39,20 +40,20 @@ describe("bindingLabel", () => {
 describe("toBindings / exemptValues", () => {
   it("bounds a tool's input unless it was checked as exempt", () => {
     expect(toBindings(["mcp-1::search", "mcp-1::launch"], ["mcp-1::search"])).toEqual([
-      { mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: false },
-      { mcpServerId: "mcp-1", toolName: "launch", requiresInputApproval: true },
+      { mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: false, elicits: false },
+      { mcpServerId: "mcp-1", toolName: "launch", requiresInputApproval: true, elicits: false },
     ]);
   });
 
   it("bounds everything when nothing is checked", () => {
     expect(toBindings(["mcp-1::search"], [])).toEqual([
-      { mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: true },
+      { mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: true, elicits: false },
     ]);
   });
 
   it("ignores an exemption for a tool that is no longer bound", () => {
     expect(toBindings(["mcp-1::search"], ["mcp-1::gone"])).toEqual([
-      { mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: true },
+      { mcpServerId: "mcp-1", toolName: "search", requiresInputApproval: true, elicits: false },
     ]);
   });
 
@@ -68,5 +69,18 @@ describe("toBindings / exemptValues", () => {
   it("treats a binding with no flag at all as bounded", () => {
     // What an older record looks like: absence is not an exemption.
     expect(exemptValues([{ mcpServerId: "mcp-1", toolName: "search" }])).toEqual([]);
+  });
+  it("carries the asking flag through a save untouched", () => {
+    const bindings = [
+      { mcpServerId: "mcp-1", toolName: "set", elicits: true },
+      { mcpServerId: "mcp-1", toolName: "get" },
+    ];
+    const asking = askingValues(bindings);
+
+    expect(asking).toEqual(["mcp-1::set"]);
+    expect(toBindings(["mcp-1::set", "mcp-1::get"], [], asking).map((b) => b.elicits)).toEqual([
+      true,
+      false,
+    ]);
   });
 });

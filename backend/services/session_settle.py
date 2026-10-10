@@ -2,7 +2,8 @@
 
 After every server-driven turn (:mod:`services.session_runner`), the session's
 row is brought up to date from the turn's events: what it now waits on --
-an approval, a form, or a time its agent chose with ``wait_until`` -- and
+an approval, a form, its initiator, or a time its agent chose with
+``wait_until`` -- and
 whether it is idle, finished, or failed. Three follow-ups can come out of that:
 
 * An approval it waits on may already be decided -- from the approvals list,
@@ -63,7 +64,9 @@ async def settle_turn(
     The session now waits on what it waited on before minus what this turn
     answered, plus the client-tool calls this turn left open. It is waiting for
     an approval if any of those is ``render_approval``, for input if one is
-    ``render_a2ui``. Otherwise it is ``scheduled`` when its agent called
+    ``render_a2ui``. Otherwise it is ``waiting_for_initiator`` when its agent
+    tried to start a task held back for the run's initiator (the row's
+    ``initiator_task_id``), and ``scheduled`` when its agent called
     ``wait_until`` during the turn (the row's ``resume_at``). Otherwise a
     branch session with no unfinished task is
     ``done``, the main session is ``done`` once the run has finished, and
@@ -111,6 +114,8 @@ async def settle_turn(
         status = ExecutionSessionStatus.waiting_for_approval
     elif RENDER_A2UI_TOOL_NAME in names:
         status = ExecutionSessionStatus.waiting_for_input
+    elif row.initiator_task_id is not None:
+        status = ExecutionSessionStatus.waiting_for_initiator
     elif row.resume_at is not None:
         status = ExecutionSessionStatus.scheduled
     elif is_branch and not unfinished:

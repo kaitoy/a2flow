@@ -86,7 +86,10 @@ async def test_the_local_executor_ignores_the_credential(
     seen: list[tuple[str, dict[str, Any]]] = []
 
     async def _call(
-        connection: McpConnection, tool_name: str, arguments: dict[str, Any]
+        connection: McpConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
     ) -> types.CallToolResult:
         seen.append((tool_name, arguments))
         return types.CallToolResult(content=[])

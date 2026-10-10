@@ -155,6 +155,11 @@ class ExecutorCallToolRequest(_Wire):
             the proof-of-possession digest.
         sender: Who is asking, and proof the request is unaltered.
         credential: The tool certificate backing the call.
+        elicit: Whether the backend will answer the server's elicitation
+            requests. Only then does the proxy advertise the capability and
+            relay a request as an ``elicit`` frame (see
+            :class:`ExecutorCallFrame`). Not signed: all it changes is whether
+            the server may ask a question, never what is called.
     """
 
     connection: ConnectionSpec
@@ -164,6 +169,54 @@ class ExecutorCallToolRequest(_Wire):
     session_id: str
     sender: ExecutorSender
     credential: ExecutorCredential | None = None
+    elicit: bool = False
+
+
+class ExecutorCallFrame(_Wire):
+    """One message the proxy sends on ``/call-tool``'s WebSocket.
+
+    A call is a WebSocket rather than one request because the server may stop
+    mid-call to ask a person something (an MCP elicitation): the question goes
+    down the socket and the answer (:class:`ExecutorElicitationAnswer`) comes
+    back up the same one, so whichever proxy replica took the call is the one
+    the answer reaches. The proxy sends any number of ``elicit`` frames and
+    ends with exactly one ``result`` or ``error`` frame -- also for a call it
+    refuses before starting.
+
+    Attributes:
+        type: ``elicit`` (a question to answer on the same socket), ``result``
+            (the call finished), or ``error`` (it was refused or could not be
+            made).
+        key: For ``elicit``, the handle the answer is sent back under.
+        params: For ``elicit``, the server's ``elicitation/create`` parameters
+            as an MCP wire type.
+        result: For ``result``, the raw ``tools/call`` result as an MCP wire
+            type.
+        code: For ``error``, the machine-readable error code.
+        message: For ``error``, a caller-safe explanation.
+    """
+
+    type: Literal["elicit", "result", "error"]
+    key: str | None = None
+    params: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
+    code: str | None = None
+    message: str | None = None
+
+
+class ExecutorElicitationAnswer(_Wire):
+    """The backend's answer to one ``elicit`` frame, sent on the call's socket.
+
+    Unsigned: it travels on the mutually authenticated connection the signed
+    call was made over, and can only answer that call's own questions.
+
+    Attributes:
+        key: The ``key`` of the ``elicit`` frame being answered.
+        result: The answer, an MCP ``ElicitResult`` wire type.
+    """
+
+    key: str
+    result: dict[str, Any]
 
 
 class ExecutorTestCallToolRequest(_Wire):

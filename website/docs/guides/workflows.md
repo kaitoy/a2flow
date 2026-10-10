@@ -181,6 +181,16 @@ tool switched to "needs no approval" is labelled **Any input** on the approval t
 later asks for, so the approver sees which tools were left unbounded rather than having
 to infer it.
 
+**Tools that ask the initiator.** Some tools stop mid-call to ask the person running the
+workflow a question — the Azure MCP Server asks for consent before every operation on a
+secret. Tell the design agent which task's tool does this, in the prompt when you
+generate the workflow or in its design session, and it marks the tool as asking. A step
+with such a tool waits for its initiator to resume it before it starts, so they are in
+the chat to answer ([Confirmations from an MCP server](./workflow-executions.md#mcp-server-confirmations)).
+A tool not marked this way is not allowed to ask. The admin form has no control for the
+mark; it keeps whatever the design agent set. In a run's task timeline, the **Bound
+tools** dialog labels such a tool **Asks the initiator mid-call**.
+
 **Task titles.** Both of those lists show every record instead of paginating, which lets the **Depends on** column work as a cross-reference: each dependency is named by its title, and hovering that chip highlights the row it points at. The design agent is held to terse imperative titles — 2 to 4 words, 50 characters — so they read cleanly as chips; a longer one is refused with a note telling it to move the detail into the description. The limit binds the agent, not people: a title edited through the admin form may run to 200 characters, and one that overflows its chip is clipped and revealed on hover.
 
 ## Deleting a workflow

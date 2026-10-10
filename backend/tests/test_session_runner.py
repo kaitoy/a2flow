@@ -31,15 +31,19 @@ from ag_ui.core import (
 from google.adk.sessions import InMemorySessionService
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from dependencies.context import APP_NAME
 from infrastructure.agent import tenant_app_name
 from infrastructure.locks import advisory_lock, agent_run_key
-from infrastructure.workflow_task_tools import wait_until
+from infrastructure.workflow_task_tools import update_workflow_task, wait_until
 from models.approval import Approval, ApprovalStatus
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.mcp_server import MCPServer, McpTransport
+from models.notification import Notification, NotificationType
+from models.user import SYSTEM_USER_ID
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from repositories.execution_session import SqlExecutionSessionRepository
 from repositories.execution_session_queue import due_sessions
@@ -47,7 +51,13 @@ from services.session_inputs import EXECUTION_KICKOFF_PROMPT, RECOVERY_PROMPT
 from services.session_runner import SessionRunner
 from tests._envelope import assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
-from tests._workflow import create_published_workflow, create_skill
+from tests._workflow import (
+    add_template,
+    create_published_workflow,
+    create_skill,
+    generate_workflow,
+    publish_workflow,
+)
 
 
 class ScriptedAgent:
@@ -513,6 +523,9 @@ async def test_a_turn_reaches_viewers_through_the_stream(
     response = await client.get(f"{_base(execution)}/stream", params={"after": cursor})
 
     assert response.status_code == 200
+    # A compressing proxy would hold the stream back until it closes, and a turn
+    # waiting on a person's answer never closes on its own.
+    assert "no-transform" in response.headers["cache-control"]
     events = [
         json.loads(line.removeprefix("data: "))
         for line in response.text.splitlines()
@@ -953,3 +966,118 @@ async def test_wait_until_reads_a_time_without_an_offset_in_the_local_zone(
     await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
 
     assert agent.results[0]["resume_at"] == local.astimezone(UTC).isoformat()
+
+
+class StartingAgent(ScriptedAgent):
+    """A scripted agent that tries to start one task on every turn, for real."""
+
+    def __init__(self, session_id: str, user_id: str, task_id: str) -> None:
+        super().__init__()
+        self.context: Any = SimpleNamespace(
+            session=SimpleNamespace(id=session_id), user_id=user_id, state=None
+        )
+        self.task_id = task_id
+        self.results: list[dict[str, Any]] = []
+
+    async def run(self, input_data: RunAgentInput) -> AsyncGenerator[Any, None]:
+        self.results.append(
+            await update_workflow_task(self.task_id, self.context, status="in_progress")
+        )
+        async for event in super().run(input_data):
+            yield event
+
+
+async def _execute_with_an_asking_tool(
+    client: AsyncClient, engine: AsyncEngine
+) -> tuple[dict[str, Any], str]:
+    """Execute a workflow whose one task binds a tool marked ``elicits``."""
+    async with AsyncSession(engine) as db:
+        server = MCPServer(
+            name="vault",
+            transport=McpTransport.streamable_http,
+            url="https://example.com/mcp",
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        server_id = server.id
+        db.add(server)
+        await db.commit()
+    skill = await create_skill(client)
+    wf = await generate_workflow(client, skill["id"])
+    await add_template(
+        client,
+        wf["id"],
+        tool_bindings=[{"mcpServerId": server_id, "toolName": "set", "elicits": True}],
+    )
+    await publish_workflow(client, wf["id"])
+    execution: dict[str, Any] = assert_ok(
+        await client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
+    (task,) = assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
+        )
+    )
+    return execution, task["id"]
+
+
+async def test_a_task_whose_tool_asks_waits_for_its_initiator_to_resume_it(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution, task_id = await _execute_with_an_asking_tool(client, engine)
+    sid = execution["sessionId"]
+    agent = StartingAgent(sid, execution["initiatorId"], task_id)
+    registry.get.return_value = agent
+
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)  # the kickoff
+
+    assert agent.results[0]["waiting_for_initiator"] == task_id
+    row = await _session(engine, sid)
+    assert row.status is ExecutionSessionStatus.waiting_for_initiator
+    assert row.initiator_task_id == task_id
+    async with AsyncSession(engine) as db:
+        notes = (await db.exec(select(Notification))).all()
+    assert [(n.user_id, n.type) for n in notes] == [
+        (execution["initiatorId"], NotificationType.elicitation_request)
+    ]
+    assert await _run_status(engine, execution["id"]) is WorkflowExecutionStatus.running
+
+    # The resume button: a message from the initiator.
+    assert_ok(
+        await client.post(f"{_base(execution)}/input", json={"message": "resume"}),
+        status=202,
+    )
+    assert (await _session(engine, sid)).initiator_task_id is None
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    assert agent.results[1]["status"] == "in_progress"
+    assert (await _session(engine, sid)).status is ExecutionSessionStatus.idle
+
+
+async def test_only_the_initiator_resumes_a_task_whose_tool_asks(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """Someone else typing is not the initiator being there to answer."""
+    client, engine, runner, registry = runner_env
+    execution, task_id = await _execute_with_an_asking_tool(client, engine)
+    sid = execution["sessionId"]
+    agent = StartingAgent(sid, execution["initiatorId"], task_id)
+    registry.get.return_value = agent
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    assert_ok(
+        await client.post(
+            f"{_base(execution)}/input",
+            json={"message": "go"},
+            headers={"X-User-Id": "alice"},
+        ),
+        status=202,
+    )
+    await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
+
+    assert "waiting_for_initiator" in agent.results[1]
+    assert (await _session(engine, sid)).status is (
+        ExecutionSessionStatus.waiting_for_initiator
+    )

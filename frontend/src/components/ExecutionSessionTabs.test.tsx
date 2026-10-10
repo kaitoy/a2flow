@@ -35,6 +35,7 @@ describe("ExecutionSessionTabs", () => {
           session("main", "idle"),
           session("b1", "waiting_for_approval", "main"),
           session("b2", "done", "main"),
+          session("b3", "waiting_for_initiator", "main"),
         ]}
         mainSessionId="main"
         value="main"
@@ -42,7 +43,12 @@ describe("ExecutionSessionTabs", () => {
       />
     );
     const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
-    expect(tabs).toEqual(["Main · Idle", "Branch 1 · Waiting for approval", "Branch 2 · Done"]);
+    expect(tabs).toEqual([
+      "Main · Idle",
+      "Branch 1 · Waiting for approval",
+      "Branch 2 · Done",
+      "Branch 3 · Waiting for initiator",
+    ]);
     expect(screen.getByRole("tab", { name: "Main · Idle" })).toHaveAttribute(
       "aria-selected",
       "true"

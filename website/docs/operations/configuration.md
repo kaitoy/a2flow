@@ -132,6 +132,8 @@ Every MCP tool call must present a short-lived X.509 certificate issued for the 
 | `MCP_TOOL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | Clock-skew tolerance for the proof-of-possession signature accompanying each proxied call |
 | `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | Subject and lifetime of the generated root. Read only when the root is first generated; changing them later has no effect on an existing root |
 | `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | Base URL of the registry the [Browse registry](../guides/mcp-servers.md#registering-from-the-mcp-registry) dialog searches |
+| `MCP_ELICITATION_TIMEOUT_SECONDS` | `900` | How long a tool call waits for the run's initiator to answer an MCP server's [confirmation](../guides/workflow-executions.md#mcp-server-confirmations) before the question expires. The initiator has just resumed the task, so this bounds only a question left behind |
+| `AGENT_TURN_TIMEOUT_SECONDS` | `3600` | The longest one agent turn of a run may last, waiting included. Keep it well above `MCP_ELICITATION_TIMEOUT_SECONDS`, since a turn whose tool call is waiting on a person is still running |
 
 ## MCP proxy {#mcp-sandbox}
 

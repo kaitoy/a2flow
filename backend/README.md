@@ -174,7 +174,7 @@ A registry of [MCP](https://modelcontextprotocol.io/) servers whose tools the wo
 
 | `transport` | Fields | Connection |
 |---|---|---|
-| `streamable_http` (default) | `url`, `headers` | One streamable HTTP session per operation, 30-second timeout. SSE-transport servers are not supported. |
+| `streamable_http` (default) | `url`, `headers` | One streamable HTTP session per operation, 30-second timeout (paused while a person answers the server's [elicitation](#mcp-elicitation)). SSE-transport servers are not supported. |
 | `stdio` | `command`, `args`, `env` | One child process per operation, 120-second timeout — the larger budget covers a cold `npx -y pkg@version` / `uvx pkg` download. `command` is restricted to `npx`/`uvx`, the only two runtimes the image that launches it ships. |
 | `script` | `language`, `source`, `packages`, `env` | Launched like `stdio` (same process model and timeout), through a runner bundled in `infrastructure/script_runners/`. See below. |
 
@@ -330,10 +330,28 @@ It decides *whether* a call may happen. *Where* it happens is `infrastructure/mc
 - **Stubbing** is the `McpToolStub` protocol, consulted for `call_tool` only, and only *after* the chain has allowed it — so a [mocked](#tool-mocks) run rehearses the same authorization a real one faces. The implementation, `WorkflowExecutionToolStub`, answers from the run's snapshot. It has two methods rather than one: `stubs` reports whether a call is stubbed without side effects (the gateway asks before the chain runs, since the answer decides whether a refusal is audited), and `answer` consumes one of the run's ordered responses. Unlike an audit failure, an exception here is *not* swallowed — falling through to the real tool is the one outcome a stub must never produce.
 - **Every call that reaches a server is audited.** The `McpAuditSink` protocol receives each `call_tool` verdict, allowed or refused; `infrastructure/mcp_audit.py` appends it to `mcp_tool_invocations`. Two things are deliberately absent: listings, which have no side effect and would bury the calls that do, and stubbed calls in either direction, which were never going to reach a server. A sink that raises is logged and swallowed: auditing must never turn an allowed call into a refused one.
 - **The gateway owns the database session** and closes it before any network or subprocess call — a stdio spawn can hold the caller for two minutes, which must not pin a database connection. A policy's `db` is valid only while its `authorize` runs.
+- **A server may ask a question mid-call** — see [MCP elicitation](#mcp-elicitation) below. The gateway hands the executor a handler bound to the run (`McpElicitor`, implemented by `infrastructure/mcp_elicitation.py`) for a real call only: a stubbed call reaches no server, and a gateway built without an elicitor (as in tests) lets no server ask.
 
 `GET /api/v1/mcp-servers/{id}/tools` — the admin tool catalog — does not go through the gateway (nothing about it belongs to a run), but it does go through the same **executor**, so a stdio server it queries is launched wherever the deployment launches them.
 
 The run's own audit trail is readable at `GET /api/v1/workflow-executions/{id}/tool-invocations`, gated by the same read access as the run's tasks. It lists exactly what the gateway decided on — the raw arguments are never stored, only their digest.
+
+#### MCP elicitation
+
+An MCP server may stop partway through `tools/call` and ask the client something (`elicitation/create`): a message and a form of flat primitive fields. The Azure MCP Server does it before every operation on a Key Vault secret. A2Flow answers by putting the question to the run's initiator in the chat while the call — and the turn — stays open.
+
+Only a tool a task binds with `elicits` (`ToolBinding.elicits`, set by the design agent) may ask, and such a task starts only when the initiator is there to answer, so the wait is short rather than bounded by a person noticing a notification:
+
+| Piece | Role |
+|---|---|
+| `infrastructure/workflow_task_tools.py` | `update_workflow_task(in_progress)` on a task with an `elicits` binding is held back unless the calling session's `pending_input` is a `message` whose `acting_user_id` is the initiator — the session screen's **Resume** button is exactly such a message. Held back, it records `ExecutionSession.initiator_task_id`, notifies the initiator (`elicitation_request`), and tells the agent to end its turn; `services/session_settle.py` then settles the session as `waiting_for_initiator`. Queued input clears the field |
+| `infrastructure/mcp_gateway.py` | Hands the executor an elicitation handler only when an `in_progress` task of the calling session binds the tool with `elicits`; any other call keeps the capability unadvertised |
+| `infrastructure/mcp_client.py` | `call_server_tool(..., on_elicit=...)` passes the handler to `ClientSession(elicitation_callback=...)`, which is what makes the session advertise the capability. The operation's `asyncio.timeout` is paused (`Timeout.reschedule`) for as long as the handler takes; without a handler the capability is not advertised and the SDK refuses the request |
+| `infrastructure/mcp_elicitation.py` | `SqlElicitationBroker`: records the question in `mcp_elicitations`, appends an `ACTIVITY_SNAPSHOT` (`activityType: "mcp_elicitation"`) to the running turn's `session_stream_events`, then polls the row until it is answered or `expires_at` (`MCP_ELICITATION_TIMEOUT_SECONDS`) passes. Polling, because the answer may land on another replica. A URL-mode question is declined |
+| `services/mcp_elicitation.py` | `GET` / `POST …/sessions/{sid}/elicitations/{id}[/answer]`. Reading follows the run's read access; answering is the initiator's alone (no super-admin bypass, like an A2UI form), validates an `accept`'s content against the stored schema with `jsonschema` (`422 INVALID_SESSION_INPUT`), and is a compare-and-set out of `pending` (`409 ELICITATION_ALREADY_ANSWERED`) |
+| `infrastructure/agent.py` | Passes `AGENT_TURN_TIMEOUT_SECONDS` to ag-ui-adk as `execution_timeout_seconds`, whose 600-second default counts from the turn's start and would cut a waiting turn off |
+
+The answer is not chat input: `/input` refuses a `running` session, and the turn that is waiting is what picks the answer up. Holding the call open costs one session-runner slot and one database connection per waiting turn — for as long as the initiator, already in the chat, takes to answer.
 
 #### MCP proxy
 
@@ -346,7 +364,9 @@ A registered MCP server is third-party code: a stdio one is launched as a child 
 | `infrastructure/google_token.py` | Mints the Google OAuth 2.0 access token a `${gcp-token:…}` placeholder stands for, from the credential JSON the referenced secret entry holds |
 | `infrastructure/mcp_client.py` | The transport, and the module that actually runs in the proxy. Deliberately free of the ORM — its imports are the MCP SDK, httpx, and two dependency-free modules of ours |
 | `infrastructure/mcp_transport_tls.py` | Issues the TLS material for the hop, at backend startup, from the same root that signs tool certificates |
-| `mcp_proxy/` | The proxy process itself: `app.py` (two endpoints and a health probe), `auth.py` (what it checks), `__main__.py` (the listener) |
+| `mcp_proxy/` | The proxy process itself: `app.py` (its endpoints and a health probe), `auth.py` (what it checks), `__main__.py` (the listener) |
+
+**A call is a WebSocket.** `/call-tool` is a WebSocket endpoint: the backend (`websockets` client, same mTLS context) sends the signed `ExecutorCallToolRequest` as the first message, and the proxy sends `ExecutorCallFrame`s back — any number of `elicit` frames, one per question the server asks, each answered by an `ExecutorElicitationAnswer` on the same socket, then one `result` or `error` (a refusal before the call starts is an `error` frame too). The answer needs no signature of its own: it rides the mutually authenticated connection the signed call was made over. Nothing about a call outlives its socket, so the proxy may run as any number of replicas. Without `"elicit": true` on the request the proxy does not advertise the capability at all.
 
 **Two things guard the hop, and neither is redundant.** The listener runs with `CERT_REQUIRED` against the root CA, so nothing without a certificate this deployment issued opens a connection at all. But TLS authenticates a *connection*, not the operations flowing down it — and uvicorn does not implement the ASGI TLS extension, so a handler cannot read the peer certificate anyway. Every request therefore carries its own evidence:
 

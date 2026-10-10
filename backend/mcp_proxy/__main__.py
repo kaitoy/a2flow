@@ -60,6 +60,9 @@ def main() -> int:
         ssl_ca_certs=str(credentials.ca_certificate),
         # Nothing without a certificate this deployment issued gets to speak.
         ssl_cert_reqs=ssl.CERT_REQUIRED,
+        # Tool calls are WebSockets; uvicorn's default implementation is
+        # built on websockets' deprecated legacy API.
+        ws="websockets-sansio",
         # Keeps the timestamped format setup_logging() installed.
         log_config=None,
         timeout_graceful_shutdown=30,

@@ -124,6 +124,18 @@ _DEFAULT_MCP_PROXY_PORT = 8443
 #: unlike a tool certificate, nothing about this one bounds a grant.
 _DEFAULT_MCP_TRANSPORT_CERT_VALIDITY_DAYS = 365
 
+#: How long, in seconds, an MCP tool call may wait on a person answering the
+#: server's question (an MCP elicitation) in the run's chat. Fifteen minutes:
+#: long enough to notice the notification and come back to the chat, short
+#: enough that a forgotten question does not hold a turn for the rest of the day.
+_DEFAULT_MCP_ELICITATION_TIMEOUT_SECONDS = 900
+
+#: Upper bound, in seconds, for one agent turn of a workflow session, counted
+#: from the turn's start. An hour, so a turn whose tool call is waiting on a
+#: person's answer (see ``_DEFAULT_MCP_ELICITATION_TIMEOUT_SECONDS``) is not cut
+#: off by ag-ui-adk's own ten-minute default.
+_DEFAULT_AGENT_TURN_TIMEOUT_SECONDS = 3600
+
 #: Defaults keyed by field name for :meth:`Settings._fallback_positive_int`.
 #: A validator shared across fields cannot read each field's own default, so
 #: the mapping supplies it.
@@ -133,6 +145,8 @@ _POSITIVE_INT_DEFAULTS = {
     "mcp_ca_validity_days": _DEFAULT_MCP_CA_VALIDITY_DAYS,
     "mcp_proxy_port": _DEFAULT_MCP_PROXY_PORT,
     "mcp_transport_cert_validity_days": _DEFAULT_MCP_TRANSPORT_CERT_VALIDITY_DAYS,
+    "mcp_elicitation_timeout_seconds": _DEFAULT_MCP_ELICITATION_TIMEOUT_SECONDS,
+    "agent_turn_timeout_seconds": _DEFAULT_AGENT_TURN_TIMEOUT_SECONDS,
 }
 
 
@@ -277,6 +291,15 @@ class Settings(BaseSettings):
             forked when its task graph branches (see
             :mod:`services.execution_branching`). Once reached, further
             branches queue behind the session they would have forked from.
+        mcp_elicitation_timeout_seconds: How long an MCP tool call may wait on
+            the run's initiator answering the server's question in the chat
+            (see :mod:`services.mcp_elicitation`). Once it lapses the question
+            is marked expired and the server is told the person cancelled.
+        agent_turn_timeout_seconds: Upper bound for one agent turn of a
+            workflow session, counted from its start and handed to ag-ui-adk
+            as ``execution_timeout_seconds``. Must leave room for
+            ``mcp_elicitation_timeout_seconds``, since a turn whose tool call
+            is waiting on a person is still running.
         email_queue_batch_size: How many messages one drain pass claims.
         email_queue_poll_interval_seconds: How long the worker sleeps when the
             queue is empty.
@@ -353,6 +376,8 @@ class Settings(BaseSettings):
     mcp_proxy_server_name: str = _DEFAULT_MCP_PROXY_SERVER_NAME
     mcp_proxy_port: int = _DEFAULT_MCP_PROXY_PORT
     mcp_transport_cert_validity_days: int = _DEFAULT_MCP_TRANSPORT_CERT_VALIDITY_DAYS
+    mcp_elicitation_timeout_seconds: int = _DEFAULT_MCP_ELICITATION_TIMEOUT_SECONDS
+    agent_turn_timeout_seconds: int = _DEFAULT_AGENT_TURN_TIMEOUT_SECONDS
 
     session_cookie_secure: bool = False
     session_idle_timeout_seconds: int = _DEFAULT_IDLE_TIMEOUT_SECONDS
@@ -426,6 +451,8 @@ class Settings(BaseSettings):
         "mcp_ca_validity_days",
         "mcp_proxy_port",
         "mcp_transport_cert_validity_days",
+        "mcp_elicitation_timeout_seconds",
+        "agent_turn_timeout_seconds",
         mode="before",
     )
     @classmethod

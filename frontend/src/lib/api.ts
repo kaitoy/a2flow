@@ -23,6 +23,8 @@ import type {
   ImpersonationEventRead,
   LoginRequest,
   McpCommand,
+  McpElicitationAnswer,
+  McpElicitation as McpElicitationModel,
   McpRegistryEnvVar,
   McpRegistryHeader,
   McpRegistrySearchResult,
@@ -209,6 +211,7 @@ function reportApiError(error: unknown): void {
 /** Backend error code for `ForbiddenError` -- see `backend/repositories/exceptions.py`. */
 const FORBIDDEN_CODE = "FORBIDDEN";
 const APPROVAL_ALREADY_RESOLVED_CODE = "APPROVAL_ALREADY_RESOLVED";
+const ELICITATION_ALREADY_ANSWERED_CODE = "ELICITATION_ALREADY_ANSWERED";
 
 /**
  * True when `error` is the backend's `ForbiddenError` (HTTP 403, envelope
@@ -230,6 +233,16 @@ export function isForbiddenError(error: unknown): boolean {
  */
 export function isApprovalAlreadyResolvedError(error: unknown): boolean {
   return error instanceof ApiClientError && error.code === APPROVAL_ALREADY_RESOLVED_CODE;
+}
+
+/**
+ * True when `error` is the backend's `ElicitationAlreadyAnsweredError` (HTTP
+ * 409, envelope `error.code === "ELICITATION_ALREADY_ANSWERED"`) -- the
+ * question an MCP server asked was answered in another tab, or expired before
+ * this answer arrived, so the UI re-reads it rather than reporting a failure.
+ */
+export function isElicitationAlreadyAnsweredError(error: unknown): boolean {
+  return error instanceof ApiClientError && error.code === ELICITATION_ALREADY_ANSWERED_CODE;
 }
 
 /** Per-call options accepted by the API functions below. */
@@ -307,6 +320,8 @@ type WithAudit<T extends Partial<Record<AuditedKeys, unknown>>> = T &
 
 export type AgentSkill = WithAudit<AgentSkillModel>;
 export type Approval = WithAudit<ApprovalModel>;
+/** A question an MCP server asked in the middle of a tool call, and its answer once given. */
+export type McpElicitation = WithAudit<McpElicitationModel>;
 /**
  * One approval with its `approvedCalls` typed and its `tagIds` attached.
  *
@@ -362,6 +377,7 @@ export type {
   ImpersonationEventRead,
   LoginRequest,
   McpCommand,
+  McpElicitationAnswer,
   McpRegistryEnvVar,
   McpRegistryHeader,
   McpRegistrySearchResult,
@@ -1615,6 +1631,40 @@ export async function sendSessionInput(
     }),
     options
   );
+}
+
+/** Fetch one question an MCP server asked during a turn of a workflow session. */
+export async function getSessionElicitation(
+  executionId: string,
+  sessionId: string,
+  elicitationId: string
+): Promise<McpElicitation> {
+  return unwrap(
+    sdk.getSessionElicitationApiV1WorkflowExecutionsExecutionIdSessionsSessionIdElicitationsElicitationIdGet(
+      { path: { execution_id: executionId, session_id: sessionId, elicitation_id: elicitationId } }
+    )
+  ) as Promise<McpElicitation>;
+}
+
+/**
+ * Answer a question an MCP server asked mid-call; the waiting tool call picks
+ * the answer up by itself. Accepted while the session's turn is running --
+ * unlike {@link sendSessionInput} -- since that turn is what is waiting.
+ */
+export async function answerSessionElicitation(
+  executionId: string,
+  sessionId: string,
+  elicitationId: string,
+  answer: McpElicitationAnswer
+): Promise<McpElicitation> {
+  return unwrap(
+    sdk.answerSessionElicitationApiV1WorkflowExecutionsExecutionIdSessionsSessionIdElicitationsElicitationIdAnswerPost(
+      {
+        path: { execution_id: executionId, session_id: sessionId, elicitation_id: elicitationId },
+        body: answer,
+      }
+    )
+  ) as Promise<McpElicitation>;
 }
 
 /**

@@ -141,8 +141,8 @@ class WorkflowTaskTemplateToolBinding(SQLModel, table=True):
     server side is ``RESTRICT`` so a registered server cannot be deleted while
     templates still bind its tools.
 
-    ``requires_input_approval`` is copied onto the run's task alongside the pair
-    it qualifies. This is the only place it can be set -- a run cannot -- which
+    ``requires_input_approval`` and ``elicits`` are copied onto the run's task
+    alongside the pair they qualify. This is the only place it can be set -- a run cannot -- which
     is what makes it a property of the *design*. See
     :class:`models.workflow_task.ToolBinding`.
     """
@@ -166,3 +166,4 @@ class WorkflowTaskTemplateToolBinding(SQLModel, table=True):
     mcp_server_id: str = Field(primary_key=True)
     tool_name: str = Field(primary_key=True)
     requires_input_approval: bool = Field(default=True)
+    elicits: bool = Field(default=False)

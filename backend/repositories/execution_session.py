@@ -71,6 +71,10 @@ class ExecutionSessionRepository(Protocol):
         self, session_id: str, at: datetime, *, user_id: str
     ) -> None: ...
 
+    async def set_initiator_task(
+        self, session_id: str, task_id: str, *, user_id: str
+    ) -> None: ...
+
 
 class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
     """SQLModel-backed implementation of ExecutionSessionRepository."""
@@ -171,6 +175,9 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
                 pending_input=pending_input,
                 # Input wakes a ``scheduled`` session early: it no longer waits.
                 resume_at=None,
+                # Nor does a session held back for its initiator: whoever
+                # resumes it, the turn decides whether the task may start.
+                initiator_task_id=None,
                 updated_by=user_id,
             )
         )
@@ -203,12 +210,15 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
                 ``None``.
 
         Any status but ``scheduled`` also clears ``resume_at``: only a
-        ``scheduled`` session waits on a time. The run's status is recomputed
+        ``scheduled`` session waits on a time. Likewise any status but
+        ``waiting_for_initiator`` clears ``initiator_task_id``. The run's status is recomputed
         in the same commit (see :meth:`_sync_execution_status`).
         """
         values: dict[str, Any] = {"status": status, "updated_by": user_id}
         if status is not ExecutionSessionStatus.scheduled:
             values["resume_at"] = None
+        if status is not ExecutionSessionStatus.waiting_for_initiator:
+            values["initiator_task_id"] = None
         if summary is not None:
             values["summary"] = summary
         await self._update(
@@ -275,6 +285,25 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
         """
         await self._update(
             session_id, {"resume_at": at, "updated_by": user_id}, None, False
+        )
+
+    async def set_initiator_task(
+        self, session_id: str, task_id: str, *, user_id: str
+    ) -> None:
+        """Record the task a session holds back for its initiator.
+
+        Settling the turn then leaves the session ``waiting_for_initiator``.
+
+        Args:
+            session_id: The session whose agent tried to start the task.
+            task_id: The task, which binds a tool that asks its initiator.
+            user_id: Recorded on the row's ``updated_by``.
+        """
+        await self._update(
+            session_id,
+            {"initiator_task_id": task_id, "updated_by": user_id},
+            None,
+            False,
         )
 
     async def mark_run(

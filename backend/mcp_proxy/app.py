@@ -10,22 +10,33 @@ volume the backend published it to. If it is not there, the process refuses to
 start rather than coming up unable to verify anything -- which would look
 healthy while failing every request.
 
-Responses use the same ``{meta, data, error}`` envelope as the public API, so a
+A tool call is a WebSocket rather than a request (see
+:class:`models.mcp_execution.ExecutorCallFrame`): the server may stop mid-call
+to ask a person something (an MCP elicitation), and the question and its answer
+travel on the call's own connection. Nothing about a call outlives its socket,
+so the proxy can run as any number of replicas.
+
+HTTP responses use the same ``{meta, data, error}`` envelope as the public API, so a
 failure reads the same way on both sides of the hop and the request id is in
 the logs of both. That is the one place this package borrows from the backend's
 own models; a future split of the sandbox's dependencies would start by cutting
 it.
 """
 
+import asyncio
+import contextlib
 import logging
+import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cryptography import x509
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
+from mcp import types
+from pydantic import ValidationError
 
 from config import get_settings
 from infrastructure import mcp_client
@@ -40,8 +51,10 @@ from infrastructure.script_runners import NODE_RUNNER, PYTHON_RUNNER
 from mcp_proxy.auth import ProxyAuthError, verify_call_credential, verify_sender
 from middleware.envelope import RequestContextMiddleware
 from models.mcp_execution import (
+    ExecutorCallFrame,
     ExecutorCallToolRequest,
     ExecutorCallToolResponse,
+    ExecutorElicitationAnswer,
     ExecutorListToolsRequest,
     ExecutorListToolsResponse,
     ExecutorTestCallToolRequest,
@@ -56,6 +69,13 @@ logger = logging.getLogger(__name__)
 #: Where the loaded root is kept for the lifetime of the process. A module-level
 #: holder rather than app state so the route functions stay plain.
 _root: dict[str, x509.Certificate] = {}
+
+#: Seconds this side waits for an answer beyond the backend's own limit, so the
+#: backend -- which records the question as expired -- is the one that gives up.
+_ANSWER_GRACE_SECONDS = 30
+
+#: Bytes of randomness in an ``elicit`` frame's key.
+_ANSWER_KEY_BYTES = 16
 
 
 def load_root_certificate() -> x509.Certificate:
@@ -205,30 +225,45 @@ async def list_tools(body: ExecutorListToolsRequest, request: Request) -> JSONRe
     )
 
 
-@app.post("/call-tool")
-async def call_tool(body: ExecutorCallToolRequest, request: Request) -> JSONResponse:
-    """Invoke one tool on one registered MCP server.
+@app.websocket("/call-tool")
+async def call_tool(websocket: WebSocket) -> None:
+    """Invoke one tool on one registered MCP server, over a WebSocket.
 
-    Both signatures are checked before anything is reached: the sender's, which
-    covers the connection spec, and the tool certificate's, which covers this
-    call and must grant this exact tool.
+    The backend sends the call (:class:`ExecutorCallToolRequest`) as the first
+    message. Both signatures are checked before anything is reached: the
+    sender's, which covers the connection spec, and the tool certificate's,
+    which covers this call and must grant this exact tool. From then on the
+    proxy sends :class:`ExecutorCallFrame` messages -- an ``elicit`` frame per
+    question the server asks, answered by an :class:`ExecutorElicitationAnswer`
+    on the same socket, then one ``result`` or ``error`` -- and closes. A
+    refusal is an ``error`` frame too.
 
     Args:
-        body: The call to make and the evidence backing it.
-        request: The incoming request.
-
-    Returns:
-        The tool result, or an error envelope.
+        websocket: The connection, already mutually authenticated by TLS.
     """
+    await websocket.accept()
+    try:
+        body = ExecutorCallToolRequest.model_validate_json(
+            await websocket.receive_text()
+        )
+    except ValidationError:
+        await _finish(
+            websocket,
+            ExecutorCallFrame(
+                type="error", code="VALIDATION_ERROR", message="not a tool call"
+            ),
+        )
+        return
+    except WebSocketDisconnect:
+        return
     now = datetime.now(UTC)
     window = _signature_window()
-    connection_json = body.connection.model_dump(mode="json")
     try:
         verify_sender(
             body.sender,
             ca_certificate=load_root_certificate(),
             operation=CALL_OPERATION,
-            connection=connection_json,
+            connection=body.connection.model_dump(mode="json"),
             tool_name=body.tool_name,
             arguments=body.arguments,
             now=now,
@@ -251,23 +286,131 @@ async def call_tool(body: ExecutorCallToolRequest, request: Request) -> JSONResp
             body.mcp_server_id,
             exc.message,
         )
-        return _error(request, 403, "MCP_PROXY_FORBIDDEN", exc.message)
+        await _finish(
+            websocket,
+            ExecutorCallFrame(
+                type="error", code="MCP_PROXY_FORBIDDEN", message=exc.message
+            ),
+        )
+        return
+    await _relay_call(websocket, body)
 
+
+async def _relay_call(websocket: WebSocket, body: ExecutorCallToolRequest) -> None:
+    """Run one verified call, relaying the server's questions over ``websocket``.
+
+    The call runs in its own task -- the transport's task group must enter and
+    exit in one task -- while this one reads the backend's answers. If the
+    backend goes away, or sends something that is not an answer, the call is
+    cancelled.
+
+    Args:
+        websocket: The accepted connection.
+        body: The verified call.
+    """
+    answers: dict[str, asyncio.Future[types.ElicitResult]] = {}
+
+    async def ask(params: types.ElicitRequestParams) -> types.ElicitResult:
+        key = secrets.token_urlsafe(_ANSWER_KEY_BYTES)
+        answer: asyncio.Future[types.ElicitResult] = (
+            asyncio.get_running_loop().create_future()
+        )
+        answers[key] = answer
+        await websocket.send_text(
+            ExecutorCallFrame(
+                type="elicit",
+                key=key,
+                params=params.model_dump(mode="json", by_alias=True, exclude_none=True),
+            ).model_dump_json(by_alias=True, exclude_none=True)
+        )
+        limit = get_settings().mcp_elicitation_timeout_seconds + _ANSWER_GRACE_SECONDS
+        try:
+            return await asyncio.wait_for(answer, limit)
+        except TimeoutError:
+            return types.ElicitResult(action="cancel")
+        finally:
+            answers.pop(key, None)
+
+    async def read_answers() -> None:
+        while True:
+            message = ExecutorElicitationAnswer.model_validate_json(
+                await websocket.receive_text()
+            )
+            answer = answers.get(message.key)
+            if answer is not None and not answer.done():
+                answer.set_result(types.ElicitResult.model_validate(message.result))
+
+    call = asyncio.create_task(_call(body, ask if body.elicit else None))
+    reader = asyncio.create_task(read_answers())
+    try:
+        await asyncio.wait({call, reader}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        reader.cancel()
+        abandoned = not call.done()
+        if abandoned:
+            call.cancel()
+    if abandoned:
+        # The reader ended first: the backend went away, or broke the protocol.
+        await asyncio.wait({call})
+        failure = None if reader.cancelled() else reader.exception()
+        if failure is not None and not isinstance(failure, WebSocketDisconnect):
+            logger.warning("Abandoned a call to %s: %s", body.tool_name, failure)
+            await _finish(
+                websocket,
+                ExecutorCallFrame(
+                    type="error", code="VALIDATION_ERROR", message="not an answer"
+                ),
+            )
+        return
+    await _finish(websocket, call.result())
+
+
+async def _call(
+    body: ExecutorCallToolRequest, ask: mcp_client.ElicitHandler | None
+) -> ExecutorCallFrame:
+    """Make the call and return the frame that ends it.
+
+    Args:
+        body: The verified call.
+        ask: Relays the server's questions, or ``None`` to let it ask none.
+
+    Returns:
+        A ``result`` frame, or an ``error`` frame for any failure.
+    """
     try:
         result = await mcp_client.call_server_tool(
-            spec_to_connection(body.connection), body.tool_name, body.arguments
+            spec_to_connection(body.connection),
+            body.tool_name,
+            body.arguments,
+            on_elicit=ask,
         )
     except McpConnectionError as exc:
-        return _error(request, 502, "MCP_UNREACHABLE", exc.reason)
+        return ExecutorCallFrame(
+            type="error", code="MCP_UNREACHABLE", message=exc.reason
+        )
+    except Exception:
+        # Without a frame the backend would wait forever for one.
+        logger.exception("A call to %s failed unexpectedly", body.tool_name)
+        return ExecutorCallFrame(
+            type="error", code="INTERNAL_ERROR", message="the call failed"
+        )
+    return ExecutorCallFrame(
+        type="result", result=result.model_dump(mode="json", by_alias=True)
+    )
 
-    data = ExecutorCallToolResponse(
-        result=result.model_dump(mode="json", by_alias=True)
-    )
-    return JSONResponse(
-        content=ApiResponse[ExecutorCallToolResponse](
-            meta=_meta(request), data=data
-        ).model_dump(mode="json", by_alias=True)
-    )
+
+async def _finish(websocket: WebSocket, frame: ExecutorCallFrame) -> None:
+    """Send the frame that ends a call and close, if the backend is still there.
+
+    Args:
+        websocket: The accepted connection.
+        frame: The ``result`` or ``error`` frame.
+    """
+    with contextlib.suppress(WebSocketDisconnect, RuntimeError):
+        await websocket.send_text(
+            frame.model_dump_json(by_alias=True, exclude_none=True)
+        )
+        await websocket.close()
 
 
 #: The ``args`` tail a script runner is launched with -- the only thing

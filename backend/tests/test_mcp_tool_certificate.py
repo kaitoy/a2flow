@@ -594,6 +594,7 @@ async def test_certificate_endpoint_reports_the_granted_tools(
             "mcpServerId": server_id,
             "toolName": "read_file",
             "requiresInputApproval": True,
+            "elicits": False,
         }
     ]
     assert data[0]["revokedAt"] is None

@@ -74,7 +74,7 @@ from infrastructure.mcp_certificate import (
     extract_claims,
     verify_certificate,
 )
-from infrastructure.mcp_client import McpConnection
+from infrastructure.mcp_client import ElicitHandler, McpConnection
 from infrastructure.mcp_connection import resolve_connection
 from infrastructure.mcp_executor import McpExecutor, get_mcp_executor
 from infrastructure.secret_cipher import get_secret_cipher
@@ -514,6 +514,45 @@ class McpToolStub(Protocol):
         ...
 
 
+class McpElicitor(Protocol):
+    """Answers the questions a server asks in the middle of a call.
+
+    An MCP server may stop partway through ``tools/call`` and ask the client
+    something (an elicitation). The gateway knows who is behind a call; this is
+    what turns that into a person's answer. See
+    :class:`infrastructure.mcp_elicitation.SqlElicitationBroker`.
+    """
+
+    async def elicit(
+        self,
+        *,
+        tenant_id: str,
+        execution_id: str,
+        session_id: str,
+        user_id: str | None,
+        server_id: str,
+        server_name: str,
+        tool_name: str,
+        params: types.ElicitRequestParams,
+    ) -> types.ElicitResult:
+        """Put the server's question to a person and return their answer.
+
+        Args:
+            tenant_id: Tenant the run belongs to.
+            execution_id: The run whose tool call asked.
+            session_id: The session (chat) the call runs in.
+            user_id: The user the turn acts for, if known.
+            server_id: Id of the registered server that asked.
+            server_name: Its name.
+            tool_name: The tool whose call asked.
+            params: The server's ``elicitation/create`` parameters.
+
+        Returns:
+            The answer for the server.
+        """
+        ...
+
+
 @asynccontextmanager
 async def _default_session() -> AsyncIterator[AsyncSession]:
     """Open a database session on the module-level engine.
@@ -559,6 +598,7 @@ class McpGateway:
         audit: McpAuditSink | None = None,
         stub: McpToolStub | None = None,
         executor: McpExecutor | None = None,
+        elicitor: McpElicitor | None = None,
         session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]]
         | None = None,
     ) -> None:
@@ -580,6 +620,11 @@ class McpGateway:
                 process, or in the MCP proxy container. Defaults to whichever
                 :func:`infrastructure.mcp_executor.get_mcp_executor` selects
                 from the configuration.
+            elicitor: Answers the questions a server asks mid-call. ``None``
+                (as in a directly constructed gateway in tests) lets no server
+                ask; the process-wide gateway built by :func:`get_mcp_gateway`
+                passes the database-backed broker, which puts the question to
+                the run's initiator in the chat.
             session_factory: Opens the database session each operation runs
                 against. Defaults to a session on the module-level engine.
         """
@@ -588,6 +633,7 @@ class McpGateway:
         self._policies: tuple[McpPolicy, ...] = tuple(policies or ())
         self._stub = stub
         self._executor: McpExecutor = executor or get_mcp_executor()
+        self._elicitor = elicitor
         self._session_factory = session_factory or _default_session
 
     async def list_tools(self, request: ListToolsRequest) -> list[ServerToolListing]:
@@ -666,6 +712,13 @@ class McpGateway:
         like any other and then answered from the run's recorded mocks, without
         reaching a server and without an audit row.
 
+        A call that does reach a server may be stopped by it to ask a question
+        (an MCP elicitation). That is allowed only for a tool the calling
+        session's task binds with ``elicits`` (see :meth:`_elicits`); with an
+        elicitor configured, the question then goes to the run's initiator --
+        who resumed the task and is in the chat -- and the call waits for the
+        answer.
+
         Args:
             request: The call request.
 
@@ -732,8 +785,22 @@ class McpGateway:
                 operation=McpOperation.call_tool,
             )
             server_name = server.name
-        # The session is closed: the call below may take up to two minutes.
+            elicits = await self._elicits(db, identity, request)
+        on_elicit = (
+            self._elicit_handler(identity, request, server_name) if elicits else None
+        )
+        # The session is closed: the call below may take up to two minutes, or
+        # as long as a person takes to answer the server's question.
         try:
+            if on_elicit is None:
+                return await self._executor.call_tool(
+                    connection,
+                    request.tool_name,
+                    request.arguments,
+                    mcp_server_id=request.server_id,
+                    session_id=request.principal.session_id,
+                    credential=request.principal.credential,
+                )
             return await self._executor.call_tool(
                 connection,
                 request.tool_name,
@@ -741,12 +808,84 @@ class McpGateway:
                 mcp_server_id=request.server_id,
                 session_id=request.principal.session_id,
                 credential=request.principal.credential,
+                on_elicit=on_elicit,
             )
         except McpConnectionError as exc:
             logger.warning("MCP server %s unreachable: %s", server_name, exc.reason)
             raise McpUpstreamError(
                 f"MCP server {server_name!r} unreachable: {exc.reason}"
             ) from exc
+
+    async def _elicits(
+        self, db: AsyncSession, identity: McpIdentity, request: CallToolRequest
+    ) -> bool:
+        """Return whether the calling session's work binds this tool as asking.
+
+        Only a tool a task binds with ``elicits`` may ask the run's initiator
+        anything: such a task starts on a turn the initiator drove, so they are
+        there to answer. Any other call keeps the capability unadvertised, and
+        a question from its server is refused at once rather than left waiting
+        on someone who is not looking.
+
+        Args:
+            db: The gateway's open database session.
+            identity: The verified caller.
+            request: The call being made.
+
+        Returns:
+            ``True`` when an ``in_progress`` task of the calling session binds
+            the tool with ``elicits`` set.
+        """
+        from infrastructure.mcp_policies import _in_progress_tasks
+
+        if self._elicitor is None or identity.execution_id is None:
+            return False
+        tasks = await _in_progress_tasks(
+            db,
+            identity.execution_id,
+            identity.tenant_id,
+            request.principal.session_id,
+        )
+        return any(
+            b.elicits
+            and b.mcp_server_id == request.server_id
+            and b.tool_name == request.tool_name
+            for t in tasks
+            for b in t.tool_bindings
+        )
+
+    def _elicit_handler(
+        self, identity: McpIdentity, request: CallToolRequest, server_name: str
+    ) -> ElicitHandler | None:
+        """Bind the elicitor to this call, or return ``None`` if nobody can answer.
+
+        Args:
+            identity: The verified caller.
+            request: The call being made.
+            server_name: The target server's name.
+
+        Returns:
+            A handler for :mod:`infrastructure.mcp_client`, or ``None`` when no
+            elicitor is configured or the call belongs to no run.
+        """
+        elicitor = self._elicitor
+        execution_id = identity.execution_id
+        if elicitor is None or execution_id is None:
+            return None
+
+        async def handle(params: types.ElicitRequestParams) -> types.ElicitResult:
+            return await elicitor.elicit(
+                tenant_id=identity.tenant_id,
+                execution_id=execution_id,
+                session_id=request.principal.session_id,
+                user_id=identity.user_id,
+                server_id=request.server_id,
+                server_name=server_name,
+                tool_name=request.tool_name,
+                params=params,
+            )
+
+        return handle
 
     async def _query(
         self, base: ServerToolListing, connection: McpConnection | None
@@ -919,9 +1058,11 @@ def get_mcp_gateway() -> McpGateway:
 
     Returns:
         The shared gateway, built with the default policy chain, the
-        database-backed audit sink, and the run's tool-mock stub.
+        database-backed audit sink, the run's tool-mock stub, and the broker
+        that puts a server's mid-call questions to the run's initiator.
     """
     from infrastructure.mcp_audit import SqlMcpAuditSink
+    from infrastructure.mcp_elicitation import get_elicitation_broker
     from infrastructure.mcp_policies import default_policies
     from infrastructure.tool_mocks import WorkflowExecutionToolStub
 
@@ -929,4 +1070,5 @@ def get_mcp_gateway() -> McpGateway:
         policies=default_policies(),
         audit=SqlMcpAuditSink(),
         stub=WorkflowExecutionToolStub(),
+        elicitor=get_elicitation_broker(),
     )
