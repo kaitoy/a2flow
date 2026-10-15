@@ -18,7 +18,7 @@ re-summarizing the design conversation is a separate, user-triggered step
 
 import logging
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 
 from ag_ui.core import RunAgentInput, RunErrorEvent, UserMessage
 from google.adk.sessions import BaseSessionService
@@ -46,12 +46,14 @@ from models.workflow import (
 from models.workflow_published_version import dump_templates, snapshot_template
 from repositories.agent_skill import AgentSkillRepository
 from repositories.exceptions import (
+    ForeignKeyViolationError,
     NotFoundError,
     SkillNotReadyError,
     SummarizationFailedError,
     WorkflowDescriptionNotGeneratableError,
     WorkflowNotRunnableError,
 )
+from repositories.knowledge import KnowledgeBaseRepository
 from repositories.workflow import WorkflowRepository
 from repositories.workflow_published_version import WorkflowPublishedVersionRepository
 from repositories.workflow_task_template import (
@@ -130,6 +132,7 @@ class WorkflowDesignService:
         skills: AgentSkillRepository,
         templates: WorkflowTaskTemplateRepository,
         versions: WorkflowPublishedVersionRepository,
+        knowledge_bases: KnowledgeBaseRepository,
         session_service: BaseSessionService,
         app_name: str,
         summarize: Summarizer | None = None,
@@ -142,6 +145,9 @@ class WorkflowDesignService:
             templates: Repository providing WorkflowTaskTemplate persistence.
             versions: Repository storing the published-design snapshot written by
                 :meth:`publish`.
+            knowledge_bases: The caller's tag-scoped KnowledgeBase repository,
+                linking a generated workflow to the knowledge bases picked
+                for it; a hidden one is rejected like a missing one.
             session_service: ADK session store, read by
                 :meth:`generate_description` to build the design transcript.
             app_name: ADK application name keying sessions in the store.
@@ -156,11 +162,19 @@ class WorkflowDesignService:
         self._skills = skills
         self._templates = templates
         self._versions = versions
+        self._knowledge_bases = knowledge_bases
         self._session_service = session_service
         self._app_name = app_name
         self._summarize = summarize or summarize_design_transcript
 
-    async def generate(self, skill_id: str, name: str, *, user_id: str) -> Workflow:
+    async def generate(
+        self,
+        skill_id: str,
+        name: str,
+        *,
+        user_id: str,
+        knowledge_base_ids: Sequence[str] = (),
+    ) -> Workflow:
         """Register a draft Workflow, with its design session, for a skill.
 
         Creates the workflow in ``generating`` status, minting the id of the
@@ -170,12 +184,14 @@ class WorkflowDesignService:
         task templates. The prompt itself is not stored — it becomes the design
         session's first chat message. The workflow also inherits the skill's
         tag attachments as a one-time copy at creation time; the two records'
-        tags are independent from then on.
+        tags are independent from then on. ``knowledge_base_ids`` are linked
+        before this returns, so the background design run can consult them.
 
         Args:
             skill_id: Identifier of the skill to generate a workflow from.
             name: Unique name of the new workflow.
             user_id: ID of the user generating the workflow.
+            knowledge_base_ids: Knowledge bases to link the new workflow to.
 
         Returns:
             The created Workflow (status ``generating``).
@@ -184,12 +200,19 @@ class WorkflowDesignService:
             NotFoundError: If no skill exists with the given ID.
             SkillNotReadyError: If the skill has no published revision yet.
             UniqueViolationError: If a workflow with ``name`` already exists.
+            ForeignKeyViolationError: If a knowledge base id names none the
+                caller can see.
         """
         skill = await self._skills.get(skill_id)
         if skill is None:
             raise NotFoundError("AgentSkill", skill_id)
         if skill.commit_sha is None:
             raise SkillNotReadyError(skill.id)
+        # Checked up front: the workflow is committed before it can be linked,
+        # and a bad id must not leave a workflow stuck in ``generating``.
+        for kb_id in knowledge_base_ids:
+            if await self._knowledge_bases.get(kb_id) is None:
+                raise ForeignKeyViolationError("KnowledgeBase", kb_id)
         # Capture before the commits below: each commit on the shared request
         # session expires loaded instances, and a plain attribute read on an
         # expired instance fails outside an explicit refresh.
@@ -208,6 +231,10 @@ class WorkflowDesignService:
         tag_ids = await self._skills.tag_ids_for(skill_id)
         if tag_ids:
             await self._workflows.set_tags(workflow_id, tag_ids)
+        if knowledge_base_ids:
+            await self._knowledge_bases.replace_workflow_links(
+                workflow_id, knowledge_base_ids
+            )
         await self._workflows.set_status(
             workflow_id, WorkflowStatus.generating, user_id=user_id
         )

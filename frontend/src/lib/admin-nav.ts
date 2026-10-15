@@ -1,5 +1,6 @@
 /** @module admin-nav — Shared admin navigation item list used by the admin sidebar and the welcome page. */
 import {
+  BookOpen,
   Building2,
   CheckCircle2,
   FlaskConical,
@@ -99,6 +100,13 @@ export const adminNavItems: AdminNavItem[] = [
     icon: FlaskConical,
     description: "Stub tools for draft workflow runs",
     roles: [Role.DEVELOPER, Role.ADMIN],
+  },
+  {
+    href: "/knowledge-bases",
+    label: "Knowledge Bases",
+    icon: BookOpen,
+    description: "Build wikis your workflows can read",
+    roles: [Role.DEVELOPER, Role.ADMIN, Role.REVIEWER],
   },
   {
     href: "/workflows",

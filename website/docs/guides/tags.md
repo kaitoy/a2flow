@@ -5,14 +5,14 @@ sidebar_position: 10
 
 # Tags
 
-Tags are the labels records are classified by. One vocabulary is shared by all six taggable registries, so an `aws` tag narrows secrets and MCP servers alike.
+Tags are the labels records are classified by. One vocabulary is shared by all seven taggable registries, so an `aws` tag narrows secrets and MCP servers alike.
 
-![Flowchart showing one shared tag vocabulary per tenant applied to six taggable registries: Secrets, MCP Servers, Agent Skills, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary.svg#gh-light-mode-only)
-![Flowchart showing one shared tag vocabulary per tenant applied to six taggable registries: Secrets, MCP Servers, Agent Skills, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary-dark.svg#gh-dark-mode-only)
+![Flowchart showing one shared tag vocabulary per tenant applied to seven taggable registries: Secrets, MCP Servers, Agent Skills, Knowledge Bases, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary.svg#gh-light-mode-only)
+![Flowchart showing one shared tag vocabulary per tenant applied to seven taggable registries: Secrets, MCP Servers, Agent Skills, Knowledge Bases, Workflows, Tool Mocks, and User Groups.](./img/tags-vocabulary-dark.svg#gh-dark-mode-only)
 
 Open **Tags** in the admin sidebar to curate the vocabulary. Each tag has a **Name**, unique within the tenant, an optional **Description**, a **color** picked from a fixed eight-slot palette — an arbitrary color value is refused — and an **Access control** checkbox, off by default, that turns the tag from a plain label into a gate (see [Access-control tags](#access-control-tags)).
 
-Creating or editing a plain tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the six taggable resources, so a tag can always be minted by whoever is about to need it. A tag with **Access control** ticked is different: only an Admin (or Super Admin) can create one, edit any of its fields, or delete it. A Developer sees an existing access-control tag entirely read-only — the checkbox as a fixed value, the other fields as plain text, and no Save or Delete button — and can still create or edit a plain tag as before. Reads stay open like every other section.
+Creating or editing a plain tag requires `admin` **or** `developer`, matching the union of the roles that can write to any of the seven taggable resources, so a tag can always be minted by whoever is about to need it. A tag with **Access control** ticked is different: only an Admin (or Super Admin) can create one, edit any of its fields, or delete it. A Developer sees an existing access-control tag entirely read-only — the checkbox as a fixed value, the other fields as plain text, and no Save or Delete button — and can still create or edit a plain tag as before. Reads stay open like every other section.
 
 ## Attaching tags to a record
 
@@ -51,7 +51,7 @@ Workflow design is the exception: giving a step a tool counts as using the MCP s
 
 ## Workflow execution and approval tags {#execution-and-approval-tags}
 
-A [workflow execution](./workflow-executions.md) shows a **Tags** column and field too, and so does the [approval](./approvals.md) it belongs to — but read-only, and outside the six taggable registries above. When a run starts, it copies the tags its workflow carries at that moment; retagging the workflow afterwards, or deleting it, never changes what an already-started run shows. There is no **Tags** picker on these two screens and no tag filter on their lists — attaching and detaching tags stays on the workflow itself.
+A [workflow execution](./workflow-executions.md) shows a **Tags** column and field too, and so does the [approval](./approvals.md) it belongs to — but read-only, and outside the seven taggable registries above. When a run starts, it copies the tags its workflow carries at that moment; retagging the workflow afterwards, or deleting it, never changes what an already-started run shows. There is no **Tags** picker on these two screens and no tag filter on their lists — attaching and detaching tags stays on the workflow itself.
 
 An access-control tag copied this way still gates the run and its approvals, exactly as it gates the workflow: if your groups no longer carry a tag the run copied, both the run and every approval under it disappear from your lists and your direct links — even if you started the run yourself or are its designated approver. The same applies to everything you could do inside the run: sending a message in its chat, opening its tasks, and approving or rejecting an approval under it all fail as if the run did not exist. Only an Admin or a Super Admin is exempt, as with any access-control tag. The tag has to be attached to the workflow *before* it runs; retagging the workflow afterwards never reaches runs already started, since the copy happens once, at the moment the run begins.
 

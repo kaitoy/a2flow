@@ -19,6 +19,8 @@ from services.agent_skill_sync import sync_agent_skill
 from services.approval import ApprovalService
 from services.approver_groups import ApproverGroupResolver
 from services.impersonation_event import ImpersonationEventService
+from services.knowledge_base import KnowledgeBaseService
+from services.knowledge_ingest import run_knowledge_job
 from services.mcp_elicitation import MCPElicitationService
 from services.mcp_registry import MCPRegistryService
 from services.mcp_server import MCPServerService
@@ -53,6 +55,9 @@ from .repository import (
     EffectiveRoleRepositoryDep,
     ExecutionSessionRepositoryDep,
     ImpersonationEventRepositoryDep,
+    KnowledgeBaseRepositoryDep,
+    KnowledgePageRepositoryDep,
+    KnowledgeSourceRepositoryDep,
     McpCertificateAuthorityRepositoryDep,
     MCPElicitationRepositoryDep,
     MCPServerRepositoryDep,
@@ -365,11 +370,18 @@ def get_workflow_design_service(
     skills: AgentSkillRepositoryDep,
     templates: WorkflowTaskTemplateRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
+    knowledge_bases: KnowledgeBaseRepositoryDep,
     session_service: SessionServiceDep,
 ) -> WorkflowDesignService:
     """Create a WorkflowDesignService wiring the repositories and the session store."""
     return WorkflowDesignService(
-        workflows, skills, templates, versions, session_service, APP_NAME
+        workflows,
+        skills,
+        templates,
+        versions,
+        knowledge_bases,
+        session_service,
+        APP_NAME,
     )
 
 
@@ -465,6 +477,43 @@ def get_session_file_service(
 
 
 SessionFileServiceDep = Annotated[SessionFileService, Depends(get_session_file_service)]
+
+
+def get_knowledge_base_service(
+    repo: KnowledgeBaseRepositoryDep,
+    sources: KnowledgeSourceRepositoryDep,
+    pages: KnowledgePageRepositoryDep,
+    workflows: WorkflowRepositoryDep,
+) -> KnowledgeBaseService:
+    """Create a KnowledgeBaseService backed by the request's repositories."""
+    return KnowledgeBaseService(
+        repo,
+        sources,
+        pages,
+        workflows,
+        max_source_bytes=get_settings().knowledge_source_max_bytes,
+    )
+
+
+KnowledgeBaseServiceDep = Annotated[
+    KnowledgeBaseService, Depends(get_knowledge_base_service)
+]
+
+#: The background ingest/removal job, as the knowledge-bases router hands it to
+#: ``BackgroundTasks``.
+KnowledgeJob = Callable[..., Awaitable[None]]
+
+
+def get_knowledge_job() -> KnowledgeJob:
+    """Return the background job that folds a source into its wiki or takes it out.
+
+    Injected rather than called by name so tests can override it: the real job
+    opens a database session of its own and calls the configured LLM.
+    """
+    return run_knowledge_job
+
+
+KnowledgeJobDep = Annotated[KnowledgeJob, Depends(get_knowledge_job)]
 
 
 def get_mcp_elicitation_service(

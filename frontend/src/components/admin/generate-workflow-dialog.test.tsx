@@ -53,6 +53,11 @@ describe("GenerateWorkflowDialog", () => {
     expect(screen.getByLabelText(/prompt/i)).toHaveValue("");
   });
 
+  it("offers a knowledge base picker for the design run", () => {
+    renderOpen();
+    expect(screen.getByRole("button", { name: "Select knowledge bases…" })).toBeInTheDocument();
+  });
+
   it("submits the generation api and navigates to the new workflow", async () => {
     const user = userEvent.setup();
     const pushMock = vi.fn();
@@ -80,7 +85,13 @@ describe("GenerateWorkflowDialog", () => {
     await user.type(screen.getByLabelText(/prompt/i), "Do the thing");
     await user.click(screen.getByRole("button", { name: /generate/i }));
 
-    await waitFor(() => expect(receivedBody).toEqual({ name: "my-flow", prompt: "Do the thing" }));
+    await waitFor(() =>
+      expect(receivedBody).toEqual({
+        name: "my-flow",
+        prompt: "Do the thing",
+        knowledgeBaseIds: [],
+      })
+    );
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows/new-wf-id"));
   });
 

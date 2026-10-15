@@ -251,6 +251,61 @@ export const MCP_TOOL_MOCK_1 = {
   updatedBy: "",
 };
 
+/** A knowledge base with one page and two sources (one read, one still queued). */
+export const KNOWLEDGE_BASE_1 = {
+  id: "kb-1",
+  tenantId: "tenant-1",
+  name: "IT",
+  description: "IT know-how",
+  tagIds: [],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const KNOWLEDGE_SOURCE_READY = {
+  id: "src-a",
+  tenantId: "tenant-1",
+  knowledgeBaseId: "kb-1",
+  kind: "file",
+  url: null,
+  fileName: "vpn.pdf",
+  contentType: "application/pdf",
+  sizeBytes: 1024,
+  title: "VPN guide",
+  status: "ready",
+  error: null,
+  ingestedAt: "2026-01-02T00:00:00Z",
+  citationKey: "src-aaaaaaaa",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z",
+  createdBy: "",
+  updatedBy: "",
+};
+
+export const KNOWLEDGE_SOURCE_FAILED = {
+  ...KNOWLEDGE_SOURCE_READY,
+  id: "src-b",
+  kind: "url",
+  url: "https://example.com/handbook",
+  fileName: null,
+  contentType: null,
+  title: null,
+  status: "failed",
+  error: "https://example.com/handbook answered HTTP 404",
+  ingestedAt: null,
+  citationKey: "src-bbbbbbbb",
+};
+
+export const KNOWLEDGE_PAGE_1 = {
+  path: "/procedures/vpn-setup.md",
+  type: "Procedure",
+  title: "VPN setup",
+  description: "How to connect remotely.",
+  updatedAt: "2026-01-02T00:00:00Z",
+};
+
 /** A mock of the built-in approval tool: no server, two successive decisions. */
 export const MCP_TOOL_MOCK_BUILTIN = {
   id: "mock-2",
@@ -623,6 +678,28 @@ export const handlers = [
   http.patch(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(MCP_SERVER_1)),
 
   http.delete(`${BASE}/api/v1/mcp-servers/:serverId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/knowledge-bases`, () => envelope([KNOWLEDGE_BASE_1])),
+
+  http.get(`${BASE}/api/v1/knowledge-bases/:kbId`, () => envelope(KNOWLEDGE_BASE_1)),
+
+  http.post(`${BASE}/api/v1/knowledge-bases`, () =>
+    envelope({ ...KNOWLEDGE_BASE_1, id: "new-kb-id" }, 201)
+  ),
+
+  http.patch(`${BASE}/api/v1/knowledge-bases/:kbId`, () => envelope(KNOWLEDGE_BASE_1)),
+
+  http.delete(`${BASE}/api/v1/knowledge-bases/:kbId`, () => envelope(null)),
+
+  http.get(`${BASE}/api/v1/knowledge-bases/:kbId/sources`, () =>
+    envelope([KNOWLEDGE_SOURCE_READY, KNOWLEDGE_SOURCE_FAILED])
+  ),
+
+  http.get(`${BASE}/api/v1/knowledge-bases/:kbId/pages`, () => envelope([KNOWLEDGE_PAGE_1])),
+
+  http.get(`${BASE}/api/v1/workflows/:id/knowledge-bases`, () => envelope([])),
+
+  http.put(`${BASE}/api/v1/workflows/:id/knowledge-bases`, () => envelope([KNOWLEDGE_BASE_1])),
 
   http.get(`${BASE}/api/v1/mcp-tool-mocks`, () =>
     envelope([MCP_TOOL_MOCK_1, MCP_TOOL_MOCK_BUILTIN])

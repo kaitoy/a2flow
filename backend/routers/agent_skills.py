@@ -116,9 +116,17 @@ async def generate_workflow(
     success leaves a ``draft`` with templates and a summarized description,
     failure leaves ``failed`` with the reason — the design chat stays usable
     to fix the task templates by hand. Requires the skill to have a published revision
-    (HTTP 409 ``SKILL_NOT_READY`` otherwise).
+    (HTTP 409 ``SKILL_NOT_READY`` otherwise). ``knowledgeBaseIds`` links the
+    workflow to knowledge bases before the design run starts, so it can
+    consult them (HTTP 422 ``FOREIGN_KEY_VIOLATION`` for one the caller
+    cannot see).
     """
-    workflow = await service.generate(skill_id, body.name, user_id=user_id)
+    workflow = await service.generate(
+        skill_id,
+        body.name,
+        user_id=user_id,
+        knowledge_base_ids=body.knowledge_base_ids,
+    )
     background.add_task(generation_job, workflow.id, body.prompt, user_id=user_id)
     return ApiResponse(meta=meta, data=await service.to_read(workflow))
 

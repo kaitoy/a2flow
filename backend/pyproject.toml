@@ -43,6 +43,8 @@ dependencies = [
     "alembic>=1.13.0",
     "prometheus-client>=0.21",
     "jsonschema>=4.23.0",
+    "markitdown[docx,pdf]>=0.1.0",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
@@ -93,3 +95,12 @@ ignore_missing_imports = true
 # installed `alembic` package once backend/ is on sys.path), so a dotted
 # [[tool.mypy.overrides]] module pattern can't target them — exclude by path.
 exclude = ["^alembic/versions/"]
+
+# numpy (installed with markitdown, and imported by google-adk and others when
+# present) ships stubs written in Python 3.12 syntax, which mypy rejects under
+# the 3.11 `python_version` above. Nothing here uses numpy, so it is not
+# followed; `follow_imports_for_stubs` is what extends that to a .pyi package.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true

@@ -4,9 +4,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { FormField } from "@/components/admin/form-field";
+import { KnowledgeBasePicker } from "@/components/admin/knowledge-base-picker";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import { generateWorkflow } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-// Generated schema carries the name/prompt constraints as-is.
+// Generated schema carries the name/prompt/knowledge-base constraints as-is.
 const schema = zGenerateWorkflowRequest;
 
 type FormValues = z.infer<typeof schema>;
@@ -36,8 +37,9 @@ export interface GenerateWorkflowDialogProps {
 
 /**
  * Modal dialog that starts "Generate workflow" for an agent skill: the workflow
- * name (prefilled with `defaultName`) plus the prompt the background design
- * run breaks into the workflow's task templates.
+ * name (prefilled with `defaultName`), the prompt the background design run
+ * breaks into the workflow's task templates, and the knowledge bases the
+ * workflow is linked to — linked before that run starts, so it can consult them.
  *
  * On submit the draft workflow is registered immediately and the app navigates
  * to its detail page, which polls until generation settles — so the dialog
@@ -57,18 +59,19 @@ export function GenerateWorkflowDialog({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: { name: defaultName, prompt: "" },
+    defaultValues: { name: defaultName, prompt: "", knowledgeBaseIds: [] },
   });
 
   // Re-seed the form every time the dialog opens, so reopening it for another
   // skill (the list page reuses one instance) never shows the previous input.
   useEffect(() => {
     if (!open) return;
-    reset({ name: defaultName, prompt: "" });
+    reset({ name: defaultName, prompt: "", knowledgeBaseIds: [] });
   }, [open, defaultName, reset]);
 
   async function onSubmit(values: FormValues) {
@@ -77,6 +80,7 @@ export function GenerateWorkflowDialog({
         const workflow = await generateWorkflow(skillId, {
           name: values.name,
           prompt: values.prompt,
+          knowledgeBaseIds: values.knowledgeBaseIds,
         });
         dispatch(showToast({ message: "Workflow generation started" }));
         router.push(`/workflows/${workflow.id}`);
@@ -125,6 +129,14 @@ export function GenerateWorkflowDialog({
             {...register("prompt")}
           />
         </FormField>
+
+        <Controller
+          control={control}
+          name="knowledgeBaseIds"
+          render={({ field }) => (
+            <KnowledgeBasePicker value={field.value ?? []} onChange={field.onChange} />
+          )}
+        />
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>

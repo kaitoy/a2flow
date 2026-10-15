@@ -92,6 +92,16 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 This is **durable state, not a cache**: a workflow execution pins the revision it started with, so wiping the directory leaves existing executions unable to load their skill (HTTP 409 `SKILL_NOT_READY`) until an admin pulls the skill again — and a pull fetches the repository's current head, not the pinned revision. Back it up ([Backup and restore](./backup.md)), and give every backend replica the same directory ([Horizontal scaling](./scaling.md)).
 
+## Knowledge bases {#knowledge-bases}
+
+| Variable | Default | What it does |
+|---|---|---|
+| `KNOWLEDGE_SOURCE_MAX_BYTES` | `20971520` (20 MiB) | Largest document that may be uploaded to a [knowledge base](../guides/knowledge-bases.md), and largest web page fetched for one. A larger upload is refused as soon as it passes this |
+| `KNOWLEDGE_INGEST_CHUNK_CHARS` | `40000` | Characters of a source the LLM reads at a time. A longer source is read in parts, one after another. Lower it for a model with a small context window |
+| `KNOWLEDGE_FETCH_TIMEOUT_SECONDS` | `30` | How long fetching a web page source may take per request |
+
+Sources and pages are stored in the database, like session files, so they need no volume of their own. Reading a source calls the LLM configured for the agents ([LLM configuration](../getting-started/llm-configuration.md)), several times for a large document.
+
 ## Session files {#session-files}
 
 | Variable | Default | What it does |

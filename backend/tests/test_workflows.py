@@ -76,6 +76,43 @@ async def test_generate_workflow_copies_the_skills_tags(
     assert wf["tagIds"] == [tag["id"]]
 
 
+async def test_generate_workflow_links_knowledge_bases(
+    workflow_client: AsyncClient,
+) -> None:
+    """Picked knowledge bases are linked before the design run starts."""
+    skill = await create_skill(workflow_client)
+    kb = assert_ok(
+        await workflow_client.post("/api/v1/knowledge-bases", json={"name": "IT"}),
+        status=201,
+    )
+    wf = assert_ok(
+        await workflow_client.post(
+            f"/api/v1/agent-skills/{skill['id']}/workflows",
+            json={**GENERATE_BODY, "knowledgeBaseIds": [kb["id"]]},
+        ),
+        status=201,
+    )
+    linked = assert_ok(
+        await workflow_client.get(f"/api/v1/workflows/{wf['id']}/knowledge-bases")
+    )
+    assert [k["id"] for k in linked] == [kb["id"]]
+
+
+async def test_generate_workflow_unknown_knowledge_base_creates_nothing(
+    workflow_client: AsyncClient,
+) -> None:
+    skill = await create_skill(workflow_client)
+    assert_err(
+        await workflow_client.post(
+            f"/api/v1/agent-skills/{skill['id']}/workflows",
+            json={**GENERATE_BODY, "knowledgeBaseIds": ["nope"]},
+        ),
+        code="FOREIGN_KEY_VIOLATION",
+        status=422,
+    )
+    assert assert_ok(await workflow_client.get("/api/v1/workflows")) == []
+
+
 async def test_generate_workflow_schedules_generation_job(
     workflow_client: AsyncClient, mock_generation_job: AsyncMock
 ) -> None:

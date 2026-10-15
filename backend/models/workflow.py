@@ -30,6 +30,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
 from models.constraints import EntityName, PromptText, WorkflowDescText
+from models.knowledge import KnowledgeBaseIdsUpdate
 from models.tenant_scoped import TenantScoped
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
@@ -258,15 +259,17 @@ class WorkflowRead(BaseEntity):
         return cls(**workflow.model_dump(), tag_ids=tag_ids)
 
 
-class GenerateWorkflowRequest(SQLModel):
+class GenerateWorkflowRequest(KnowledgeBaseIdsUpdate):
     """Request body of ``POST /agent-skills/{skill_id}/workflows``.
 
     ``name`` becomes the new workflow's unique name (the UI prefills it with
     the skill name); ``prompt`` is the user's request that the background
-    design run breaks into task templates.
+    design run breaks into task templates. ``knowledge_base_ids``, inherited
+    from :class:`~models.knowledge.KnowledgeBaseIdsUpdate`, links the new
+    workflow to knowledge bases before that run starts, so the run can
+    already consult them.
     """
 
-    model_config = _alias_config
     name: EntityName
     prompt: PromptText
 

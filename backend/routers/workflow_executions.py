@@ -24,7 +24,6 @@ so their literal path segment is matched first.
 """
 
 from typing import Annotated
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
@@ -63,6 +62,7 @@ from models.session_file import SessionFileRead
 from models.user import Role
 from models.workflow_execution import WorkflowExecutionRead
 from models.workflow_task import WorkflowTaskRead
+from routers._download import content_disposition
 from services.metrics import MetricsWindow
 from services.session_stream import SSE_HEADERS, stream_events
 
@@ -265,26 +265,6 @@ async def delete_workflow_execution(
     return ApiResponse(meta=meta, data=None)
 
 
-def _content_disposition(name: str) -> str:
-    """Build a ``Content-Disposition`` header value that downloads ``name`` as a file.
-
-    Always ``attachment``: a session file's bytes are whatever a participant or
-    the agent put there, and serving arbitrary uploaded content inline is how an
-    upload endpoint turns into a stored-XSS vector. The name is emitted twice --
-    a quoted ASCII form every client understands, and the RFC 5987 ``filename*``
-    form that carries the real, possibly non-ASCII name.
-
-    Args:
-        name: The stored file name.
-
-    Returns:
-        The header value.
-    """
-    fallback = name.encode("ascii", "replace").decode("ascii")
-    fallback = fallback.replace('"', "'").replace("\\", "_")
-    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name)}"
-
-
 @router.post(
     "/{execution_id}/files",
     response_model=ApiResponse[SessionFileRead],
@@ -343,7 +323,7 @@ async def download_session_file(
         content=stored.data,
         media_type="application/octet-stream",
         headers={
-            "Content-Disposition": _content_disposition(stored.name),
+            "Content-Disposition": content_disposition(stored.name),
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "private, no-store",
         },

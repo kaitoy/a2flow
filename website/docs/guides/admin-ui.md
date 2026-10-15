@@ -26,6 +26,7 @@ The breadcrumb trail above every title mirrors that path — `Admin › Workflow
 | **Tags** | The labels records are classified by | Admin, Developer |
 | **Secrets** | Credentials for tools and repositories | Admin, Developer |
 | **Agent Skills** | Agent capabilities, cloned from Git repositories | Developer, Admin |
+| **Knowledge Bases** | Wikis the LLM writes from your documents, for workflows to read | Developer, Admin, Reviewer |
 | **MCP Servers** | Tool servers the agent can call | Developer, Admin |
 | **Tool Mocks** | Stand-ins that stub tools for draft workflow runs | Developer, Admin |
 | **Workflows** | Multi-step flows and their task templates | Developer, Requester, Admin |

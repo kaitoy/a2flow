@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/store";
 import { DEVELOPER, REQUESTER, REVIEWER, SUPER_ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
+import { KNOWLEDGE_BASE_1 } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import WorkflowDetailPage from "./page";
@@ -44,6 +45,33 @@ describe("WorkflowDetailPage", () => {
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
     expect(screen.queryByLabelText(/prompt/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the linked knowledge bases and saves a changed selection", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id/knowledge-bases", () =>
+        envelope([KNOWLEDGE_BASE_1])
+      )
+    );
+    const put = vi.fn();
+    server.use(
+      http.put(
+        "http://localhost:8000/api/v1/workflows/:id/knowledge-bases",
+        async ({ request }) => {
+          put(await request.json());
+          return envelope([]);
+        }
+      )
+    );
+    vi.mocked(useRouter).mockReturnValue({ push: vi.fn() } as unknown as ReturnType<
+      typeof useRouter
+    >);
+    const user = userEvent.setup();
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await user.click(await screen.findByRole("button", { name: "Remove IT" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(put).toHaveBeenCalledWith({ knowledgeBaseIds: [] }));
   });
 
   it("shows the workflow status", async () => {

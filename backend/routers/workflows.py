@@ -43,12 +43,14 @@ from dependencies.context import (
     TagFilterDep,
 )
 from dependencies.service import (
+    KnowledgeBaseServiceDep,
     WorkflowDesignServiceDep,
     WorkflowServiceDep,
     WorkflowTaskTemplateServiceDep,
 )
 from infrastructure.agent import tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from models.knowledge import KnowledgeBaseIdsUpdate, KnowledgeBaseRead
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
 from models.user import Role
@@ -480,6 +482,41 @@ async def execute_workflow(
         ),
     )
     return ApiResponse(meta=meta, data=execution)
+
+
+@router.get(
+    "/{workflow_id}/knowledge-bases",
+    response_model=ApiResponse[list[KnowledgeBaseRead]],
+)
+async def list_workflow_knowledge_bases(
+    workflow_id: str, service: KnowledgeBaseServiceDep, meta: ApiMetaDep
+) -> ApiResponse[list[KnowledgeBaseRead]]:
+    """Return the knowledge bases this workflow's agents may read.
+
+    Only those the caller may see themselves are listed.
+    """
+    return ApiResponse(meta=meta, data=await service.workflow_links(workflow_id))
+
+
+@router.put(
+    "/{workflow_id}/knowledge-bases",
+    response_model=ApiResponse[list[KnowledgeBaseRead]],
+    dependencies=_requires_developer,
+)
+async def set_workflow_knowledge_bases(
+    workflow_id: str,
+    body: KnowledgeBaseIdsUpdate,
+    service: KnowledgeBaseServiceDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[KnowledgeBaseRead]]:
+    """Replace the knowledge bases this workflow's agents may read.
+
+    A live setting, not part of the published design: a run reads the links as
+    they are when it looks something up, so changing them does not mark a
+    published workflow ``modified``.
+    """
+    links = await service.set_workflow_links(workflow_id, body.knowledge_base_ids)
+    return ApiResponse(meta=meta, data=links)
 
 
 @router.put(

@@ -25,6 +25,7 @@ sidebar_position: 7
 | `impersonation_events` | [代理ログイン](../concepts/impersonation.md)の監査証跡 |
 | `agent_skills` | [Agent Skill](../guides/agent-skills.md) の定義と、クローン元のリポジトリ |
 | `mcp_servers` | 登録済みの [MCP サーバー](../guides/mcp-servers.md)と、その接続方法 |
+| `knowledge_bases`、`knowledge_sources`、`knowledge_pages` | [ナレッジベース](../guides/knowledge-bases.md)。アップロードした文書と登録した URL、そこから書かれたページ |
 | `secrets` | 名前付きの[認証情報のまとまり](../guides/secrets.md)。ローカルで暗号化するか、Vault を参照します |
 | `workflows` | [ワークフロー](../guides/workflows.md)の定義とライフサイクルの状態 |
 | `workflow_task_templates` | ワークフローの、あらかじめ設計されたタスクの一覧 |

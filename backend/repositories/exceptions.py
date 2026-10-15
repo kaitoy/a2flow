@@ -534,6 +534,20 @@ class SessionFileValidationError(ReasonError):
     http_status = 422
 
 
+class KnowledgeSourceValidationError(ReasonError):
+    """Raised when a document or URL cannot be registered as a knowledge source.
+
+    Covers an empty or unusably named upload, a file type the extractor does
+    not read, a file over ``Settings.knowledge_source_max_bytes``, and a
+    request to re-ingest or remove a source whose deletion is already in
+    flight. Carries a human-readable ``reason`` surfaced in the error
+    envelope's ``details`` block when returning HTTP 422.
+    """
+
+    code = "INVALID_KNOWLEDGE_SOURCE"
+    http_status = 422
+
+
 class McpServerValidationError(ReasonError):
     """Raised when an MCPServer create/update would leave an invalid transport shape.
 

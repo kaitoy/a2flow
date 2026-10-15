@@ -63,6 +63,19 @@ _DEFAULT_SESSION_FILE_MAX_BYTES = 20 * 1024 * 1024
 #: without a ceiling a long-running session could grow without bound.
 _DEFAULT_SESSION_FILES_MAX_TOTAL_BYTES = 200 * 1024 * 1024
 
+#: Largest document (20 MiB) that may be uploaded to, or fetched for, a
+#: knowledge base. Sources are stored as database blobs and converted to text
+#: in memory, so this bounds both.
+_DEFAULT_KNOWLEDGE_SOURCE_MAX_BYTES = 20 * 1024 * 1024
+
+#: Characters of converted source text handed to the ingest agent per turn. A
+#: longer document is read in parts of this size, one after another, so a large
+#: manual does not overflow the model's context window.
+_DEFAULT_KNOWLEDGE_INGEST_CHUNK_CHARS = 40_000
+
+#: Per-request timeout, in seconds, for fetching a knowledge source's URL.
+_DEFAULT_KNOWLEDGE_FETCH_TIMEOUT_SECONDS = 30
+
 #: The deployment's local timezone. The operations metrics use it to decide
 #: where a calendar day starts ("today" counts, the lead-time trend's daily
 #: buckets), and the workflow agent reads a time written without an offset in
@@ -178,6 +191,12 @@ class Settings(BaseSettings):
         session_files_max_total_bytes: Combined size, in bytes, of every file
             one workflow session may hold. Files are removed only when their
             run is deleted, so this is what bounds a session's footprint.
+        knowledge_source_max_bytes: Largest document, in bytes, that may be
+            uploaded to a knowledge base or fetched from a source URL.
+        knowledge_ingest_chunk_chars: Characters of converted source text the
+            ingest agent reads per turn; longer documents are read in parts.
+        knowledge_fetch_timeout_seconds: Per-request timeout, in seconds, for
+            fetching a knowledge source's URL.
         llm_model: LLM selection, either a bare Gemini model name or a
             ``litellm:<provider>/<model>`` string.
         role_description: Base role text fed into the system prompt builder.
@@ -333,6 +352,10 @@ class Settings(BaseSettings):
 
     session_file_max_bytes: int = _DEFAULT_SESSION_FILE_MAX_BYTES
     session_files_max_total_bytes: int = _DEFAULT_SESSION_FILES_MAX_TOTAL_BYTES
+
+    knowledge_source_max_bytes: int = _DEFAULT_KNOWLEDGE_SOURCE_MAX_BYTES
+    knowledge_ingest_chunk_chars: int = _DEFAULT_KNOWLEDGE_INGEST_CHUNK_CHARS
+    knowledge_fetch_timeout_seconds: int = _DEFAULT_KNOWLEDGE_FETCH_TIMEOUT_SECONDS
 
     llm_model: str = "gemini-3.8-flash"
     role_description: str = "You are a helpful assistant."

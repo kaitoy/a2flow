@@ -8,6 +8,7 @@ from routers import (
     auth,
     health,
     impersonation_events,
+    knowledge_bases,
     mcp_registry,
     mcp_servers,
     mcp_tool_certificates,
@@ -47,6 +48,7 @@ api_router.include_router(agent_skills.router, dependencies=_protected)
 api_router.include_router(mcp_tool_certificates.router, dependencies=_protected)
 api_router.include_router(approvals.router, dependencies=_protected)
 api_router.include_router(impersonation_events.router, dependencies=_protected)
+api_router.include_router(knowledge_bases.router, dependencies=_protected)
 api_router.include_router(mcp_registry.router, dependencies=_protected)
 api_router.include_router(mcp_servers.router, dependencies=_protected)
 api_router.include_router(mcp_tool_invocations.router, dependencies=_protected)
