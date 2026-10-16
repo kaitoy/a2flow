@@ -1406,6 +1406,156 @@ def upgrade() -> None:
         ["tenant_id", "name"],
         unique=False,
     )
+    op.create_table(
+        "knowledge_bases",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "tenant_id", "name", name="uq_knowledge_bases_tenant_id_name"
+        ),
+    )
+    op.create_index(
+        "ix_knowledge_bases_tenant_id_name",
+        "knowledge_bases",
+        ["tenant_id", "name"],
+        unique=False,
+    )
+    op.create_table(
+        "knowledge_sources",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "knowledge_base_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.Column(
+            "kind", sa.Enum("url", "file", name="knowledgesourcekind"), nullable=False
+        ),
+        sa.Column("url", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("file_name", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("content_type", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("size_bytes", sa.Integer(), nullable=False),
+        sa.Column("data", sa.LargeBinary(), nullable=True),
+        sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "pending",
+                "ingesting",
+                "ready",
+                "failed",
+                "removing",
+                name="knowledgesourcestatus",
+            ),
+            nullable=False,
+        ),
+        sa.Column("error", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("ingested_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["knowledge_base_id"],
+            ["knowledge_bases.id"],
+            name="fk_knowledge_sources_knowledge_base_id",
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_knowledge_sources_tenant_id",
+        "knowledge_sources",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_knowledge_sources_knowledge_base_id",
+        "knowledge_sources",
+        ["knowledge_base_id"],
+        unique=False,
+    )
+    op.create_table(
+        "knowledge_pages",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "knowledge_base_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.Column("path", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("type", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("body", sa.Text(), nullable=False),
+        sa.Column(
+            "meta",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["knowledge_base_id"],
+            ["knowledge_bases.id"],
+            name="fk_knowledge_pages_knowledge_base_id",
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "knowledge_base_id",
+            "path",
+            name="uq_knowledge_pages_knowledge_base_id_path",
+        ),
+    )
+    op.create_index(
+        "ix_knowledge_pages_tenant_id",
+        "knowledge_pages",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_table(
+        "workflow_knowledge_bases",
+        sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "knowledge_base_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
+        ),
+        sa.ForeignKeyConstraint(
+            ["workflow_id"],
+            ["workflows.id"],
+            name="fk_workflow_knowledge_bases_workflow_id",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["knowledge_base_id"],
+            ["knowledge_bases.id"],
+            name="fk_workflow_knowledge_bases_knowledge_base_id",
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint("workflow_id", "knowledge_base_id"),
+    )
+    op.create_index(
+        "ix_workflow_knowledge_bases_knowledge_base_id",
+        "workflow_knowledge_bases",
+        ["knowledge_base_id"],
+        unique=False,
+    )
     for link_table, owner_table in (
         ("secret_tags", "secrets"),
         ("workflow_tags", "workflows"),
@@ -1414,6 +1564,7 @@ def upgrade() -> None:
         ("mcp_tool_mock_tags", "mcp_tool_mocks"),
         ("user_group_tags", "user_groups"),
         ("workflow_execution_tags", "workflow_executions"),
+        ("knowledge_base_tags", "knowledge_bases"),
     ):
         op.create_table(
             link_table,
@@ -1643,6 +1794,7 @@ def downgrade() -> None:
     )
     op.drop_table("mcp_tool_certificates")
     for link_table in (
+        "knowledge_base_tags",
         "workflow_execution_tags",
         "user_group_tags",
         "mcp_tool_mock_tags",
@@ -1653,6 +1805,20 @@ def downgrade() -> None:
     ):
         op.drop_index(f"ix_{link_table}_tag_id", table_name=link_table)
         op.drop_table(link_table)
+    op.drop_index(
+        "ix_workflow_knowledge_bases_knowledge_base_id",
+        table_name="workflow_knowledge_bases",
+    )
+    op.drop_table("workflow_knowledge_bases")
+    op.drop_index("ix_knowledge_pages_tenant_id", table_name="knowledge_pages")
+    op.drop_table("knowledge_pages")
+    op.drop_index(
+        "ix_knowledge_sources_knowledge_base_id", table_name="knowledge_sources"
+    )
+    op.drop_index("ix_knowledge_sources_tenant_id", table_name="knowledge_sources")
+    op.drop_table("knowledge_sources")
+    op.drop_index("ix_knowledge_bases_tenant_id_name", table_name="knowledge_bases")
+    op.drop_table("knowledge_bases")
     op.drop_index("ix_tags_tenant_id_name", table_name="tags")
     op.drop_table("tags")
     op.drop_index("ix_user_group_members_user_id", table_name="user_group_members")

@@ -26,6 +26,12 @@ from repositories.impersonation_event import (
     ImpersonationEventRepository,
     SqlImpersonationEventRepository,
 )
+from repositories.knowledge import (
+    KnowledgeBaseRepository,
+    SqlKnowledgeBaseRepository,
+    SqlKnowledgePageRepository,
+    SqlKnowledgeSourceRepository,
+)
 from repositories.mcp_ca import (
     McpCertificateAuthorityRepository,
     SqlMcpCertificateAuthorityRepository,
@@ -170,6 +176,49 @@ def get_mcp_tool_mock_repository(
 
 MCPToolMockRepositoryDep = Annotated[
     MCPToolMockRepository, Depends(get_mcp_tool_mock_repository)
+]
+
+
+def get_knowledge_base_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep, access_tag_ids: AccessTagIdsDep
+) -> KnowledgeBaseRepository:
+    """Create a KnowledgeBaseRepository backed by the current database session.
+
+    Restricted to the knowledge bases the caller may act on -- see
+    :func:`dependencies.auth.get_access_tag_ids`. Their sources and pages are
+    reached only through a knowledge base fetched from it.
+    """
+    return SqlKnowledgeBaseRepository(
+        db, tenant_id=tenant_id, access_tag_ids=access_tag_ids
+    )
+
+
+KnowledgeBaseRepositoryDep = Annotated[
+    KnowledgeBaseRepository, Depends(get_knowledge_base_repository)
+]
+
+
+def get_knowledge_source_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> SqlKnowledgeSourceRepository:
+    """Create a SqlKnowledgeSourceRepository backed by the current database session."""
+    return SqlKnowledgeSourceRepository(db, tenant_id=tenant_id)
+
+
+KnowledgeSourceRepositoryDep = Annotated[
+    SqlKnowledgeSourceRepository, Depends(get_knowledge_source_repository)
+]
+
+
+def get_knowledge_page_repository(
+    db: DBSessionDep, tenant_id: CurrentTenantScopeDep
+) -> SqlKnowledgePageRepository:
+    """Create a SqlKnowledgePageRepository backed by the current database session."""
+    return SqlKnowledgePageRepository(db, tenant_id=tenant_id)
+
+
+KnowledgePageRepositoryDep = Annotated[
+    SqlKnowledgePageRepository, Depends(get_knowledge_page_repository)
 ]
 
 

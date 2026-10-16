@@ -107,10 +107,27 @@ def skill_sync_key(skill_id: str) -> str:
     return f"skill-sync:{skill_id}"
 
 
+def knowledge_base_key(kb_id: str) -> str:
+    """Build the lock key serializing the ingest jobs of one KnowledgeBase.
+
+    Unlike :func:`skill_sync_key`, a contending job waits rather than skips:
+    two jobs on the same knowledge base edit the same pages, and each one's
+    work is distinct (a different source, or a removal), so neither may be
+    dropped.
+
+    Args:
+        kb_id: Id of the KnowledgeBase whose pages the job edits.
+
+    Returns:
+        The key to pass to :func:`advisory_lock`.
+    """
+    return f"knowledge-base:{kb_id}"
+
+
 def email_queue_key() -> str:
     """Return the lock key electing the one process that drains outgoing email.
 
-    Unlike the two keys above this one is a constant, because what it protects
+    Unlike the keys above this one is a constant, because what it protects
     is a singleton: the deployment has exactly one SMTP relay, so exactly one
     sender may run. Holding this is also what lets the sender keep its rate
     limiter in memory and its SMTP connection open — see

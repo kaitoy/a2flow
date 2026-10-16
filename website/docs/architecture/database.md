@@ -25,6 +25,7 @@ The database is also what coordinates a multi-replica backend: an agent run hold
 | `impersonation_events` | Audit trail of [impersonation](../concepts/impersonation.md) sessions |
 | `agent_skills` | [Agent Skill](../guides/agent-skills.md) definitions and the repository each is cloned from |
 | `mcp_servers` | Registered [MCP servers](../guides/mcp-servers.md) and how to reach them |
+| `knowledge_bases`, `knowledge_sources`, `knowledge_pages` | [Knowledge bases](../guides/knowledge-bases.md): each one's uploaded documents and registered URLs, and the pages written from them |
 | `secrets` | Named [credential bundles](../guides/secrets.md), either encrypted locally or referenced in Vault |
 | `workflows` | [Workflow](../guides/workflows.md) definitions and their lifecycle status |
 | `workflow_task_templates` | The pre-designed task list of a workflow |

@@ -21,6 +21,13 @@ import type {
   ExecutionSession as ExecutionSessionModel,
   GenerateWorkflowRequest,
   ImpersonationEventRead,
+  KnowledgeBaseCreate,
+  KnowledgeBaseRead as KnowledgeBaseModel,
+  KnowledgeBaseUpdate,
+  KnowledgePageContent,
+  KnowledgePageSummary,
+  KnowledgeSourceRead as KnowledgeSourceModel,
+  KnowledgeSourceStatus,
   LoginRequest,
   McpCommand,
   McpElicitationAnswer,
@@ -346,6 +353,10 @@ export type OutboundEmail = WithAudit<OutboundEmailModel>;
  * `impersonatorId` is who acted, and `startedAt` is when.
  */
 export type ImpersonationEvent = ImpersonationEventRead;
+/** A wiki of LLM-written pages that workflows linked to it can read. */
+export type KnowledgeBase = WithAudit<KnowledgeBaseModel>;
+/** A URL or uploaded document feeding a knowledge base, with its ingest state. */
+export type KnowledgeSource = WithAudit<KnowledgeSourceModel>;
 export type Secret = WithAudit<SecretModel>;
 export type SystemSettings = WithAudit<SystemSettingsModel>;
 export type Tag = WithAudit<TagModel>;
@@ -375,6 +386,11 @@ export type {
   CertificateGrant,
   GenerateWorkflowRequest,
   ImpersonationEventRead,
+  KnowledgeBaseCreate,
+  KnowledgeBaseUpdate,
+  KnowledgePageContent,
+  KnowledgePageSummary,
+  KnowledgeSourceStatus,
   LoginRequest,
   McpCommand,
   McpElicitationAnswer,
@@ -1701,6 +1717,154 @@ export async function uploadSessionFile(
 export function sessionFileDownloadUrl(workflowExecutionId: string, fileId: string): string {
   const execution = encodeURIComponent(workflowExecutionId);
   return `${API_BASE}/api/v1/workflow-executions/${execution}/files/${encodeURIComponent(fileId)}/content`;
+}
+
+/** List the tenant's knowledge bases (createdAt DESC by default). */
+export async function listKnowledgeBases(query: ListQuery = {}): Promise<KnowledgeBase[]> {
+  return unwrap(
+    sdk.listKnowledgeBasesApiV1KnowledgeBasesGet({ query: listQuery(query) })
+  ) as Promise<KnowledgeBase[]>;
+}
+
+/** Fetch a single knowledge base by ID. */
+export async function getKnowledgeBase(id: string, options?: CallOptions): Promise<KnowledgeBase> {
+  return unwrap(
+    sdk.getKnowledgeBaseApiV1KnowledgeBasesKbIdGet({ path: { kb_id: id } }),
+    options
+  ) as Promise<KnowledgeBase>;
+}
+
+/** Create an empty knowledge base. */
+export async function createKnowledgeBase(body: KnowledgeBaseCreate): Promise<KnowledgeBase> {
+  return unwrap(sdk.createKnowledgeBaseApiV1KnowledgeBasesPost({ body })) as Promise<KnowledgeBase>;
+}
+
+/** Rename or redescribe a knowledge base. */
+export async function updateKnowledgeBase(
+  id: string,
+  body: KnowledgeBaseUpdate
+): Promise<KnowledgeBase> {
+  return unwrap(
+    sdk.updateKnowledgeBaseApiV1KnowledgeBasesKbIdPatch({ path: { kb_id: id }, body })
+  ) as Promise<KnowledgeBase>;
+}
+
+/** Delete a knowledge base together with its sources, pages, and workflow links. */
+export async function deleteKnowledgeBase(id: string): Promise<void> {
+  await unwrap(sdk.deleteKnowledgeBaseApiV1KnowledgeBasesKbIdDelete({ path: { kb_id: id } }));
+}
+
+/** Replace a knowledge base's tag set wholesale, returning the updated record. */
+export async function setKnowledgeBaseTags(id: string, tagIds: string[]): Promise<KnowledgeBase> {
+  return unwrap(
+    sdk.setKnowledgeBaseTagsApiV1KnowledgeBasesKbIdTagsPut({
+      path: { kb_id: id },
+      body: { tagIds },
+    })
+  ) as Promise<KnowledgeBase>;
+}
+
+/** List a knowledge base's sources, newest first. */
+export async function listKnowledgeSources(kbId: string): Promise<KnowledgeSource[]> {
+  return unwrap(
+    sdk.listKnowledgeSourcesApiV1KnowledgeBasesKbIdSourcesGet({ path: { kb_id: kbId } })
+  ) as Promise<KnowledgeSource[]>;
+}
+
+/**
+ * Register a web page as a knowledge source. The server answers at once with
+ * the source `pending`; reading it into the wiki happens in the background.
+ */
+export async function addKnowledgeUrlSource(kbId: string, url: string): Promise<KnowledgeSource> {
+  return unwrap(
+    sdk.addKnowledgeUrlSourceApiV1KnowledgeBasesKbIdSourcesUrlPost({
+      path: { kb_id: kbId },
+      body: { url },
+    })
+  ) as Promise<KnowledgeSource>;
+}
+
+/** Upload a document as a knowledge source, read into the wiki in the background. */
+export async function addKnowledgeFileSource(kbId: string, file: File): Promise<KnowledgeSource> {
+  return unwrap(
+    sdk.addKnowledgeFileSourceApiV1KnowledgeBasesKbIdSourcesFilePost({
+      path: { kb_id: kbId },
+      body: { file },
+    })
+  ) as Promise<KnowledgeSource>;
+}
+
+/** Read a source into the wiki again, returning it `pending`. */
+export async function reingestKnowledgeSource(
+  kbId: string,
+  sourceId: string
+): Promise<KnowledgeSource> {
+  return unwrap(
+    sdk.reingestKnowledgeSourceApiV1KnowledgeBasesKbIdSourcesSourceIdReingestPost({
+      path: { kb_id: kbId, source_id: sourceId },
+    })
+  ) as Promise<KnowledgeSource>;
+}
+
+/**
+ * Remove a source. The server returns it marked `removing`; it disappears once
+ * its knowledge has been taken out of the wiki's pages.
+ */
+export async function deleteKnowledgeSource(
+  kbId: string,
+  sourceId: string
+): Promise<KnowledgeSource> {
+  return unwrap(
+    sdk.deleteKnowledgeSourceApiV1KnowledgeBasesKbIdSourcesSourceIdDelete({
+      path: { kb_id: kbId, source_id: sourceId },
+    })
+  ) as Promise<KnowledgeSource>;
+}
+
+/** List the pages of a knowledge base, ordered by path. */
+export async function listKnowledgePages(kbId: string): Promise<KnowledgePageSummary[]> {
+  return unwrap(
+    sdk.listKnowledgePagesApiV1KnowledgeBasesKbIdPagesGet({ path: { kb_id: kbId } })
+  ) as Promise<KnowledgePageSummary[]>;
+}
+
+/** Fetch one page as its complete Markdown document, frontmatter included. */
+export async function getKnowledgePage(kbId: string, path: string): Promise<KnowledgePageContent> {
+  return unwrap(
+    sdk.getKnowledgePageApiV1KnowledgeBasesKbIdPagesPathGet({
+      path: { kb_id: kbId, path: path.replace(/^\//, "") },
+    })
+  ) as Promise<KnowledgePageContent>;
+}
+
+/**
+ * Build the URL that downloads a knowledge base as a zipped bundle — a plain
+ * link, like {@link sessionFileDownloadUrl}.
+ */
+export function knowledgeBaseExportUrl(kbId: string): string {
+  return `${API_BASE}/api/v1/knowledge-bases/${encodeURIComponent(kbId)}/export`;
+}
+
+/** List the knowledge bases a workflow's agents may read. */
+export async function listWorkflowKnowledgeBases(workflowId: string): Promise<KnowledgeBase[]> {
+  return unwrap(
+    sdk.listWorkflowKnowledgeBasesApiV1WorkflowsWorkflowIdKnowledgeBasesGet({
+      path: { workflow_id: workflowId },
+    })
+  ) as Promise<KnowledgeBase[]>;
+}
+
+/** Replace the knowledge bases a workflow's agents may read. */
+export async function setWorkflowKnowledgeBases(
+  workflowId: string,
+  knowledgeBaseIds: string[]
+): Promise<KnowledgeBase[]> {
+  return unwrap(
+    sdk.setWorkflowKnowledgeBasesApiV1WorkflowsWorkflowIdKnowledgeBasesPut({
+      path: { workflow_id: workflowId },
+      body: { knowledgeBaseIds },
+    })
+  ) as Promise<KnowledgeBase[]>;
 }
 
 /** List WorkflowExecution records (newest first) with optional pagination, sort, and filters. */

@@ -26,6 +26,7 @@ A2Flow のレコードは、すべて管理画面で作成し、確認し、編�
 | **Tags** | レコードを分類するラベル | Admin、Developer |
 | **Secrets** | ツールやリポジトリで使う資格情報 | Admin、Developer |
 | **Agent Skills** | Git リポジトリからクローンしたエージェントの能力 | Developer、Admin |
+| **Knowledge Bases** | 文書から LLM が書く、ワークフローが参照する wiki | Developer、Admin、Reviewer |
 | **MCP Servers** | エージェントが呼び出せるツールサーバー | Developer、Admin |
 | **Tool Mocks** | 下書きワークフローの実行でツールを差し替える代役 | Developer、Admin |
 | **Workflows** | 複数ステップの流れとそのタスクテンプレート | Developer、Requester、Admin |

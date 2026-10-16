@@ -1,8 +1,8 @@
 """Tag data models: the tag master table and the join rows that attach tags to records.
 
 A Tag is a tenant-scoped label that can be attached to a Secret, a Workflow, an
-MCPServer, an AgentSkill, an MCPToolMock, a UserGroup, or a WorkflowExecution.
-One tag set is shared by all seven resource types, so filtering a list by
+MCPServer, an AgentSkill, an MCPToolMock, a UserGroup, a WorkflowExecution, or a
+KnowledgeBase. One tag set is shared by all eight resource types, so filtering a list by
 ``aws`` narrows secrets and MCP servers alike.
 
 A WorkflowExecution's tags are a **snapshot**, not a live attachment: they are
@@ -28,11 +28,11 @@ plain filters.
 Attachment lives in one join table per resource type
 (:class:`SecretTag`, :class:`WorkflowTag`, :class:`McpServerTag`,
 :class:`AgentSkillTag`, :class:`McpToolMockTag`, :class:`UserGroupTag`,
-:class:`WorkflowExecutionTag`), each keyed by the record's id and the tag's
+:class:`WorkflowExecutionTag`, :class:`KnowledgeBaseTag`), each keyed by the record's id and the tag's
 **id** — never its name. That indirection is the point: renaming a tag changes
 only the ``tags`` row, so every record already carrying it follows along.
 
-Seven join tables rather than one polymorphic ``(resource_type, resource_id)``
+Eight join tables rather than one polymorphic ``(resource_type, resource_id)``
 table, because a polymorphic owner column cannot carry a real foreign key. Every
 other join table in this codebase (``user_group_members``,
 ``workflow_task_template_dependencies``, ``workflow_task_template_tool_bindings``)
@@ -216,6 +216,13 @@ class McpToolMockTag(TagLink, table=True):
     __table_args__ = _link_table_args("mcp_tool_mock_tags", "mcp_tool_mocks")
 
 
+class KnowledgeBaseTag(TagLink, table=True):
+    """Join row attaching one Tag to one KnowledgeBase."""
+
+    __tablename__ = "knowledge_base_tags"
+    __table_args__ = _link_table_args("knowledge_base_tags", "knowledge_bases")
+
+
 class UserGroupTag(TagLink, table=True):
     """Join row attaching one Tag to one UserGroup."""
 
@@ -226,7 +233,7 @@ class UserGroupTag(TagLink, table=True):
 class WorkflowExecutionTag(TagLink, table=True):
     """Join row attaching one Tag to one WorkflowExecution.
 
-    Unlike the other six join tables, these rows are a snapshot copied once
+    Unlike the other seven join tables, these rows are a snapshot copied once
     from the workflow's own :class:`WorkflowTag` rows when the run starts —
     see the module docstring.
     """

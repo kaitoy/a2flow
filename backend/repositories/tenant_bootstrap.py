@@ -2,7 +2,8 @@
 
 Code that runs outside FastAPI's request-scoped DI -- the ADK agent tools in
 ``infrastructure/*_tools.py`` and the background jobs in
-``services/workflow_design.py`` / ``services/agent_skill_sync.py`` -- opens
+``services/workflow_design.py`` / ``services/agent_skill_sync.py`` /
+``services/knowledge_ingest.py`` -- opens
 its own database session and has no ``CurrentTenantIdDep`` to construct a
 tenant-scoped repository with. Each entry point is handed a single opaque id
 (an ADK session id set when the run was dispatched, or a bare workflow_id /
@@ -19,6 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.agent_skill import AgentSkill
 from models.execution_session import ExecutionSession
+from models.knowledge import KnowledgeSource
 from models.workflow import Workflow
 from models.workflow_execution import WorkflowExecution
 
@@ -107,4 +109,12 @@ async def resolve_workflow_tenant(db: AsyncSession, workflow_id: str) -> str | N
 async def resolve_agent_skill_tenant(db: AsyncSession, skill_id: str) -> str | None:
     """Return the tenant_id of an AgentSkill, or ``None`` if it does not exist."""
     stmt = select(AgentSkill.tenant_id).where(AgentSkill.id == skill_id)
+    return (await db.exec(stmt)).first()
+
+
+async def resolve_knowledge_source_tenant(
+    db: AsyncSession, source_id: str
+) -> str | None:
+    """Return the tenant_id of a KnowledgeSource, or ``None`` if it does not exist."""
+    stmt = select(KnowledgeSource.tenant_id).where(KnowledgeSource.id == source_id)
     return (await db.exec(stmt)).first()

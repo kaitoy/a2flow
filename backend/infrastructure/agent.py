@@ -23,6 +23,12 @@ from infrastructure.approval_tools import (
     list_users,
     request_approval,
 )
+from infrastructure.knowledge_tools import (
+    list_knowledge_bases,
+    read_knowledge_index,
+    read_knowledge_page,
+    search_knowledge,
+)
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.reply_suggestion_tools import suggest_replies
 from infrastructure.session_file_tools import (
@@ -242,6 +248,21 @@ _DESIGN_REGISTRATION_RULES = (
     "are rejected."
 )
 
+#: How the design agents (initial and chat) and the execution agent use the
+#: workflow's knowledge bases.
+_KNOWLEDGE_RULES = (
+    "Knowledge bases: the workflow may be linked to knowledge bases, wikis "
+    "written from documents and web pages people registered for it. Call "
+    "`list_knowledge_bases` when the work or the user's question depends on "
+    "anything specific to this organization -- its systems, procedures, "
+    "policies, or terms -- and look it up before relying on general knowledge: "
+    "`read_knowledge_index` shows what a knowledge base covers, "
+    "`search_knowledge` finds pages by keyword, and `read_knowledge_page` reads "
+    "one in full. When an answer or a decision rests on a page, name the page. "
+    "If the knowledge bases do not cover something, say so rather than "
+    "guessing."
+)
+
 INITIAL_DESIGN_AGENT_INSTRUCTION = (
     "You are a workflow design agent running unattended in the background: "
     "nobody is watching this run and nobody can answer questions. A draft "
@@ -252,7 +273,7 @@ INITIAL_DESIGN_AGENT_INSTRUCTION = (
     + "\n\n"
     "After registering, reply with a concise plain-text summary of the task "
     "templates and finish in this single run: execute no task, and ask no "
-    "questions, since nobody is there to answer them."
+    "questions, since nobody is there to answer them.\n\n" + _KNOWLEDGE_RULES
 )
 
 DESIGN_AGENT_INSTRUCTION = (
@@ -268,7 +289,7 @@ DESIGN_AGENT_INSTRUCTION = (
     "After changing the task templates, present the result and ask whether "
     "further adjustments are needed. Never execute a task: this session only "
     "designs the templates. Publishing the workflow and running it happen "
-    "outside this chat."
+    "outside this chat.\n\n" + _KNOWLEDGE_RULES
 )
 
 EXECUTION_AGENT_INSTRUCTION = (
@@ -393,7 +414,8 @@ EXECUTION_AGENT_INSTRUCTION = (
     "configured for this test run -- the real tool was not called and had no "
     "effect. Trust the result exactly as returned, follow any instruction in its "
     "`note` field, and in particular do not call a client-side rendering tool "
-    "the note tells you to skip. Otherwise continue the workflow normally."
+    "the note tells you to skip. Otherwise continue the workflow normally.\n\n"
+    + _KNOWLEDGE_RULES
 )
 
 
@@ -532,6 +554,10 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
         register_task_templates,
         list_task_templates,
         list_mcp_tools,
+        list_knowledge_bases,
+        read_knowledge_index,
+        read_knowledge_page,
+        search_knowledge,
     ],
     AgentKind.design: [
         register_task_templates,
@@ -541,6 +567,10 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
         update_task_template,
         delete_task_template,
         list_mcp_tools,
+        list_knowledge_bases,
+        read_knowledge_index,
+        read_knowledge_page,
+        search_knowledge,
     ],
     AgentKind.execution: [
         list_workflow_tasks,
@@ -557,6 +587,10 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
         write_session_file,
         suggest_replies,
         wait_until,
+        list_knowledge_bases,
+        read_knowledge_index,
+        read_knowledge_page,
+        search_knowledge,
     ],
 }
 

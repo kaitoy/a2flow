@@ -29,7 +29,9 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
+import { KnowledgeBasePicker } from "@/components/admin/knowledge-base-picker";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
+import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { type RunWorkflowChoice, RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
 import { StatusCard } from "@/components/admin/status-card";
 import { TagPicker } from "@/components/admin/tag-picker";
@@ -54,8 +56,10 @@ import {
   getAgentSkill,
   getWorkflow,
   isForbiddenError,
+  listWorkflowKnowledgeBases,
   publishWorkflow,
   SUPPRESS_FORBIDDEN_TOAST,
+  setWorkflowKnowledgeBases,
   setWorkflowTags,
   updateWorkflow,
   type Workflow,
@@ -186,6 +190,11 @@ export default function WorkflowDetailPage() {
   // discard the user's in-progress selection.
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [savedTagIds, setSavedTagIds] = useState<string[]>([]);
+  // The knowledge bases the workflow's agents may read: a sub-resource like
+  // tags, and kept out of `applyWorkflow` for the same reason.
+  const [kbIds, setKbIds] = useState<string[]>([]);
+  const [savedKbIds, setSavedKbIds] = useState<string[]>([]);
+  const [kbOptions, setKbOptions] = useState<PickerOption[]>([]);
 
   const save = useAsyncAction({ showDone: false });
   const publish = useAsyncAction({ showDone: false });
@@ -237,6 +246,16 @@ export default function WorkflowDetailPage() {
         applyWorkflow(wf);
         setTagIds(wf.tagIds ?? []);
         setSavedTagIds(wf.tagIds ?? []);
+        listWorkflowKnowledgeBases(workflowId)
+          .then((kbs) => {
+            const ids = kbs.map((kb) => kb.id);
+            setKbIds(ids);
+            setSavedKbIds(ids);
+            setKbOptions(kbs.map((kb) => ({ value: kb.id, label: kb.name })));
+          })
+          .catch(() => {
+            // Failure toast is shown globally by api.ts; the picker starts empty.
+          });
         setSkill(await getAgentSkill(wf.agentSkillId, SUPPRESS_FORBIDDEN_TOAST));
       })
       .catch((err: unknown) => {
@@ -276,6 +295,9 @@ export default function WorkflowDetailPage() {
         // selection actually changed.
         if (!sameIds(tagIds, savedTagIds)) {
           await setWorkflowTags(workflowId, tagIds);
+        }
+        if (!sameIds(kbIds, savedKbIds)) {
+          await setWorkflowKnowledgeBases(workflowId, kbIds);
         }
         dispatch(showToast({ message: "Workflow updated" }));
         // Return to the list on success, matching every other admin edit page.
@@ -615,6 +637,13 @@ export default function WorkflowDetailPage() {
               Used for the workflow execution whenever Description above is empty.
             </p>
           </FormField>
+
+          <KnowledgeBasePicker
+            value={kbIds}
+            onChange={setKbIds}
+            readOnly={!canEdit}
+            initialOptions={kbOptions}
+          />
 
           <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 

@@ -40,6 +40,7 @@ const sidebars: SidebarsConfig = {
         'guides/workflow-executions',
         'guides/approvals',
         'guides/agent-skills',
+        'guides/knowledge-bases',
         'guides/mcp-servers',
         'guides/tool-mocks',
         'guides/secrets',

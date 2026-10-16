@@ -44,7 +44,7 @@ Each workflow record carries a **Name**, the [tags](./tags.md) it is classified 
 
 **Generate workflow** is reachable from two places, both opening the same dialog without leaving the page: the row action in the [Agent Skills](./agent-skills.md) list, and the Generate Workflow icon button in the header of a skill's detail page. Either is disabled until the skill has published a revision.
 
-1. Fill in the **Workflow Name** (prefilled with the skill name) and the **Prompt** describing the work. Because generating navigates away, the detail page offers to save unsaved edits first — declining leaves the page untouched and does not generate.
+1. Fill in the **Workflow Name** (prefilled with the skill name) and the **Prompt** describing the work. Optionally pick [knowledge bases](./knowledge-bases.md) under **Knowledge Bases**: they are linked to the new workflow right away, so the design agent can already look things up in them. Because generating navigates away, the detail page offers to save unsaved edits first — declining leaves the page untouched and does not generate.
 2. The workflow is registered right away as `generating`, and you land on its detail page, which refreshes itself while the work runs.
 3. In the background, the prompt is sent as the first message of the workflow's **design session**. The design agent follows the skill, breaks the request into steps, and registers them as the workflow's task templates — a dependency graph, where each step declares which steps must finish before it, plus any [MCP tools](./workflows.md#mcp-tools-for-tasks) it needs.
 4. When the run finishes, the design conversation is summarized into **Generated description**, the status becomes `draft`, and a [notification](./notifications.md) deep-links you back to the workflow.
@@ -192,6 +192,10 @@ mark; it keeps whatever the design agent set. In a run's task timeline, the **Bo
 tools** dialog labels such a tool **Asks the initiator mid-call**.
 
 **Task titles.** Both of those lists show every record instead of paginating, which lets the **Depends on** column work as a cross-reference: each dependency is named by its title, and hovering that chip highlights the row it points at. The design agent is held to terse imperative titles — 2 to 4 words, 50 characters — so they read cleanly as chips; a longer one is refused with a note telling it to move the detail into the description. The limit binds the agent, not people: a title edited through the admin form may run to 200 characters, and one that overflows its chip is clipped and revealed on hover.
+
+## Knowledge bases {#knowledge-bases}
+
+Choose knowledge bases under **Knowledge Bases** on the workflow's detail page and click **Save**, and the design agent and the execution agent look things up in them while they work — see [Knowledge Bases](./knowledge-bases.md#linking-a-knowledge-base-to-a-workflow). The choice is not part of the published design, so changing it never marks the workflow as modified.
 
 ## Deleting a workflow
 

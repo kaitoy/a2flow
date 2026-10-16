@@ -157,9 +157,9 @@ SPECS["guides/notifications-routing"] = head(
 
 # ---------------------------------------------------------------- guides/tags-vocabulary
 SPECS["guides/tags-vocabulary"] = head(
-    "One vocabulary, six registries", "1 つの語彙、6 つのレジストリ",
-    "Flowchart showing one shared tag vocabulary per tenant applied to six taggable registries: Secrets, MCP Servers, Agent Skills, Workflows, Tool Mocks, and User Groups.",
-    "テナントごとに 1 つのタグ語彙が、タグを付けられる 6 つのレジストリ(Secrets、MCP Servers、Agent Skills、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。",
+    "One vocabulary, seven registries", "1 つの語彙、7 つのレジストリ",
+    "Flowchart showing one shared tag vocabulary per tenant applied to seven taggable registries: Secrets, MCP Servers, Agent Skills, Knowledge Bases, Workflows, Tool Mocks, and User Groups.",
+    "テナントごとに 1 つのタグ語彙が、タグを付けられる 7 つのレジストリ(Secrets、MCP Servers、Agent Skills、Knowledge Bases、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。",
     page_title="Tag vocabulary", svg_title="Tag vocabulary",
 ) + [
     label("Tag vocabulary", "タグ語彙"),

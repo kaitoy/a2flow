@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>1 つの語彙、6 つのレジストリ</title>
+  <title>1 つの語彙、7 つのレジストリ</title>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -56,11 +56,11 @@
 <body>
   <div class="frame">
     <p class="eyebrow">Flowchart · Diagram Design</p>
-    <h1>1 つの語彙、6 つのレジストリ</h1>
+    <h1>1 つの語彙、7 つのレジストリ</h1>
 
     <svg viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="tags-vocabulary-dark-title tags-vocabulary-dark-desc">
-      <title id="tags-vocabulary-dark-title">1 つの語彙、6 つのレジストリ</title>
-      <desc id="tags-vocabulary-dark-desc">テナントごとに 1 つのタグ語彙が、タグを付けられる 6 つのレジストリ(Secrets、MCP Servers、Agent Skills、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。</desc>
+      <title id="tags-vocabulary-dark-title">1 つの語彙、7 つのレジストリ</title>
+      <desc id="tags-vocabulary-dark-desc">テナントごとに 1 つのタグ語彙が、タグを付けられる 7 つのレジストリ(Secrets、MCP Servers、Agent Skills、Knowledge Bases、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
@@ -68,37 +68,41 @@
 
       <rect width="100%" height="100%" fill="#030711"/>
 
-      <!-- Arrows: hub → 6 registries, each its own elbow with a staggered bend row so none overlap -->
-      <path d="M400,132 L400,136 Q400,144 392,144 L98,144 Q90,144 90,152 L90,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <path d="M440,132 L440,152 Q440,160 432,160 L262,160 Q254,160 254,168 L254,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <path d="M480,132 L480,168 Q480,176 472,176 L426,176 Q418,176 418,184 L418,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <path d="M520,132 L520,184 Q520,192 528,192 L574,192 Q582,192 582,200 L582,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <path d="M560,132 L560,200 Q560,208 568,208 L738,208 Q746,208 746,216 L746,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <path d="M600,132 L600,216 Q600,224 608,224 L902,224 Q910,224 910,232 L910,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <!-- Arrows: hub -> 7 registries; the left ones bend lower the further in they leave the hub, the right ones mirror it, so none cross -->
+      <path d="M380,132 L380,136 Q380,144 372,144 L82,144 Q74,144 74,152 L74,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M420,132 L420,152 Q420,160 412,160 L224,160 Q216,160 216,168 L216,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M460,132 L460,168 Q460,176 452,176 L366,176 Q358,176 358,184 L358,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M500,132 L500,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M540,132 L540,168 Q540,176 548,176 L634,176 Q642,176 642,184 L642,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M580,132 L580,152 Q580,160 588,160 L776,160 Q784,160 784,168 L784,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M620,132 L620,136 Q620,144 628,144 L918,144 Q926,144 926,152 L926,240" fill="none" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
 
       <!-- Hub (focal) -->
       <rect x="360" y="60" width="280" height="72" rx="6" fill="rgba(59,245,196,0.10)" stroke="#3bf5c4" stroke-width="1"/>
       <text x="500" y="90" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">タグ語彙</text>
       <text x="500" y="110" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">テナントごとに 1 つ</text>
 
-      <!-- Six registries -->
-      <rect x="20" y="240" width="140" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
-      <text x="90" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Secrets</text>
+      <!-- Seven registries -->
+      <rect x="12" y="240" width="124" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="74" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Secrets</text>
 
-      <rect x="184" y="240" width="140" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
-      <text x="254" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP Servers</text>
+      <rect x="154" y="240" width="124" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="216" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP Servers</text>
 
-      <rect x="348" y="240" width="140" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
-      <text x="418" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Agent Skills</text>
+      <rect x="296" y="240" width="124" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="358" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Agent Skills</text>
 
-      <rect x="512" y="240" width="140" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
-      <text x="582" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflows</text>
+      <rect x="438" y="240" width="124" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="500" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Knowledge Bases</text>
 
-      <rect x="676" y="240" width="140" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
-      <text x="746" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tool Mocks</text>
+      <rect x="580" y="240" width="124" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="642" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflows</text>
 
-      <rect x="840" y="240" width="140" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
-      <text x="910" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User Groups</text>
+      <rect x="722" y="240" width="124" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="784" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tool Mocks</text>
+
+      <rect x="864" y="240" width="124" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="926" y="272" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User Groups</text>
     </svg>
   </div>
 </body>

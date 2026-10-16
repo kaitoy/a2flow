@@ -11,6 +11,13 @@ in-memory engine shares a single connection between every session, and here two
 genuinely run at once -- the broker's poll and the answering request -- so one
 closing would roll back the other's uncommitted write. Separate connections are
 what production has, and what this module needs to observe it.
+
+The file gets production's pragmas too, WAL journal mode included. Under the
+default rollback journal a reader blocks a writer: a test that cancels the
+waiting call mid-poll leaves that poll's read lock behind briefly, the
+broker's expiry times out on ``database is locked``, and SQLAlchemy returns
+the failed writer to the pool without rolling it back, locking every later
+reader out as well. Under WAL, as in production, readers never block writers.
 """
 
 import asyncio
@@ -29,6 +36,7 @@ from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
+from infrastructure.database import _set_sqlite_pragmas
 from infrastructure.mcp_elicitation import (
     ELICITATION_ACTIVITY_TYPE,
     SqlElicitationBroker,
@@ -37,7 +45,7 @@ from models.execution_session import ExecutionSession, SessionStreamEvent
 from models.mcp_elicitation import MCPElicitation, MCPElicitationStatus
 from models.notification import Notification
 from tests import test_workflow_execution_access as _access
-from tests._engine import _set_sqlite_fk, pg_url
+from tests._engine import pg_url
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests.test_workflow_execution_access import (
@@ -56,13 +64,13 @@ access_env = _access.access_env
 
 @pytest.fixture(autouse=True)
 def _separate_connections(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Back ``access_env`` with a file database, one connection per session."""
+    """Back ``access_env`` with a WAL file database, one connection per session."""
     if pg_url() is not None:
         return
 
     async def _file_engine() -> AsyncEngine:
         engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
-        sa_event.listen(engine.sync_engine, "connect", _set_sqlite_fk)
+        sa_event.listen(engine.sync_engine, "connect", _set_sqlite_pragmas)
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
         return engine
