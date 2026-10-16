@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from sqlalchemy import ColumnElement, delete, or_
+from sqlalchemy import ColumnElement, case, delete, or_
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -512,9 +512,12 @@ class SqlKnowledgePageRepository(TenantScopedRepository[KnowledgePage]):
     async def search(
         self, kb_ids: Sequence[str], terms: Sequence[str], *, limit: int
     ) -> list[KnowledgePage]:
-        """Return pages whose title, description, or body contains any of ``terms``.
+        """Return the best pages whose title, description, or body contains any of ``terms``.
 
-        Case-insensitive substring matching; the caller ranks the result.
+        Case-insensitive substring matching. Ranked in the database, before
+        ``limit`` applies, so a strong match is never cut by weaker ones: each
+        term scores 3 when in the title, 2 in the description, and 1 in the
+        body; ties break by path.
 
         # ponytail: LIKE scan over every page; move to PostgreSQL full-text
         # search (tsvector + GIN) when knowledge bases get large.
@@ -522,25 +525,33 @@ class SqlKnowledgePageRepository(TenantScopedRepository[KnowledgePage]):
         Args:
             kb_ids: Knowledge bases to search.
             terms: Words to look for; a page matching any one is returned.
-            limit: Maximum number of candidate pages.
+            limit: Maximum number of pages.
 
         Returns:
-            Matching pages, unranked.
+            Matching pages, best first.
         """
         if not kb_ids or not terms:
             return []
-        matches = [
-            column.icontains(term, autoescape=True)
+        weighted = [
+            (col(KnowledgePage.title).icontains(term, autoescape=True), 3)
             for term in terms
-            for column in (
-                col(KnowledgePage.title),
-                col(KnowledgePage.description),
-                col(KnowledgePage.body),
+        ] + [
+            (column.icontains(term, autoescape=True), weight)
+            for term in terms
+            for column, weight in (
+                (col(KnowledgePage.description), 2),
+                (col(KnowledgePage.body), 1),
             )
         ]
+        cases = [case((match, weight), else_=0) for match, weight in weighted]
+        score = sum(cases[1:], cases[0])
         stmt = (
             select(KnowledgePage)
-            .where(col(KnowledgePage.knowledge_base_id).in_(kb_ids), or_(*matches))
+            .where(
+                col(KnowledgePage.knowledge_base_id).in_(kb_ids),
+                or_(*(match for match, _ in weighted)),
+            )
+            .order_by(score.desc(), col(KnowledgePage.path))
             .limit(limit)
         )
         return list((await self._db.exec(self._scoped(stmt))).all())

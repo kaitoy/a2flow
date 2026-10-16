@@ -34,7 +34,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from infrastructure import database
 from infrastructure.okf import render_index, render_page
 from infrastructure.workflow_task_tools import _user_id
-from models.knowledge import KnowledgeBase, KnowledgePage
+from models.knowledge import KnowledgeBase
 from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.knowledge import (
     SqlKnowledgeBaseRepository,
@@ -50,9 +50,6 @@ _NO_WORKFLOW = "no workflow is bound to the current session; no knowledge is ava
 
 #: Search returns at most this many pages, best first.
 _MAX_RESULTS = 10
-
-#: Candidate pages fetched from the database before ranking.
-_MAX_CANDIDATES = 200
 
 #: Words of a query beyond this many are ignored.
 _MAX_TERMS = 8
@@ -221,21 +218,6 @@ def _terms(query: str) -> list[str]:
     return list(dict.fromkeys(words))[:_MAX_TERMS]
 
 
-def _score(page: KnowledgePage, terms: list[str]) -> int:
-    """Rank a page: a term in the title counts most, then the description, then the body."""
-    title, description, body = (
-        page.title.lower(),
-        page.description.lower(),
-        page.body.lower(),
-    )
-    return sum(
-        (3 if t in title else 0)
-        + (2 if t in description else 0)
-        + (1 if t in body else 0)
-        for t in terms
-    )
-
-
 def _snippet(body: str, terms: list[str]) -> str:
     """Return the stretch of ``body`` around the first matching term."""
     lowered = body.lower()
@@ -279,10 +261,7 @@ async def search_knowledge(
             if kb is None:
                 return _not_linked(knowledge_base_id)
             kbs = [kb]
-        candidates = await pages.search(
-            [kb.id for kb in kbs], terms, limit=_MAX_CANDIDATES
-        )
-        ranked = sorted(candidates, key=lambda p: (-_score(p, terms), p.path))
+        ranked = await pages.search([kb.id for kb in kbs], terms, limit=_MAX_RESULTS)
         return {
             "results": [
                 {
@@ -292,6 +271,6 @@ async def search_knowledge(
                     "description": p.description,
                     "snippet": _snippet(p.body, terms),
                 }
-                for p in ranked[:_MAX_RESULTS]
+                for p in ranked
             ]
         }

@@ -197,6 +197,29 @@ async def test_search_ranks_title_matches_first_and_stays_in_linked_bases(
     )
 
 
+async def test_search_ranks_before_the_limit_cuts(engine: AsyncEngine) -> None:
+    """A strong match written after weaker ones still survives a small limit."""
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        kb = KnowledgeBase(name="Big", **_audit())
+        db.add(kb)
+        await db.flush()
+        pages = SqlKnowledgePageRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
+        for path, title in (("/a.md", "Alpha"), ("/b.md", "Beta"), ("/z.md", "VPN")):
+            await pages.upsert(
+                kb.id,
+                path,
+                type_="Concept",
+                title=title,
+                description="",
+                body="Mentions the VPN.",
+                meta={},
+                user_id=_USER,
+            )
+        await db.commit()
+        found = await pages.search([kb.id], ["vpn"], limit=1)
+    assert [p.path for p in found] == ["/z.md"]
+
+
 async def test_access_control_tag_hides_a_linked_knowledge_base(
     engine: AsyncEngine, kbs: dict[str, str]
 ) -> None:
