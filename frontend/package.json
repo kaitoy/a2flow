@@ -3,7 +3,7 @@
   "version": "0.1.2",
   "private": true,
   "license": "Apache-2.0",
-  "packageManager": "pnpm@11.2.2",
+  "packageManager": "pnpm@12.15.0",
   "scripts": {
     "predev": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",
     "prebuild": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",

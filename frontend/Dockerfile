@@ -8,7 +8,7 @@
 #   docker build -f frontend/Dockerfile .
 
 # --- Stage 1: export the backend OpenAPI spec -------------------------------
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS openapi
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS openapi
 
 WORKDIR /backend
 COPY backend/ .
@@ -17,7 +17,7 @@ RUN uv sync --frozen --no-install-project \
     && uv run --no-sync python -m scripts.export_openapi
 
 # --- Stage 2: build the Next.js app -----------------------------------------
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 
 RUN corepack enable
 
@@ -35,7 +35,7 @@ RUN node --use-system-ca scripts/download-a2ui-schema.mjs \
     && pnpm exec next build
 
 # --- Stage 3: runtime --------------------------------------------------------
-FROM node:24-slim
+FROM node:26-slim
 
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \

@@ -9,7 +9,7 @@
 # holding the skill store. What each stage adds is what only that stage uses.
 #
 # Python version matches backend/.python-version.
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS base
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS base
 
 WORKDIR /app
 
@@ -63,8 +63,8 @@ FROM base AS mcp-proxy
 # /app/.npm is npx's package cache, written the first time a stdio MCP server
 # registered as an npm package is launched. Derived from HOME for the same
 # reason as the uv cache above.
-COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node:26-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:26-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && mkdir -p /app/.npm \
