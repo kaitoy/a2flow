@@ -226,6 +226,9 @@ need one, so each gets a workaround:
 
 Drop each one once its tool supports TypeScript 7 directly.
 
+The same `.pnpmfile.cjs` keeps `@a2ui/react` on Zod 3: its types have to share the
+Zod that `@a2ui/web_core` bundles, while the rest of the frontend is on Zod 4.
+
 Every collection endpoint accepts a shared set of `limit` / `offset` / sort (`s`) /
 filter (`q`) query parameters, with camelCase field names. See
 [.claude/rules/api-conventions.md](.claude/rules/api-conventions.md) for the full

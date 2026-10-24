@@ -166,7 +166,7 @@ overrides:
   js-yaml: ^4.3.2
   dompurify: ^3.4.13
 
-pnpmfileChecksum: sha256-nbVyWPw0k1h9OfctTLxC6dvNM5pmDdNYJjGqdD51THI=
+pnpmfileChecksum: sha256-rbP2x/ixJIcZSu2NZWaAQBFy3ieFNQYB1RmS05wFEtg=
 
 importers:
 
@@ -177,7 +177,7 @@ importers:
         version: 0.2.2(@a2ui/web_core@0.14.0)
       '@a2ui/react':
         specifier: 0.14.0
-        version: 0.14.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(zod@3.25.76)
+        version: 0.14.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@a2ui/web_core':
         specifier: 0.14.0
         version: 0.14.0
@@ -189,7 +189,7 @@ importers:
         version: 1.0.3
       '@ag-ui/core':
         specifier: ^1.0.3
-        version: 1.0.3(zod@3.25.76)
+        version: 1.0.3(zod@4.6.7)
       '@codemirror/commands':
         specifier: ^6.11.1
         version: 6.11.1
@@ -212,8 +212,8 @@ importers:
         specifier: ^6.43.15
         version: 6.43.15
       '@hookform/resolvers':
-        specifier: ^5.9.2
-        version: 5.9.2(@standard-schema/spec@1.1.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1))(zod@3.25.76)
+        specifier: ^6.0.0
+        version: 6.0.0(@standard-schema/spec@1.1.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@lezer/highlight':
         specifier: ^1.2.5
         version: 1.2.5
@@ -260,8 +260,8 @@ importers:
         specifier: ^9.3.0
         version: 9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1)
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.6.2
@@ -328,7 +328,6 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
-      zod: ^3.25.76
 
   '@a2ui/web_core@0.14.0':
     resolution: {integrity: sha512-OEJOgcfRMW0lwActVl1NKToxE2Ff5G3mIBHDB6gKm0elGZSwAhB7bj+Ef2a/h2nrL+57VPnSR67YSNz9JVV4yw==}
@@ -523,8 +522,8 @@ packages:
   '@hey-api/types@0.1.4':
     resolution: {integrity: sha512-thWfawrDIP7wSI9ioT13I5soaaqB5vAPIiZmgD8PbeEVKNrkonc0N/Sjj97ezl7oQgusZmaNphGdMKipPO6IBg==}
 
-  '@hookform/resolvers@5.9.2':
-    resolution: {integrity: sha512-RtjTnZqsC38s4NKp2XO3fD8IA5uyN4tB7McQ5C6uiMPcV+WWO8F+wVa3e+BXUpH2ScgxghAlwFRMVqjT9WChAQ==}
+  '@hookform/resolvers@6.0.0':
+    resolution: {integrity: sha512-6iBzQnB+YwAveVc8HUi6QYLITn5X+xNKRMFIcNXHZlvp2aTI7yWbj4n/JodXxirMCcBc4VCjb2aYAJh4x07mVw==}
     peerDependencies:
       '@sinclair/typebox': '>=0.25.24'
       '@standard-schema/spec': ^1.0.0
@@ -538,7 +537,7 @@ packages:
       class-transformer: '>=0.4.0'
       class-validator: '>=0.12.0'
       computed-types: ^1.0.0
-      effect: ^3.10.3
+      effect: ^4.0.0
       fluentvalidation-ts: ^3.0.0
       fp-ts: ^2.7.0
       io-ts: ^2.0.0
@@ -2548,7 +2547,7 @@ snapshots:
       dompurify: 3.4.17
       markdown-it: 14.3.3
 
-  '@a2ui/react@0.14.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(zod@3.25.76)':
+  '@a2ui/react@0.14.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@a2ui/markdown-it': 0.2.2(@a2ui/web_core@0.14.0)
       '@a2ui/web_core': 0.14.0
@@ -2595,6 +2594,10 @@ snapshots:
   '@ag-ui/core@1.0.3(zod@3.25.76)':
     optionalDependencies:
       zod: 3.25.76
+
+  '@ag-ui/core@1.0.3(zod@4.6.7)':
+    optionalDependencies:
+      zod: 4.6.7
 
   '@ag-ui/encoder@1.0.3(zod@3.25.76)':
     dependencies:
@@ -2802,13 +2805,13 @@ snapshots:
 
   '@hey-api/types@0.1.4': {}
 
-  '@hookform/resolvers@5.9.2(@standard-schema/spec@1.1.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1))(zod@3.25.76)':
+  '@hookform/resolvers@6.0.0(@standard-schema/spec@1.1.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.90.0(@types/react@19.3.0)(react@19.3.1)
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
-      zod: 3.25.76
+      zod: 4.6.7
 
   '@img/colour@1.1.0':
     optional: true
