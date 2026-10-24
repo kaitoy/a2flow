@@ -1,5 +1,6 @@
 import { A2UIActivityType, RENDER_A2UI_TOOL_NAME } from "@ag-ui/a2ui-middleware";
 import type { AgentSubscriber } from "@ag-ui/client";
+import { contentToText } from "@ag-ui/core";
 import {
   A2UI_SOURCE_TOOL_CALL_ID_KEY,
   CALL_MCP_TOOL_NAME,
@@ -159,7 +160,7 @@ export function createAgentSubscriber(
       );
     },
     onToolCallResultEvent: async ({ event }) => {
-      const result = parseToolResult(event.content);
+      const result = parseToolResult(contentToText(event.content));
       if (sessionFileCallIds.has(event.toolCallId)) {
         const file = parseSessionFileResult(result);
         // A rejected write comes back as `{error}`; showing no card is right —

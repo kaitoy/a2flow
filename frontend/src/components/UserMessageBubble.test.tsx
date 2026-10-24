@@ -11,7 +11,7 @@ describe("UserMessageBubble", () => {
     expect(container.firstChild).toHaveClass("justify-end");
   });
 
-  it("extracts text from InputContent array", () => {
+  it("extracts text from a ContentPart array", () => {
     render(
       <UserMessageBubble
         message={{
@@ -24,7 +24,7 @@ describe("UserMessageBubble", () => {
     expect(screen.getByText("world")).toBeInTheDocument();
   });
 
-  it("ignores non-text InputContent entries", () => {
+  it("ignores non-text ContentPart entries", () => {
     render(
       <UserMessageBubble
         message={{

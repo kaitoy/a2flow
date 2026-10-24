@@ -1,17 +1,7 @@
 "use client";
 
-import type { TextInputContent, UserMessage } from "@ag-ui/core";
+import { contentToText, type UserMessage } from "@ag-ui/core";
 import type { ReactNode } from "react";
-
-/** Extract the plain text from a user message, handling both string and content-part array forms. */
-function getUserTextContent(content: UserMessage["content"]): string {
-  return typeof content === "string"
-    ? content
-    : content
-        .filter((c): c is TextInputContent => c.type === "text")
-        .map((c) => c.text)
-        .join("");
-}
 
 /**
  * Render a user message as a chat bubble on the sender's side of the thread.
@@ -37,7 +27,7 @@ export function UserMessageBubble({
   /** Whether the signed-in viewer sent this message. Drives which side it takes. */
   isOwn?: boolean;
 }) {
-  const textContent = getUserTextContent(message.content);
+  const textContent = contentToText(message.content);
   // Only a shared chat (one that identifies its senders) can place a message on
   // the left; without an avatar there is no other sender to distinguish.
   const onOwnSide = isOwn || !avatar;
