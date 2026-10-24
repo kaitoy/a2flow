@@ -39,7 +39,7 @@ describe("NewUserGroupPage", () => {
     render(<NewUserGroupPage />, { preloadedState: ADMIN });
     await userEvent.click(screen.getByLabelText(/^Name/));
     await userEvent.tab();
-    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=1 characters/)).toBeInTheDocument());
   });
 
   it("submits the selected roles and members", async () => {

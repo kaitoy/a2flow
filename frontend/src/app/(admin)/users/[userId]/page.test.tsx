@@ -212,7 +212,7 @@ describe("UserDetailPage", () => {
     const firstNameInput = screen.getByRole("textbox", { name: /first name/i });
     await user.clear(firstNameInput);
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=1 characters/)).toBeInTheDocument());
   });
 
   it("passes the loaded avatar customization to the preview", async () => {

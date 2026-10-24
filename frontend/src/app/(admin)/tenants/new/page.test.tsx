@@ -88,7 +88,7 @@ describe("NewTenantPage", () => {
     renderPage();
     await user.click(screen.getByRole("textbox", { name: /^display name/i }));
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=1 characters/)).toBeInTheDocument());
   });
 
   it("shows validation error on blur when name has uppercase characters", async () => {

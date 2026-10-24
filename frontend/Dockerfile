@@ -22,7 +22,7 @@ FROM node:26-slim AS build
 RUN corepack enable
 
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml frontend/.pnpmfile.cjs ./
 RUN pnpm install --frozen-lockfile
 
 COPY frontend/ .

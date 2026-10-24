@@ -216,6 +216,19 @@ path segments — adding an `/api/v1/` prefix turns `listAgentSkillsAgentSkillsG
 `cd frontend && pnpm build` is the quick check: a type error on an `sdk.` call in
 `lib/api.ts` is a name mismatch to fix.
 
+The frontend is on TypeScript 7, which ships no classic compiler API. Two tools still
+need one, so each gets a workaround:
+
+| Tool | Workaround |
+|---|---|
+| `openapi-ts` (imports `typescript` at runtime) | [frontend/.pnpmfile.cjs](frontend/.pnpmfile.cjs) replaces its `typescript` peer with `@typescript/typescript6`, the TypeScript 6 API package |
+| `next build` type check | `experimental.useTypeScriptCli` in `frontend/next.config.ts` runs the `tsc` CLI instead of the API |
+
+Drop each one once its tool supports TypeScript 7 directly.
+
+The same `.pnpmfile.cjs` keeps `@a2ui/react` on Zod 3: its types have to share the
+Zod that `@a2ui/web_core` bundles, while the rest of the frontend is on Zod 4.
+
 Every collection endpoint accepts a shared set of `limit` / `offset` / sort (`s`) /
 filter (`q`) query parameters, with camelCase field names. See
 [.claude/rules/api-conventions.md](.claude/rules/api-conventions.md) for the full

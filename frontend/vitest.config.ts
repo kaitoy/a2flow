@@ -11,6 +11,14 @@ export default defineConfig({
     // but jsdom has none either, so the tests that need real measurements were
     // already stubbing them. See src/test/setup.ts for the API differences.
     environment: "happy-dom",
+    // Serve the page from the API base defined below, so requests are
+    // same-origin as they are behind the production proxy. happy-dom enforces
+    // CORS on its own fetch (which MSW 3 intercepts below, not in place of), so
+    // a cross-origin page would send preflights; src/lib/api.cors.test.ts
+    // covers that setup on purpose.
+    environmentOptions: {
+      happyDOM: { url: "http://localhost:8000" },
+    },
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],

@@ -1,4 +1,4 @@
-import type { ToolMessage } from "@ag-ui/core";
+import { contentToText, type ToolMessage } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import {
   buildRenderAckMessages,
@@ -147,7 +147,7 @@ describe("buildRenderAckMessages", () => {
     );
     expect(results[0]).toMatchObject({ toolCallId: "call-a", content: RENDER_ACK_CONTENT });
     expect(results[1].toolCallId).toBe("call-b");
-    expect(JSON.parse(results[1].content)).toMatchObject({
+    expect(JSON.parse(contentToText(results[1].content))).toMatchObject({
       status: "action",
       surfaceId: "result",
       values: { email: "a@b.c" },

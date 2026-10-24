@@ -178,7 +178,7 @@ describe("AgentSkillDetailPage", () => {
     const nameInput = screen.getByLabelText(/^name/i);
     await user.clear(nameInput);
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=1 characters/)).toBeInTheDocument());
   });
 
   it("shows error toast on load failure", async () => {

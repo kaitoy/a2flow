@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
   // build. This repo curates its own agent instructions (root CLAUDE.md and
   // .claude/rules/), so opt out of the generated ones.
   agentRules: false,
+  // TypeScript 7 has no compiler API for `next build` to type-check through,
+  // so run its `tsc` CLI instead.
+  experimental: {
+    useTypeScriptCli: true,
+  },
   // The /api/* and /openapi.json → backend proxy lives in src/proxy.ts, so it
   // can read BACKEND_BASE_URL at container start instead of at build time.
   turbopack: {

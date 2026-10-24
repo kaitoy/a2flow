@@ -1,7 +1,7 @@
 "use client";
 
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
-import type { Message } from "@ag-ui/core";
+import { contentToText, type Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
 import { Sparkles } from "lucide-react";
 import {
@@ -237,7 +237,8 @@ export function MessageList({
   const toolResultContentByCallId = useMemo(() => {
     const map = new Map<string, string>();
     for (const msg of messages) {
-      if (msg.role === "tool" && msg.toolCallId) map.set(msg.toolCallId, msg.content ?? "");
+      if (msg.role === "tool" && msg.toolCallId)
+        map.set(msg.toolCallId, contentToText(msg.content));
     }
     return map;
   }, [messages]);

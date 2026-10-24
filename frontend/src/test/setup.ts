@@ -14,7 +14,7 @@ import { server } from "./msw/server";
 // genuine timeout reports as the failed assertion rather than a killed test.
 configure({ asyncUtilTimeout: 5_000 });
 
-beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
+beforeAll(() => server.listen({ onUnhandledFrame: "warn" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

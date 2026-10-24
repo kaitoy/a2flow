@@ -163,7 +163,7 @@ describe("NewAgentSkillPage", () => {
     const nameInput = screen.getByLabelText(/^name/i);
     await user.click(nameInput);
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=1 characters/)).toBeInTheDocument());
   });
 
   it("shows validation error on blur when name has a non-printable character", async () => {
