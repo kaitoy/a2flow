@@ -19,7 +19,6 @@ import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useVisibleAdminNavItems } from "@/lib/admin-nav";
 import { Role, useHasRole } from "@/lib/roles";
-import "@/lib/zod-messages";
 
 /**
  * The admin section's navigation link list, shared by the static desktop

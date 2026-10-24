@@ -131,7 +131,7 @@ describe("GenerateWorkflowDialog", () => {
     renderOpen();
     await user.click(screen.getByRole("button", { name: /generate/i }));
 
-    await waitFor(() => expect(screen.getByText(/at least 1 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=1 characters/)).toBeInTheDocument());
     expect(generateSpy).not.toHaveBeenCalled();
   });
 

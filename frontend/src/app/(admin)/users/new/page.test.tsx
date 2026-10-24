@@ -101,7 +101,7 @@ describe("NewUserPage", () => {
     renderPage();
     await user.click(screen.getByRole("textbox", { name: /username/i }));
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/at least 3 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=3 characters/)).toBeInTheDocument());
   });
 
   it("shows validation error on blur when username has invalid characters", async () => {
@@ -125,7 +125,7 @@ describe("NewUserPage", () => {
     renderPage();
     await user.type(screen.getByLabelText(/password/i), "short");
     await user.tab();
-    await waitFor(() => expect(screen.getByText(/at least 12 character/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/>=12 characters/)).toBeInTheDocument());
   });
 
   it("does not render a tenant field for a non-super-admin viewer", () => {

@@ -3,7 +3,6 @@ import { configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { store } from "@/store";
 import { dismissToast } from "@/store/toastSlice";
-import "@/lib/zod-messages";
 import { server } from "./msw/server";
 
 // Testing Library's 1000ms default for `findBy*` / `waitFor` is too tight for a
