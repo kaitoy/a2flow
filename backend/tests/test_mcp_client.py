@@ -17,7 +17,6 @@ from infrastructure.mcp_client import (
     MCP_TIMEOUT_SECONDS,
     HttpConnection,
     StdioConnection,
-    _create_no_redirect_http_client,
     call_server_tool,
     list_server_tools,
 )
@@ -81,11 +80,3 @@ def test_connection_timeouts_differ_by_transport() -> None:
     assert HttpConnection(url=_URL).timeout_seconds == MCP_TIMEOUT_SECONDS
     assert StdioConnection(command="npx").timeout_seconds == MCP_STDIO_TIMEOUT_SECONDS
     assert MCP_STDIO_TIMEOUT_SECONDS > MCP_TIMEOUT_SECONDS
-
-
-async def test_create_no_redirect_http_client_disables_redirects() -> None:
-    client = _create_no_redirect_http_client()
-    try:
-        assert client.follow_redirects is False
-    finally:
-        await client.aclose()

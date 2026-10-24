@@ -82,7 +82,7 @@ CONNECTION = HttpConnection(url="https://mcp.example.com/mcp")
 #: Azure MCP Server uses before touching a secret.
 QUESTION = types.ElicitRequestFormParams(
     message="Do you want to continue?",
-    requestedSchema={
+    requested_schema={
         "type": "object",
         "properties": {
             "decision": {
@@ -281,7 +281,7 @@ def reachable(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make the transport succeed, so only authorization decides the outcome."""
 
     async def _list(connection: McpConnection) -> list[types.Tool]:
-        return [types.Tool(name=TOOL_NAME, inputSchema={})]
+        return [types.Tool(name=TOOL_NAME, input_schema={})]
 
     async def _call(
         connection: McpConnection,

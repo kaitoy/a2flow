@@ -342,20 +342,21 @@ class MCPServerService:
         except McpConnectionError as exc:
             return ScriptCallResult(is_error=True, content=[_script_error(exc)])
         return ScriptCallResult(
-            is_error=bool(result.isError),
+            is_error=bool(result.is_error),
             content=[
                 block.text
                 for block in result.content
                 if isinstance(block, types.TextContent)
             ],
-            structured=result.structuredContent,
+            structured=result.structured_content,
         )
 
     async def _script_connection(self, request: ScriptTestRequest) -> McpConnection:
         """Resolve an unsaved script into the connection that launches its runner.
 
         Builds a transient, never-persisted :class:`MCPServer` so the script is
-        launched exactly as it will be once saved.
+        launched exactly as it will be once saved. It has no tenant or audit
+        fields, which only a stored row needs.
 
         Args:
             request: The script to launch.
@@ -363,7 +364,7 @@ class MCPServerService:
         Returns:
             The runner's connection, with ``env`` secrets resolved.
         """
-        server = MCPServer(
+        server = MCPServer(  # type: ignore[call-arg]
             name="script-test",
             transport=McpTransport.script,
             language=request.language,
@@ -378,16 +379,16 @@ def _script_error(exc: McpConnectionError) -> str:
     """Return a script test's failure reason without the transport's type label.
 
     A load failure arrives as the runner's JSON-RPC error, which the client
-    reports as ``McpError: <traceback>``; the label says nothing to the
+    reports as ``MCPError: <traceback>``; the label says nothing to the
     script's author and misaligns the traceback's first line.
 
     Args:
         exc: The failure to describe.
 
     Returns:
-        The reason, minus a leading ``McpError: ``.
+        The reason, minus a leading ``MCPError: ``.
     """
-    return exc.reason.removeprefix("McpError: ")
+    return exc.reason.removeprefix("MCPError: ")
 
 
 def _tool_infos(tools: Sequence[types.Tool]) -> _McpToolInfoList:
@@ -403,8 +404,8 @@ def _tool_infos(tools: Sequence[types.Tool]) -> _McpToolInfoList:
         McpToolInfo(
             name=tool.name,
             description=tool.description,
-            input_schema=tool.inputSchema,
-            output_schema=tool.outputSchema,
+            input_schema=tool.input_schema,
+            output_schema=tool.output_schema,
         )
         for tool in tools
     ]

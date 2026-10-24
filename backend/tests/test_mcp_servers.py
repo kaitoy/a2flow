@@ -782,12 +782,10 @@ async def test_delete_server_referenced_by_binding_returns_409(
         execution = WorkflowExecution(
             session_id="sess-1",
             name="wf",
-            workflow_prompt="p",
             agent_skill_id="skill-1",
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            skill_dir="/tmp/skill",
             initiator_id=SYSTEM_USER_ID,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
@@ -834,8 +832,8 @@ async def test_list_server_tools_returns_tools(
             SimpleNamespace(
                 name="search",
                 description="Search the web",
-                inputSchema={"type": "object"},
-                outputSchema={
+                input_schema={"type": "object"},
+                output_schema={
                     "type": "object",
                     "properties": {"hits": {"type": "array"}},
                 },
@@ -844,8 +842,8 @@ async def test_list_server_tools_returns_tools(
             SimpleNamespace(
                 name="ping",
                 description=None,
-                inputSchema={"type": "object"},
-                outputSchema=None,
+                input_schema={"type": "object"},
+                output_schema=None,
             ),
         ]
 

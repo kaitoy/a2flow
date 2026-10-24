@@ -135,7 +135,7 @@ def _result_to_dict(result: types.CallToolResult) -> dict[str, Any]:
     texts = [
         block.text for block in result.content if isinstance(block, types.TextContent)
     ]
-    if result.isError:
+    if result.is_error:
         payload: dict[str, Any] = {
             "error": "\n".join(texts) or "MCP tool reported an error"
         }
@@ -143,7 +143,7 @@ def _result_to_dict(result: types.CallToolResult) -> dict[str, Any]:
         payload = {
             "result": {
                 "content": texts,
-                "structured": result.structuredContent,
+                "structured": result.structured_content,
             }
         }
     if (result.meta or {}).get(MOCKED_META_KEY):
@@ -171,7 +171,7 @@ def _listing_to_dict(listing: ServerToolListing) -> dict[str, Any]:
             {
                 "name": tool.name,
                 "description": tool.description,
-                "input_schema": tool.inputSchema,
+                "input_schema": tool.input_schema,
             }
             for tool in listing.tools
         ],

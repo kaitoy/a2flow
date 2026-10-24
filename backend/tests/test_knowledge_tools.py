@@ -47,7 +47,7 @@ async def engine(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncEngine,
     await eng.dispose()
 
 
-def _audit() -> dict[str, str]:
+def _audit() -> dict[str, Any]:
     return {
         "tenant_id": DEFAULT_TEST_TENANT_ID,
         "created_by": _USER,

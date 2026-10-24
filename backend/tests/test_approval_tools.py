@@ -67,12 +67,10 @@ async def _seed_session(
         execution = WorkflowExecution(
             session_id=session_id,
             name="wf",
-            workflow_prompt="do it",
             agent_skill_id="skill-1",
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            skill_dir="/tmp/skill",
             initiator_id=user_id,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=user_id,

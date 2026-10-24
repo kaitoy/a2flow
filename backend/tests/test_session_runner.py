@@ -188,10 +188,10 @@ async def test_the_kickoff_runs_on_the_server_with_the_client_tools(
     assert [m.content for m in sent.messages if isinstance(m, UserMessage)] == [
         EXECUTION_KICKOFF_PROMPT
     ]
-    assert {t.name for t in sent.tools} == {"render_approval", "render_a2ui"}
-    assert any("A2UI" in c.description for c in sent.context)
+    assert {t.name for t in sent.tools or []} == {"render_approval", "render_a2ui"}
+    assert any("A2UI" in c.description for c in sent.context or [])
     # The run acts as its initiator, whoever queued the turn.
-    assert sent.forwarded_props["userId"] == execution["initiatorId"]
+    assert (sent.forwarded_props or {})["userId"] == execution["initiatorId"]
     row = await _session(engine, execution["sessionId"])
     assert row.status is ExecutionSessionStatus.idle
     assert row.pending_input is None
@@ -399,7 +399,7 @@ async def test_a_message_runs_as_its_sender_and_is_attributed_to_them(
     await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
 
     (sent,) = agent.inputs
-    assert sent.state["temp:actingUserId"] == "alice"
+    assert (sent.state or {})["temp:actingUserId"] == "alice"
     history = assert_ok(await client.get(f"{_base(execution)}/messages"))
     alice = [m for m in history["messages"] if m.get("content") == "hi from alice"]
     assert alice[0]["senderUserId"] == "alice"
@@ -674,7 +674,7 @@ async def test_a_turn_is_told_which_files_the_session_holds(
     registry.get.return_value = agent
     await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
 
-    entries = {c.description: c.value for c in agent.inputs[0].context}
+    entries = {c.description: c.value for c in agent.inputs[0].context or []}
     assert "input.csv" in entries["Files attached to this session"]
 
 
@@ -802,7 +802,7 @@ async def test_a_branch_point_forks_a_session_and_the_join_returns_to_main(
     registry.get.return_value = agent
     await runner.run_turn(main, DEFAULT_TEST_TENANT_ID)
     (sent,) = agent.inputs
-    reports = {c.description: c.value for c in sent.context}
+    reports = {c.description: c.value for c in sent.context or []}
     assert "C went fine: 3 rows." in reports["Finished branch reports"]
     assert (await _session(engine, main)).status is ExecutionSessionStatus.done
 
@@ -864,7 +864,7 @@ async def test_waiting_until_a_time_schedules_the_session_and_resumes_it_then(
     await runner.run_turn(sid, DEFAULT_TEST_TENANT_ID)
 
     assert "resume_at" in agent.results[0]
-    assert any(c.description == "Current time" for c in agent.inputs[0].context)
+    assert any(c.description == "Current time" for c in agent.inputs[0].context or [])
     row = await _session(engine, sid)
     assert row.status is ExecutionSessionStatus.scheduled
     assert row.resume_at is not None

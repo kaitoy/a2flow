@@ -1132,7 +1132,7 @@ async def test_removal_leaves_non_demo_records_untouched(
                 tenant_id=TENANT_ID,
                 name="operator-token",
                 type=SecretType.local,
-                value="ciphertext",
+                entries={"value": "ciphertext"},
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )

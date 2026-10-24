@@ -1,6 +1,6 @@
 """Tests for answering a server's mid-call questions in ``infrastructure.mcp_client``.
 
-A real FastMCP server is wired to the client over in-memory streams, replacing
+A real MCPServer server is wired to the client over in-memory streams, replacing
 only :func:`infrastructure.mcp_client._transport_streams`, so the
 ``elicitation/create`` round trip -- the capability advertised at
 ``initialize``, the request, the answer the tool sees -- is the SDK's own.
@@ -14,7 +14,7 @@ from typing import Any
 import anyio
 import pytest
 from mcp import types
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.shared.memory import create_client_server_memory_streams
 from pydantic import BaseModel
 
@@ -31,12 +31,12 @@ class _Decision(BaseModel):
     decision: str
 
 
-def _server() -> FastMCP:
+def _server() -> MCPServer:
     """A server with one tool that asks before acting and one that is just slow."""
-    server = FastMCP("elicitation-test")
+    server = MCPServer("elicitation-test")
 
     @server.tool()
-    async def guarded(ctx: Context) -> str:  # type: ignore[type-arg]
+    async def guarded(ctx: Context) -> str:
         answer = await ctx.elicit("Do you want to continue?", _Decision)
         if answer.action == "accept":
             return f"accepted:{answer.data.decision}"
@@ -52,11 +52,11 @@ def _server() -> FastMCP:
 
 @pytest.fixture
 def in_memory(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Route every connection to a fresh in-memory FastMCP server."""
+    """Route every connection to a fresh in-memory MCPServer server."""
 
     @asynccontextmanager
     async def _streams(connection: Any) -> AsyncIterator[Any]:
-        server = _server()._mcp_server
+        server = _server()._lowlevel_server
         async with (
             create_client_server_memory_streams() as (client_streams, server_streams),
             anyio.create_task_group() as group,
@@ -110,11 +110,13 @@ async def test_a_decline_reaches_the_tool(in_memory: None) -> None:
 
 
 async def test_without_a_handler_the_server_cannot_ask(in_memory: None) -> None:
-    """No capability is advertised, so the SDK refuses the request."""
-    result = await mcp_client.call_server_tool(CONNECTION, "guarded", {})
+    """No capability is advertised, so the SDK refuses the request.
 
-    assert result.isError
-    assert "Elicitation not supported" in _text(result)
+    The server's ``ctx.elicit`` raises, and MCPServer answers the whole call
+    with a protocol error rather than an ``is_error`` result.
+    """
+    with pytest.raises(McpConnectionError, match="Elicitation not supported"):
+        await mcp_client.call_server_tool(CONNECTION, "guarded", {})
 
 
 async def test_the_timeout_stands_still_while_a_person_answers(

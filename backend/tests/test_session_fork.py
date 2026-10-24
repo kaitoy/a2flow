@@ -67,7 +67,7 @@ def test_the_fork_drops_the_parents_ag_ui_bookkeeping() -> None:
 
 
 async def test_a_fork_copies_the_settled_history_under_new_ids() -> None:
-    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    service = InMemorySessionService()
     parent = await service.create_session(
         app_name=APP,
         user_id=USER,

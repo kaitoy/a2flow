@@ -56,7 +56,7 @@ async def insert_workflow_task(
     description: str | None = None,
     status: str = "pending",
     depends_on_ids: Sequence[str] = (),
-    tool_bindings: Sequence[Mapping[str, object]] = (),
+    tool_bindings: Sequence[Mapping[str, Any]] = (),
     user_id: str = "owner",
     tenant_id: str = DEFAULT_TEST_TENANT_ID,
 ) -> str:

@@ -48,6 +48,7 @@ def _local_secret(name: str, **entries: str) -> Secret:
         name=name,
         type=SecretType.local,
         entries={key: _CIPHER.encrypt(value) for key, value in entries.items()},
+        tenant_id="t-1",
         created_by=SYSTEM_USER_ID,
         updated_by=SYSTEM_USER_ID,
     )
@@ -59,6 +60,7 @@ def _vault_secret(name: str) -> Secret:
         type=SecretType.vault,
         vault_mount="secret",
         vault_path="myapp/github",
+        tenant_id="t-1",
         created_by=SYSTEM_USER_ID,
         updated_by=SYSTEM_USER_ID,
     )

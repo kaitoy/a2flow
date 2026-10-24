@@ -267,7 +267,7 @@ def _fast_bcrypt_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture()
 def real_session_service() -> InMemorySessionService:
-    return InMemorySessionService()  # type: ignore[no-untyped-call]
+    return InMemorySessionService()
 
 
 @pytest.fixture()

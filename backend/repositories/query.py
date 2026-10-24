@@ -163,7 +163,9 @@ def _coerce(
     Raises:
         QueryValidationError: If the value cannot be coerced to the field type.
     """
-    adapter: TypeAdapter[Any] = TypeAdapter(model.model_fields[py_field].annotation)
+    adapter: TypeAdapter[Any] = TypeAdapter(
+        model.model_fields[py_field].annotation or Any
+    )
     try:
         value = adapter.validate_python(raw)
     except ValidationError as exc:

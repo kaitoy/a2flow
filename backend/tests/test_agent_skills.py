@@ -664,6 +664,7 @@ def test_synced_at_is_serialized_with_a_z_suffix() -> None:
     skill = AgentSkill(
         name="my-skill",
         repo_url="https://github.com/example/repo",
+        tenant_id="t-1",
         created_by=SYSTEM_USER_ID,
         updated_by=SYSTEM_USER_ID,
         synced_at=datetime(2026, 7, 14, 12, 0, tzinfo=UTC),
@@ -677,6 +678,7 @@ def test_synced_at_is_null_before_the_first_clone() -> None:
     skill = AgentSkill(
         name="my-skill",
         repo_url="https://github.com/example/repo",
+        tenant_id="t-1",
         created_by=SYSTEM_USER_ID,
         updated_by=SYSTEM_USER_ID,
     )

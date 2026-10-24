@@ -183,7 +183,7 @@ class SqlElicitationBroker:
                     server_name=server_name,
                     tool_name=tool_name,
                     message=params.message,
-                    requested_schema=params.requestedSchema,
+                    requested_schema=params.requested_schema,
                     expires_at=datetime.now(UTC)
                     + timedelta(seconds=get_settings().mcp_elicitation_timeout_seconds),
                 ),

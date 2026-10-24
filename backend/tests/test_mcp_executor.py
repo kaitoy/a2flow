@@ -68,7 +68,7 @@ async def test_the_local_executor_lists_through_the_transport(
 
     async def _list(connection: McpConnection) -> list[types.Tool]:
         seen.append(connection)
-        return [types.Tool(name="read_file", inputSchema={})]
+        return [types.Tool(name="read_file", input_schema={})]
 
     monkeypatch.setattr(mcp_client, "list_server_tools", _list)
     connection = HttpConnection(url="https://mcp.example.com/mcp")

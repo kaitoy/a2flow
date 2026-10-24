@@ -93,7 +93,7 @@ SCHEMA: dict[str, Any] = {
     "required": ["decision"],
 }
 QUESTION = types.ElicitRequestFormParams(
-    message="Do you want to continue?", requestedSchema=SCHEMA
+    message="Do you want to continue?", requested_schema=SCHEMA
 )
 
 Env = tuple[AsyncClient, AsyncEngine]
@@ -315,7 +315,7 @@ async def test_a_url_question_is_declined_without_asking(access_env: Env) -> Non
         eng,
         execution_id,
         types.ElicitRequestURLParams(
-            message="Sign in", url="https://example.com", elicitationId="e-1"
+            message="Sign in", url="https://example.com", elicitation_id="e-1"
         ),
     )
 

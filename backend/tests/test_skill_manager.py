@@ -31,6 +31,7 @@ def _make_skill(
         repo_url=repo_url,
         repo_path=repo_path,
         repo_ref=repo_ref,
+        tenant_id="t-1",
         created_by="system",
         updated_by="system",
     )

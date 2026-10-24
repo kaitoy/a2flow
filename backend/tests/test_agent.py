@@ -47,7 +47,7 @@ async def agent_client() -> AsyncGenerator[tuple[AsyncClient, MagicMock], None]:
     mock_registry = MagicMock()
     mock_registry.get.return_value = mock_agent
 
-    session_service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    session_service = InMemorySessionService()
     app.dependency_overrides[get_session_service] = lambda: session_service
     app.dependency_overrides[get_agent_registry] = lambda: mock_registry
     _install_auth_overrides(app)
@@ -215,7 +215,7 @@ async def test_agent_endpoint_injects_user_id_from_header(
         headers={"X-User-Id": "alice"},
     )
 
-    assert captured[0].forwarded_props["userId"] == "alice"
+    assert (captured[0].forwarded_props or {})["userId"] == "alice"
 
 
 async def test_agent_endpoint_defaults_user_id_when_header_absent(
@@ -235,7 +235,7 @@ async def test_agent_endpoint_defaults_user_id_when_header_absent(
 
     await client.post("/api/v1/agent", json=_make_run_agent_input())
 
-    assert captured[0].forwarded_props["userId"] == "user"
+    assert (captured[0].forwarded_props or {})["userId"] == "user"
 
 
 async def test_agent_endpoint_header_overrides_client_user_id(
@@ -256,7 +256,7 @@ async def test_agent_endpoint_header_overrides_client_user_id(
     body = {**_make_run_agent_input(), "forwardedProps": {"userId": "spoofed"}}
     await client.post("/api/v1/agent", json=body, headers={"X-User-Id": "alice"})
 
-    assert captured[0].forwarded_props["userId"] == "alice"
+    assert (captured[0].forwarded_props or {})["userId"] == "alice"
 
 
 async def test_agent_endpoint_strips_a2ui_inject_flag(
@@ -286,8 +286,8 @@ async def test_agent_endpoint_strips_a2ui_inject_flag(
     }
     await client.post("/api/v1/agent", json=body, headers={"X-User-Id": "alice"})
 
-    assert "injectA2UITool" not in captured[0].forwarded_props
-    assert captured[0].forwarded_props["userId"] == "alice"
+    assert "injectA2UITool" not in (captured[0].forwarded_props or {})
+    assert (captured[0].forwarded_props or {})["userId"] == "alice"
 
 
 async def test_agent_endpoint_encodes_events_as_sse(
@@ -394,7 +394,7 @@ def test_create_app_enables_resumability() -> None:
 def test_agent_registry_builds_resumable_agents() -> None:
     from infrastructure.agent import AgentRegistry
 
-    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    service = InMemorySessionService()
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
     agent = registry.get(None, None, None, tenant_id="tenant-1")
@@ -409,7 +409,7 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
 
     from infrastructure.agent import AgentRegistry
 
-    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    service = InMemorySessionService()
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
     assert registry.get(None, None, None, tenant_id="tenant-1") is registry.get(
@@ -467,7 +467,7 @@ def test_agent_registry_caches_are_isolated_per_tenant(tmp_path: Any) -> None:
     """The same skill revision resolved for two tenants yields distinct agents."""
     from infrastructure.agent import AgentRegistry
 
-    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    service = InMemorySessionService()
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
     skill_dir = tmp_path / "skill"
@@ -493,7 +493,7 @@ def test_agent_registry_evicts_lru_entry_per_tenant_when_over_capacity(
     from infrastructure.agent import AgentRegistry
 
     monkeypatch.setattr(agent_module, "_AGENT_CACHE_MAX_ENTRIES", 2)
-    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    service = InMemorySessionService()
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
     def _skill_dir(name: str) -> Any:
@@ -533,7 +533,7 @@ def test_agent_registry_lru_cap_is_independent_per_tenant(
     from infrastructure.agent import AgentRegistry
 
     monkeypatch.setattr(agent_module, "_AGENT_CACHE_MAX_ENTRIES", 1)
-    service = InMemorySessionService()  # type: ignore[no-untyped-call]
+    service = InMemorySessionService()
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
     def _skill_dir(name: str) -> Any:

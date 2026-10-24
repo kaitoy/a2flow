@@ -47,7 +47,7 @@ from infrastructure.mcp_policies import (
 )
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
-from models.mcp_server import MCPServer, McpTransport
+from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.mcp_tool_invocation import McpAuditDecision
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
@@ -134,7 +134,7 @@ async def _seed_stdio_server(
         server = MCPServer(
             name=name,
             transport=McpTransport.stdio,
-            command="npx",
+            command=McpCommand.npx,
             args=args if args is not None else ["-y", "pkg"],
             env=env or {},
             tenant_id=DEFAULT_TEST_TENANT_ID,
@@ -153,12 +153,10 @@ async def _seed_session(eng: AsyncEngine, *, session_id: str = "sess-abc") -> st
         execution = WorkflowExecution(
             session_id=session_id,
             name="wf",
-            workflow_prompt="do it",
             agent_skill_id="skill-1",
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            skill_dir="/tmp/skill",
             initiator_id=SYSTEM_USER_ID,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
@@ -262,7 +260,7 @@ async def _seed_local_secret(eng: AsyncEngine, name: str, value: str) -> None:
 def _tool_result(text: str = "ok", *, is_error: bool = False) -> types.CallToolResult:
     """Build a CallToolResult with a single text block."""
     return types.CallToolResult(
-        content=[types.TextContent(type="text", text=text)], isError=is_error
+        content=[types.TextContent(type="text", text=text)], is_error=is_error
     )
 
 
@@ -368,7 +366,7 @@ async def test_empty_chain_allows_an_unbound_tool(
     result = await McpGateway(policies=[]).call_tool(
         CallToolRequest(_principal(), server_id, "anything", {})
     )
-    assert result.isError is False
+    assert result.is_error is False
 
 
 async def test_policies_run_in_order_and_the_first_denial_short_circuits(
@@ -535,7 +533,7 @@ async def test_binding_policy_allows_the_union_of_in_progress_tasks(
         result = await gateway.call_tool(
             CallToolRequest(_principal(credential=credential), server_id, tool_name, {})
         )
-        assert result.isError is False
+        assert result.is_error is False
 
 
 async def test_binding_policy_ignores_listings(engine: AsyncEngine) -> None:
@@ -651,7 +649,7 @@ async def test_call_tool_returns_a_tool_level_error_untouched(
     result = await McpGateway(policies=[]).call_tool(
         CallToolRequest(_principal(), server_id, "search", {})
     )
-    assert result.isError is True
+    assert result.is_error is True
 
 
 async def test_call_tool_expands_secrets_and_env_placeholders_for_stdio(
@@ -900,7 +898,7 @@ class _RecordingElicitor:
 
 _QUESTION = types.ElicitRequestFormParams(
     message="Continue?",
-    requestedSchema={"type": "object", "properties": {"decision": {"type": "string"}}},
+    requested_schema={"type": "object", "properties": {"decision": {"type": "string"}}},
 )
 
 
@@ -1042,7 +1040,7 @@ async def test_list_tools_isolates_an_unreachable_server(
     async def fake_list_server_tools(connection: McpConnection) -> list[types.Tool]:
         if "bad" in connection.label:
             raise McpConnectionError(connection.label, "connection refused")
-        return [types.Tool(name="search", inputSchema={"type": "object"})]
+        return [types.Tool(name="search", input_schema={"type": "object"})]
 
     monkeypatch.setattr(
         "infrastructure.mcp_client.list_server_tools", fake_list_server_tools

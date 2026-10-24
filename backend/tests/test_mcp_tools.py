@@ -27,7 +27,7 @@ from infrastructure.mcp_gateway import (
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
-from models.mcp_server import MCPServer, McpTransport
+from models.mcp_server import McpCommand, MCPServer, McpTransport
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
 from models.workflow import Workflow
@@ -139,7 +139,7 @@ async def _seed_stdio_server(
     eng: AsyncEngine,
     *,
     name: str = "stdio-srv",
-    command: str = "npx",
+    command: McpCommand = McpCommand.npx,
     args: list[str] | None = None,
     env: dict[str, str] | None = None,
 ) -> str:
@@ -167,12 +167,10 @@ async def _seed_session(eng: AsyncEngine, *, session_id: str = "sess-abc") -> st
         execution = WorkflowExecution(
             session_id=session_id,
             name="wf",
-            workflow_prompt="do it",
             agent_skill_id="skill-1",
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            skill_dir="/tmp/skill",
             initiator_id=SYSTEM_USER_ID,
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
@@ -227,8 +225,8 @@ def _tool_result(
     """Build a CallToolResult with a single text block."""
     return types.CallToolResult(
         content=[types.TextContent(type="text", text=text)],
-        isError=is_error,
-        structuredContent=structured,
+        is_error=is_error,
+        structured_content=structured,
     )
 
 
@@ -398,7 +396,6 @@ async def test_call_forwards_a_stdio_server_as_a_stdio_connection(
     await _seed_local_secret(engine, "files-key", "tok-stdio")
     server_id = await _seed_stdio_server(
         engine,
-        command="npx",
         args=["-y", "files-mcp@0.3.0"],
         env={"API_KEY": "${secret:files-key/k}"},
     )
@@ -458,7 +455,7 @@ async def test_list_mcp_tools_works_in_a_design_session(
             SimpleNamespace(
                 name="search",
                 description="Search the web",
-                inputSchema={"type": "object"},
+                input_schema={"type": "object"},
             )
         ]
 
@@ -514,7 +511,7 @@ async def test_list_mcp_tools_aggregates_and_isolates_failures(
             SimpleNamespace(
                 name="search",
                 description="Search the web",
-                inputSchema={"type": "object"},
+                input_schema={"type": "object"},
             )
         ]
 

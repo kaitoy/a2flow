@@ -14,10 +14,10 @@ Design notes:
   :func:`call_server_tool`. Nothing outside this module branches on transport.
 * **Nothing of A2Flow's own world.** Deliberately no ORM row, no session, no
   settings: resolution lives in :mod:`infrastructure.mcp_connection` precisely
-  so this module's imports are the MCP SDK, httpx, and two dependency-free
+  so this module's imports are the MCP SDK, httpx2, and two dependency-free
   modules of ours. What runs beside a user-registered MCP server should be as
   small as it can be.
-* **One connection per operation.** Both ``streamablehttp_client`` and
+* **One connection per operation.** Both ``streamable_http_client`` and
   ``stdio_client`` run an anyio task group that must be entered and exited in
   the same asyncio task; opening and closing the session inside a single
   ``async with`` stack per call guarantees that, at the cost of a handshake
@@ -48,13 +48,13 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+import httpx2
 from mcp import ClientSession, StdioServerParameters, types
+from mcp.client.context import ClientRequestContext
 from mcp.client.session import ElicitationFnT
 from mcp.client.stdio import stdio_client
-from mcp.client.streamable_http import streamablehttp_client
-from mcp.shared.context import RequestContext
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._stream_protocols import ReadStream, WriteStream
 from mcp.shared.message import SessionMessage
 
 from infrastructure.url_safety import assert_public_http_url
@@ -78,8 +78,13 @@ MCP_STDIO_TIMEOUT_SECONDS = 120.0
 #: bound that wait itself and answer ``cancel`` when it gives up.
 ElicitHandler = Callable[[types.ElicitRequestParams], Awaitable[types.ElicitResult]]
 
-_ReadStream = MemoryObjectReceiveStream[SessionMessage | Exception]
-_WriteStream = MemoryObjectSendStream[SessionMessage]
+_ReadStream = ReadStream[SessionMessage | Exception]
+_WriteStream = WriteStream[SessionMessage]
+
+#: Per-request HTTP timeouts for streamable-HTTP sessions, matching the SDK's
+#: own defaults: a long read timeout because a server may hold a response
+#: stream open. The whole operation is still bounded by ``MCP_TIMEOUT_SECONDS``.
+_HTTP_TIMEOUT = httpx2.Timeout(30.0, read=300.0)
 
 
 @dataclass(frozen=True)
@@ -155,36 +160,21 @@ class StdioConnection:
 McpConnection = HttpConnection | StdioConnection
 
 
-def _create_no_redirect_http_client(
-    headers: dict[str, str] | None = None,
-    timeout: httpx.Timeout | None = None,
-    auth: httpx.Auth | None = None,
-) -> httpx.AsyncClient:
-    """Build the httpx client MCP sessions use, with redirect-following disabled.
+def _create_http_client(headers: dict[str, str]) -> httpx2.AsyncClient:
+    """Build the HTTP client a streamable-HTTP MCP session runs on.
 
-    The MCP SDK's own factory (``mcp.shared._httpx_utils.create_mcp_http_client``)
-    hardcodes ``follow_redirects=True``. Without this override, a server URL
-    that passed host validation could 30x-redirect a request to a
-    private/internal address and the client would silently follow it. The
-    streamable-HTTP MCP protocol has no legitimate need for redirects, so
-    following them is simply turned off.
+    Redirects need no handling here: the SDK follows one only when it stays on
+    the endpoint's origin and keeps the request method, whatever the client's
+    own ``follow_redirects`` says, so a server URL that passed host validation
+    cannot bounce a request to a private/internal address.
 
     Args:
         headers: Extra headers to send with every request.
-        timeout: Request timeout; httpx's own default is applied if omitted.
-        auth: Optional authentication handler.
 
     Returns:
-        A configured, non-redirect-following ``httpx.AsyncClient``.
+        A configured ``httpx2.AsyncClient``; the caller closes it.
     """
-    kwargs: dict[str, Any] = {"follow_redirects": False}
-    if timeout is not None:
-        kwargs["timeout"] = timeout
-    if headers is not None:
-        kwargs["headers"] = headers
-    if auth is not None:
-        kwargs["auth"] = auth
-    return httpx.AsyncClient(**kwargs)
+    return httpx2.AsyncClient(headers=headers, timeout=_HTTP_TIMEOUT)
 
 
 @asynccontextmanager
@@ -220,11 +210,13 @@ async def _transport_streams(
         return
 
     await asyncio.to_thread(assert_public_http_url, connection.url)
-    async with streamablehttp_client(
-        connection.url,
-        headers=connection.headers or None,
-        httpx_client_factory=_create_no_redirect_http_client,
-    ) as (read_stream, write_stream, _get_session_id):
+    async with (
+        _create_http_client(connection.headers) as http_client,
+        streamable_http_client(connection.url, http_client=http_client) as (
+            read_stream,
+            write_stream,
+        ),
+    ):
         yield read_stream, write_stream
 
 
@@ -261,7 +253,7 @@ async def mcp_session(
 def _describe_failure(exc: BaseException) -> str:
     """Describe a connection failure, unwrapping any nested ``ExceptionGroup``.
 
-    ``stdio_client`` and ``streamablehttp_client`` both run their transport
+    ``stdio_client`` and ``streamable_http_client`` both run their transport
     inside an anyio task group, so a connection failure often surfaces as a
     bare ``BaseExceptionGroup("unhandled errors in a TaskGroup", [...])``
     whose own ``str()`` is just "(1 sub-exception)" -- the actual cause is
@@ -324,7 +316,7 @@ def _pausing_timeout(
     """
 
     async def callback(
-        context: RequestContext[ClientSession, Any],
+        context: ClientRequestContext,
         params: types.ElicitRequestParams,
     ) -> types.ElicitResult | types.ErrorData:
         loop = asyncio.get_running_loop()
@@ -349,7 +341,7 @@ async def call_server_tool(
     """Invoke ``tool_name`` with ``arguments`` on the server behind ``connection``.
 
     Tool-level failures are *not* raised: they come back inside the returned
-    :class:`mcp.types.CallToolResult` with ``isError`` set, so the caller can
+    :class:`mcp.types.CallToolResult` with ``is_error`` set, so the caller can
     relay them to the agent verbatim.
 
     Args:

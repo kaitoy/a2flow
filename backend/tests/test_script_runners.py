@@ -134,8 +134,8 @@ async def test_python_runner_exposes_public_top_level_functions() -> None:
 
     assert set(tools) == {"add", "greet", "fail"}
     assert tools["add"].description == "Add two integers."
-    assert tools["add"].inputSchema["properties"]["a"]["type"] == "integer"
-    assert tools["add"].inputSchema["required"] == ["a", "b"]
+    assert tools["add"].input_schema["properties"]["a"]["type"] == "integer"
+    assert tools["add"].input_schema["required"] == ["a", "b"]
 
 
 async def test_python_runner_calls_a_tool_despite_prints() -> None:
@@ -144,7 +144,7 @@ async def test_python_runner_calls_a_tool_despite_prints() -> None:
     added = await call_server_tool(connection, "add", {"a": 2, "b": 3})
     greeted = await call_server_tool(connection, "greet", {"name": "ada"})
 
-    assert not added.isError
+    assert not added.is_error
     assert _text(added) == "5"
     assert _text(greeted) == "hello ada"
 
@@ -152,7 +152,7 @@ async def test_python_runner_calls_a_tool_despite_prints() -> None:
 async def test_python_runner_reports_an_exception_as_a_tool_error() -> None:
     connection = await _connection(ScriptLanguage.python, _PYTHON_SOURCE)
     result = await call_server_tool(connection, "fail", {})
-    assert result.isError
+    assert result.is_error
     assert "boom" in _text(result)
 
 
@@ -174,7 +174,7 @@ def pick(
     connection = await _connection(ScriptLanguage.python, source)
     [tool] = await list_server_tools(connection)
 
-    assert tool.inputSchema == {
+    assert tool.input_schema == {
         "type": "object",
         "properties": {
             "tags": {"type": "array", "items": {"type": "string"}},
@@ -206,9 +206,9 @@ async def test_node_runner_exposes_public_exported_functions() -> None:
 
     assert set(tools) == {"add", "greet", "fail"}
     assert tools["add"].description == "Add two numbers."
-    assert tools["add"].inputSchema["required"] == ["a", "b"]
+    assert tools["add"].input_schema["required"] == ["a", "b"]
     assert tools["greet"].description is None
-    assert tools["greet"].inputSchema == {"type": "object"}
+    assert tools["greet"].input_schema == {"type": "object"}
 
 
 @_needs_node
@@ -218,7 +218,7 @@ async def test_node_runner_calls_a_tool_despite_console_log() -> None:
     added = await call_server_tool(connection, "add", {"a": 2, "b": 3})
     greeted = await call_server_tool(connection, "greet", {"name": "ada"})
 
-    assert not added.isError
+    assert not added.is_error
     assert _text(added) == "5"
     assert _text(greeted) == "hello ada"
 
@@ -227,7 +227,7 @@ async def test_node_runner_calls_a_tool_despite_console_log() -> None:
 async def test_node_runner_reports_an_exception_as_a_tool_error() -> None:
     connection = await _connection(ScriptLanguage.javascript, _JS_SOURCE)
     result = await call_server_tool(connection, "fail", {})
-    assert result.isError
+    assert result.is_error
     assert _text(result) == "boom"
 
 
@@ -269,7 +269,7 @@ async def test_runner_reports_a_load_failure_over_the_protocol(
     assert expected in caught.value.reason
     assert "script_runners" not in caught.value.reason
     assert "base64" not in caught.value.reason
-    assert called.isError
+    assert called.is_error
     assert expected in _text(called)
 
 
@@ -299,7 +299,7 @@ async def test_python_runner_imports_a_declared_package() -> None:
 
     result = await call_server_tool(connection, "size", {"n": 3000})
 
-    assert not result.isError
+    assert not result.is_error
     assert _text(result) == "3.0 kB"
 
 
@@ -311,7 +311,7 @@ async def test_node_runner_imports_a_declared_package() -> None:
 
     result = await call_server_tool(connection, "check", {"value": "42"})
 
-    assert not result.isError
+    assert not result.is_error
     assert _text(result) == "true"
 
 

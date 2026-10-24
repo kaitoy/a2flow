@@ -153,7 +153,7 @@ def _fakes(
     store = MagicMock()
     store.skill_dir = MagicMock(return_value=skill_dir)
 
-    return registry, InMemorySessionService(), store  # type: ignore[no-untyped-call]
+    return registry, InMemorySessionService(), store
 
 
 async def _workflow_row(eng: AsyncEngine, workflow_id: str) -> Workflow:

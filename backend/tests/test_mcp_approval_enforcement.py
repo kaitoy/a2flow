@@ -118,7 +118,7 @@ def _fake_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
         **kwargs: Any,
     ) -> types.CallToolResult:
         return types.CallToolResult(
-            content=[types.TextContent(type="text", text="ok")], isError=False
+            content=[types.TextContent(type="text", text="ok")], is_error=False
         )
 
     monkeypatch.setattr(
@@ -154,12 +154,10 @@ async def _seed_execution(eng: AsyncEngine, *, session_id: str = SESSION_ID) -> 
         execution = WorkflowExecution(
             session_id=session_id,
             name="wf",
-            workflow_prompt="do it",
             agent_skill_id="skill-1",
             agent_skill_name="skill",
             agent_skill_repo_url="https://example.com/repo",
             agent_skill_repo_path=".",
-            skill_dir="/tmp/skill",
             initiator_id="owner",
             tenant_id=DEFAULT_TEST_TENANT_ID,
             created_by=SYSTEM_USER_ID,
@@ -393,7 +391,7 @@ async def test_approved_task_can_call_its_granted_tool(engine: AsyncEngine) -> N
 
     result = await _call(server_id)
 
-    assert result.isError is False
+    assert result.is_error is False
 
 
 async def test_call_is_denied_without_a_certificate_once_an_approval_exists(
@@ -508,7 +506,7 @@ async def test_an_asking_step_in_front_of_the_acting_task_still_gates_it(
     await _approve(engine, approval_id)
     await _issue(engine, approval_id)
 
-    assert (await _call(server_id)).isError is False
+    assert (await _call(server_id)).is_error is False
     async with AsyncSession(engine) as db:
         certificate = await SqlMcpToolCertificateRepository(
             db, tenant_id=DEFAULT_TEST_TENANT_ID
@@ -559,7 +557,7 @@ async def test_an_approval_on_the_asking_step_gates_the_task_after_it(
     await _approve(engine, approval_id)
     await _issue(engine, approval_id)
 
-    assert (await _call(server_id)).isError is False
+    assert (await _call(server_id)).is_error is False
     async with AsyncSession(engine) as db:
         certificate = await SqlMcpToolCertificateRepository(
             db, tenant_id=DEFAULT_TEST_TENANT_ID
@@ -599,7 +597,7 @@ async def test_a_nearer_approval_invalidates_the_outer_ones_certificate(
     )
     await _approve(engine, outer)
     await _issue(engine, outer)
-    assert (await _call(server_id)).isError is False
+    assert (await _call(server_id)).is_error is False
 
     # A second request lands on the acting task itself, after the fact.
     await _seed_approval(
@@ -651,7 +649,7 @@ async def test_a_merge_waits_for_every_governing_approval(
 
     await _approve(engine, right_approval)
     await _issue(engine, right_approval)
-    assert (await _call(server_id)).isError is False
+    assert (await _call(server_id)).is_error is False
 
 
 # ---------------------------------------------------------------------------
@@ -683,7 +681,7 @@ async def test_widening_bindings_after_approval_does_not_widen_the_grant(
         await _call(server_id, tool="delete_everything")
 
     # The originally granted tool still works.
-    assert (await _call(server_id)).isError is False
+    assert (await _call(server_id)).is_error is False
 
 
 # ---------------------------------------------------------------------------
@@ -786,7 +784,7 @@ async def test_task_without_an_approval_calls_on_its_initiators_grant(
 
     result = await _call(server_id)
 
-    assert result.isError is False
+    assert result.is_error is False
     async with AsyncSession(engine) as db:
         certificate = await SqlMcpToolCertificateRepository(
             db, tenant_id=DEFAULT_TEST_TENANT_ID
@@ -830,7 +828,7 @@ async def test_widening_bindings_after_the_grant_does_not_widen_it(
     with pytest.raises(McpPolicyDeniedError, match="was not granted"):
         await _call(server_id, tool="delete_everything")
 
-    assert (await _call(server_id)).isError is False
+    assert (await _call(server_id)).is_error is False
 
 
 async def test_a_grant_is_not_issued_for_a_task_that_has_an_approval(
@@ -874,7 +872,7 @@ async def test_an_approval_arriving_later_stands_the_initiator_grant_down(
     execution_id = await _seed_execution(engine)
     task_id = await _seed_task(engine, execution_id, bindings=[(server_id, TOOL)])
     await _grant(engine, execution_id, task_id)
-    assert (await _call(server_id)).isError is False
+    assert (await _call(server_id)).is_error is False
 
     await _seed_approval(
         engine,
@@ -926,7 +924,7 @@ async def test_a_second_task_binding_the_same_tool_supplies_its_own_grant(
 
     result = await _call(server_id)
 
-    assert result.isError is False
+    assert result.is_error is False
     row = (await _invocations(engine))[0]
     assert row.workflow_task_id == open_task
     assert row.approval_id is None
@@ -1136,7 +1134,7 @@ async def test_an_audit_failure_does_not_break_the_call(
 
     result = await _call(server_id)
 
-    assert result.isError is False
+    assert result.is_error is False
 
 
 # ---------------------------------------------------------------------------
@@ -1172,7 +1170,7 @@ async def test_a_conforming_call_passes_the_argument_gate(
     )
     await _issue(engine, approval_id)
 
-    assert (await _call(srv, arguments={"path": "/etc/hosts"})).isError is False
+    assert (await _call(srv, arguments={"path": "/etc/hosts"})).is_error is False
 
 
 async def test_a_deviating_argument_value_is_denied(engine: AsyncEngine) -> None:
@@ -1266,7 +1264,7 @@ async def test_an_approval_with_no_declaration_does_not_constrain_arguments(
     )
     await _issue(engine, approval_id)
 
-    assert (await _call(srv, arguments={"anything": "at all"})).isError is False
+    assert (await _call(srv, arguments={"anything": "at all"})).is_error is False
 
 
 async def test_an_initiator_grant_is_not_argument_constrained(
@@ -1278,7 +1276,7 @@ async def test_an_initiator_grant_is_not_argument_constrained(
     task_id = await _seed_task(engine, execution_id, bindings=[(srv, TOOL)])
     await _grant(engine, execution_id, task_id)
 
-    assert (await _call(srv, arguments={"path": "/anything"})).isError is False
+    assert (await _call(srv, arguments={"path": "/anything"})).is_error is False
 
 
 async def test_a_merge_must_satisfy_every_governing_declaration(
@@ -1329,7 +1327,7 @@ async def test_a_merge_must_satisfy_every_governing_declaration(
         await _call(srv, arguments={"path": "/etc/hosts"})
 
     # Inside both.
-    assert (await _call(srv, arguments={"path": "/etc/motd"})).isError is False
+    assert (await _call(srv, arguments={"path": "/etc/motd"})).is_error is False
 
 
 async def test_a_denied_argument_is_audited_without_its_value(
@@ -1398,7 +1396,7 @@ async def test_an_exempt_tool_accepts_arguments_nobody_declared(
     )
     await _issue(engine, approval_id)
 
-    assert (await _call(srv, arguments={"path": "/anything/at/all"})).isError is False
+    assert (await _call(srv, arguments={"path": "/anything/at/all"})).is_error is False
 
 
 async def test_an_exempt_tool_is_still_gated_by_the_approval(
@@ -1450,7 +1448,7 @@ async def test_exempting_one_tool_leaves_the_others_bounded(
     )
     await _issue(engine, approval_id)
 
-    assert (await _call(srv, arguments={"path": "/etc/shadow"})).isError is False
+    assert (await _call(srv, arguments={"path": "/etc/shadow"})).is_error is False
     with pytest.raises(McpPolicyDeniedError, match="outside what the approver"):
         await _call(srv, tool="write_file", arguments={"path": "/etc/passwd"})
 

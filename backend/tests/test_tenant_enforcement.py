@@ -577,7 +577,6 @@ async def _seed_cross_tenant_execution_with_message(
         execution = WorkflowExecution(
             session_id=session_id,
             name="wf",
-            workflow_prompt="do it",
             agent_skill_id=skill_id,
             agent_skill_name=skill_id,
             agent_skill_repo_url="https://example.com/repo",

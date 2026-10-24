@@ -198,11 +198,11 @@ def mock_result_to_call_result(response: MockResponse) -> types.CallToolResult:
     meta = {MOCKED_META_KEY: True}
     if response.kind is MockResponseKind.structured:
         return types.CallToolResult(
-            content=[], structuredContent=response.value, _meta=meta
+            content=[], structured_content=response.value, _meta=meta
         )
     return types.CallToolResult(
         content=[types.TextContent(type="text", text=str(response.value))],
-        isError=response.kind is MockResponseKind.error,
+        is_error=response.kind is MockResponseKind.error,
         _meta=meta,
     )
 

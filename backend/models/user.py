@@ -427,7 +427,7 @@ class UserRead(BaseEntity):
         """
         return cls(
             **user.model_dump(exclude={"password"}),
-            group_roles=sorted(group_roles),
+            group_roles=sorted(Role(role) for role in group_roles),
             group_ids=sorted(group_ids),
             group_tag_ids=sorted(group_tag_ids),
         )

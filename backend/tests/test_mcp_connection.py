@@ -6,6 +6,7 @@ transport, which runs in the MCP proxy container.
 """
 
 import sys
+from typing import Any
 
 import pytest
 
@@ -26,7 +27,7 @@ class _StubResolver:
 
 
 def _server(**fields: object) -> MCPServer:
-    defaults: dict[str, object] = {
+    defaults: dict[str, Any] = {
         "id": "srv-1",
         "name": "srv",
         "tenant_id": "t-1",
@@ -48,7 +49,7 @@ def _unvalidated_server(**fields: object) -> MCPServer:
     removed), which ``MCPServerCreate``/``MCPServerService.update`` would
     otherwise reject before it ever reaches ``resolve_connection``.
     """
-    defaults: dict[str, object] = {
+    defaults: dict[str, Any] = {
         "id": "srv-1",
         "name": "srv",
         "tenant_id": "t-1",
@@ -59,7 +60,7 @@ def _unvalidated_server(**fields: object) -> MCPServer:
         "args": [],
         "env": {},
     }
-    return MCPServer.model_construct(**{**defaults, **fields})  # type: ignore[arg-type]
+    return MCPServer.model_construct(**{**defaults, **fields})
 
 
 async def test_resolve_connection_builds_http_connection_with_resolved_headers() -> (
