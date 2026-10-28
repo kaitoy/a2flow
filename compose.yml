@@ -99,6 +99,11 @@ services:
       # container path rather than a volume: it is reissued on every start that
       # finds it missing, so there is nothing to keep.
       MCP_BACKEND_TLS_DIR: /app/.mcp-tls-backend
+    # `default` reaches the database and serves the frontend; `mcp` is the one
+    # network it shares with `mcp-proxy` (see the `networks` block below).
+    networks:
+      - default
+      - mcp
     volumes:
       - skills:/var/lib/a2flow/skills
       - mcp-tls:/var/lib/a2flow/mcp-tls
@@ -155,6 +160,11 @@ services:
     environment:
       MCP_PROXY_TLS_DIR: /var/lib/a2flow/mcp-tls
       MCP_PROXY_PORT: "8443"
+    # Only `mcp`, never `default`: the code that runs here must not be able to
+    # open a connection to `db` (or `worker`, or `frontend`) at all, whatever
+    # credential it may know.
+    networks:
+      - mcp
     volumes:
       # Read-only: the backend issues this material, and nothing that runs in
       # here should be able to replace it.
@@ -197,6 +207,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+networks:
+  # The backend <-> mcp-proxy hop, kept apart from `default` so the third-party
+  # MCP server code in `mcp-proxy` cannot reach `db`. Not `internal`: remote MCP
+  # servers, and the packages stdio servers fetch at launch, are on the internet.
+  mcp:
 
 volumes:
   pgdata:

@@ -38,7 +38,7 @@ SSE のエージェントルート(`POST /api/v1/workflow-executions/{id}/agent`
 
 ## プロセス構成 {#process-layout}
 
-API と並んで、デプロイでは [MCP プロキシ](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を動かします。テナントが登録した MCP サーバーを実際に起動したり接続したりするプロセスです。分けていること自体が目的で、第三者のコードが動く場所なので、データベースへのアクセスもシークレット暗号鍵も LLM の API キーも持ちません。`compose.yml` では `mcp-proxy` コンテナとして動きます。コンテナを自前で組む場合は [MCP プロキシ](./configuration.md#mcp-sandbox)で設定します。
+API と並んで、デプロイでは [MCP プロキシ](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を動かします。テナントが登録した MCP サーバーを実際に起動したり接続したりするプロセスです。分けていること自体が目的で、第三者のコードが動く場所なので、データベースへのアクセスもシークレット暗号鍵も LLM の API キーも持ちません。`compose.yml` では `mcp-proxy` コンテナとして、API とだけ共有するネットワーク上で動くため、データベースにはそもそも接続できません。コンテナを自前で組む場合も同様にプロキシをデータベースのネットワークから外し、[MCP プロキシ](./configuration.md#mcp-sandbox)で設定します。
 
 押さえるべき点が 2 つあります。
 
