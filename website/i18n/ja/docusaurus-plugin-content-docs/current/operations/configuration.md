@@ -130,15 +130,6 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 **キーはバックアップしてください。** 失うと保存済みのローカルシークレットがすべて復号できなくなり、同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
 
-**`secret-key` ボリュームより前の Docker Compose 環境をアップグレードする場合。** 以前のイメージはビルドディレクトリの `backend/.secret_key` をイメージ内にコピーしていて、そのコピーが実際に使われるキーでした。今のイメージには含まれないので、再ビルドの前に `.env` の `SECRET_ENCRYPTION_KEY` にそのファイルの中身を設定するか、ファイルをボリュームにコピーしてください。
-
-```bash
-docker compose create backend
-docker compose cp backend/.secret_key backend:/var/lib/a2flow/secret-key/.secret_key
-```
-
-どちらもせずに起動すると新しいキーが生成され、既存のシークレットはすべて読めなくなります。
-
 `VAULT_ADDR` は、ユーザーが入力した URL に適用される SSRF チェックの対象から意図的に外してあります。運用者が設定するデプロイ設定であり、通常はプライベートアドレスを指すからです。
 
 ## MCP ツールと承認 {#mcp-tools-and-approvals}

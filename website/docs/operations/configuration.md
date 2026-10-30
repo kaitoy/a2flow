@@ -130,15 +130,6 @@ The encryption key is resolved at first use, in order:
 
 **Back the key up.** Losing it makes every stored local secret undecryptable, and the same key protects the [approval CA](../architecture/approvals.md)'s signing key.
 
-**Upgrading a Docker Compose deployment that predates the `secret-key` volume.** Earlier images copied `backend/.secret_key` from the build directory into the image, and that copy was the key in use. The image no longer contains it, so before rebuilding, either set `SECRET_ENCRYPTION_KEY` in `.env` to that file's contents, or copy the file into the volume:
-
-```bash
-docker compose create backend
-docker compose cp backend/.secret_key backend:/var/lib/a2flow/secret-key/.secret_key
-```
-
-Starting without either generates a new key, and every existing secret becomes unreadable.
-
 `VAULT_ADDR` is deliberately exempt from the SSRF URL checks applied to user-supplied URLs: it is operator-set deployment configuration and typically points at a private address.
 
 ## MCP tools and approvals {#mcp-tools-and-approvals}
