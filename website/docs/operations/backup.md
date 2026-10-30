@@ -60,6 +60,12 @@ If you set `SECRET_ENCRYPTION_KEY` explicitly, the key already lives wherever yo
 
 If you did not, the backend generated one on first use and wrote it to the file at `SECRET_KEY_FILE` (default `.secret_key`, next to the SQLite database file). That file is the only copy. Back it up somewhere other than the machine it sits on, and treat it like the credential it is.
 
+Under Docker Compose the file is in the `secret-key` named volume:
+
+```bash
+docker run --rm -v a2flow_secret-key:/key -v "$PWD:/backup" alpine   cp /key/.secret_key /backup/secret_key-$(date +%F)
+```
+
 Rotating the key is not supported: the existing secrets are encrypted with the old one. See [Secret management](./configuration.md#secret-management).
 
 ## Checking a restore

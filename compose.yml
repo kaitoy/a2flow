@@ -99,6 +99,12 @@ services:
       # container path rather than a volume: it is reissued on every start that
       # finds it missing, so there is nothing to keep.
       MCP_BACKEND_TLS_DIR: /app/.mcp-tls-backend
+      # The Fernet key that encrypts stored secrets and the approval CA's key.
+      # Generated here on first start unless SECRET_ENCRYPTION_KEY is set, and
+      # shared with `worker` through the `secret-key` volume -- never baked into
+      # the image, and never mounted into `mcp-proxy`.
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      SECRET_KEY_FILE: /var/lib/a2flow/secret-key/.secret_key
     # `default` reaches the database and serves the frontend; `mcp` is the one
     # network it shares with `mcp-proxy` (see the `networks` block below).
     networks:
@@ -107,6 +113,7 @@ services:
     volumes:
       - skills:/var/lib/a2flow/skills
       - mcp-tls:/var/lib/a2flow/mcp-tls
+      - secret-key:/var/lib/a2flow/secret-key
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
       interval: 10s
@@ -133,6 +140,11 @@ services:
     command: ["uv", "run", "--no-sync", "python", "-m", "worker"]
     environment:
       DB_URL: postgresql://a2flow:a2flow@db:5432/a2flow
+      # Same key as the backend: the worker decrypts the SMTP password.
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      SECRET_KEY_FILE: /var/lib/a2flow/secret-key/.secret_key
+    volumes:
+      - secret-key:/var/lib/a2flow/secret-key
     depends_on:
       # Not just for the database: the API applies the Alembic migrations and
       # seeds the settings row on startup, and the worker does neither. Waiting
@@ -218,3 +230,4 @@ volumes:
   pgdata:
   skills:
   mcp-tls:
+  secret-key:

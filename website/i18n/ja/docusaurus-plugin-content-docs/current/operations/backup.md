@@ -60,6 +60,12 @@ docker run --rm -v a2flow_skills:/skills -v "$PWD:/backup" alpine \
 
 設定していない場合、バックエンドが最初の使用時に生成し、`SECRET_KEY_FILE` のファイル(既定は `.secret_key`。SQLite のデータベースファイルの隣)に書いています。このファイルが唯一の複製です。それが載っているマシン以外の場所にバックアップし、認証情報として扱ってください。
 
+Docker Compose では、このファイルは `secret-key` という名前付きボリュームにあります。
+
+```bash
+docker run --rm -v a2flow_secret-key:/key -v "$PWD:/backup" alpine   cp /key/.secret_key /backup/secret_key-$(date +%F)
+```
+
 キーのローテーションには対応していません。既存のシークレットは古いキーで暗号化されているからです。[シークレットの管理](./configuration.md#secret-management)を参照してください。
 
 ## 復旧の確認 {#checking-a-restore}

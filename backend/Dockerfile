@@ -36,14 +36,15 @@ FROM base AS backend
 
 # curl is used by compose.yml's backend healthcheck to probe /api/v1/health.
 #
-# /var/lib/a2flow/skills and /var/lib/a2flow/mcp-tls are pre-created and chowned
-# because they are the mount points for compose.yml's named volumes -- Docker
-# seeds a new named volume's ownership from the image path it overlays, so this
-# is what makes the first skill clone and the first certificate write (both as
-# `app`) succeed instead of hitting a root-owned mount point.
+# /var/lib/a2flow/skills, /var/lib/a2flow/mcp-tls and /var/lib/a2flow/secret-key
+# are pre-created and chowned because they are the mount points for compose.yml's
+# named volumes -- Docker seeds a new named volume's ownership from the image
+# path it overlays, so this is what makes the first skill clone, the first
+# certificate write and the first key generation (all as `app`) succeed instead
+# of hitting a root-owned mount point.
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /var/lib/a2flow/skills /var/lib/a2flow/mcp-tls \
+    && mkdir -p /var/lib/a2flow/skills /var/lib/a2flow/mcp-tls /var/lib/a2flow/secret-key \
     && chown -R app:app /var/lib/a2flow
 USER app
 

@@ -7,6 +7,10 @@ __pycache__/
 .mypy_cache/
 tests/
 .env
+.env.*
+# The Fernet master key a local run generates. Baked into the image it would
+# become every container's key -- and readable from mcp-proxy.
+.secret_key
 *.db
 *.db-shm
 *.db-wal

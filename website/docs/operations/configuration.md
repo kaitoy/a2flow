@@ -116,7 +116,7 @@ Session files are stored in the database rather than on disk, so they need no di
 | Variable | Default | What it does |
 |---|---|---|
 | `SECRET_ENCRYPTION_KEY` | — | Fernet key used to encrypt `local` [secrets](../guides/secrets.md) before storage |
-| `SECRET_KEY_FILE` | `.secret_key` | Path to the on-disk key file, next to the SQLite database file |
+| `SECRET_KEY_FILE` | `.secret_key` | Path to the on-disk key file, next to the SQLite database file. Under `docker compose` it is `/var/lib/a2flow/secret-key/.secret_key`, backed by the `secret-key` named volume that the backend and the email worker share |
 | `VAULT_ADDR` | — | Address of the single HashiCorp Vault (KV v2 only) that `vault`-type secrets are read live from. Vault is disabled when unset |
 | `VAULT_ROLE_ID` / `VAULT_SECRET_ID` | — | AppRole credentials, which take precedence over the static token |
 | `VAULT_APPROLE_MOUNT` | `approle` | AppRole login mount path |
@@ -129,6 +129,15 @@ The encryption key is resolved at first use, in order:
 3. Failing both, a key is generated, saved to that file, and a WARNING is logged.
 
 **Back the key up.** Losing it makes every stored local secret undecryptable, and the same key protects the [approval CA](../architecture/approvals.md)'s signing key.
+
+**Upgrading a Docker Compose deployment that predates the `secret-key` volume.** Earlier images copied `backend/.secret_key` from the build directory into the image, and that copy was the key in use. The image no longer contains it, so before rebuilding, either set `SECRET_ENCRYPTION_KEY` in `.env` to that file's contents, or copy the file into the volume:
+
+```bash
+docker compose create backend
+docker compose cp backend/.secret_key backend:/var/lib/a2flow/secret-key/.secret_key
+```
+
+Starting without either generates a new key, and every existing secret becomes unreadable.
 
 `VAULT_ADDR` is deliberately exempt from the SSRF URL checks applied to user-supplied URLs: it is operator-set deployment configuration and typically points at a private address.
 
