@@ -23,3 +23,9 @@ def test_hash_password_uses_fast_rounds_by_default_in_tests() -> None:
 
     assert hashed.split("$")[2] == "04"
     assert verify_password(plain, hashed)
+
+
+def test_verify_password_rejects_overlong_password_instead_of_raising() -> None:
+    hashed = hash_password("correct horse battery staple")
+
+    assert not verify_password("A" * 100, hashed)

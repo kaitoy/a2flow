@@ -44,6 +44,12 @@ def test_rejects_literal_private_ranges(host: str) -> None:
         assert_public_http_url(f"http://{host}/x")
 
 
+@pytest.mark.parametrize("host", ["100.64.0.1", "100.100.100.200"])
+def test_rejects_literal_shared_address_space(host: str) -> None:
+    with pytest.raises(UnsafeUrlError, match="disallowed address"):
+        assert_public_http_url(f"http://{host}/x")
+
+
 def test_rejects_literal_link_local_ipv6() -> None:
     with pytest.raises(UnsafeUrlError, match="disallowed address"):
         assert_public_http_url("http://[fe80::1]/x")

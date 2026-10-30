@@ -27,6 +27,7 @@ sends strictly sequentially for exactly this reason.
 import asyncio
 import logging
 import smtplib
+import ssl
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -138,14 +139,20 @@ def _open_blocking(config: SmtpConfig) -> smtplib.SMTP:
     Returns:
         The connected client, ready to send.
     """
+    # A verifying context, not smtplib's default: without one, both TLS modes
+    # accept any certificate, and AUTH would hand the relay password to whoever
+    # answers the handshake.
+    context = ssl.create_default_context()
     client: smtplib.SMTP
     if config.security is SmtpSecurity.ssl:
-        client = smtplib.SMTP_SSL(config.host, config.port, timeout=config.timeout)
+        client = smtplib.SMTP_SSL(
+            config.host, config.port, timeout=config.timeout, context=context
+        )
     else:
         client = smtplib.SMTP(config.host, config.port, timeout=config.timeout)
     try:
         if config.security is SmtpSecurity.starttls:
-            client.starttls()
+            client.starttls(context=context)
             # STARTTLS resets the session, so the relay's capability list has to
             # be re-read before AUTH is attempted on the upgraded connection.
             client.ehlo()

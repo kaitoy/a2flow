@@ -80,6 +80,26 @@ async def test_login_wrong_password_is_unauthenticated(
 
 
 @pytest.mark.asyncio
+async def test_login_overlong_password_is_unauthenticated_not_500(
+    auth_client: AsyncClient,
+) -> None:
+    # bcrypt refuses passwords over 72 bytes; a 500 here would reveal that the
+    # account exists, since unknown accounts never reach bcrypt.
+    assert_err(
+        await auth_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": AUTH_USERNAME,
+                "password": "A" * 100,
+                "tenantName": DEFAULT_TEST_TENANT_ID,
+            },
+        ),
+        code="UNAUTHENTICATED",
+        status=401,
+    )
+
+
+@pytest.mark.asyncio
 async def test_login_unknown_user_is_unauthenticated(auth_client: AsyncClient) -> None:
     assert_err(
         await auth_client.post(

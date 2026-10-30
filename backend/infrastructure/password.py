@@ -58,7 +58,15 @@ def verify_password(plain: str, hashed: str) -> bool:
         plain: The plaintext password to verify.
         hashed: The previously stored bcrypt hash.
 
+    A password bcrypt refuses to check -- bcrypt 5 raises ``ValueError`` for
+    one longer than 72 bytes -- simply does not match. Letting the error
+    propagate would turn a login attempt into a 500 for existing accounts only,
+    telling an attacker which usernames are real.
+
     Returns:
         ``True`` if the password matches the hash, ``False`` otherwise.
     """
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except ValueError:
+        return False

@@ -7,6 +7,7 @@ rather than leaking a raw ``smtplib`` exception into a caller's ``except``.
 """
 
 import smtplib
+import ssl
 from typing import Any
 
 import pytest
@@ -41,13 +42,17 @@ class _FakeClient:
 
     instances: list["_FakeClient"] = []
 
-    def __init__(self, host: str, port: int, timeout: float) -> None:
+    def __init__(
+        self, host: str, port: int, timeout: float, context: Any = None
+    ) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
         self.calls: list[str] = []
         self.logged_in: tuple[str, str] | None = None
         self.messages: list[Any] = []
+        self.context = context
+        self.tls_context: Any = None
         _FakeClient.instances.append(self)
 
     #: Exceptions to raise from successive ``send_message`` calls across every
@@ -57,8 +62,9 @@ class _FakeClient:
     #: How many ``send_message`` calls have been made, across every instance.
     attempts: int = 0
 
-    def starttls(self) -> None:
+    def starttls(self, context: Any = None) -> None:
         self.calls.append("starttls")
+        self.tls_context = context
 
     def ehlo(self) -> None:
         self.calls.append("ehlo")
@@ -134,6 +140,7 @@ async def test_starttls_upgrades_and_re_greets(monkeypatch: pytest.MonkeyPatch) 
         body="b",
     )
     assert _FakeClient.instances[0].calls[:2] == ["starttls", "ehlo"]
+    assert _FakeClient.instances[0].tls_context.verify_mode is ssl.CERT_REQUIRED
 
 
 async def test_ssl_security_uses_the_implicit_tls_client(
@@ -145,6 +152,7 @@ async def test_ssl_security_uses_the_implicit_tls_client(
         _config(security=SmtpSecurity.ssl), to="x@example.com", subject="s", body="b"
     )
     assert _FakeClient.instances[0].port == 2525
+    assert _FakeClient.instances[0].context.verify_mode is ssl.CERT_REQUIRED
 
 
 async def test_no_login_without_a_username(monkeypatch: pytest.MonkeyPatch) -> None:

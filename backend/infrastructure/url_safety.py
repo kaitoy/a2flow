@@ -86,11 +86,15 @@ def resolve_host(host: str) -> list[str]:
 def _is_unsafe_address(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     """Return whether ``addr`` (or its IPv4-mapped form) is disallowed.
 
-    Checks loopback, private, link-local (covers the 169.254.169.254 cloud
-    metadata address), reserved, multicast, and unspecified explicitly, plus
-    the address's ``ipv4_mapped`` form for IPv6, so classification does not
-    depend on which Python 3.11+ patch version fixed IPv4-mapped-address
-    handling in the stdlib ``ipaddress`` module.
+    An allowlist rather than a blocklist: anything the stdlib ``ipaddress``
+    module does not report as globally routable (``is_global``) is refused --
+    loopback, private, link-local (covers the 169.254.169.254 cloud metadata
+    address), shared address space (100.64.0.0/10, e.g. Alibaba Cloud's
+    100.100.100.200 metadata endpoint), documentation, reserved, and
+    unspecified -- plus multicast, which ``is_global`` lets through. The
+    address's ``ipv4_mapped`` form is checked too for IPv6, so classification
+    does not depend on which Python 3.11+ patch version fixed
+    IPv4-mapped-address handling in the stdlib ``ipaddress`` module.
 
     Args:
         addr: The address to classify.
@@ -102,15 +106,7 @@ def _is_unsafe_address(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> b
     candidates: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = [addr]
     if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
         candidates.append(addr.ipv4_mapped)
-    return any(
-        a.is_loopback
-        or a.is_private
-        or a.is_link_local
-        or a.is_reserved
-        or a.is_multicast
-        or a.is_unspecified
-        for a in candidates
-    )
+    return any(not a.is_global or a.is_multicast for a in candidates)
 
 
 def assert_public_http_url(url: str) -> None:
@@ -122,7 +118,7 @@ def assert_public_http_url(url: str) -> None:
     Raises:
         UnsafeUrlError: If the scheme isn't http/https, the host is missing,
             resolution fails or times out, or any resolved address is
-            loopback/private/link-local/reserved/multicast/unspecified.
+            not globally routable, or multicast.
     """
     parsed = urlsplit(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
@@ -141,5 +137,5 @@ def assert_public_http_url(url: str) -> None:
         if _is_unsafe_address(ipaddress.ip_address(addr_str)):
             raise UnsafeUrlError(
                 f"host {host!r} resolves to disallowed address {addr_str!r} "
-                "(loopback/private/link-local/reserved/multicast/unspecified)"
+                "(not globally routable, or multicast)"
             )

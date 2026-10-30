@@ -192,8 +192,8 @@ async def _transport_streams(
 
     Raises:
         infrastructure.url_safety.UnsafeUrlError: For a :class:`HttpConnection`
-            whose host resolves to a loopback/private/link-local/reserved/
-            multicast/unspecified address. Rechecked here (in addition to the
+            whose host resolves to an address that is not globally routable,
+            or is multicast. Rechecked here (in addition to the
             ``HttpUrl`` Pydantic validation at API-input time) as
             defense-in-depth against DNS-rebinding-after-validation and rows
             that bypass Pydantic. Not applicable to stdio, which opens no
