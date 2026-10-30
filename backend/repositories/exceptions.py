@@ -508,6 +508,19 @@ class ReasonError(RepositoryError):
         return {"reason": self.reason}
 
 
+class AgentSkillValidationError(ReasonError):
+    """Raised when an AgentSkill create/update would send credentials unsafely.
+
+    The rule spans ``repo_url`` and ``repo_auth_password``, and a PATCH may
+    touch only one of them, so only the service can see the merged result.
+    Carries a human-readable ``reason`` surfaced in the error envelope's
+    ``details`` block when returning HTTP 422.
+    """
+
+    code = "INVALID_AGENT_SKILL"
+    http_status = 422
+
+
 class AvatarValidationError(ReasonError):
     """Raised when an uploaded avatar image has an unsupported type or exceeds the size limit.
 

@@ -35,3 +35,5 @@ Vault's own connection, and the key local secrets are encrypted with, are set up
 ## Renaming and deleting
 
 Secrets are referenced **by name** and resolved lazily. Renaming or deleting one that something still references does not fail at edit time — the next use fails instead, naming the secret it could not find. An [agent skill](./agent-skills.md) whose reference has gone stale records the reason on its own record the next time it is pulled.
+
+Saving a reference is checked, though. When you save an MCP server whose headers or environment name a secret, run **Test Run** on a script, or save a skill's **Auth Password**, the secret must exist and must be one you can open. A secret hidden from you by an [access-control tag](./tags.md#access-control-tags) is rejected exactly like a missing one. The same applies when you edit a record that already references such a secret, even if you change only another field.

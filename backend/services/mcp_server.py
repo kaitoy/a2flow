@@ -9,15 +9,16 @@ the tools it advertises, and launching an unsaved script to list or run its
 tools before it is saved.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from mcp import types
 
+from infrastructure.google_token import GCP_TOKEN_PLACEHOLDER_PATTERN
 from infrastructure.mcp_client import McpConnection
 from infrastructure.mcp_connection import resolve_connection
 from infrastructure.mcp_executor import get_mcp_executor
-from infrastructure.secret_resolver import SecretResolver
+from infrastructure.secret_resolver import PLACEHOLDER_PATTERN, SecretResolver
 from models.mcp_server import (
     MCPServer,
     MCPServerCreate,
@@ -33,6 +34,7 @@ from models.mcp_server import (
     referenced_env_names,
 )
 from repositories.exceptions import (
+    ForeignKeyViolationError,
     McpConnectionError,
     McpServerValidationError,
     NotFoundError,
@@ -91,6 +93,26 @@ class MCPServerService:
         """
         self._repo = repo
         self._resolver = resolver
+
+    async def _assert_refs_visible(self, values: Iterable[str]) -> None:
+        """Raise unless every secret the values reference is visible to the caller.
+
+        Covers both ``${secret:NAME/KEY}`` and ``${gcp-token:NAME/KEY}``. A
+        hidden secret is reported exactly like a missing one, so the check
+        cannot be used to learn which hidden names exist.
+
+        Args:
+            values: Header or env values, possibly holding placeholders.
+
+        Raises:
+            ForeignKeyViolationError: If a referenced secret does not exist or
+                is hidden from the caller by an access-control tag.
+        """
+        for value in values:
+            for pattern in (PLACEHOLDER_PATTERN, GCP_TOKEN_PLACEHOLDER_PATTERN):
+                for match in pattern.finditer(value):
+                    if not await self._resolver.is_visible(match.group(1)):
+                        raise ForeignKeyViolationError("Secret", match.group(1))
 
     async def get(self, server_id: str) -> MCPServer:
         """Return the MCPServer with the given ID.
@@ -187,7 +209,12 @@ class MCPServerService:
 
         Returns:
             The created MCPServer.
+
+        Raises:
+            ForeignKeyViolationError: If ``headers`` or ``env`` reference a
+                secret that does not exist or is hidden from the caller.
         """
+        await self._assert_refs_visible([*data.headers.values(), *data.env.values()])
         return await self._repo.create(data, user_id=user_id)
 
     async def update(
@@ -219,6 +246,11 @@ class MCPServerService:
                 effective transport's shape, its ``args`` embed a
                 ``${env:NAME}`` placeholder naming a key absent from the
                 effective ``env``, or its Python source does not compile.
+            ForeignKeyViolationError: If the effective ``headers`` or ``env``
+                reference a secret that does not exist or is hidden from the
+                caller -- checked against the stored values too, so changing
+                only the URL or the code cannot carry a hidden secret somewhere
+                new.
         """
         existing = await self.get(server_id)
         effective = data.transport or existing.transport
@@ -259,6 +291,9 @@ class MCPServerService:
 
         if updates:
             data = data.model_copy(update=updates)
+        headers = data.headers if data.headers is not None else existing.headers
+        env = data.env if data.env is not None else existing.env
+        await self._assert_refs_visible([*headers.values(), *env.values()])
         return await self._repo.update(server_id, data, user_id=user_id)
 
     async def delete(self, server_id: str) -> None:
@@ -363,7 +398,13 @@ class MCPServerService:
 
         Returns:
             The runner's connection, with ``env`` secrets resolved.
+
+        Raises:
+            ForeignKeyViolationError: If ``env`` references a secret that does
+                not exist or is hidden from the caller -- the call's result
+                goes straight back to them, value included.
         """
+        await self._assert_refs_visible(request.env.values())
         server = MCPServer(  # type: ignore[call-arg]
             name="script-test",
             transport=McpTransport.script,

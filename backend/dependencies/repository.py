@@ -327,7 +327,9 @@ def get_secret_repository(
     Restricted to the secrets the caller may act on -- see
     :func:`dependencies.auth.get_access_tag_ids`. ``get_by_name``, which the
     request-scoped :class:`~infrastructure.secret_resolver.SecretResolver`
-    uses to expand ``${secret:...}`` placeholders, stays tenant-only.
+    uses to expand ``${secret:...}`` placeholders, stays tenant-only; a
+    reference the caller writes is checked with ``get_visible_by_name``
+    instead.
     """
     return SqlSecretRepository(db, tenant_id=tenant_id, access_tag_ids=access_tag_ids)
 

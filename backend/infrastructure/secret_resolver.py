@@ -83,6 +83,21 @@ class SecretResolver:
         self._cipher = cipher
         self._vault = vault
 
+    async def is_visible(self, name: str) -> bool:
+        """Return whether the caller may reference the named secret.
+
+        Unlike resolution, which is tenant-only so a stored record keeps
+        working for whoever runs it, this honours the caller's access-control
+        tags: it is what a write of a new reference is checked against.
+
+        Args:
+            name: The secret's unique name.
+
+        Returns:
+            ``True`` if the secret exists and is not hidden from the caller.
+        """
+        return await self._repo.get_visible_by_name(name) is not None
+
     async def resolve_value(self, name: str, key: str) -> str:
         """Return the plaintext value of one entry of the named secret.
 

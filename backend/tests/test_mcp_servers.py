@@ -940,7 +940,19 @@ async def test_list_server_tools_resolves_secret_placeholders(
 async def test_list_server_tools_missing_secret_returns_502(
     mcp_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A dangling placeholder fails resolution without leaking the reason."""
+    """A placeholder left dangling by a deleted secret fails without leaking why.
+
+    Saving a reference to a missing secret is refused up front, so the dangling
+    state is reached the way it happens in practice: the secret is deleted
+    after the server was saved.
+    """
+    secret = assert_ok(
+        await mcp_client.post(
+            "/api/v1/secrets",
+            json={"name": "nope", "type": "local", "entries": {"k": "v"}},
+        ),
+        status=201,
+    )
     created = assert_ok(
         await mcp_client.post(
             "/api/v1/mcp-servers",
@@ -952,6 +964,7 @@ async def test_list_server_tools_missing_secret_returns_502(
         ),
         status=201,
     )
+    assert_ok(await mcp_client.delete(f"/api/v1/secrets/{secret['id']}"))
     connected: list[str] = []
 
     async def fake_list_server_tools(connection: McpConnection) -> list[Any]:

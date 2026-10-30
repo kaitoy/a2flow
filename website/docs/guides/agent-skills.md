@@ -50,6 +50,8 @@ Credentials are not typed into the skill form. Register them once as a [secret](
 1. Set **Auth Username**. It defaults to `x-access-token`, which suits a GitHub personal access token; set a real account name for hosts that need one.
 2. Pick the **secret** in the first dropdown of **Auth Password**, then one **Entry Key** within it in the second. That entry's value is used as the password when the repository is cloned.
 
+An **Auth Password** needs a **Repo URL** starting with `https://`. With `http://` the save is rejected, since the password would cross the network unencrypted.
+
 Both secret types are offered. A Vault-backed secret has its entry keys read live from Vault, since they are not stored locally.
 
 The reference is stored as a name and a key, and resolved at clone time — so deleting or renaming the secret later does not fail on the spot, it makes the next pull fail and records the reason on the skill. The detail page does not quietly drop a reference that no longer resolves: it stays selected, marked `(not found)`, with a warning. Clearing it is your call.

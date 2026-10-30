@@ -33,6 +33,8 @@ class SecretRepository(Protocol):
 
     async def get_by_name(self, name: str) -> Secret | None: ...
 
+    async def get_visible_by_name(self, name: str) -> Secret | None: ...
+
     async def list(
         self,
         *,
@@ -113,6 +115,19 @@ class SqlSecretRepository(TenantScopedRepository[Secret]):
         """
         stmt = select(Secret).where(Secret.name == name)
         stmt = self._in_tenant(stmt)
+        result = await self._db.exec(stmt)
+        return result.first()
+
+    async def get_visible_by_name(self, name: str) -> Secret | None:
+        """Return the named Secret, or ``None`` if missing or hidden from the caller.
+
+        The write-time counterpart of :meth:`get_by_name`: checked when a caller
+        *writes* a reference (an MCP server's headers or env, an unsaved
+        script's env, a skill's ``repo_auth_password``), so nobody can bind --
+        and thereby read or send out -- a secret their access-control tags hide.
+        """
+        stmt = select(Secret).where(Secret.name == name)
+        stmt = self._scoped(stmt)
         result = await self._db.exec(stmt)
         return result.first()
 

@@ -1087,6 +1087,116 @@ async def test_access_control_gates_every_taggable_collection(
     assert_ok(await client.get(f"/api/v1/{collection}/{record_id}", headers=DEVELOPER))
 
 
+async def _hidden_secret(client: AsyncClient) -> None:
+    """Create the ``creds`` secret behind an access-control tag nobody holds."""
+    gated = await _create_tag(client, "gated", accessControl=True)
+    secret_id = (await _create_secret(client))["id"]
+    await _gate(client, "secrets", secret_id, [gated["id"]])
+
+
+async def test_a_developer_cannot_reference_a_hidden_secret_in_an_mcp_server(
+    workflow_client: AsyncClient,
+) -> None:
+    """Binding a hidden secret would let its value be sent or printed elsewhere."""
+    client = workflow_client
+    await _hidden_secret(client)
+    header = {"Authorization": "${secret:creds/token}"}
+    url = "https://mcp.example.com/mcp"
+
+    # Reported like a missing secret, so the check reveals no hidden names.
+    for headers in (header, {"Authorization": "Bearer ${gcp-token:creds/token}"}):
+        assert_err(
+            await client.post(
+                "/api/v1/mcp-servers",
+                json={"name": "srv", "url": url, "headers": headers},
+                headers=DEVELOPER,
+            ),
+            "FOREIGN_KEY_VIOLATION",
+            422,
+        )
+    assert_err(
+        await client.post(
+            "/api/v1/mcp-servers/script-call",
+            json={
+                "language": "python",
+                "source": "def leak() -> str:\n    return 'x'\n",
+                "env": {"X": "${secret:creds/token}"},
+                "toolName": "leak",
+            },
+            headers=DEVELOPER,
+        ),
+        "FOREIGN_KEY_VIOLATION",
+        422,
+    )
+
+    # A server the super admin bound stays visible, but re-pointing it is refused.
+    server = assert_ok(
+        await client.post(
+            "/api/v1/mcp-servers",
+            json={"name": "srv", "url": url, "headers": header},
+        ),
+        201,
+    )
+    assert_err(
+        await client.patch(
+            f"/api/v1/mcp-servers/{server['id']}",
+            json={"url": "https://attacker.example.com/mcp"},
+            headers=DEVELOPER,
+        ),
+        "FOREIGN_KEY_VIOLATION",
+        422,
+    )
+
+
+async def test_a_developer_cannot_bind_a_hidden_secret_to_a_skill_clone(
+    workflow_client: AsyncClient,
+) -> None:
+    """The clone sends the password to ``repoUrl``, so both fields are checked."""
+    client = workflow_client
+    await _hidden_secret(client)
+    body = {"name": "skill", "repoUrl": "https://github.com/x/y"}
+
+    assert_err(
+        await client.post(
+            "/api/v1/agent-skills",
+            json={**body, "repoAuthPassword": "creds/token"},
+            headers=DEVELOPER,
+        ),
+        "FOREIGN_KEY_VIOLATION",
+        422,
+    )
+
+    skill = await create_skill(client, repoAuthPassword="creds/token")
+    assert_err(
+        await client.patch(
+            f"/api/v1/agent-skills/{skill['id']}",
+            json={"repoUrl": "https://attacker.example.com/x.git"},
+            headers=DEVELOPER,
+        ),
+        "FOREIGN_KEY_VIOLATION",
+        422,
+    )
+
+
+async def test_a_skill_password_is_never_sent_over_plain_http(
+    workflow_client: AsyncClient,
+) -> None:
+    client = workflow_client
+    await _create_secret(client)
+    assert_err(
+        await client.post(
+            "/api/v1/agent-skills",
+            json={
+                "name": "skill",
+                "repoUrl": "http://github.com/x/y",
+                "repoAuthPassword": "creds/token",
+            },
+        ),
+        "INVALID_AGENT_SKILL",
+        422,
+    )
+
+
 async def test_a_hidden_workflow_cannot_be_listed_read_or_executed(
     workflow_client: AsyncClient,
 ) -> None:
