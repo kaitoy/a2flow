@@ -17,7 +17,7 @@ The frontend holds no state of its own — it proxies `/api/*` and keeps nothing
 | **A shared `MCP_PROXY_TLS_DIR`** | Every replica writes and reads the material that identifies it to the [MCP proxy](../architecture/mcp-gateway-and-proxy.md#the-sandbox) there, and the proxy reads the same directory. A replica that had its own would issue material the proxy has never seen |
 | Sticky sessions | Not required. The advisory lock below does the job routing affinity would be reached for |
 
-The MCP proxy itself scales on its own terms: it keeps nothing between calls, so replicas of it need no coordination at all. Size it against how many tool calls run at once, not against how many backend replicas there are.
+The MCP proxy itself scales on its own terms: it keeps nothing between calls but a download cache, so replicas of it need no coordination at all — they may share `MCP_SANDBOX_DIR` or each keep their own. Size it against how many tool calls run at once, not against how many backend replicas there are.
 
 ## One driver per conversation
 

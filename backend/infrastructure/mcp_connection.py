@@ -115,6 +115,7 @@ async def resolve_connection(
             args=_expand_env_args(list(server.args), resolved_env, server.name),
             env=resolved_env,
             raw_args=list(server.args),
+            tenant_id=server.tenant_id,
         )
     if server.transport is McpTransport.script:
         if not server.language or not server.source:
@@ -127,7 +128,13 @@ async def resolve_connection(
         env[SOURCE_ENV_VAR] = server.source
         if server.packages:
             env[PACKAGES_ENV_VAR] = json.dumps(server.packages)
-        return StdioConnection(command=command, args=args, env=env, raw_args=args)
+        return StdioConnection(
+            command=command,
+            args=args,
+            env=env,
+            raw_args=args,
+            tenant_id=server.tenant_id,
+        )
     if not server.url:
         raise McpConnectionError(server.name, "streamable_http server has no url")
     return HttpConnection(

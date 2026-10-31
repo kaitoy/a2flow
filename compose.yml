@@ -172,6 +172,21 @@ services:
     environment:
       MCP_PROXY_TLS_DIR: /var/lib/a2flow/mcp-tls
       MCP_PROXY_PORT: "8443"
+      # One home directory per tenant. Every stdio MCP server launch runs in
+      # its own bubblewrap sandbox with its tenant's directory as HOME, so
+      # package caches are never shared across tenants. The proxy refuses to
+      # start without it.
+      MCP_SANDBOX_DIR: /var/lib/a2flow/mcp-home
+    # What bubblewrap needs to create the per-launch sandbox inside this
+    # container: Docker's default seccomp and AppArmor profiles block the
+    # user and mount namespaces it builds, and `systempaths` must be
+    # unconfined for it to mount a fresh /proc (the one thing that keeps a
+    # launch from reading another's environment). Loosened for this service
+    # only, which in exchange isolates every launch from every other one.
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+      - systempaths=unconfined
     # Only `mcp`, never `default`: the code that runs here must not be able to
     # open a connection to `db` (or `worker`, or `frontend`) at all, whatever
     # credential it may know.
@@ -181,6 +196,7 @@ services:
       # Read-only: the backend issues this material, and nothing that runs in
       # here should be able to replace it.
       - mcp-tls:/var/lib/a2flow/mcp-tls:ro
+      - mcp-home:/var/lib/a2flow/mcp-home
     healthcheck:
       # The listener demands a client certificate, so curl cannot probe it
       # without one. Checking that the port accepts a connection is what can be
@@ -230,4 +246,5 @@ volumes:
   pgdata:
   skills:
   mcp-tls:
+  mcp-home:
   secret-key:

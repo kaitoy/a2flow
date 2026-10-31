@@ -4,6 +4,10 @@ Starts the listener with mutual TLS against the root the backend published.
 ``CERT_REQUIRED`` is the point of the whole file: without it, anything that can
 route to this port on the internal network could ask it to launch a command.
 
+It also refuses to start when it cannot sandbox what it launches: without
+``MCP_SANDBOX_DIR``, or when a probe launch through bubblewrap fails (see
+:func:`infrastructure.mcp_sandbox.probe`).
+
 The material has to exist before this runs. In ``compose.yml`` that is
 guaranteed by ``depends_on: backend: service_healthy`` — the backend writes it
 during startup, before it reports healthy — so a missing file here means the
@@ -17,6 +21,7 @@ import sys
 import uvicorn
 
 from config import get_settings
+from infrastructure import mcp_sandbox
 from infrastructure.logging_context import setup_logging
 from infrastructure.mcp_transport_tls import proxy_server_credentials
 
@@ -27,7 +32,8 @@ def main() -> int:
     """Run the proxy until it is stopped.
 
     Returns:
-        A process exit status: non-zero when the TLS material is missing.
+        A process exit status: non-zero when the TLS material is missing or
+        no sandbox can be created.
     """
     setup_logging()
     settings = get_settings()
@@ -48,6 +54,25 @@ def main() -> int:
             "directory at startup; check that both containers mount the same "
             "volume and that MCP_PROXY_TLS_DIR agrees on both sides.",
             ", ".join(missing),
+        )
+        return 1
+
+    # Every launch here is someone else's code; without its sandbox, one
+    # tenant's server could read the next one's secrets.
+    if settings.mcp_sandbox_dir is None:
+        logger.error(
+            "Cannot start: MCP_SANDBOX_DIR is not set. The proxy launches "
+            "every stdio MCP server in its own sandbox and will not run them "
+            "without one."
+        )
+        return 1
+    failure = mcp_sandbox.probe(settings.mcp_sandbox_dir)
+    if failure is not None:
+        logger.error(
+            "Cannot start: a sandbox cannot be created here (%s). The "
+            "container needs the security options compose.yml gives mcp-proxy, "
+            "and the host must allow unprivileged user namespaces.",
+            failure,
         )
         return 1
 

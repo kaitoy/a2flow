@@ -635,7 +635,10 @@ async def test_list_stdio_server_tools_uses_a_stdio_connection(
     )
     assert_ok(await mcp_client.get(f"/api/v1/mcp-servers/{created['id']}/tools"))
     assert seen["connection"] == StdioConnection(
-        command="npx", args=["-y", "files-mcp@0.3.0"], env={"API_KEY": "tok-xyz"}
+        command="npx",
+        args=["-y", "files-mcp@0.3.0"],
+        env={"API_KEY": "tok-xyz"},
+        tenant_id="tenant-default",
     )
 
 

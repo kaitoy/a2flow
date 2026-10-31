@@ -54,6 +54,9 @@ class StdioConnectionSpec(_Wire):
         env: Environment for the child, secrets already resolved.
         raw_args: ``args`` before expansion, used only for error messages and
             logs so a secret-derived value never appears in one.
+        tenant_id: The tenant the server belongs to, which picks the
+            sandbox's home directory. Part of the signed spec, so a request
+            cannot be replayed into another tenant's home.
     """
 
     transport: Literal["stdio"] = "stdio"
@@ -61,6 +64,7 @@ class StdioConnectionSpec(_Wire):
     args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     raw_args: list[str] | None = None
+    tenant_id: str | None = None
 
 
 #: One registered server, resolved and ready to reach.
@@ -279,6 +283,7 @@ def connection_to_spec(connection: McpConnection) -> ConnectionSpec:
             args=list(connection.args),
             env=dict(connection.env),
             raw_args=None if connection.raw_args is None else list(connection.raw_args),
+            tenant_id=connection.tenant_id,
         )
     return HttpConnectionSpec(url=connection.url, headers=dict(connection.headers))
 
@@ -298,5 +303,6 @@ def spec_to_connection(spec: ConnectionSpec) -> McpConnection:
             args=list(spec.args),
             env=dict(spec.env),
             raw_args=None if spec.raw_args is None else list(spec.raw_args),
+            tenant_id=spec.tenant_id,
         )
     return HttpConnection(url=spec.url, headers=dict(spec.headers))

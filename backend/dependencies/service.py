@@ -47,6 +47,7 @@ from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 from services.workflow_task import WorkflowTaskService
 from services.workflow_task_template import WorkflowTaskTemplateService
 
+from .auth import CurrentTenantScopeDep
 from .context import APP_NAME
 from .repository import (
     AgentSkillLookupDep,
@@ -166,10 +167,16 @@ TagServiceDep = Annotated[TagService, Depends(get_tag_service)]
 
 
 def get_mcp_server_service(
-    repo: MCPServerRepositoryDep, resolver: SecretResolverDep
+    repo: MCPServerRepositoryDep,
+    resolver: SecretResolverDep,
+    tenant_id: CurrentTenantScopeDep,
 ) -> MCPServerService:
-    """Create an MCPServerService backed by the request's repository and resolver."""
-    return MCPServerService(repo, resolver)
+    """Create an MCPServerService backed by the request's repository and resolver.
+
+    The tenant is the one the repository is scoped to (cached per request); the
+    service launches an unsaved script under test in that tenant's sandbox.
+    """
+    return MCPServerService(repo, resolver, tenant_id)
 
 
 MCPServerServiceDep = Annotated[MCPServerService, Depends(get_mcp_server_service)]

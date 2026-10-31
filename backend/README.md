@@ -385,9 +385,26 @@ A registered MCP server is third-party code: a stdio one is launched as a child 
 | `infrastructure/mcp_executor.py` | The seam. `LocalMcpExecutor` opens the connection in this process — the default, and what a local `uvicorn main:app` and the test suite use. `RemoteMcpExecutor` hands the operation to the proxy. Selected by `MCP_PROXY_URL` |
 | `infrastructure/mcp_connection.py` | Resolves an `MCPServer` row and its `${secret:…}` / `${gcp-token:…}` placeholders into a connection spec. Stays on this side: only the resolved values for the one server being called cross over, which is why the far side needs neither the Fernet key, nor Vault, nor a Google credential |
 | `infrastructure/google_token.py` | Mints the Google OAuth 2.0 access token a `${gcp-token:…}` placeholder stands for, from the credential JSON the referenced secret entry holds |
-| `infrastructure/mcp_client.py` | The transport, and the module that actually runs in the proxy. Deliberately free of the ORM — its imports are the MCP SDK, httpx, and two dependency-free modules of ours |
+| `infrastructure/mcp_client.py` | The transport, and the module that actually runs in the proxy. Deliberately free of the ORM — its imports are the MCP SDK, httpx, and a few small modules of ours |
+| `infrastructure/mcp_sandbox.py` | Wraps every stdio launch in a bubblewrap sandbox of its own when `MCP_SANDBOX_DIR` is set — see [Per-launch sandbox](#per-launch-sandbox) below |
 | `infrastructure/mcp_transport_tls.py` | Issues the TLS material for the hop, at backend startup, from the same root that signs tool certificates |
 | `mcp_proxy/` | The proxy process itself: `app.py` (its endpoints and a health probe), `auth.py` (what it checks), `__main__.py` (the listener) |
+
+##### Per-launch sandbox
+
+The proxy keeps third-party code away from the backend's credentials, but every tenant's stdio servers still start in that one container, as one Unix user — and a `script` server is code a tenant wrote. So `mcp_client._transport_streams` runs each stdio launch through `mcp_sandbox.wrap()` whenever `MCP_SANDBOX_DIR` is set (`compose.yml` sets it; the proxy's `__main__` refuses to start without it, and probes one launch at startup so a container missing the security options below fails there instead of on every call):
+
+| `bwrap` flag | What it closes |
+|---|---|
+| `--unshare-all` + `--proc /proc` | Own user/PID/IPC/UTS/cgroup namespaces and a fresh `/proc`: another launch's `/proc/<pid>/environ` and `cmdline` — resolved secrets, `${env:NAME}`-expanded `argv`, a script's source — are invisible |
+| `--die-with-parent` | When the call ends, PID 1 of the namespace dies and the kernel kills everything inside, including a grandchild that `setsid`-escaped the SDK's process-group kill |
+| `--ro-bind / /` | The runners, `/app`, and `.venv` are read-only, so no launch can rewrite what the next one executes |
+| `--tmpfs /var/lib/a2flow` | Hides the proxy's own TLS private key |
+| `--bind <MCP_SANDBOX_DIR>/<tenant_id> /home/a2flow` | `HOME`. npx's, uv's and the script runners' package caches all live under it, so they are shared within a tenant and never across tenants |
+
+The network namespace stays shared (`--share-net`): reaching the outside world is a server's job, and the proxy's Docker network already keeps it off `db`. `tenant_id` rides in `StdioConnectionSpec`, inside the signed connection spec, so a request cannot be redirected into another tenant's home; `wrap()` refuses anything that is not a UUID.
+
+Inside a container, bubblewrap needs `seccomp=unconfined`, `apparmor=unconfined` and `systempaths=unconfined` (the last for the fresh `/proc`), which `compose.yml` grants to `mcp-proxy` alone. A local `uvicorn main:app` leaves `MCP_SANDBOX_DIR` unset and launches unsandboxed — `bwrap` does not exist on Windows or macOS.
 
 **A call is a WebSocket.** `/call-tool` is a WebSocket endpoint: the backend (`websockets` client, same mTLS context) sends the signed `ExecutorCallToolRequest` as the first message, and the proxy sends `ExecutorCallFrame`s back — any number of `elicit` frames, one per question the server asks, each answered by an `ExecutorElicitationAnswer` on the same socket, then one `result` or `error` (a refusal before the call starts is an `error` frame too). The answer needs no signature of its own: it rides the mutually authenticated connection the signed call was made over. Nothing about a call outlives its socket, so the proxy may run as any number of replicas. Without `"elicit": true` on the request the proxy does not advertise the capability at all.
 

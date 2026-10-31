@@ -83,16 +83,25 @@ _ReadList = list[McpServerRead]
 class MCPServerService:
     """Application service orchestrating MCPServer operations."""
 
-    def __init__(self, repo: MCPServerRepository, resolver: SecretResolver) -> None:
+    def __init__(
+        self,
+        repo: MCPServerRepository,
+        resolver: SecretResolver,
+        tenant_id: str | None = None,
+    ) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing MCPServer persistence.
             resolver: Resolver expanding ``${secret:NAME/KEY}`` placeholders in
                 header values before connecting to a server.
+            tenant_id: The request's tenant. An unsaved script under test is
+                launched in this tenant's sandbox, since it has no row to carry
+                one.
         """
         self._repo = repo
         self._resolver = resolver
+        self._tenant_id = tenant_id
 
     async def _assert_refs_visible(self, values: Iterable[str]) -> None:
         """Raise unless every secret the values reference is visible to the caller.
@@ -390,8 +399,9 @@ class MCPServerService:
         """Resolve an unsaved script into the connection that launches its runner.
 
         Builds a transient, never-persisted :class:`MCPServer` so the script is
-        launched exactly as it will be once saved. It has no tenant or audit
-        fields, which only a stored row needs.
+        launched exactly as it will be once saved. Its tenant is the caller's,
+        which picks the sandbox it runs in; it has no audit fields, which only a
+        stored row needs.
 
         Args:
             request: The script to launch.
@@ -412,6 +422,7 @@ class MCPServerService:
             source=request.source,
             packages=request.packages,
             env=request.env,
+            tenant_id=self._tenant_id,  # type: ignore[arg-type]  # transient row
         )
         return await resolve_connection(server, self._resolver)
 

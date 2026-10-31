@@ -547,7 +547,7 @@ export default function Home(): ReactNode {
                 <span className="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>
                 <h3><Translate id="home.features.mcp.title">{'MCP tools, scoped per task'}</Translate></h3>
                 <p>
-                  <Translate id="home.features.mcp.body">{'Register remote MCP servers, and the agent binds only the tools each task needs at plan time. At run time, a task can call nothing but its own tools.'}</Translate>
+                  <Translate id="home.features.mcp.body">{'Register MCP servers, and the agent binds only the tools each task needs at plan time. At run time, a task can call nothing but its own tools — and every server A2Flow starts runs in its own bubblewrap sandbox.'}</Translate>
                 </p>
               </div>
               <div className="feature glass reveal">

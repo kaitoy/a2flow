@@ -57,6 +57,22 @@ One call carries no task certificate: a [test run](../guides/mcp-servers.md#test
 
 The proxy is a second line, not the decision-maker. Whether the task is still running, whether the approval still stands, whether the certificate was withdrawn — none of that is answerable there, and all of it stays with the gateway.
 
+## Every launch in its own sandbox {#per-launch-sandbox}
+
+The proxy keeps registered servers away from A2Flow. It also keeps them away from **each other**. Every tenant's servers start in the same proxy, and some of them are scripts a tenant wrote themselves — so each server the proxy starts is sealed in a sandbox of its own, created for that one call and torn down when it ends.
+
+| Inside the sandbox | What that rules out |
+|---|---|
+| The server sees only its own processes | Reading the secret values handed to any other server running at the same time |
+| The system and A2Flow's own programs are read-only | Altering what a later server — another tenant's, say — runs on its next start |
+| Its home directory, where downloaded packages are kept, belongs to its tenant alone | A server picking up a package another tenant planted |
+| Everything inside ends when the call ends | A process lingering after the call to watch the calls that come after it |
+| The proxy's own credentials are not there at all | Impersonating the proxy to anyone |
+
+A remote server, which the proxy only connects out to, runs nothing in the proxy and so needs no sandbox.
+
+The isolation is built on [bubblewrap](https://github.com/containers/bubblewrap), the Linux sandboxing tool behind Flatpak. The proxy checks that it can create a sandbox when it starts, and refuses to start if it cannot — it never falls back to running a server unsandboxed. See [Deployment](../operations/deployment.md#process-layout) for what that asks of the host.
+
 ## The policy chain
 
 | Order | Policy | What it requires |

@@ -44,6 +44,7 @@ Two things to get right:
 
 - **The API has to start first.** It issues the material both ends identify each other with, so the proxy will not accept anything until that has been written. Gate the proxy on the API's health check, as `compose.yml` does.
 - **They need a shared directory.** `MCP_PROXY_TLS_DIR` has to be the same storage on both sides — writable by the API, read-only for the proxy. Nothing durable is kept there: it is rewritten whenever it is missing or close to expiring.
+- **The proxy has to be able to build sandboxes.** It starts every server in a [sandbox of its own](../architecture/mcp-gateway-and-proxy.md#per-launch-sandbox), and checks at startup that it can — if it cannot, it stops with an error rather than running servers unsandboxed. Inside a container this takes three security options, which `compose.yml` gives the `mcp-proxy` service and only that service: `seccomp=unconfined`, `apparmor=unconfined`, and `systempaths=unconfined`. On an Ubuntu 24.04 or later host, unprivileged user namespaces must also be allowed: `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`.
 
 Skipping the proxy is possible — leave `MCP_PROXY_URL` unset and the API reaches MCP servers itself, which is what a local development run does. It means a registered server runs beside the deployment's credentials, so it is not a choice to make for an environment where anyone can register one.
 

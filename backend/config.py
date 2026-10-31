@@ -258,6 +258,12 @@ class Settings(BaseSettings):
             ``dNSName`` of its server certificate and verified during the
             handshake.
         mcp_proxy_port: Port the proxy's listener binds.
+        mcp_sandbox_dir: Directory holding one home directory per tenant for
+            sandboxed stdio MCP launches. Set, every stdio server runs in its
+            own bubblewrap sandbox (see :mod:`infrastructure.mcp_sandbox`),
+            with that tenant's directory as ``HOME``. Unset -- the default,
+            for a local checkout on a machine without ``bwrap`` -- servers run
+            unsandboxed. The MCP proxy refuses to start without it.
         mcp_transport_cert_validity_days: Validity of the TLS material above.
             Reissued automatically once less than 30 days remain.
         session_cookie_secure: Whether auth/CSRF cookies carry the ``Secure``
@@ -387,6 +393,7 @@ class Settings(BaseSettings):
     )
     mcp_proxy_server_name: str = _DEFAULT_MCP_PROXY_SERVER_NAME
     mcp_proxy_port: int = _DEFAULT_MCP_PROXY_PORT
+    mcp_sandbox_dir: Path | None = None
     mcp_transport_cert_validity_days: int = _DEFAULT_MCP_TRANSPORT_CERT_VALIDITY_DAYS
     mcp_elicitation_timeout_seconds: int = _DEFAULT_MCP_ELICITATION_TIMEOUT_SECONDS
     agent_turn_timeout_seconds: int = _DEFAULT_AGENT_TURN_TIMEOUT_SECONDS

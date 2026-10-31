@@ -117,7 +117,7 @@ async def test_resolve_connection_builds_stdio_connection_with_resolved_env() ->
         resolver,
     )
     assert connection == StdioConnection(
-        command="npx", args=["-y", "pkg"], env={"API_KEY": "TOKEN"}
+        command="npx", args=["-y", "pkg"], env={"API_KEY": "TOKEN"}, tenant_id="t-1"
     )
 
 
@@ -143,7 +143,10 @@ async def test_resolve_connection_expands_env_placeholder_in_args() -> None:
         resolver,
     )
     assert connection == StdioConnection(
-        command="npx", args=["--token", "TOKEN"], env={"API_KEY": "TOKEN"}
+        command="npx",
+        args=["--token", "TOKEN"],
+        env={"API_KEY": "TOKEN"},
+        tenant_id="t-1",
     )
     assert connection.label == "npx --token ${env:API_KEY}"
     assert "TOKEN" not in connection.label
@@ -175,6 +178,7 @@ async def test_resolve_connection_starts_the_python_runner_for_a_python_script()
         command=sys.executable,
         args=["-I", "-S", str(PYTHON_RUNNER)],
         env={"API_KEY": "TOKEN", "A2FLOW_SCRIPT_SOURCE": "def f(): ..."},
+        tenant_id="t-1",
     )
 
 
@@ -194,6 +198,7 @@ async def test_resolve_connection_starts_the_node_runner_for_a_javascript_script
         command="node",
         args=[str(NODE_RUNNER)],
         env={"A2FLOW_SCRIPT_SOURCE": "export function f() {}"},
+        tenant_id="t-1",
     )
 
 

@@ -683,6 +683,7 @@ async def test_call_tool_expands_secrets_and_env_placeholders_for_stdio(
         command="npx",
         args=["-y", "files-mcp@0.3.0", "--key=tok-stdio"],
         env={"API_KEY": "tok-stdio"},
+        tenant_id="tenant-default",
     )
 
 

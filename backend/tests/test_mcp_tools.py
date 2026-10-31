@@ -421,6 +421,7 @@ async def test_call_forwards_a_stdio_server_as_a_stdio_connection(
         command="npx",
         args=["-y", "files-mcp@0.3.0"],
         env={"API_KEY": "tok-stdio"},
+        tenant_id="tenant-default",
     )
 
 

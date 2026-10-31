@@ -61,15 +61,23 @@ FROM base AS mcp-proxy
 # base image already provides uv.) Only this stage gets it -- this is the only
 # process that launches an MCP server.
 #
-# /app/.npm is npx's package cache, written the first time a stdio MCP server
-# registered as an npm package is launched. Derived from HOME for the same
-# reason as the uv cache above.
+# libatomic1 is a shared library the copied node binary links against and the
+# slim base lacks.
+#
+# bubblewrap gives every stdio MCP server launch its own sandbox (see
+# infrastructure/mcp_sandbox.py): its own PID namespace and /proc, a read-only
+# root, and a HOME of /var/lib/a2flow/mcp-home/<tenant id> -- so npx's, uv's and
+# the script runners' package caches are kept per tenant, not shared in /app.
+# That directory is compose.yml's `mcp-home` volume mount point, pre-created
+# and chowned for the same reason as the backend stage's volumes.
 COPY --from=node:26-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --from=node:26-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
-    && mkdir -p /app/.npm \
-    && chown -R app:app /app/.npm
+    && apt-get update && apt-get install -y --no-install-recommends bubblewrap libatomic1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /var/lib/a2flow/mcp-home \
+    && chown -R app:app /var/lib/a2flow/mcp-home
 USER app
 
 EXPOSE 8443

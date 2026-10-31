@@ -21,7 +21,7 @@ the agent takes part in — it is what the agent does.
 | **[Workflows designed in conversation](https://kaitoy.github.io/a2flow/docs/guides/workflows)** | Start from an [Agent Skill](https://kaitoy.github.io/a2flow/docs/guides/agent-skills) — a `SKILL.md` in a Git repository — and talk to the AI. It drafts the task graph, you adjust it, you publish it — and that published plan is what every run follows: an SOP you carry out with the AI. |
 | **[A run is one shared chat](https://kaitoy.github.io/a2flow/docs/guides/workflow-executions)** | The requester presses **Run**, the agent walks the task graph — asking its questions through forms it draws into the chat — and the approver decides in the same thread. No ticket queue, no side channel. |
 | **[Approvals that carry real authority](https://kaitoy.github.io/a2flow/docs/guides/approvals)** | Each task holds a short-lived X.509 certificate over exactly the tools it was granted. The MCP gateway refuses any call that does not present one, signed — a prompt injection cannot talk its way past it, and the agent cannot widen a grant afterwards. |
-| **[MCP servers, sandboxed](https://kaitoy.github.io/a2flow/docs/guides/mcp-servers)** | Register the servers whose tools your workflows use. Third-party server code runs in a [separate proxy](https://kaitoy.github.io/a2flow/docs/architecture/mcp-gateway-and-proxy), away from the database credentials and API keys. |
+| **[MCP servers, sandboxed](https://kaitoy.github.io/a2flow/docs/guides/mcp-servers)** | Register the servers whose tools your workflows use. Third-party server code runs in a [separate proxy](https://kaitoy.github.io/a2flow/docs/architecture/mcp-gateway-and-proxy), away from the database credentials and API keys — and every launch gets [its own bubblewrap sandbox](https://kaitoy.github.io/a2flow/docs/architecture/mcp-gateway-and-proxy#per-launch-sandbox): a private process table, a read-only system, and a home directory no other tenant can touch. |
 | **[Tool mocks](https://kaitoy.github.io/a2flow/docs/guides/tool-mocks)** | Exercise a draft workflow end to end with no side effects: mocked tools return a configured result, so no request reaches the server and nobody is emailed. |
 | **[Secrets](https://kaitoy.github.io/a2flow/docs/guides/secrets)** | Named key/value bundles, referenced from server headers and environment as `${secret:name/key}` — never pasted into a form twice. |
 | **[Append-only audit logs](https://kaitoy.github.io/a2flow/docs/guides/audit-logs)** | Every tool call the gateway allowed or refused, every certificate issued, every impersonated session, every mail sent. Nothing in the screens edits or removes a record. |
@@ -46,7 +46,8 @@ resolved only when it is used, from whichever store backs it: the database, encr
 HashiCorp Vault, read live. No tool call reaches a server directly — the gateway decides
 whether it may happen, and the MCP proxy is where it happens, a separate process because
 it runs third-party code and so must not sit next to the database credentials or the API
-keys. See the
+keys. Inside it, each server launch is sealed in a sandbox of its own, so one tenant's
+server can neither read another's secrets nor tamper with what runs next. See the
 [architecture overview](https://kaitoy.github.io/a2flow/docs/architecture/overview) for
 the full picture.
 

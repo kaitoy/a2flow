@@ -12,11 +12,15 @@ Design notes:
   :func:`infrastructure.mcp_connection.resolve_connection`, which also expands
   ``${secret:NAME/KEY}`` placeholders — and hand it to :func:`list_server_tools` /
   :func:`call_server_tool`. Nothing outside this module branches on transport.
-* **Nothing of A2Flow's own world.** Deliberately no ORM row, no session, no
-  settings: resolution lives in :mod:`infrastructure.mcp_connection` precisely
-  so this module's imports are the MCP SDK, httpx2, and two dependency-free
-  modules of ours. What runs beside a user-registered MCP server should be as
-  small as it can be.
+* **Nothing of A2Flow's own world.** Deliberately no ORM row and no session:
+  resolution lives in :mod:`infrastructure.mcp_connection` precisely so this
+  module's imports are the MCP SDK, httpx2, and a few small modules of ours.
+  What runs beside a user-registered MCP server should be as small as it can
+  be. The one setting read here is ``mcp_sandbox_dir``.
+* **Every stdio launch sandboxed, when configured.** With ``MCP_SANDBOX_DIR``
+  set -- the MCP proxy refuses to start without it -- a stdio server's command
+  runs under :func:`infrastructure.mcp_sandbox.wrap`, one bubblewrap sandbox
+  per launch.
 * **One connection per operation.** Both ``streamable_http_client`` and
   ``stdio_client`` run an anyio task group that must be entered and exited in
   the same asyncio task; opening and closing the session inside a single
@@ -57,6 +61,8 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._stream_protocols import ReadStream, WriteStream
 from mcp.shared.message import SessionMessage
 
+from config import get_settings
+from infrastructure import mcp_sandbox
 from infrastructure.url_safety import assert_public_http_url, guard_peer_address
 from repositories.exceptions import McpConnectionError
 
@@ -131,12 +137,16 @@ class StdioConnection:
             ``env`` entry never appears in an error message or log line.
             Falls back to ``args`` when omitted (e.g. by tests constructing a
             connection directly).
+        tenant_id: The tenant the server belongs to. Picks the sandbox's home
+            directory, and with it the package caches the launch may reuse;
+            a sandboxed launch without one is refused.
     """
 
     command: str
     args: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     raw_args: list[str] | None = field(default=None, compare=False)
+    tenant_id: str | None = None
 
     @property
     def label(self) -> str:
@@ -208,8 +218,13 @@ async def _transport_streams(
             the client from :func:`_create_http_client`, surfacing as a
             connection failure. Not applicable to stdio, which opens no
             socket.
+        McpConnectionError: For a sandboxed stdio launch without a valid
+            tenant (see :func:`infrastructure.mcp_sandbox.wrap`).
     """
     if isinstance(connection, StdioConnection):
+        sandbox_dir = get_settings().mcp_sandbox_dir
+        if sandbox_dir is not None:
+            connection = mcp_sandbox.wrap(connection, sandbox_dir)
         parameters = StdioServerParameters(
             command=connection.command,
             args=list(connection.args),

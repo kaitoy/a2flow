@@ -154,6 +154,7 @@ Left unset — which is what a plain local run does — the agent reaches MCP se
 | `MCP_PROXY_TLS_DIR` | a directory beside the application | Where the agent publishes what the proxy needs to identify itself. The proxy reads the same directory, read-only |
 | `MCP_BACKEND_TLS_DIR` | a directory beside the application | Where the agent keeps its *own* key. Deliberately not the directory above — nothing running in the proxy should be able to read it |
 | `MCP_TRANSPORT_CERT_VALIDITY_DAYS` | `365` | Lifetime of that material. Reissued automatically once fewer than 30 days remain, so it needs no attention |
+| `MCP_SANDBOX_DIR` | unset | Where each tenant's home directory for [sandboxed server launches](../architecture/mcp-gateway-and-proxy.md#per-launch-sandbox) lives — the packages a tenant's servers download are kept here, one directory per tenant. Set, every locally started server runs in its own sandbox; the proxy refuses to start without it. Unset on a plain local run, where servers start unsandboxed |
 
 ## Notification email {#notification-email}
 
