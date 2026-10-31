@@ -401,6 +401,34 @@ async def test_resolve_effective_user_actor_demoted_falls_back_and_closes_event(
 
 
 @pytest.mark.asyncio
+async def test_resolve_effective_user_actor_stripped_of_admin_falls_back(
+    impersonation_service_engine: Any,
+) -> None:
+    """An admin whose admin role is revoked mid-impersonation stops acting as the target."""
+    async with AsyncSession(
+        impersonation_service_engine, expire_on_commit=False
+    ) as session:
+        service, actor = await _service_and_user(
+            impersonation_service_engine, session, "admin-a"
+        )
+        await service.start(actor=actor, target_user_id="dev-a")
+
+        demoted_actor = actor.model_copy(update={"roles": ["developer"]})
+
+        effective = await service.resolve_effective_user(
+            actor=demoted_actor, target_user_id="dev-a"
+        )
+        assert effective.id == "admin-a"
+
+        events_repo = SqlImpersonationEventRepository(session)
+        assert (
+            await events_repo.get_open(
+                impersonator_id="admin-a", target_user_id="dev-a"
+            )
+        ) is None
+
+
+@pytest.mark.asyncio
 async def test_stop_closes_open_event(impersonation_service_engine: Any) -> None:
     async with AsyncSession(
         impersonation_service_engine, expire_on_commit=False

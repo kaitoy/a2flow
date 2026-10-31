@@ -10,7 +10,7 @@ whom) and the persistent audit trail (:class:`~models.impersonation_event.Impers
 
 from collections.abc import Collection
 
-from models.user import SYSTEM_USER_ID, Role, User
+from models.user import SYSTEM_USER_ID, Role, User, has_any_role
 from repositories.effective_roles import EffectiveRoleRepository
 from repositories.exceptions import ForbiddenError, NotFoundError
 from repositories.impersonation_event import ImpersonationEventRepository
@@ -156,9 +156,10 @@ class ImpersonationService:
         Called on every request, not just at :meth:`start`. Never raises: a
         header that no longer names a valid, open impersonation (stopped
         elsewhere, target since disabled/promoted -- including promoted by
-        being added to an ``admin``-granting user group -- or, since
-        eligibility for an ``admin`` target also depends on the actor's own
-        role, the actor since demoted from ``super_admin``) falls back to the
+        being added to an ``admin``-granting user group -- the actor since
+        stripped of ``admin`` or no longer sharing the target's tenant, or,
+        since eligibility for an ``admin`` target also depends on the actor's
+        own role, the actor since demoted from ``super_admin``) falls back to the
         real actor and closes the stale event, rather than failing the
         request -- an error here would otherwise be able to lock a legitimate
         admin out of the whole app on a stale ``localStorage`` value (see
@@ -182,6 +183,14 @@ class ImpersonationService:
             target is None
             or not target.enabled
             or target.deleted_at is not None
+            # start()'s actor rules, re-applied: an actor since stripped of
+            # admin (directly or by leaving an admin-granting group) must not
+            # keep acting through an impersonation opened while they held it.
+            or not has_any_role(await self._effective_roles_of(actor), Role.admin)
+            or (
+                Role.super_admin not in (actor.roles or [])
+                and target.tenant_id != actor.tenant_id
+            )
             or _target_ineligible_for_actor(
                 actor=actor,
                 target=target,

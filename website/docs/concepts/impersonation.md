@@ -38,7 +38,7 @@ The start and stop endpoints are the deliberate exception: they are gated on the
 
 ## When an impersonation stops being valid {#stale-impersonations}
 
-Eligibility is re-checked on **every** request, not just when impersonation starts — the table above depends on roles, and roles move. If the impersonation no longer holds, the request does not fail: it silently falls back to the real actor and closes the stale record. That covers the target being disabled or deleted, the target being promoted (including by being added to a group that grants `admin`), the actor losing `super_admin`, and the impersonation having been stopped somewhere else.
+Eligibility is re-checked on **every** request, not just when impersonation starts — the table above depends on roles, and roles move. If the impersonation no longer holds, the request does not fail: it silently falls back to the real actor and closes the stale record. That covers the target being disabled or deleted, the target being promoted (including by being added to a group that grants `admin`), the actor losing `admin` (directly or by leaving a group that grants it) or `super_admin`, the actor no longer sharing the target's tenant, and the impersonation having been stopped somewhere else.
 
 Failing the request instead would be worse than useless: the selection lives in the browser's local storage, so an error would let one stale value lock a legitimate admin out of the whole application.
 
