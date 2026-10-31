@@ -142,6 +142,7 @@ async def get_approval(
 async def list_approval_certificates(
     approval_id: str,
     service: McpToolCertificateServiceDep,
+    approvals: ApprovalServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[list[McpToolCertificateRead]]:
     """Return the certificates issued under this approval, one per covered task.
@@ -157,9 +158,12 @@ async def list_approval_certificates(
     the next approval, and each of those is granted its certificate only when it
     starts, so a freshly granted approval legitimately has none.
 
-    Scoped like ``GET /approvals/{id}``: any authenticated user may fetch it,
-    since it discloses nothing the approval record does not already.
+    Scoped like ``GET /approvals/{id}``: any authenticated user who can see the
+    approval may fetch it, since it discloses nothing the approval record does
+    not already. The approval is loaded first, so one hidden by its execution's
+    access-control tag answers 404 here too.
     """
+    await approvals.get(approval_id)
     certificates = await service.list_for_approval(approval_id)
     return ApiResponse(meta=meta, data=certificates)
 

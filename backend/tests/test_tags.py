@@ -1407,6 +1407,12 @@ async def test_an_approvals_execution_access_tag_hides_it_from_its_approver(
     )
     assert approval_id not in await _listed_ids(client, "approvals", REQUESTER)
     assert_err(await client.get(detail_url, headers=REQUESTER), "NOT_FOUND", 404)
+    assert_err(
+        await client.get(f"{detail_url}/certificates", headers=REQUESTER),
+        "NOT_FOUND",
+        404,
+    )
+    assert_ok(await client.get(f"{detail_url}/certificates", headers=ADMIN))
     # The tag gate fires before the designated-approver check would let her in.
     assert_err(
         await client.patch(detail_url, json={"status": "approved"}, headers=REQUESTER),
