@@ -117,10 +117,6 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 |---|---|---|
 | `SECRET_ENCRYPTION_KEY` | — | `local` タイプの[シークレット](../guides/secrets.md)を保存前に暗号化する Fernet キー |
 | `SECRET_KEY_FILE` | `.secret_key` | ディスク上のキーファイルのパス。SQLite のデータベースファイルの隣です。`docker compose` では `/var/lib/a2flow/secret-key/.secret_key` で、バックエンドとメールワーカーが共有する `secret-key` という名前付きボリュームに置かれます |
-| `VAULT_ADDR` | — | `vault` タイプのシークレットをその都度読みに行く、単一の HashiCorp Vault のアドレス(KV v2 のみ)。未設定なら Vault は無効です |
-| `VAULT_ROLE_ID` / `VAULT_SECRET_ID` | — | AppRole の認証情報。静的トークンより優先されます |
-| `VAULT_APPROLE_MOUNT` | `approle` | AppRole のログインマウントパス |
-| `VAULT_TOKEN` | — | 静的トークン。AppRole の認証情報が設定されていないときに使われます |
 
 暗号化キーは最初の使用時に、次の順で解決されます。
 
@@ -130,7 +126,7 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 **キーはバックアップしてください。** 失うと保存済みのローカルシークレットがすべて復号できなくなり、同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
 
-`VAULT_ADDR` は、ユーザーが入力した URL に適用される SSRF チェックの対象から意図的に外してあります。運用者が設定するデプロイ設定であり、通常はプライベートアドレスを指すからです。
+HashiCorp Vault の設定は配備全体ではなくテナントごとにあります。各テナントは自分の Vault に接続し、その接続は Super Admin がテナントの詳細ページで設定します([テナント](../guides/users-and-groups.md#tenants)を参照)。このアドレスは、ユーザーが入力した URL に適用される SSRF チェックの対象から外してあります。設定できるのは Super Admin だけで、Vault は通常プライベートアドレスにあるからです。
 
 ## MCP ツールと承認 {#mcp-tools-and-approvals}
 

@@ -21,7 +21,10 @@ the services package would create an import cycle through
 
 A secret holds a map of entries, so every reference must name a key — even when
 the secret has exactly one entry. ``local`` entries are decrypted from the
-database; ``vault`` entries are read live from HashiCorp Vault. Every failure
+database; ``vault`` entries are read live from the HashiCorp Vault of the
+**secret's own tenant** (:class:`infrastructure.vault_client.TenantVaults`), so
+a secret can never reach a Vault path through another tenant's credential.
+Every failure
 mode — unknown name, missing key, undecryptable ciphertext, Vault error, Vault
 not configured — raises :class:`~repositories.exceptions.SecretResolutionError`
 naming the secret, so a stale reference fails with an actionable message at use
@@ -29,6 +32,7 @@ time.
 """
 
 import re
+from typing import Protocol
 
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.vault_client import VaultClient, VaultError
@@ -61,6 +65,14 @@ def split_secret_ref(ref: str) -> tuple[str, str | None]:
     return (name, key) if separator else (name, None)
 
 
+class VaultLookup(Protocol):
+    """Source of a tenant's Vault client -- :class:`~infrastructure.vault_client.TenantVaults`."""
+
+    async def client_for(self, tenant_id: str) -> VaultClient | None:
+        """Return the Vault client of ``tenant_id``, or ``None`` if it has none."""
+        ...
+
+
 class SecretResolver:
     """Resolves secret references and placeholder-bearing text to plaintext."""
 
@@ -68,20 +80,20 @@ class SecretResolver:
         self,
         repo: SecretRepository,
         cipher: SecretCipher,
-        vault: VaultClient | None,
+        vaults: VaultLookup,
     ) -> None:
         """Initialize the resolver.
 
         Args:
             repo: Repository used to look secrets up by name.
             cipher: Cipher used to decrypt local secret values.
-            vault: Vault client for ``vault``-type secrets, or ``None`` when no
-                Vault connection is configured (resolving a vault secret then
-                fails with :class:`SecretResolutionError`).
+            vaults: Source of each tenant's Vault client for ``vault``-type
+                secrets. A tenant with no Vault connection makes resolving its
+                vault secrets fail with :class:`SecretResolutionError`.
         """
         self._repo = repo
         self._cipher = cipher
-        self._vault = vault
+        self._vaults = vaults
 
     async def is_visible(self, name: str) -> bool:
         """Return whether the caller may reference the named secret.
@@ -285,14 +297,15 @@ class SecretResolver:
             SecretResolutionError: If Vault is not configured, the reference is
                 incomplete, or the read fails.
         """
-        if self._vault is None:
+        vault = await self._vaults.client_for(secret.tenant_id)
+        if vault is None:
             raise SecretResolutionError(
                 secret.name,
-                "no Vault connection is configured (set VAULT_ADDR and credentials)",
+                "the tenant has no Vault connection configured",
             )
         if not (secret.vault_mount and secret.vault_path):
             raise SecretResolutionError(secret.name, "incomplete Vault reference")
         try:
-            return await self._vault.read_kv2(secret.vault_mount, secret.vault_path)
+            return await vault.read_kv2(secret.vault_mount, secret.vault_path)
         except VaultError as exc:
             raise SecretResolutionError(secret.name, exc.reason) from exc

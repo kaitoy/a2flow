@@ -168,3 +168,95 @@ async def test_approle_uses_custom_login_mount() -> None:
     )
     await client.read_kv2("secret", "p")
     assert seen == ["/v1/auth/my-approle/login"]
+
+
+# ---------- per-tenant clients ----------
+
+
+async def _tenant_vaults_env() -> tuple[Any, Any]:
+    """Return an engine with the default test tenant seeded, plus a cipher."""
+    from cryptography.fernet import Fernet
+
+    from infrastructure.secret_cipher import SecretCipher
+    from tests._engine import make_test_engine
+    from tests._seed import seed_users
+
+    engine = await make_test_engine()
+    await seed_users(engine)
+    return engine, SecretCipher(Fernet.generate_key())
+
+
+async def _configure(engine: Any, **fields: Any) -> None:
+    """Write Vault fields straight onto the default test tenant's row."""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from models.tenant import Tenant
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    async with AsyncSession(engine) as db:
+        tenant = await db.get(Tenant, DEFAULT_TEST_TENANT_ID)
+        assert tenant is not None
+        for name, value in fields.items():
+            setattr(tenant, name, value)
+        db.add(tenant)
+        await db.commit()
+
+
+async def test_tenant_vaults_follow_each_tenants_own_settings() -> None:
+    """No settings means no client; a client is reused until the settings change."""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from infrastructure.vault_client import TenantVaults
+    from models.tenant import VaultAuthMethod
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    engine, cipher = await _tenant_vaults_env()
+    try:
+        async with AsyncSession(engine) as db:
+            vaults = TenantVaults(db, cipher)
+            assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
+            assert await vaults.client_for("no-such-tenant") is None
+
+        await _configure(
+            engine,
+            vault_addr=_ADDR,
+            vault_auth_method=VaultAuthMethod.token,
+            vault_credential=cipher.encrypt("tok"),
+        )
+        async with AsyncSession(engine) as db:
+            vaults = TenantVaults(db, cipher)
+            first = await vaults.client_for(DEFAULT_TEST_TENANT_ID)
+            assert isinstance(first, VaultClient)
+            assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is first
+
+        await _configure(engine, vault_addr="https://other-vault.example.com")
+        async with AsyncSession(engine) as db:
+            second = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+            assert second is not None and second is not first
+    finally:
+        await engine.dispose()
+
+
+async def test_tenant_vaults_refuse_an_undecryptable_credential() -> None:
+    """A credential sealed under a previous Fernet key yields no client."""
+    from cryptography.fernet import Fernet
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from infrastructure.secret_cipher import SecretCipher
+    from infrastructure.vault_client import TenantVaults
+    from models.tenant import VaultAuthMethod
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    engine, cipher = await _tenant_vaults_env()
+    try:
+        await _configure(
+            engine,
+            vault_addr=_ADDR,
+            vault_auth_method=VaultAuthMethod.token,
+            vault_credential=SecretCipher(Fernet.generate_key()).encrypt("tok"),
+        )
+        async with AsyncSession(engine) as db:
+            vaults = TenantVaults(db, cipher)
+            assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
+    finally:
+        await engine.dispose()

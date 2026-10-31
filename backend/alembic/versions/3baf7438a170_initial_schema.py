@@ -35,6 +35,19 @@ def upgrade() -> None:
         sa.Column("display_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False),
+        sa.Column("vault_addr", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "vault_auth_method",
+            sa.Enum("token", "approle", name="vaultauthmethod"),
+            nullable=True,
+        ),
+        sa.Column("vault_role_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column(
+            "vault_approle_mount", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
+        sa.Column(
+            "vault_credential", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("display_name", name="uq_tenants_display_name"),
         sa.UniqueConstraint("name", name="uq_tenants_name"),

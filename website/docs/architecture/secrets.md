@@ -29,7 +29,7 @@ The encryption key is resolved once per process: taken from the environment if i
 
 For a Vault-backed secret, A2Flow stores no values at all — only the mount and path to read them from. Both the values and the list of keys are fetched live each time they are needed, so rotating a value in Vault takes effect without touching A2Flow.
 
-One Vault connection is configured for the whole deployment, authenticating either with a static token or with AppRole credentials; an AppRole token is reused until its lease is nearly up and then refreshed by logging in again. Until Vault is configured, `vault`-type secrets cannot be resolved at all.
+Each tenant has **its own** Vault connection, configured on the [tenant record](../guides/users-and-groups.md#tenant-vault) and authenticating either with a static token or with AppRole credentials; an AppRole token is reused until its lease is nearly up and then refreshed by logging in again. A secret is always read through the connection of the tenant it belongs to. There is deliberately no deployment-wide Vault: one shared credential would let a secret in one tenant name a path holding another tenant's data. Until a tenant has a Vault connection, its `vault`-type secrets cannot be resolved at all.
 
 ## Where resolution happens
 

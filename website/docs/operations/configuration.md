@@ -117,10 +117,6 @@ Session files are stored in the database rather than on disk, so they need no di
 |---|---|---|
 | `SECRET_ENCRYPTION_KEY` | — | Fernet key used to encrypt `local` [secrets](../guides/secrets.md) before storage |
 | `SECRET_KEY_FILE` | `.secret_key` | Path to the on-disk key file, next to the SQLite database file. Under `docker compose` it is `/var/lib/a2flow/secret-key/.secret_key`, backed by the `secret-key` named volume that the backend and the email worker share |
-| `VAULT_ADDR` | — | Address of the single HashiCorp Vault (KV v2 only) that `vault`-type secrets are read live from. Vault is disabled when unset |
-| `VAULT_ROLE_ID` / `VAULT_SECRET_ID` | — | AppRole credentials, which take precedence over the static token |
-| `VAULT_APPROLE_MOUNT` | `approle` | AppRole login mount path |
-| `VAULT_TOKEN` | — | Static token, used when no AppRole credentials are set |
 
 The encryption key is resolved at first use, in order:
 
@@ -130,7 +126,7 @@ The encryption key is resolved at first use, in order:
 
 **Back the key up.** Losing it makes every stored local secret undecryptable, and the same key protects the [approval CA](../architecture/approvals.md)'s signing key.
 
-`VAULT_ADDR` is deliberately exempt from the SSRF URL checks applied to user-supplied URLs: it is operator-set deployment configuration and typically points at a private address.
+There is no deployment-wide HashiCorp Vault setting: each tenant connects to its own Vault, set by a Super Admin on the tenant's detail page (see [Tenants](../guides/users-and-groups.md#tenants)). That address is exempt from the SSRF URL checks applied to user-supplied URLs, since only a Super Admin can set it and a Vault typically lives on a private address.
 
 ## MCP tools and approvals {#mcp-tools-and-approvals}
 

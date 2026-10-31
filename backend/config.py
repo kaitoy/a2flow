@@ -2,7 +2,7 @@
 
 Collects every environment variable the running application reads (server
 bind settings, CORS, database, agent skill store, LLM selection, admin
-bootstrap, demo data, secret encryption, HashiCorp Vault, MCP registry,
+bootstrap, demo data, secret encryption, MCP registry,
 platform SMTP bootstrap, and session auth) into a single :class:`Settings`
 model instead of scattered ``os.getenv`` calls. Values with side-effecting
 fallback behavior (random admin password generation, Fernet key
@@ -239,11 +239,6 @@ class Settings(BaseSettings):
             (first in the resolution precedence handled by ``secret_cipher.py``).
         secret_key_file: Path to the on-disk Fernet key file (second in that
             precedence).
-        vault_addr: HashiCorp Vault server address; Vault is disabled when unset.
-        vault_role_id: AppRole authentication role id.
-        vault_secret_id: AppRole authentication secret id.
-        vault_approle_mount: AppRole login mount path.
-        vault_token: Static Vault token, used when AppRole credentials are absent.
         mcp_registry_url: Base URL of the official MCP registry.
         mcp_proxy_url: Base URL of the MCP proxy, the container that actually
             reaches registered MCP servers. Left unset — the default — the
@@ -375,12 +370,6 @@ class Settings(BaseSettings):
 
     secret_encryption_key: str | None = None
     secret_key_file: Path | None = None
-
-    vault_addr: str | None = None
-    vault_role_id: str | None = None
-    vault_secret_id: str | None = None
-    vault_approle_mount: str = "approle"
-    vault_token: str | None = None
 
     mcp_registry_url: str = "https://registry.modelcontextprotocol.io"
 

@@ -79,7 +79,7 @@ from infrastructure.mcp_connection import resolve_connection
 from infrastructure.mcp_executor import McpExecutor, get_mcp_executor
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.secret_resolver import SecretResolver
-from infrastructure.vault_client import get_vault_client
+from infrastructure.vault_client import TenantVaults
 from models.mcp_server import MCPServer
 from models.mcp_tool_invocation import McpAuditDecision
 from repositories.effective_roles import SqlEffectiveRoleRepository
@@ -992,7 +992,7 @@ class McpGateway:
         return SecretResolver(
             SqlSecretRepository(db, tenant_id=tenant_id),
             get_secret_cipher(),
-            get_vault_client(),
+            TenantVaults(db, get_secret_cipher()),
         )
 
     async def _resolve_connection(
@@ -1049,8 +1049,7 @@ class McpGateway:
 def get_mcp_gateway() -> McpGateway:
     """Return the process-wide MCP gateway singleton.
 
-    Defined here rather than in ``dependencies/singletons.py`` for the same
-    reason :func:`infrastructure.vault_client.get_vault_client` is:
+    Defined here rather than in ``dependencies/singletons.py`` because
     :mod:`infrastructure.mcp_tools` must import it without pulling in the
     ``dependencies`` package, which would cycle back through
     :mod:`infrastructure.agent`. The import below is local for the same kind of

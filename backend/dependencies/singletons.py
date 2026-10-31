@@ -1,7 +1,7 @@
 """LRU-cached singleton dependencies for ADK, skill, and secret services.
 
 Provides process-wide singletons (ADK session service, agent registry, skill
-manager, secret cipher, Vault client) created lazily on first resolution and
+manager, secret cipher) created lazily on first resolution and
 cached for the lifetime of the process. Tests override the underlying factory
 functions via ``app.dependency_overrides``.
 """
@@ -24,8 +24,6 @@ from infrastructure.secret_cipher import SecretCipher
 from infrastructure.secret_cipher import get_secret_cipher as get_secret_cipher
 from infrastructure.skill_manager import SkillManager
 from infrastructure.skill_manager import get_skill_manager as get_skill_manager
-from infrastructure.vault_client import VaultClient
-from infrastructure.vault_client import get_vault_client as get_vault_client
 
 from .context import APP_NAME
 
@@ -58,5 +56,4 @@ AgentRegistryDep = Annotated[AgentRegistry, Depends(get_agent_registry)]
 SkillManagerDep = Annotated[SkillManager, Depends(get_skill_manager)]
 SecretCipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 EmailSenderDep = Annotated[SmtpEmailSender, Depends(get_email_sender)]
-VaultClientDep = Annotated[VaultClient | None, Depends(get_vault_client)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]

@@ -113,4 +113,17 @@ Unlike every other admin section, this one is **Super Admin only**. It is hidden
 | **Name** | A URL-safe identifier, lowercase kebab-case. Unique, and not editable after creation. |
 | **Enabled** | Clear it to deactivate a tenant without deleting it: its users can no longer sign in, and anyone already signed in is signed out on their next request. |
 
+### The tenant's Vault {#tenant-vault}
+
+Each tenant connects to **its own** HashiCorp Vault (KV v2 only), which its [Vault-type secrets](./secrets.md) are read from. There is no Vault shared across tenants, so a secret can never read another tenant's Vault data. Set it on the tenant's detail page:
+
+| Field | Notes |
+|---|---|
+| **Vault Address** | The Vault's address, starting with `http://` or `https://`. Leave it empty and save to disconnect the tenant's Vault, which also deletes the stored credential. |
+| **Vault Auth Method** | **Token** for a static token, or **AppRole** for a role id and secret id that A2Flow exchanges for a short-lived token. |
+| **Vault Role ID** / **AppRole Mount** | AppRole only. The mount defaults to `approle`. |
+| **Vault Token** / **Vault Secret ID** | The credential for the chosen method. It is never shown again: once saved, the field reads "Saved — leave empty to keep it". Switching the auth method requires entering a new one. |
+
+Saving an address without a credential, or AppRole without a role id, is rejected with an error. Until a tenant has a Vault connection, its Vault-type secrets cannot be resolved.
+
 A **Default** tenant is seeded on first startup and holds the initial seeded `admin` user. A tenant cannot be deleted while any user is still assigned to it — reassign or delete those accounts first.

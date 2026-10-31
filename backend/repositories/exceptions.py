@@ -618,6 +618,21 @@ class SystemSettingsValidationError(ReasonError):
     http_status = 422
 
 
+class TenantValidationError(ReasonError):
+    """Raised when a tenant update would leave an unusable Vault connection.
+
+    A Vault address needs an auth method and a credential to go with it, and
+    the AppRole method also needs a role id. The rule applies to the merged
+    result of the stored record and the partial update (mirrors
+    :class:`SystemSettingsValidationError`), which only the service can compute.
+    Carries a human-readable ``reason`` surfaced in the error envelope's
+    ``details`` block when returning HTTP 422.
+    """
+
+    code = "INVALID_TENANT"
+    http_status = 422
+
+
 class EmailSendError(HttpMappedError):
     """Raised when a message could not be handed to the configured SMTP relay.
 

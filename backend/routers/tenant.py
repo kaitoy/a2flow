@@ -14,7 +14,7 @@ from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep, FilterDep, PaginationDep, SortDep
 from dependencies.service import TenantServiceDep
 from models.response import ApiResponse
-from models.tenant import Tenant, TenantCreate, TenantUpdate
+from models.tenant import TenantCreate, TenantRead, TenantUpdate
 from models.user import Role
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
@@ -25,7 +25,7 @@ _requires_super_admin = [Depends(require_roles(Role.super_admin))]
 
 @router.post(
     "",
-    response_model=ApiResponse[Tenant],
+    response_model=ApiResponse[TenantRead],
     status_code=201,
     dependencies=_requires_super_admin,
 )
@@ -34,15 +34,15 @@ async def create_tenant(
     service: TenantServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Tenant]:
+) -> ApiResponse[TenantRead]:
     """Create a new tenant."""
     tenant = await service.create(body, user_id=user_id)
-    return ApiResponse(meta=meta, data=tenant)
+    return ApiResponse(meta=meta, data=TenantRead.from_tenant(tenant))
 
 
 @router.get(
     "",
-    response_model=ApiResponse[list[Tenant]],
+    response_model=ApiResponse[list[TenantRead]],
     dependencies=_requires_super_admin,
 )
 async def list_tenants(
@@ -51,7 +51,7 @@ async def list_tenants(
     sort: SortDep,
     filters: FilterDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[Tenant]]:
+) -> ApiResponse[list[TenantRead]]:
     """Return a page of tenants."""
     items = await service.list(
         limit=pagination.limit,
@@ -59,27 +59,27 @@ async def list_tenants(
         sort=sort.sort,
         filters=filters.filters,
     )
-    return ApiResponse(meta=meta, data=items)
+    return ApiResponse(meta=meta, data=[TenantRead.from_tenant(t) for t in items])
 
 
 @router.get(
     "/{tenant_id}",
-    response_model=ApiResponse[Tenant],
+    response_model=ApiResponse[TenantRead],
     dependencies=_requires_super_admin,
 )
 async def get_tenant(
     tenant_id: str,
     service: TenantServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Tenant]:
+) -> ApiResponse[TenantRead]:
     """Return a single tenant."""
     tenant = await service.get(tenant_id)
-    return ApiResponse(meta=meta, data=tenant)
+    return ApiResponse(meta=meta, data=TenantRead.from_tenant(tenant))
 
 
 @router.patch(
     "/{tenant_id}",
-    response_model=ApiResponse[Tenant],
+    response_model=ApiResponse[TenantRead],
     dependencies=_requires_super_admin,
 )
 async def update_tenant(
@@ -88,10 +88,10 @@ async def update_tenant(
     service: TenantServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[Tenant]:
+) -> ApiResponse[TenantRead]:
     """Apply a partial update to a tenant."""
     tenant = await service.update(tenant_id, body, user_id=user_id)
-    return ApiResponse(meta=meta, data=tenant)
+    return ApiResponse(meta=meta, data=TenantRead.from_tenant(tenant))
 
 
 @router.delete(

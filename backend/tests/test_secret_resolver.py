@@ -66,6 +66,18 @@ def _vault_secret(name: str) -> Secret:
     )
 
 
+class _FakeVaults:
+    """Stand-in TenantVaults handing each tenant the client configured for it."""
+
+    def __init__(self, by_tenant: dict[str, _FakeVault]) -> None:
+        self._by_tenant = by_tenant
+        self.asked: list[str] = []
+
+    async def client_for(self, tenant_id: str) -> VaultClient | None:
+        self.asked.append(tenant_id)
+        return cast("VaultClient | None", self._by_tenant.get(tenant_id))
+
+
 def _resolver(
     secrets: list[Secret],
     *,
@@ -75,7 +87,7 @@ def _resolver(
     resolver = SecretResolver(
         cast(SecretRepository, repo),
         _CIPHER,
-        cast("VaultClient | None", vault),
+        _FakeVaults({} if vault is None else {"t-1": vault}),
     )
     return resolver, repo
 
@@ -124,6 +136,17 @@ async def test_resolve_value_reads_vault_secret() -> None:
     assert (
         await resolver.resolve_value("gh", "token") == "vault:secret/myapp/github/token"
     )
+
+
+async def test_resolve_value_reads_vault_of_the_secrets_own_tenant() -> None:
+    """A secret is read with its own tenant's Vault, never another tenant's."""
+    vaults = _FakeVaults({"t-2": _FakeVault()})
+    resolver = SecretResolver(
+        cast(SecretRepository, _FakeRepo([_vault_secret("gh")])), _CIPHER, vaults
+    )
+    with pytest.raises(SecretResolutionError, match="Vault"):
+        await resolver.resolve_value("gh", "token")
+    assert vaults.asked == ["t-1"]
 
 
 async def test_resolve_value_vault_unknown_key_raises() -> None:

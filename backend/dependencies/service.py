@@ -12,6 +12,7 @@ from fastapi import Depends
 
 from config import get_settings
 from infrastructure.secret_resolver import SecretResolver
+from infrastructure.vault_client import TenantVaults
 from repositories.session_file import SessionFileRepository
 from repositories.session_stream import SessionStreamRepository
 from services.agent_skill import AgentSkillService
@@ -87,7 +88,6 @@ from .singletons import (
     SecretCipherDep,
     SessionServiceDep,
     SkillManagerDep,
-    VaultClientDep,
 )
 
 
@@ -120,13 +120,21 @@ def get_skill_sync_job() -> SkillSyncJob:
 SkillSyncJobDep = Annotated[SkillSyncJob, Depends(get_skill_sync_job)]
 
 
+def get_tenant_vaults(db: DBSessionDep, cipher: SecretCipherDep) -> TenantVaults:
+    """Create the per-request source of each tenant's own Vault client."""
+    return TenantVaults(db, cipher)
+
+
+TenantVaultsDep = Annotated[TenantVaults, Depends(get_tenant_vaults)]
+
+
 def get_secret_resolver(
     repo: SecretRepositoryDep,
     cipher: SecretCipherDep,
-    vault: VaultClientDep,
+    vaults: TenantVaultsDep,
 ) -> SecretResolver:
-    """Create a SecretResolver wiring the repository, cipher, and optional Vault client."""
-    return SecretResolver(repo, cipher, vault)
+    """Create a SecretResolver wiring the repository, cipher, and tenant Vaults."""
+    return SecretResolver(repo, cipher, vaults)
 
 
 SecretResolverDep = Annotated[SecretResolver, Depends(get_secret_resolver)]
@@ -283,9 +291,11 @@ OutboundEmailServiceDep = Annotated[
 ]
 
 
-def get_tenant_service(repo: TenantRepositoryDep) -> TenantService:
-    """Create a TenantService backed by the request's repository."""
-    return TenantService(repo)
+def get_tenant_service(
+    repo: TenantRepositoryDep, cipher: SecretCipherDep
+) -> TenantService:
+    """Create a TenantService backed by the request's repository and the cipher."""
+    return TenantService(repo, cipher)
 
 
 TenantServiceDep = Annotated[TenantService, Depends(get_tenant_service)]

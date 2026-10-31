@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.tenant import Tenant, TenantCreate, TenantUpdate
+from models.tenant import Tenant, TenantCreate, TenantRead, TenantUpdate
 from repositories._integrity import is_foreign_key_error, is_unique_error
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -89,13 +89,13 @@ class SqlTenantRepository:
         filters: Sequence[FilterSpec] = (),
     ) -> list[Tenant]:
         stmt = select(Tenant)
-        stmt = apply_filters(stmt, Tenant, filters, readable=Tenant)
+        stmt = apply_filters(stmt, Tenant, filters, readable=TenantRead)
         stmt = apply_sort(
             stmt,
             Tenant,
             sort,
             default=[col(Tenant.created_at).desc()],
-            readable=Tenant,
+            readable=TenantRead,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())

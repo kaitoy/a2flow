@@ -170,4 +170,82 @@ describe("TenantDetailPage", () => {
       })
     );
   });
+
+  describe("Vault connection", () => {
+    const VAULT_TENANT = {
+      ...FULL_TENANT,
+      vaultAddr: "https://vault.acme.internal",
+      vaultAuthMethod: "token",
+      vaultRoleId: null,
+      vaultApproleMount: null,
+      vaultCredentialSet: true,
+    };
+
+    /** Serve `tenant` and capture the PATCH body the page sends. */
+    function capturePatch(tenant: object) {
+      const captured: { body: Record<string, unknown> | null } = { body: null };
+      server.use(
+        http.get("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(tenant)),
+        http.patch("http://localhost:8000/api/v1/tenants/:tenantId", async ({ request }) => {
+          captured.body = (await request.json()) as Record<string, unknown>;
+          return envelope(tenant);
+        })
+      );
+      return captured;
+    }
+
+    it("keeps a saved token by leaving the field blank", async () => {
+      setup();
+      const captured = capturePatch(VAULT_TENANT);
+      renderPage();
+      await waitFor(() => screen.getByDisplayValue("https://vault.acme.internal"));
+      expect(screen.getByLabelText("Vault Token")).toHaveAttribute(
+        "placeholder",
+        "Saved — leave empty to keep it"
+      );
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(captured.body).toMatchObject({
+        vaultAddr: "https://vault.acme.internal",
+        vaultAuthMethod: "token",
+      });
+      expect(captured.body).not.toHaveProperty("vaultCredential");
+    });
+
+    it("clears the whole connection when the address is emptied", async () => {
+      setup();
+      const captured = capturePatch(VAULT_TENANT);
+      renderPage();
+      const addr = await screen.findByDisplayValue("https://vault.acme.internal");
+      await userEvent.clear(addr);
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(captured.body).toMatchObject({ vaultAddr: null, vaultCredential: null });
+    });
+
+    it("asks for a role id and a new secret id when switching to AppRole", async () => {
+      setup();
+      const captured = capturePatch(VAULT_TENANT);
+      renderPage();
+      await waitFor(() => screen.getByDisplayValue("https://vault.acme.internal"));
+      await userEvent.click(screen.getByRole("tab", { name: "AppRole" }));
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText("Role ID is required")).toBeInTheDocument();
+      expect(screen.getByText("Secret ID is required")).toBeInTheDocument();
+      expect(captured.body).toBeNull();
+
+      await userEvent.type(screen.getByLabelText("Vault Role ID"), "role-1");
+      await userEvent.type(screen.getByLabelText("Vault Secret ID"), "sid-1");
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(captured.body).toMatchObject({
+        vaultAuthMethod: "approle",
+        vaultRoleId: "role-1",
+        vaultCredential: "sid-1",
+      });
+    });
+  });
 });

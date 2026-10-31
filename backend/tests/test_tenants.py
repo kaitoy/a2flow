@@ -283,3 +283,108 @@ async def test_non_super_admin_cannot_delete_tenant(
         f"/api/v1/tenants/{created['id']}", headers={"X-User-Roles": "admin"}
     )
     assert_err(response, code="FORBIDDEN", status=403)
+
+
+# ---------- vault connection ----------
+
+_VAULT = {
+    "vaultAddr": "https://vault.acme.internal:8200",
+    "vaultAuthMethod": "token",
+    "vaultCredential": "hvs.secret-token",
+}
+
+
+async def test_vault_credential_is_stored_encrypted_and_never_returned(
+    tenant_client: AsyncClient,
+) -> None:
+    response = await tenant_client.post(
+        "/api/v1/tenants", json={**_CREATE_BODY, **_VAULT}
+    )
+    body = assert_ok(response, status=201)
+    assert body["vaultAddr"] == _VAULT["vaultAddr"]
+    assert body["vaultCredentialSet"] is True
+    assert "vaultCredential" not in body
+    assert "hvs.secret-token" not in response.text
+
+    listed = await tenant_client.get("/api/v1/tenants")
+    assert "hvs.secret-token" not in listed.text
+    assert assert_ok(listed)[0]["vaultCredentialSet"] is True
+
+
+async def test_blank_vault_credential_keeps_the_stored_one(
+    tenant_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json={**_CREATE_BODY, **_VAULT}),
+        status=201,
+    )
+    body = assert_ok(
+        await tenant_client.patch(
+            f"/api/v1/tenants/{created['id']}",
+            json={"vaultAddr": "https://vault2.acme.internal", "vaultCredential": ""},
+        )
+    )
+    assert body["vaultCredentialSet"] is True
+
+    cleared = assert_ok(
+        await tenant_client.patch(
+            f"/api/v1/tenants/{created['id']}",
+            json={"vaultAddr": None, "vaultCredential": None},
+        )
+    )
+    assert cleared["vaultCredentialSet"] is False
+    assert cleared["vaultAddr"] is None
+
+
+async def test_vault_addr_without_a_credential_is_rejected(
+    tenant_client: AsyncClient,
+) -> None:
+    assert_err(
+        await tenant_client.post(
+            "/api/v1/tenants",
+            json={**_CREATE_BODY, "vaultAddr": _VAULT["vaultAddr"]},
+        ),
+        code="INVALID_TENANT",
+        status=422,
+    )
+    assert_err(
+        await tenant_client.post(
+            "/api/v1/tenants",
+            json={**_CREATE_BODY, **_VAULT, "vaultAuthMethod": "approle"},
+        ),
+        code="INVALID_TENANT",
+        status=422,
+    )
+
+
+async def test_vault_credential_cannot_be_filtered_on(
+    tenant_client: AsyncClient,
+) -> None:
+    """The ciphertext column must not be usable as a blind filter oracle."""
+    response = await tenant_client.get(
+        "/api/v1/tenants", params={"q": "vaultCredential:like:a"}
+    )
+    assert_err(response, code="INVALID_QUERY", status=400)
+
+
+async def test_switching_vault_auth_method_needs_a_new_credential(
+    tenant_client: AsyncClient,
+) -> None:
+    """A stored token must not be reused as an AppRole secret id."""
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json={**_CREATE_BODY, **_VAULT}),
+        status=201,
+    )
+    switch = {"vaultAuthMethod": "approle", "vaultRoleId": "role-1"}
+    assert_err(
+        await tenant_client.patch(f"/api/v1/tenants/{created['id']}", json=switch),
+        code="INVALID_TENANT",
+        status=422,
+    )
+    body = assert_ok(
+        await tenant_client.patch(
+            f"/api/v1/tenants/{created['id']}",
+            json={**switch, "vaultCredential": "secret-id-1"},
+        )
+    )
+    assert body["vaultAuthMethod"] == "approle"

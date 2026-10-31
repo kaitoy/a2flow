@@ -21,7 +21,7 @@ from infrastructure.locks import LockNotAcquiredError, advisory_lock, skill_sync
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.secret_resolver import SecretResolver
 from infrastructure.skill_manager import SkillManager, get_skill_manager
-from infrastructure.vault_client import get_vault_client
+from infrastructure.vault_client import TenantVaults
 from models.agent_skill import SkillSyncStatus
 from repositories.agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from repositories.exceptions import (
@@ -175,7 +175,7 @@ async def sync_agent_skill(skill_id: str, *, user_id: str) -> None:
                     tenant_id=tenant_id,
                 ),
                 resolver=SecretResolver(
-                    secrets, get_secret_cipher(), get_vault_client()
+                    secrets, get_secret_cipher(), TenantVaults(db, get_secret_cipher())
                 ),
                 skill_manager=get_skill_manager(),
             )

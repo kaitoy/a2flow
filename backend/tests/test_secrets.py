@@ -521,10 +521,14 @@ def _use_vault(vault: object | None) -> None:
     The ``secrets_client`` fixture clears every override afterwards, so this
     needs no teardown of its own.
     """
-    from dependencies.singletons import get_vault_client
+    from dependencies.service import get_tenant_vaults
     from main import app
 
-    app.dependency_overrides[get_vault_client] = lambda: vault
+    class _Vaults:
+        async def client_for(self, tenant_id: str) -> object | None:
+            return vault
+
+    app.dependency_overrides[get_tenant_vaults] = _Vaults
 
 
 async def test_list_keys_of_local_secret_returns_sorted_keys(
