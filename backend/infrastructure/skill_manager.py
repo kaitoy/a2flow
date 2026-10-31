@@ -229,6 +229,7 @@ class SkillManager:
             # event loop is not blocked while pack data is fetched.
             commit_sha = await asyncio.to_thread(_do_clone)
             self._assert_skill_dir_present(skill, staging)
+            await asyncio.to_thread(self._assert_no_symlinks, skill, staging)
             await asyncio.to_thread(self._publish, staging, skill_root / commit_sha)
             return commit_sha
         except SkillCloneError:
@@ -271,6 +272,28 @@ class SkillManager:
                 skill.id,
                 f"repo_path {skill.repo_path!r} not found in the cloned repository",
             )
+
+    @staticmethod
+    def _assert_no_symlinks(skill: AgentSkill, staging: Path) -> None:
+        """Raise if the cloned tree contains a symbolic link anywhere.
+
+        The tree is attacker-controlled, and dulwich materializes a symlink
+        entry with whatever target the commit names. Every reader of a
+        revision -- ``get_content``'s SKILL.md read and ADK's
+        ``load_skill_from_dir``, which slurps every file -- follows links, so a
+        link to ``/proc/self/environ`` or the key file would hand the backend's
+        secrets to whoever can read the skill. Refusing the whole revision
+        here keeps every published tree link-free for all of them.
+        """
+        for dirpath, dirnames, filenames in os.walk(staging):
+            for name in (*dirnames, *filenames):
+                path = Path(dirpath) / name
+                if path.is_symlink():
+                    raise SkillCloneError(
+                        skill.id,
+                        f"symbolic link {path.relative_to(staging).as_posix()!r} "
+                        "is not allowed in a skill repository",
+                    )
 
     def _publish(self, staging: Path, target: Path) -> None:
         """Move a staged clone into place as an immutable revision directory."""

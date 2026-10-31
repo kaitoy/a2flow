@@ -41,6 +41,8 @@ The two are deliberately independent: a pull that fails does **not** clear the p
 
 **Pull** re-clones the repository at its configured **Ref**, or at the default branch when none is set. It is how a skill picks up upstream changes, and how a failed registration is retried after fixing the URL or the credentials. A moved branch tip or a re-pointed tag is picked up the next time the skill is pulled.
 
+A repository that contains a **symbolic link** anywhere in its tree is refused: the clone or pull fails with a reason naming the link, and no revision is published from it. Replace the link with a copy of the file it points to.
+
 Each published revision is kept as long as something still needs it, and a workflow execution stays pinned to the revision it started with, so pulling never changes what an in-flight run is following. The store's location and its retention are covered in the [configuration reference](../operations/configuration.md#agent-skill-store).
 
 ## Private repositories

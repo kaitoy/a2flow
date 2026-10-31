@@ -157,6 +157,35 @@ async def test_clone_rejects_a_repo_path_missing_from_the_cloned_tree(
     assert not (tmp_path / skill.id / _SHA_A).exists()
 
 
+async def test_clone_rejects_a_tree_containing_a_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A symlinked SKILL.md would let `/content` read any file the backend can."""
+    secret = tmp_path / "outside.txt"
+    secret.write_text("key")
+
+    def _clone(_url: str, target: str, **_kwargs: Any) -> MagicMock:
+        Path(target).mkdir(parents=True)
+        try:
+            (Path(target) / "SKILL.md").symlink_to(secret)
+        except OSError:
+            pytest.skip("creating symlinks is not permitted on this host")
+        repo = MagicMock()
+        repo.head.return_value = _SHA_A.encode()
+        return repo
+
+    monkeypatch.setattr(
+        "infrastructure.skill_manager.porcelain.clone", MagicMock(side_effect=_clone)
+    )
+    manager = _manager(tmp_path / "store")
+    skill = _make_skill()
+
+    with pytest.raises(SkillCloneError, match="symbolic link 'SKILL.md'"):
+        await manager.clone(skill)
+
+    assert not (tmp_path / "store" / skill.id / _SHA_A).exists()
+
+
 async def test_clone_rejects_repo_path_escaping_the_revision_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
