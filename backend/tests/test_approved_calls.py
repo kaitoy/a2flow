@@ -10,6 +10,8 @@ digest, so a message quoting the value it refused would write back what the row
 exists to withhold.
 """
 
+import time
+
 from infrastructure.approved_calls import (
     declared_tools,
     match_call,
@@ -238,6 +240,14 @@ def test_matches_is_unanchored() -> None:
     assert _match(declaration, name="dev-web") is None
     assert _match(declaration, name="prod-web") is not None
     assert _match([_call(name={"matches": "dev"})], name="my-dev-box") is None
+
+
+def test_a_catastrophically_backtracking_pattern_times_out_as_a_refusal() -> None:
+    """A ReDoS pattern is cut off by the timeout instead of freezing the loop."""
+    started = time.monotonic()
+    refusal = _match([_call(name={"matches": "^([a-z0-9]+-?)+$"})], name="a" * 40 + "!")
+    assert refusal is not None
+    assert time.monotonic() - started < 5
 
 
 def test_matches_refuses_a_non_string() -> None:

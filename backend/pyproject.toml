@@ -54,6 +54,7 @@ dependencies = [
     # IANA time zone data for zoneinfo (session_runner, metrics, config): Windows
     # and slim container images ship no system zoneinfo database.
     "tzdata>=2026.1",
+    "regex>=2026.9.29",
 ]
 
 [project.scripts]

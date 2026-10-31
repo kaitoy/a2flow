@@ -57,9 +57,10 @@ approver authored and the approval already shows, and never the value the run
 passed. That is enough for the agent to correct itself: it knows what it sent.
 """
 
-import re
 from collections.abc import Sequence
 from typing import Any
+
+import regex
 
 from models.approval import ApprovedCall
 
@@ -71,11 +72,17 @@ OPERATORS: tuple[str, ...] = ("eq", "in", "lte", "gte", "matches")
 #: does not count towards the exactly-one-operator rule.
 _MODIFIERS: frozenset[str] = frozenset({"optional"})
 
-#: Longest ``matches`` pattern a declaration may carry. ``re`` has no timeout, so
-#: a pathological pattern would burn the request's thread. The patterns come from
+#: Longest ``matches`` pattern a declaration may carry. The patterns come from
 #: the run's own agent and are read by a human approver rather than supplied by
 #: an anonymous caller, so a bound this generous only rules out the absurd.
 _MAX_PATTERN_LENGTH = 512
+
+#: Seconds one ``matches`` evaluation may run. Matching happens on the event
+#: loop, and a steerable agent can write a catastrophically backtracking pattern
+#: (``^([a-z0-9]+-?)+$``) that a human approver will not spot, so the
+#: ``regex`` engine's timeout caps the stall instead of the length bounds alone.
+#: A match that runs out of time counts as not satisfied.
+_MATCH_TIMEOUT_SECONDS = 0.1
 
 #: How much of an argument a ``matches`` constraint examines. Bounds the other
 #: half of the same worry: a long subject string against a backtracking pattern.
@@ -211,8 +218,8 @@ def _validate_constraint(
             )
         else:
             try:
-                re.compile(value)
-            except re.error as exc:
+                regex.compile(value)
+            except regex.error as exc:
                 problems.append(
                     f"{at}: 'matches' is not a valid regular expression: {exc}"
                 )
@@ -313,9 +320,15 @@ def _satisfies(constraint: dict[str, Any], value: Any) -> bool:
     if "gte" in constraint:
         return _is_number(value) and value >= constraint["gte"]
     if "matches" in constraint:
-        return (
-            isinstance(value, str)
-            and re.search(constraint["matches"], value[:_MAX_MATCHED_LENGTH])
-            is not None
-        )
+        if not isinstance(value, str):
+            return False
+        try:
+            found = regex.search(
+                constraint["matches"],
+                value[:_MAX_MATCHED_LENGTH],
+                timeout=_MATCH_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            return False
+        return found is not None
     return False
