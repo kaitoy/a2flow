@@ -1,8 +1,8 @@
 "use client";
 
-import { renderMarkdown } from "@a2ui/markdown-it";
 import type { AssistantMessage } from "@ag-ui/core";
 import { type ReactNode, useEffect, useState } from "react";
+import { renderMarkdown } from "@/lib/markdown";
 
 /**
  * Render an assistant message as a left-aligned glass bubble with an optional streaming cursor.

@@ -1,11 +1,11 @@
 "use client";
 
-import { renderMarkdown } from "@a2ui/markdown-it";
 import { A2uiSurface, MarkdownContext, type ReactComponentImplementation } from "@a2ui/react/v0_9";
 import type { SurfaceModel } from "@a2ui/web_core/v0_9";
 import { MessageProcessor } from "@a2ui/web_core/v0_9";
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useEffect, useRef, useState } from "react";
+import { renderMarkdown } from "@/lib/markdown";
 import { SurfaceResolvedContext } from "./a2ui/surfaceResolvedContext";
 import { tailwindCatalog } from "./a2uiCatalog";
 

@@ -1,11 +1,11 @@
 /** @module MarkdownContentDialog — modal fetching a Markdown document and rendering it. */
 "use client";
 
-import { renderMarkdown } from "@a2ui/markdown-it";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { renderMarkdown } from "@/lib/markdown";
 
 /** Props for {@link MarkdownContentDialog}. */
 export interface MarkdownContentDialogProps {

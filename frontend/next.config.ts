@@ -16,6 +16,24 @@ const nextConfig: NextConfig = {
   },
   // The /api/* and /openapi.json → backend proxy lives in src/proxy.ts, so it
   // can read BACKEND_BASE_URL at container start instead of at build time.
+  // Images and media load only from this origin (avatars come through the
+  // /api proxy) or in-memory sources (avatar upload previews). Agent output can
+  // carry attacker-chosen URLs, and an <img> or A2UI Image/Video that loads one
+  // leaks data to that host with no click. Scripts and styles are left to the
+  // browser defaults.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "img-src 'self' data: blob:; media-src 'self' data: blob:",
+          },
+        ],
+      },
+    ];
+  },
   turbopack: {
     resolveAlias: {
       crypto: './src/lib/crypto-shim.ts',
