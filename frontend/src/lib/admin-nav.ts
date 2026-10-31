@@ -10,6 +10,7 @@ import {
   ScrollText,
   Server,
   Settings2,
+  ShieldCheck,
   Tags,
   User,
   UsersRound,
@@ -134,6 +135,13 @@ export const adminNavItems: AdminNavItem[] = [
     label: "Audit Logs",
     icon: ScrollText,
     description: "Trace tool calls, impersonation, certificates, and mail",
+    roles: [Role.ADMIN],
+  },
+  {
+    href: "/tenant-settings",
+    label: "Tenant Settings",
+    icon: ShieldCheck,
+    description: "Set how failed sign-ins lock accounts",
     roles: [Role.ADMIN],
   },
   {

@@ -74,6 +74,8 @@ import type {
   TagUpdate,
   TenantCreate,
   TenantRead as TenantModel,
+  TenantSettings,
+  TenantSettingsUpdate,
   TenantUpdate,
   ToolBinding,
   UserCreate,
@@ -425,6 +427,8 @@ export type {
   TagCreate,
   TagUpdate,
   TenantCreate,
+  TenantSettings,
+  TenantSettingsUpdate,
   TenantUpdate,
   ToolBinding,
   UserCreate,
@@ -1066,6 +1070,21 @@ export async function updateSystemSettings(body: SystemSettingsUpdate): Promise<
   return unwrap(
     sdk.updateSystemSettingsApiV1SystemSettingsPatch({ body: body })
   ) as Promise<SystemSettings>;
+}
+
+/**
+ * Fetch the acting tenant's admin-managed settings (sign-in lockout). `admin`
+ * only; a `super_admin` gets the tenant selected in the tenant switcher.
+ */
+export async function getTenantSettings(options?: CallOptions): Promise<TenantSettings> {
+  return unwrap(sdk.getTenantSettingsApiV1TenantSettingsGet(), options) as Promise<TenantSettings>;
+}
+
+/** Apply a partial update to the acting tenant's admin-managed settings. `admin` only. */
+export async function updateTenantSettings(body: TenantSettingsUpdate): Promise<TenantSettings> {
+  return unwrap(
+    sdk.updateTenantSettingsApiV1TenantSettingsPatch({ body: body })
+  ) as Promise<TenantSettings>;
 }
 
 /**

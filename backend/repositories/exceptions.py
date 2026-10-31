@@ -69,6 +69,32 @@ class CsrfError(HttpMappedError):
         super().__init__(message)
 
 
+class TooManyLoginAttemptsError(HttpMappedError):
+    """Raised when login is refused because of too many recent failures.
+
+    Mapped to HTTP 429 with the ``TOO_MANY_LOGIN_ATTEMPTS`` error code. Raised
+    by ``AuthService.login`` before the password is checked, once the
+    submitted account has hit its tenant's failure limit.
+    """
+
+    code = "TOO_MANY_LOGIN_ATTEMPTS"
+    http_status = 429
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        """Initialize the error.
+
+        Args:
+            retry_after_seconds: Seconds until the oldest counted failure
+                leaves the window and a new attempt is accepted.
+        """
+        minutes = max(1, -(-retry_after_seconds // 60))
+        super().__init__(
+            "Too many failed sign-in attempts. "
+            f"Try again in {minutes} minute{'s' if minutes != 1 else ''}."
+        )
+        self.retry_after_seconds = retry_after_seconds
+
+
 class ForbiddenError(HttpMappedError):
     """Raised when an authenticated user is not allowed to perform an action.
 

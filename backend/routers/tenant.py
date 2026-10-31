@@ -4,7 +4,8 @@ Tenants are the platform-wide organizational boundary (see
 :mod:`models.tenant`), so every route — reads included — is gated behind the
 ``super_admin`` role — unlike most resources, there is no self-service or
 ``admin``-level carve-out, and reads are not left open the way they are for
-most resources.
+most resources. The one carve-out is :mod:`routers.tenant_settings`, where a
+tenant's own ``admin`` edits its sign-in throttling.
 """
 
 from fastapi import APIRouter, Depends

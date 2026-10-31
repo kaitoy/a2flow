@@ -33,6 +33,7 @@ The breadcrumb trail above every title mirrors that path — `Admin › Workflow
 | **Workflow Executions** | Workflow runs and their history | Everyone signed in |
 | **Approvals** | Approval requests and their decisions | Everyone signed in |
 | **Audit Logs** | Tool calls, impersonation, granted authority, and sent mail | Admin, Super Admin |
+| **Tenant Settings** | How failed sign-ins lock your tenant's accounts — see [Failed sign-ins](./users-and-groups.md#failed-sign-ins) | Admin |
 | **System Settings** | The mail server notifications are sent through | Super Admin |
 
 A section missing from your sidebar is one your roles cannot write to. Reads stay open, so a colleague can still send you a direct link to a record inside it — see [Roles and authorization](../concepts/authorization.md).

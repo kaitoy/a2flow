@@ -36,7 +36,8 @@ class TenantService:
         Mutates ``payload`` in place. A non-empty credential is replaced by its
         ciphertext; an empty one is dropped so the stored ciphertext is kept
         (the admin form never receives it, so a blank field means "unchanged");
-        an explicit ``None`` is kept and clears it.
+        an explicit ``None`` is kept and clears it. An explicit ``None`` for a
+        sign-in limit is dropped instead, since those columns cannot be empty.
 
         Args:
             current: The stored tenant, or ``None`` on create.
@@ -48,6 +49,11 @@ class TenantService:
                 while keeping the old method's credential, or names the AppRole
                 method without a role id.
         """
+        # The sign-in limits are non-nullable columns with defaults; an
+        # explicit null means "leave as is", not "clear".
+        for field in ("login_max_failures", "login_lockout_minutes"):
+            if payload.get(field, 0) is None:
+                payload.pop(field)
         new_credential = False
         if "vault_credential" in payload:
             credential = payload["vault_credential"]

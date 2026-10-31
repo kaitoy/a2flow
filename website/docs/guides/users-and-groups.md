@@ -51,6 +51,21 @@ Deleting an account that nothing else references removes it outright. An account
 
 Records never show a raw user id. Every detail page and list resolves the owner to a name; two accounts get a label instead, because they own records across tenant boundaries: the internal account shows as **System User**, and a Super Admin you cannot see shows as **Super Admin**.
 
+## Failed sign-ins {#failed-sign-ins}
+
+Repeated wrong passwords lock an account for a while. After **Failed Sign-ins Before Lockout** failures for the same username (and tenant) within **Lockout Minutes** — 5 within 15 minutes unless the tenant changed them — the sign-in screen rejects even the correct password and says how many minutes to wait. The lock lifts once the oldest of those failures is **Lockout Minutes** old.
+
+Each tenant sets its own values. Open **Tenant Settings** in the admin sidebar (the `admin` role is required) to change them for your tenant:
+
+| Field | Notes |
+|---|---|
+| **Failed Sign-ins Before Lockout** | How many failures lock an account. 1 to 100; default 5. |
+| **Lockout Minutes** | How many minutes failures are counted over, and how long a locked account stays locked. 1 to 1440 (one day); default 15. |
+
+A Super Admin edits the same two fields on a tenant's detail page under **Tenants**, or opens **Tenant Settings** while acting as the tenant. Accounts that belong to no tenant, such as `root`, always use the defaults.
+
+A successful sign-in clears the account's failure count. A username that does not exist is locked after the same number of failures, so a lock never reveals whether an account exists. Nobody needs to unlock an account: the lock lifts on its own.
+
 ## Your own account {#your-own-account}
 
 Click the profile button in the app bar and choose **Profile** to review your own account. The page opens with an identity card — a banner, your avatar across its lower edge, your display name as the heading, and your `@username`, roles and status pills beside it — followed by two read-only cards:
@@ -105,13 +120,14 @@ Writing to this section requires the `admin` role. Reads stay open, so a viewer 
 
 Open **Tenants** in the admin sidebar to manage tenants — the top-level organizational boundary for multi-tenancy. What that boundary means for everything else, and how a Super Admin picks a tenant to act as, is covered under [Tenants](../concepts/tenants.md); this section is about the records themselves.
 
-Unlike every other admin section, this one is **Super Admin only**. It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
+Unlike every other admin section, this one is **Super Admin only** (a tenant's own admin changes its sign-in lockout under **Tenant Settings** instead). It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
 
 | Field | Notes |
 |---|---|
 | **Display Name** | The human-readable label. Unique. |
 | **Name** | A URL-safe identifier, lowercase kebab-case. Unique, and not editable after creation. |
 | **Enabled** | Clear it to deactivate a tenant without deleting it: its users can no longer sign in, and anyone already signed in is signed out on their next request. |
+| **Failed Sign-ins Before Lockout** / **Lockout Minutes** | How failed sign-ins lock the tenant's accounts — see [Failed sign-ins](#failed-sign-ins). |
 
 ### The tenant's Vault {#tenant-vault}
 

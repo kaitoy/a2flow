@@ -48,6 +48,12 @@ def upgrade() -> None:
         sa.Column(
             "vault_credential", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
+        sa.Column(
+            "login_max_failures", sa.Integer(), nullable=False, server_default="5"
+        ),
+        sa.Column(
+            "login_lockout_minutes", sa.Integer(), nullable=False, server_default="15"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("display_name", name="uq_tenants_display_name"),
         sa.UniqueConstraint("name", name="uq_tenants_name"),
@@ -259,6 +265,19 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_auth_sessions_token_hash", "auth_sessions", ["token_hash"], unique=False
+    )
+    op.create_table(
+        "login_failures",
+        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("key", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("failed_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_login_failures_key_failed_at",
+        "login_failures",
+        ["key", "failed_at"],
+        unique=False,
     )
     op.create_table(
         "impersonation_events",
@@ -1951,6 +1970,8 @@ def downgrade() -> None:
         table_name="impersonation_events",
     )
     op.drop_table("impersonation_events")
+    op.drop_index("ix_login_failures_key_failed_at", table_name="login_failures")
+    op.drop_table("login_failures")
     op.drop_index("ix_auth_sessions_token_hash", table_name="auth_sessions")
     op.drop_table("auth_sessions")
     op.drop_index("ix_agent_skills_tenant_id_name", table_name="agent_skills")

@@ -15,6 +15,12 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
+import {
+  SignInLockoutFields,
+  signInLockoutShape,
+  toSignInLockoutBody,
+  toSignInLockoutFormValues,
+} from "@/components/admin/sign-in-lockout-fields";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -60,6 +66,7 @@ function buildSchema(savedMethod: VaultAuthMethod | null) {
       vaultRoleId: z.string(),
       vaultApproleMount: z.string(),
       vaultCredential: z.string(),
+      ...signInLockoutShape,
     })
     .superRefine((values, ctx) => {
       if (values.vaultAddr === "") return;
@@ -92,7 +99,11 @@ type FormValues = z.infer<ReturnType<typeof buildSchema>>;
  * the backend keeps the ciphertext it already holds.
  */
 function toBody(values: FormValues): TenantUpdate {
-  const body: TenantUpdate = { displayName: values.displayName, enabled: values.enabled };
+  const body: TenantUpdate = {
+    displayName: values.displayName,
+    enabled: values.enabled,
+    ...toSignInLockoutBody(values),
+  };
   if (values.vaultAddr === "") {
     return {
       ...body,
@@ -114,7 +125,7 @@ function toBody(values: FormValues): TenantUpdate {
 
 /**
  * Detail page of a tenant: its display name, its immutable URL-safe name,
- * whether it is enabled, and the connection to its own HashiCorp Vault (address,
+ * whether it is enabled, how failed sign-ins lock its accounts, and the connection to its own HashiCorp Vault (address,
  * auth method, and a write-only token or AppRole secret id). The page is titled with the tenant's display name —
  * the same label its row carries in the list. Reachable only by `super_admin`
  * — `layout.tsx` blocks every other viewer before this page mounts. Name is
@@ -158,6 +169,7 @@ export default function TenantDetailPage() {
       vaultRoleId: "",
       vaultApproleMount: "",
       vaultCredential: "",
+      ...toSignInLockoutFormValues({}),
     },
   });
   const authMethod = watch("vaultAuthMethod");
@@ -177,6 +189,7 @@ export default function TenantDetailPage() {
           vaultRoleId: tenant.vaultRoleId ?? "",
           vaultApproleMount: tenant.vaultApproleMount ?? "",
           vaultCredential: "",
+          ...toSignInLockoutFormValues(tenant),
         });
         setAudit({
           createdBy: tenant.createdBy,
@@ -263,6 +276,17 @@ export default function TenantDetailPage() {
           </FormField>
 
           <Checkbox label="Enabled" {...register("enabled")} />
+
+          <hr className="border-outline-variant" />
+
+          <SignInLockoutFields
+            maxFailures={register("loginMaxFailures")}
+            lockoutMinutes={register("loginLockoutMinutes")}
+            errors={{
+              loginMaxFailures: errors.loginMaxFailures?.message,
+              loginLockoutMinutes: errors.loginLockoutMinutes?.message,
+            }}
+          />
 
           <hr className="border-outline-variant" />
 

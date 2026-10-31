@@ -55,6 +55,8 @@ All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require
 
 A missing or invalid session returns `401 UNAUTHENTICATED`.
 
+Failed logins are throttled (`services/auth.py`): `Tenant.login_max_failures` failures for one `tenant/username` within `Tenant.login_lockout_minutes` (defaults 5 / 15, also used for platform-scoped accounts and unknown tenants; edited by the tenant's `admin` through `GET`/`PATCH /api/v1/tenant-settings`, which act on `CurrentTenantIdDep`), make `POST /api/v1/auth/login` return `429 TOO_MANY_LOGIN_ATTEMPTS` before the password is checked, until the oldest counted failure leaves that window. Unknown usernames count the same way, so a lockout reveals nothing about existence; a success clears the count. Failures are rows in `login_failures`, shared by every replica and pruned on each insert. There is deliberately no per-client-address limit.
+
 Sessions use a sliding idle timeout, and the cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes. `SESSION_IDLE_TIMEOUT_SECONDS` and `SESSION_COOKIE_SECURE` are documented under [Session lifetime](https://kaitoy.github.io/a2flow/docs/operations/configuration#session-lifetime).
 
 The frontend reaches the backend through a same-origin Next.js rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly. Log in with the seeded `root` or Default-tenant `admin` user (see [Seeded users](https://kaitoy.github.io/a2flow/docs/operations/configuration#seeded-users)) on first run.

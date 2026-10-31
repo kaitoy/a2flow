@@ -22,6 +22,7 @@ from routers import (
     system_settings,
     tags,
     tenant,
+    tenant_settings,
     user,
     user_groups,
     workflow_executions,
@@ -61,6 +62,7 @@ api_router.include_router(sessions.router, dependencies=_protected)
 api_router.include_router(system_settings.router, dependencies=_protected)
 api_router.include_router(tags.router, dependencies=_protected)
 api_router.include_router(tenant.router, dependencies=_protected)
+api_router.include_router(tenant_settings.router, dependencies=_protected)
 api_router.include_router(user.router, dependencies=_protected)
 api_router.include_router(user_groups.router, dependencies=_protected)
 api_router.include_router(workflow_executions.router, dependencies=_protected)

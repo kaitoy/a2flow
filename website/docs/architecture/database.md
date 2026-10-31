@@ -22,6 +22,7 @@ The database is also what coordinates a multi-replica backend: an agent run hold
 |---|---|
 | `users` | Application users and the roles granted to them — see [Users and groups](../guides/users-and-groups.md) |
 | `auth_sessions` | Server-side login sessions |
+| `login_failures` | Recent [failed sign-ins](../guides/users-and-groups.md#failed-sign-ins), counted to lock an account against repeated guessing; rows older than a day are removed |
 | `impersonation_events` | Audit trail of [impersonation](../concepts/impersonation.md) sessions |
 | `agent_skills` | [Agent Skill](../guides/agent-skills.md) definitions and the repository each is cloned from |
 | `mcp_servers` | Registered [MCP servers](../guides/mcp-servers.md) and how to reach them |

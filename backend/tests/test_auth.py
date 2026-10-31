@@ -18,11 +18,13 @@ from dependencies.auth import (
 )
 from infrastructure.password import hash_password
 from models.auth_session import AuthSession
+from models.login_failure import LoginFailure
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User, UserUpdate
 from repositories.auth_session import SqlAuthSessionRepository
 from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import UnauthorizedError
+from repositories.login_failure import SqlLoginFailureRepository
 from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from services.auth import AuthService
@@ -147,6 +149,138 @@ async def test_login_rejection_still_runs_bcrypt(
     assert checks == [AUTH_PASSWORD.encode()]
 
 
+async def _attempt(client: AsyncClient, username: str, password: str) -> Any:
+    """Post one login attempt against the default test tenant."""
+    return await client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": username,
+            "password": password,
+            "tenantName": DEFAULT_TEST_TENANT_ID,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_login_locks_account_after_repeated_failures(
+    auth_client: AsyncClient,
+) -> None:
+    """Five wrong passwords lock the account, even against the right one."""
+    for _ in range(5):
+        assert_err(
+            await _attempt(auth_client, AUTH_USERNAME, "wrong"),
+            code="UNAUTHENTICATED",
+            status=401,
+        )
+    err = assert_err(
+        await _attempt(auth_client, AUTH_USERNAME, AUTH_PASSWORD),
+        code="TOO_MANY_LOGIN_ATTEMPTS",
+        status=429,
+    )
+    assert "15 minutes" in err["message"]
+
+
+@pytest.mark.asyncio
+async def test_login_locks_unknown_username_the_same_way(
+    auth_client: AsyncClient,
+) -> None:
+    """A nonexistent account locks after the same count, hiding existence."""
+    for _ in range(5):
+        await _attempt(auth_client, "nobody", "wrong")
+    assert_err(
+        await _attempt(auth_client, "nobody", "wrong"),
+        code="TOO_MANY_LOGIN_ATTEMPTS",
+        status=429,
+    )
+
+
+@pytest.mark.asyncio
+async def test_login_success_resets_account_failures(
+    auth_client: AsyncClient,
+) -> None:
+    """A successful login clears the account's count."""
+    for _ in range(4):
+        await _attempt(auth_client, AUTH_USERNAME, "wrong")
+    assert_ok(await _attempt(auth_client, AUTH_USERNAME, AUTH_PASSWORD))
+    for _ in range(4):
+        await _attempt(auth_client, AUTH_USERNAME, "wrong")
+    assert_ok(await _attempt(auth_client, AUTH_USERNAME, AUTH_PASSWORD))
+
+
+@pytest.mark.asyncio
+async def test_login_lockout_is_per_account(auth_client: AsyncClient) -> None:
+    """Locking other accounts from the same client leaves this one usable."""
+    for i in range(20):
+        await _attempt(auth_client, f"spray-{i % 4}", "wrong")
+    assert_ok(await _attempt(auth_client, AUTH_USERNAME, AUTH_PASSWORD))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("max_failures", "lockout_minutes", "age_minutes", "status"),
+    [
+        # Two old failures reach a limit of 2 only while the window covers them.
+        (2, 60, 30, 429),
+        (2, 15, 30, 401),
+        # The default limit of 5 is not reached by two failures.
+        (5, 60, 30, 401),
+    ],
+)
+async def test_login_uses_the_tenants_limit_and_lockout(
+    auth_service_engine: Any,
+    max_failures: int,
+    lockout_minutes: int,
+    age_minutes: int,
+    status: int,
+) -> None:
+    """The account limit and lockout come from the submitted tenant."""
+    failed_at = datetime.now(UTC) - timedelta(minutes=age_minutes)
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        tenant = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
+        assert tenant is not None
+        tenant.login_max_failures = max_failures
+        tenant.login_lockout_minutes = lockout_minutes
+        session.add(tenant)
+        session.add_all(
+            LoginFailure(key=f"{tenant.name}/someone", failed_at=failed_at)
+            for _ in range(2)
+        )
+        await session.commit()
+        service = AuthService(
+            SqlUserRepository(session),
+            SqlAuthSessionRepository(session),
+            SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
+        )
+        with pytest.raises(Exception) as exc_info:
+            await service.login("someone", "wrong", tenant_name=tenant.name)
+    assert getattr(exc_info.value, "http_status", None) == status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("age_minutes", "status"), [(1, 429), (16, 401)])
+async def test_login_failures_expire_after_window(
+    auth_service_engine: Any, age_minutes: int, status: int
+) -> None:
+    """Failures older than the window no longer count."""
+    failed_at = datetime.now(UTC) - timedelta(minutes=age_minutes)
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        session.add_all(
+            LoginFailure(key=f"{DEFAULT_TEST_TENANT_ID}/old", failed_at=failed_at)
+            for _ in range(5)
+        )
+        await session.commit()
+        service = AuthService(
+            SqlUserRepository(session),
+            SqlAuthSessionRepository(session),
+            SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
+        )
+        with pytest.raises(Exception) as exc_info:
+            await service.login("old", "wrong", tenant_name=DEFAULT_TEST_TENANT_ID)
+    assert getattr(exc_info.value, "http_status", None) == status
+
+
 @pytest.mark.asyncio
 async def test_me_requires_session(auth_client: AsyncClient) -> None:
     assert_err(
@@ -247,6 +381,7 @@ async def test_authenticate_expires_idle_session(
             SqlUserRepository(session),
             SqlAuthSessionRepository(session),
             SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
         )
         result = await service.login(
             "idle", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
@@ -293,7 +428,10 @@ async def test_password_reset_revokes_the_targets_sessions(
 
         sessions = SqlAuthSessionRepository(session)
         auth = AuthService(
-            SqlUserRepository(session), sessions, SqlTenantRepository(session)
+            SqlUserRepository(session),
+            sessions,
+            SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
         )
         stolen = await auth.login(
             "target", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
@@ -344,6 +482,7 @@ async def test_login_rejects_disabled_tenant(auth_service_engine: Any) -> None:
             SqlUserRepository(session),
             SqlAuthSessionRepository(session),
             SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
         )
         with pytest.raises(UnauthorizedError):
             await service.login(
@@ -376,6 +515,7 @@ async def test_authenticate_rejects_when_tenant_disabled_mid_session(
             SqlUserRepository(session),
             SqlAuthSessionRepository(session),
             SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
         )
         result = await service.login(
             "tenantuser", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID

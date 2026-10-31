@@ -213,6 +213,25 @@ describe("TenantDetailPage", () => {
       expect(captured.body).not.toHaveProperty("vaultCredential");
     });
 
+    it("prefills and sends the sign-in lockout", async () => {
+      setup();
+      const captured = capturePatch({
+        ...VAULT_TENANT,
+        loginMaxFailures: 3,
+        loginLockoutMinutes: 45,
+      });
+      renderPage();
+      const maxFailures = await screen.findByLabelText(/Failed Sign-ins Before Lockout/);
+      expect(maxFailures).toHaveValue("3");
+      expect(screen.getByLabelText(/Lockout Minutes/)).toHaveValue("45");
+      await userEvent.clear(maxFailures);
+      await userEvent.type(maxFailures, "8");
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(captured.body).toMatchObject({ loginMaxFailures: 8, loginLockoutMinutes: 45 });
+    });
+
     it("clears the whole connection when the address is emptied", async () => {
       setup();
       const captured = capturePatch(VAULT_TENANT);

@@ -141,7 +141,9 @@ async def login(
     """Authenticate a user and start a session, returning the current user.
 
     On success, sets the session and CSRF cookies. On failure, raises
-    ``UnauthorizedError`` (HTTP 401) with a generic message.
+    ``UnauthorizedError`` (HTTP 401) with a generic message, or
+    ``TooManyLoginAttemptsError`` (HTTP 429) once the account has too many
+    recent failures.
     """
     result = await service.login(
         body.username, body.password, tenant_name=body.tenant_name

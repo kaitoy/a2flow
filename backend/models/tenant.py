@@ -17,6 +17,7 @@ the ``vault_credential_set`` flag.
 """
 
 from enum import StrEnum
+from typing import Annotated
 
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Index, UniqueConstraint
@@ -37,6 +38,22 @@ _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
 #: AppRole login mount used when a tenant names none.
 DEFAULT_VAULT_APPROLE_MOUNT = "approle"
+
+#: Failed sign-ins an account may have before it is locked, unless its tenant
+#: sets otherwise. Also the limit for platform-scoped accounts, which have no
+#: tenant.
+DEFAULT_LOGIN_MAX_FAILURES = 5
+#: How long, in minutes, failures are counted and an account stays locked,
+#: unless its tenant sets otherwise.
+DEFAULT_LOGIN_LOCKOUT_MINUTES = 15
+#: Upper bound of :attr:`TenantUpdate.login_lockout_minutes` (one day). Failure
+#: rows older than this can never count again, so they are pruned.
+MAX_LOGIN_LOCKOUT_MINUTES = 1440
+
+#: A tenant's failed sign-in limit.
+LoginMaxFailures = Annotated[int, Field(ge=1, le=100)]
+#: A tenant's lockout duration in minutes.
+LoginLockoutMinutes = Annotated[int, Field(ge=1, le=MAX_LOGIN_LOCKOUT_MINUTES)]
 
 
 class VaultAuthMethod(StrEnum):
@@ -72,6 +89,12 @@ class TenantUpdate(SQLModel):
     vault_role_id: ShortText | None = None
     vault_approle_mount: VaultMount | None = None
     vault_credential: str | None = Field(default=None, max_length=4096)
+    #: Failed sign-ins within :attr:`login_lockout_minutes` that lock an
+    #: account of this tenant.
+    login_max_failures: LoginMaxFailures | None = None
+    #: Minutes over which failures are counted and for which a locked account
+    #: stays locked, measured from the oldest failure still counted.
+    login_lockout_minutes: LoginLockoutMinutes | None = None
 
 
 class TenantCreate(TenantUpdate):
@@ -81,6 +104,8 @@ class TenantCreate(TenantUpdate):
     name: TenantSlug
     #: New tenants are active by default.
     enabled: bool = True
+    login_max_failures: LoginMaxFailures = DEFAULT_LOGIN_MAX_FAILURES
+    login_lockout_minutes: LoginLockoutMinutes = DEFAULT_LOGIN_LOCKOUT_MINUTES
 
 
 class Tenant(TenantCreate, BaseEntity, table=True):
@@ -108,6 +133,26 @@ class Tenant(TenantCreate, BaseEntity, table=True):
     vault_credential: str | None = None
 
 
+class TenantSettingsUpdate(SQLModel):
+    """Partial update of the settings a tenant's own ``admin`` may change.
+
+    The subset of :class:`TenantUpdate` exposed on ``PATCH /tenant-settings``,
+    which acts on the caller's tenant rather than on a tenant id.
+    """
+
+    model_config = _alias_config
+    login_max_failures: LoginMaxFailures | None = None
+    login_lockout_minutes: LoginLockoutMinutes | None = None
+
+
+class TenantSettings(SQLModel):
+    """Read view of the settings a tenant's own ``admin`` may change."""
+
+    model_config = _alias_config
+    login_max_failures: int
+    login_lockout_minutes: int
+
+
 class TenantRead(BaseEntity):
     """Read view of a Tenant, excluding the Vault credential.
 
@@ -123,6 +168,8 @@ class TenantRead(BaseEntity):
     vault_auth_method: VaultAuthMethod | None = None
     vault_role_id: str | None = None
     vault_approle_mount: str | None = None
+    login_max_failures: int = DEFAULT_LOGIN_MAX_FAILURES
+    login_lockout_minutes: int = DEFAULT_LOGIN_LOCKOUT_MINUTES
     #: Whether a Vault credential is stored. The credential is never serialized.
     vault_credential_set: bool = False
 

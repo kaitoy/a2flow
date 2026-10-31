@@ -53,6 +53,7 @@ from repositories.auth_session import SqlAuthSessionRepository
 from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import CsrfError, ForbiddenError
 from repositories.impersonation_event import SqlImpersonationEventRepository
+from repositories.login_failure import SqlLoginFailureRepository
 from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from services.auth import AuthService
@@ -89,9 +90,12 @@ _DbSessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 def get_auth_service(db: _DbSessionDep) -> AuthService:
-    """Create an AuthService wiring the user, auth-session, and tenant repositories."""
+    """Create an AuthService wiring its user, session, tenant, and throttle repositories."""
     return AuthService(
-        SqlUserRepository(db), SqlAuthSessionRepository(db), SqlTenantRepository(db)
+        SqlUserRepository(db),
+        SqlAuthSessionRepository(db),
+        SqlTenantRepository(db),
+        SqlLoginFailureRepository(db),
     )
 
 

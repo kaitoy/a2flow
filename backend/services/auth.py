@@ -6,6 +6,12 @@ timeout (``config.Settings.session_idle_timeout_seconds``, default 8 hours):
 every successful :meth:`AuthService.authenticate` refreshes the session's
 last-active time, and a session left idle past the window is revoked and
 rejected.
+
+Failed logins are throttled per submitted account -- by the limit and lockout
+time its tenant sets (``Tenant.login_max_failures`` /
+``Tenant.login_lockout_minutes``, the ``models.tenant`` defaults for a
+platform-scoped account or an unknown tenant). The counts live in the
+``login_failures`` table, so every replica enforces the same limit.
 """
 
 from dataclasses import dataclass
@@ -14,9 +20,16 @@ from datetime import UTC, datetime, timedelta
 from config import get_settings
 from infrastructure.auth_tokens import generate_token, hash_token
 from infrastructure.password import burn_password_check, verify_password
+from models.tenant import (
+    DEFAULT_LOGIN_LOCKOUT_MINUTES,
+    DEFAULT_LOGIN_MAX_FAILURES,
+    MAX_LOGIN_LOCKOUT_MINUTES,
+    Tenant,
+)
 from models.user import User
 from repositories.auth_session import AuthSessionRepository
-from repositories.exceptions import UnauthorizedError
+from repositories.exceptions import TooManyLoginAttemptsError, UnauthorizedError
+from repositories.login_failure import LoginFailureRepository
 from repositories.tenant import TenantRepository
 from repositories.user import UserRepository
 
@@ -44,6 +57,7 @@ class AuthService:
         users: UserRepository,
         sessions: AuthSessionRepository,
         tenants: TenantRepository,
+        login_failures: LoginFailureRepository,
     ) -> None:
         """Initialize the service.
 
@@ -51,10 +65,13 @@ class AuthService:
             users: Repository for user lookups and credential checks.
             sessions: Repository for login-session persistence.
             tenants: Repository used to resolve a submitted tenant name at login.
+            login_failures: Repository counting recent failed logins for
+                throttling.
         """
         self._users = users
         self._sessions = sessions
         self._tenants = tenants
+        self._login_failures = login_failures
 
     def _idle_timeout(self) -> timedelta:
         """Return the configured sliding idle timeout as a ``timedelta``."""
@@ -62,14 +79,20 @@ class AuthService:
         return timedelta(seconds=max(seconds, 1))
 
     async def login(
-        self, username: str, password: str, *, tenant_name: str | None = None
+        self,
+        username: str,
+        password: str,
+        *,
+        tenant_name: str | None = None,
     ) -> LoginResult:
         """Verify credentials and create a new login session.
 
         The same generic :class:`UnauthorizedError` is raised for an unknown
         username, an unknown or disabled tenant, a wrong password, and a
         disabled or soft-deleted account, so the response never reveals which
-        users or tenants exist.
+        users or tenants exist. Every one of those failures counts against the
+        submitted account -- an unknown username included, so a lockout does
+        not reveal existence either. A successful login clears the count.
 
         Args:
             username: The submitted username.
@@ -85,12 +108,77 @@ class AuthService:
             session and CSRF tokens.
 
         Raises:
+            TooManyLoginAttemptsError: If the account is at its failure
+                limit; raised before the password is checked.
             UnauthorizedError: If the credentials are invalid, the account
                 cannot log in, or the submitted tenant is unknown or disabled.
         """
+        tenant = await self._tenants.get_by_name(tenant_name) if tenant_name else None
+        account_key = f"{tenant_name or ''}/{username}"
+        # An unknown tenant gets the defaults, exactly like a known one that
+        # never changed them, so the limit reveals nothing about existence.
+        window = timedelta(
+            minutes=tenant.login_lockout_minutes
+            if tenant is not None
+            else DEFAULT_LOGIN_LOCKOUT_MINUTES
+        )
+        limit = (
+            tenant.login_max_failures
+            if tenant is not None
+            else DEFAULT_LOGIN_MAX_FAILURES
+        )
+        now = datetime.now(UTC)
+        count, oldest = await self._login_failures.recent(account_key, now - window)
+        if count >= limit and oldest is not None:
+            if oldest.tzinfo is None:
+                oldest = oldest.replace(tzinfo=UTC)
+            retry_after = (oldest + window - now).total_seconds()
+            raise TooManyLoginAttemptsError(int(retry_after) + 1)
+        try:
+            user = await self._verify_credentials(
+                username, password, tenant_name, tenant
+            )
+        except UnauthorizedError:
+            await self._login_failures.record(
+                account_key, now, now - timedelta(minutes=MAX_LOGIN_LOCKOUT_MINUTES)
+            )
+            raise
+        await self._login_failures.clear(account_key)
+
+        session_token = generate_token()
+        csrf_token = generate_token()
+        await self._sessions.create(
+            user_id=user.id,
+            token_hash=hash_token(session_token),
+            csrf_token=csrf_token,
+        )
+        return LoginResult(
+            user=user, session_token=session_token, csrf_token=csrf_token
+        )
+
+    async def _verify_credentials(
+        self,
+        username: str,
+        password: str,
+        tenant_name: str | None,
+        tenant: Tenant | None,
+    ) -> User:
+        """Return the user the credentials identify, if they may log in.
+
+        Args:
+            username: The submitted username.
+            password: The submitted plaintext password.
+            tenant_name: The submitted tenant name, if any.
+            tenant: The tenant ``tenant_name`` resolved to, or ``None``.
+
+        Returns:
+            The enabled, non-deleted user whose password matches.
+
+        Raises:
+            UnauthorizedError: For every reason the login is refused.
+        """
         tenant_id: str | None = None
         if tenant_name:
-            tenant = await self._tenants.get_by_name(tenant_name)
             if tenant is None or not tenant.enabled:
                 burn_password_check(password)
                 raise UnauthorizedError("Invalid username or password")
@@ -103,17 +191,7 @@ class AuthService:
             raise UnauthorizedError("Invalid username or password")
         if not verify_password(password, user.password):
             raise UnauthorizedError("Invalid username or password")
-
-        session_token = generate_token()
-        csrf_token = generate_token()
-        await self._sessions.create(
-            user_id=user.id,
-            token_hash=hash_token(session_token),
-            csrf_token=csrf_token,
-        )
-        return LoginResult(
-            user=user, session_token=session_token, csrf_token=csrf_token
-        )
+        return user
 
     async def authenticate(self, session_token: str) -> User:
         """Resolve the user for a session token, sliding the idle timeout.

@@ -22,6 +22,7 @@ sidebar_position: 7
 |---|---|
 | `users` | アプリケーションのユーザーと、付与されたロール。[ユーザーとグループ](../guides/users-and-groups.md)を参照 |
 | `auth_sessions` | サーバー側のログインセッション |
+| `login_failures` | 直近の[サインインの失敗](../guides/users-and-groups.md#failed-sign-ins)。繰り返しの推測からアカウントをロックするために数えます。1 日より古い行は削除されます |
 | `impersonation_events` | [代理ログイン](../concepts/impersonation.md)の監査証跡 |
 | `agent_skills` | [Agent Skill](../guides/agent-skills.md) の定義と、クローン元のリポジトリ |
 | `mcp_servers` | 登録済みの [MCP サーバー](../guides/mcp-servers.md)と、その接続方法 |
