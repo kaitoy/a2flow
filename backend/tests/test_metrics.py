@@ -18,6 +18,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.agent_skill import AgentSkill
 from models.approval import Approval, ApprovalStatus
 from models.outbound_email import OutboundEmail, OutboundEmailStatus
+from models.tag import Tag, WorkflowExecutionTag
 from models.user_group import UserGroup
 from models.workflow import Workflow, WorkflowStatus
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
@@ -587,6 +588,51 @@ async def test_failures_lists_runs_with_their_failed_tasks(
     assert failure["title"] == "Call the billing API"
     assert failure["errorKind"] == "api_error"
     assert failure["errorMessage"] == "billing API returned 503"
+
+
+async def test_failures_is_admin_only(
+    metrics_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """Task titles and error messages of every run are not for plain users."""
+    client, _ = metrics_env
+    res = await client.get(
+        "/api/v1/workflow-executions/failures",
+        headers={"X-User-Id": "owner", "X-User-Roles": "requester"},
+    )
+    assert res.status_code == 403
+
+
+async def test_metrics_hide_runs_gated_by_an_access_control_tag(
+    metrics_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """A run hidden from the caller by a tag is left out of every aggregate."""
+    client, eng = metrics_env
+    hidden_wf = await _seed_workflow(eng, name="Hidden")
+    hidden_run = await _seed_execution(eng, workflow_id=hidden_wf, name="hidden")
+    await _seed_execution(
+        eng, workflow_id=await _seed_workflow(eng, name="Open"), name="open"
+    )
+    async with AsyncSession(eng) as db:
+        tag = Tag(
+            name="gate",
+            access_control=True,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by="owner",
+            updated_by="owner",
+        )
+        db.add(tag)
+        await db.flush()
+        db.add(WorkflowExecutionTag(resource_id=hidden_run, tag_id=tag.id))
+        await db.commit()
+
+    def names(res: object) -> set[str]:
+        return {e["workflowName"] for e in assert_ok(res)}  # type: ignore[arg-type]
+
+    path = "/api/v1/workflow-executions/by-workflow"
+    restricted = {"X-User-Id": "owner", "X-User-Roles": "requester"}
+    assert names(await client.get(path, headers=restricted)) == {"Open"}
+    admin = {"X-User-Id": "owner", "X-User-Roles": "admin"}
+    assert names(await client.get(path, headers=admin)) == {"Hidden", "Open"}
 
 
 async def test_approval_backlog_by_approver_ranks_the_longest_wait_first(

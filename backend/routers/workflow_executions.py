@@ -136,7 +136,11 @@ async def workflow_execution_lead_time_trend(
     return ApiResponse(meta=meta, data=buckets)
 
 
-@router.get("/failures", response_model=ApiResponse[list[FailedExecutionEntry]])
+@router.get(
+    "/failures",
+    response_model=ApiResponse[list[FailedExecutionEntry]],
+    dependencies=[Depends(require_roles(Role.admin))],
+)
 async def list_failed_workflow_executions(
     service: MetricsServiceDep,
     window: MetricsWindowDep,
@@ -148,6 +152,10 @@ async def list_failed_workflow_executions(
     The triage list: driven by the failed tasks rather than by the runs' own
     status, so a run that is still in flight but already has a failure shows up
     right away.
+
+    Admin-only: each entry carries a run's task titles and free-text error
+    messages, which the run endpoints show only to its participants and to
+    admins, so a plain user must not read them for every run in the tenant.
     """
     entries = await service.failed_executions(
         MetricsWindow(since=window.since, until=window.until),

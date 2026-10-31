@@ -253,14 +253,16 @@ McpToolInvocationRepositoryDep = Annotated[
 
 
 def get_metrics_repository(
-    db: DBSessionDep, tenant_id: CurrentTenantIdDep
+    db: DBSessionDep, tenant_id: CurrentTenantIdDep, access_tag_ids: AccessTagIdsDep
 ) -> MetricsRepository:
     """Create a MetricsRepository backed by the current database session.
 
     Metrics are computed for one tenant at a time, so this is the one
     repository factory that stays on the strict dependency even for ``GET``.
+    Runs an access-control tag hides from the caller are left out of every
+    metric, as they are from the run endpoints themselves.
     """
-    return SqlMetricsRepository(db, tenant_id=tenant_id)
+    return SqlMetricsRepository(db, tenant_id=tenant_id, access_tag_ids=access_tag_ids)
 
 
 MetricsRepositoryDep = Annotated[MetricsRepository, Depends(get_metrics_repository)]

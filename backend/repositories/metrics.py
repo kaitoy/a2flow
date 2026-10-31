@@ -16,7 +16,10 @@ averaging, day bucketing — happens in :mod:`services.metrics`, deliberately:
   service and router contracts do not change.
 
 Like every other tenant-scoped repository, each query filters on the tenant
-resolved by ``CurrentTenantIdDep``; there is no cross-tenant read here.
+resolved by ``CurrentTenantIdDep``; there is no cross-tenant read here. Each
+query also drops the runs an access-control tag hides from the caller, through
+the same :class:`models.tag.WorkflowExecutionTag` rows that gate the runs
+themselves, so a metric never names a run its reader could not open.
 
 Every query here also excludes runs flagged ``WorkflowExecution.is_draft`` —
 pre-publish test runs a ``developer``/``super_admin`` started against a still
@@ -30,14 +33,17 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
+from sqlalchemy import ColumnElement
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.approval import Approval, ApprovalStatus
+from models.tag import WorkflowExecutionTag
 from models.user_group import UserGroup
 from models.workflow import Workflow
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from models.workflow_task import TaskErrorKind, WorkflowTask, WorkflowTaskStatus
+from repositories.tags import TagLinks
 
 
 def _utc(value: datetime) -> datetime:
@@ -142,15 +148,35 @@ class MetricsRepository(Protocol):
 class SqlMetricsRepository:
     """SQLModel-backed implementation of :class:`MetricsRepository`."""
 
-    def __init__(self, session: AsyncSession, *, tenant_id: str) -> None:
-        """Store the async session and the tenant every query below is scoped to.
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str,
+        access_tag_ids: frozenset[str] | None = None,
+    ) -> None:
+        """Store the async session and the scope every query below runs under.
 
         Args:
             session: The SQLModel async session to query through.
             tenant_id: Identifier of the tenant these metrics describe.
+            access_tag_ids: Ids of the tags the caller holds through their
+                groups, or ``None`` for an unrestricted caller -- see
+                :class:`repositories.tags.TagLinks`.
         """
         self._db = session
         self._tenant_id = tenant_id
+        self._tags = TagLinks(
+            session,
+            WorkflowExecutionTag,
+            tenant_id=tenant_id,
+            access_tag_ids=access_tag_ids,
+        )
+
+    def _visible(self) -> tuple[ColumnElement[bool], ...]:
+        """Return the ``WHERE`` clause hiding tag-gated runs, if the caller is restricted."""
+        clause = self._tags.visibility_clause(col(WorkflowExecution.id))
+        return () if clause is None else (clause,)
 
     def _execution_columns(self) -> Sequence[object]:
         """Return the execution/workflow column list shared by the execution queries."""
@@ -190,6 +216,7 @@ class SqlMetricsRepository:
             .where(
                 WorkflowExecution.tenant_id == self._tenant_id,
                 col(WorkflowExecution.is_draft).is_(False),
+                *self._visible(),
                 *conditions,
             )
             .order_by(col(WorkflowExecution.created_at).desc())
@@ -258,6 +285,7 @@ class SqlMetricsRepository:
             .where(
                 WorkflowExecution.tenant_id == self._tenant_id,
                 col(WorkflowExecution.is_draft).is_(False),
+                *self._visible(),
             )
             .group_by(col(WorkflowExecution.status))
         )
@@ -310,6 +338,7 @@ class SqlMetricsRepository:
             .where(
                 Approval.tenant_id == self._tenant_id,
                 col(WorkflowExecution.is_draft).is_(False),
+                *self._visible(),
                 *conditions,
             )
             .order_by(col(Approval.created_at).asc())
@@ -404,6 +433,7 @@ class SqlMetricsRepository:
             .where(
                 WorkflowTask.tenant_id == self._tenant_id,
                 col(WorkflowExecution.is_draft).is_(False),
+                *self._visible(),
                 WorkflowTask.status == WorkflowTaskStatus.failed,
                 col(WorkflowTask.updated_at) >= since,
                 col(WorkflowTask.updated_at) < until,

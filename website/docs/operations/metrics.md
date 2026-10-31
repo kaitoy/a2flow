@@ -5,7 +5,9 @@ sidebar_position: 6
 
 # Operations metrics
 
-Workflow operations data — approval backlog, run volume, failures, and lead time — is exposed for third-party dashboards in two shapes, both scoped to the caller's tenant and both available to any authenticated user.
+Workflow operations data — approval backlog, run volume, failures, and lead time — is exposed for third-party dashboards in two shapes, both scoped to the caller's tenant and, apart from the failure list noted below, both available to any authenticated user.
+
+Runs an [access-control tag](../guides/tags.md#access-control-tags) hides from the caller are left out of every view below, exactly as they are absent from the run list itself, so a metric never names a run its reader could not open.
 
 Runs started from a still-`draft` workflow (a `developer`/`super_admin` [pre-publish test run](../guides/workflows.md#running-a-workflow)) are recorded with `isDraft: true` and **excluded from every metric below** — both the Prometheus KPIs and the aggregate sub-resources, including the approval-backlog views — so throwaway test data never skews the numbers. The flag is fixed when the run starts; publishing the workflow afterwards does not reclassify runs that already happened.
 
@@ -61,7 +63,7 @@ Anything whose natural key is a user id, a run id, or a free-text error message 
 |---|---|
 | `GET /api/v1/workflow-executions/by-workflow` | Per-workflow run counts (`total` / `running` / `completed` / `failed`; `running` includes `scheduled` runs) and average lead time |
 | `GET /api/v1/workflow-executions/lead-time-trend` | Daily average lead time, one bucket per calendar day including empty ones |
-| `GET /api/v1/workflow-executions/failures` | Runs needing triage, each with its failed tasks and their recorded cause |
+| `GET /api/v1/workflow-executions/failures` | Runs needing triage, each with its failed tasks and their recorded cause. `admin` only, since it quotes task titles and error messages from runs the caller may not be part of |
 | `GET /api/v1/approvals/by-approver` | Pending-approval backlog per designated approver |
 | `GET /api/v1/approvals/by-workflow` | The same backlog, grouped by workflow |
 
