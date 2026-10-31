@@ -160,6 +160,28 @@ async def build_workflow_read(
     )
 
 
+def draft_hidden_from(workflow: Workflow, caller_roles: Collection[str]) -> bool:
+    """Return whether ``workflow`` is a draft this caller may not see.
+
+    The one statement of the draft-visibility rule -- see
+    :meth:`WorkflowService.get_for_read` -- shared with
+    :class:`services.workflow_task_template.WorkflowTaskTemplateService`, so a
+    draft's templates are hidden from exactly the callers its workflow is.
+
+    Args:
+        workflow: The workflow to judge.
+        caller_roles: The caller's effective roles.
+
+    Returns:
+        ``True`` when the workflow is ``draft`` and the caller is neither a
+        ``developer`` nor a ``reviewer`` (nor, via the bypass, a
+        ``super_admin``).
+    """
+    return workflow.status == WorkflowStatus.draft and not has_any_role(
+        caller_roles, Role.developer, Role.reviewer
+    )
+
+
 class WorkflowService:
     """Application service orchestrating Workflow and design-session operations."""
 
@@ -263,9 +285,7 @@ class WorkflowService:
                 super admin.
         """
         workflow = await self.get(workflow_id)
-        if workflow.status == WorkflowStatus.draft and not has_any_role(
-            caller_roles, Role.developer, Role.reviewer
-        ):
+        if draft_hidden_from(workflow, caller_roles):
             raise NotFoundError("Workflow", workflow_id)
         return workflow
 

@@ -290,3 +290,33 @@ async def test_creating_a_template_recovers_a_failed_workflow(
     body = assert_ok(await client.get(f"/api/v1/workflows/{wf_id}"))
     assert body["status"] == "draft"
     assert body["generationError"] is None
+
+
+async def test_draft_templates_are_hidden_from_callers_who_cannot_see_the_draft(
+    workflow_client: AsyncClient,
+) -> None:
+    """A requester gets the same 404 for a draft's templates as for the draft itself."""
+    wf_id = await _draft_workflow(workflow_client)
+    template = await add_template(workflow_client, wf_id, title="Secret step")
+    requester = {"X-User-Roles": "requester"}
+
+    assert_err(
+        await workflow_client.get(
+            f"/api/v1/workflows/{wf_id}/task-templates", headers=requester
+        ),
+        code="NOT_FOUND",
+        status=404,
+    )
+    assert_err(
+        await workflow_client.get(
+            f"/api/v1/workflow-task-templates/{template['id']}", headers=requester
+        ),
+        code="NOT_FOUND",
+        status=404,
+    )
+    reviewer = {"X-User-Roles": "reviewer"}
+    assert assert_ok(
+        await workflow_client.get(
+            f"/api/v1/workflows/{wf_id}/task-templates", headers=reviewer
+        )
+    )

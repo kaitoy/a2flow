@@ -32,6 +32,7 @@ from repositories.query import FilterSpec, SortSpec
 from repositories.workflow import WorkflowRepository
 from repositories.workflow_published_version import WorkflowPublishedVersionRepository
 from repositories.workflow_task_template import WorkflowTaskTemplateRepository
+from services.workflow import draft_hidden_from
 
 
 class WorkflowTaskTemplateService:
@@ -122,9 +123,9 @@ class WorkflowTaskTemplateService:
         if template is None:
             raise NotFoundError("WorkflowTaskTemplate", template_id)
         workflow = await self._workflows.get(template.workflow_id)
-        if workflow is None:
-            # Unreachable while the cascade holds; a template whose workflow
-            # cannot be read is not one to serve either.
+        if workflow is None or draft_hidden_from(workflow, caller_roles):
+            # A missing workflow is unreachable while the cascade holds; a
+            # draft hidden from this caller hides its templates the same way.
             raise NotFoundError("WorkflowTaskTemplate", template_id)
         if not self._reads_snapshot(workflow, caller_roles):
             return template
@@ -164,12 +165,14 @@ class WorkflowTaskTemplateService:
             The requested page of templates for the workflow.
 
         Raises:
-            NotFoundError: If the parent workflow does not exist, so callers
-                can distinguish "no such workflow" from "workflow has no
+            NotFoundError: If the parent workflow does not exist, or is a
+                draft hidden from this caller (see
+                :func:`services.workflow.draft_hidden_from`), so callers can
+                distinguish "no such workflow" from "workflow has no
                 templates".
         """
         workflow = await self._workflows.get(workflow_id)
-        if workflow is None:
+        if workflow is None or draft_hidden_from(workflow, caller_roles):
             raise NotFoundError("Workflow", workflow_id)
         if not self._reads_snapshot(workflow, caller_roles):
             return await self._repo.list(
