@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Protocol
 
-from sqlmodel import col, select
+from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.auth_session import AuthSession
@@ -21,6 +21,8 @@ class AuthSessionRepository(Protocol):
     async def touch(self, session: AuthSession, now: datetime) -> None: ...
 
     async def delete_by_token_hash(self, token_hash: str) -> None: ...
+
+    async def delete_for_user(self, user_id: str) -> None: ...
 
 
 class SqlAuthSessionRepository:
@@ -88,3 +90,14 @@ class SqlAuthSessionRepository:
         if session is not None:
             await self._db.delete(session)
             await self._db.commit()
+
+    async def delete_for_user(self, user_id: str) -> None:
+        """Delete every login session belonging to a user.
+
+        Args:
+            user_id: The user whose sessions to revoke.
+        """
+        await self._db.exec(
+            delete(AuthSession).where(col(AuthSession.user_id) == user_id)
+        )
+        await self._db.commit()

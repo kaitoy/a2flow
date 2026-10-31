@@ -19,12 +19,14 @@ from dependencies.auth import (
 from infrastructure.password import hash_password
 from models.auth_session import AuthSession
 from models.tenant import Tenant
-from models.user import SYSTEM_USER_ID, User
+from models.user import SYSTEM_USER_ID, Role, User, UserUpdate
 from repositories.auth_session import SqlAuthSessionRepository
+from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import UnauthorizedError
 from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from services.auth import AuthService
+from services.user import UserService
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_users
@@ -263,6 +265,56 @@ async def test_authenticate_expires_idle_session(
             await service.authenticate(result.session_token)
         # The expired session is deleted on rejection.
         assert (await session.exec(stmt)).first() is None
+
+
+@pytest.mark.asyncio
+async def test_password_reset_revokes_the_targets_sessions(
+    auth_service_engine: Any,
+) -> None:
+    """An admin's password reset signs out every browser holding the old login."""
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        target, admin = (
+            User(
+                username=name,
+                first_name=name,
+                last_name="User",
+                password=hash_password(AUTH_PASSWORD),
+                email=f"{name}@test.local",
+                enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                roles=roles,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+            for name, roles in (("target", []), ("boss", [Role.admin.value]))
+        )
+        session.add_all([target, admin])
+        await session.commit()
+
+        sessions = SqlAuthSessionRepository(session)
+        auth = AuthService(
+            SqlUserRepository(session), sessions, SqlTenantRepository(session)
+        )
+        stolen = await auth.login(
+            "target", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
+        kept = await auth.login(
+            "boss", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
+
+        users = UserService(
+            SqlUserRepository(session), SqlEffectiveRoleRepository(session), sessions
+        )
+        await users.update(
+            target.id,
+            UserUpdate(password="a-brand-new-password"),
+            acting_user=admin,
+            acting_roles=[Role.admin.value],
+        )
+
+        with pytest.raises(UnauthorizedError):
+            await auth.authenticate(stolen.session_token)
+        assert (await auth.authenticate(kept.session_token)).username == "boss"
 
 
 @pytest.mark.asyncio

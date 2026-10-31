@@ -21,7 +21,7 @@ Open **Users** in the admin sidebar to manage accounts. The list shows one row p
 | **Username** | Unique within the tenant. Not editable after creation. |
 | **First Name** / **Last Name** | Shown together as the display name everywhere a user is named. |
 | **Email** | Where notification email is sent. |
-| **Password** | Never shown back. On edit, leaving it blank keeps the current password. |
+| **Password** | Never shown back. On edit, leaving it blank keeps the current password. Setting a new one signs the user out everywhere they are signed in. |
 | **Enabled** | Clear it to block sign-in without deleting the account. In the list, a disabled account is shown muted and carries a small badge on its avatar, so the **Enabled** column itself can be hidden from the column picker. |
 | **Email verified** | Unverified addresses are skipped by [email delivery](./notifications.md#email-delivery). |
 | **Roles** | Checkbox per role — see below. |

@@ -52,6 +52,7 @@ from .repository import (
     AgentSkillLookupDep,
     AgentSkillRepositoryDep,
     ApprovalRepositoryDep,
+    AuthSessionRepositoryDep,
     DBSessionDep,
     EffectiveRoleRepositoryDep,
     ExecutionSessionRepositoryDep,
@@ -302,7 +303,9 @@ TenantServiceDep = Annotated[TenantService, Depends(get_tenant_service)]
 
 
 def get_user_service(
-    repo: UserRepositoryDep, effective_roles: EffectiveRoleRepositoryDep
+    repo: UserRepositoryDep,
+    effective_roles: EffectiveRoleRepositoryDep,
+    sessions: AuthSessionRepositoryDep,
 ) -> UserService:
     """Create a UserService backed by the request's repositories.
 
@@ -312,7 +315,7 @@ def get_user_service(
     their own profile page. ``EffectiveRoleRepositoryDep`` is tenant-unscoped
     and therefore safe to pull in here.
     """
-    return UserService(repo, effective_roles)
+    return UserService(repo, effective_roles, sessions)
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]

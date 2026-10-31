@@ -38,6 +38,7 @@ from models.user import (
     UserUpdate,
     has_any_role,
 )
+from repositories.auth_session import AuthSessionRepository
 from repositories.effective_roles import EffectiveRoleRepository
 from repositories.exceptions import ForbiddenError, NotFoundError, UserValidationError
 from repositories.query import FilterSpec, SortSpec
@@ -200,7 +201,10 @@ class UserService:
     """Application service orchestrating User operations."""
 
     def __init__(
-        self, repo: UserRepository, effective_roles: EffectiveRoleRepository
+        self,
+        repo: UserRepository,
+        effective_roles: EffectiveRoleRepository,
+        sessions: AuthSessionRepository,
     ) -> None:
         """Initialize the service.
 
@@ -211,9 +215,12 @@ class UserService:
                 :attr:`UserRead.group_roles` and :attr:`UserRead.group_tag_ids`.
                 Deliberately not tenant-scoped — see
                 :mod:`repositories.effective_roles`.
+            sessions: Repository of login sessions, revoked when an update
+                sets a new password.
         """
         self._repo = repo
         self._effective_roles = effective_roles
+        self._sessions = sessions
 
     async def group_roles_for(self, users: Sequence[User]) -> dict[str, list[str]]:
         """Return the group-inherited roles of each user, resolved in one query.
@@ -455,7 +462,8 @@ class UserService:
         customization edited from the ``/profile`` page).
 
         A blank or omitted password leaves the stored password unchanged; a
-        non-empty password is hashed before persistence.
+        non-empty password is hashed before persistence, and every login
+        session the target holds is revoked.
 
         Args:
             target_id: Identifier of the user to update.
@@ -519,6 +527,11 @@ class UserService:
         password = update.get("password")
         if password:
             update["password"] = hash_password(password)
+            # A reset is the usual answer to a stolen login, so it must also
+            # cut off every browser already signed in as the target. Revoked
+            # before the update so the user it returns is not expired by this
+            # commit; if the update then fails, the target just signs in again.
+            await self._sessions.delete_for_user(target_id)
         else:
             update.pop("password", None)
         return await self._repo.update(
