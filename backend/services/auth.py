@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 from config import get_settings
 from infrastructure.auth_tokens import generate_token, hash_token
-from infrastructure.password import verify_password
+from infrastructure.password import burn_password_check, verify_password
 from models.user import User
 from repositories.auth_session import AuthSessionRepository
 from repositories.exceptions import UnauthorizedError
@@ -92,15 +92,16 @@ class AuthService:
         if tenant_name:
             tenant = await self._tenants.get_by_name(tenant_name)
             if tenant is None or not tenant.enabled:
+                burn_password_check(password)
                 raise UnauthorizedError("Invalid username or password")
             tenant_id = tenant.id
         user = await self._users.get_by_username(username, tenant_id=tenant_id)
-        if (
-            user is None
-            or not user.enabled
-            or user.deleted_at is not None
-            or not verify_password(password, user.password)
-        ):
+        if user is None or not user.enabled or user.deleted_at is not None:
+            # Pay the same bcrypt cost as a wrong password, so timing does
+            # not reveal which accounts exist.
+            burn_password_check(password)
+            raise UnauthorizedError("Invalid username or password")
+        if not verify_password(password, user.password):
             raise UnauthorizedError("Invalid username or password")
 
         session_token = generate_token()

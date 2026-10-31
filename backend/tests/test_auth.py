@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import bcrypt
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -113,6 +114,35 @@ async def test_login_unknown_user_is_unauthenticated(auth_client: AsyncClient) -
         code="UNAUTHENTICATED",
         status=401,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tenant_name", [DEFAULT_TEST_TENANT_ID, "no-such-tenant"])
+async def test_login_rejection_still_runs_bcrypt(
+    auth_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tenant_name: str
+) -> None:
+    """An unknown user or tenant pays a bcrypt check, so timing hides which exist."""
+    checks: list[bytes] = []
+    real_checkpw = bcrypt.checkpw
+
+    def _spy(plain: bytes, hashed: bytes) -> bool:
+        checks.append(plain)
+        return bool(real_checkpw(plain, hashed))
+
+    monkeypatch.setattr("infrastructure.password.bcrypt.checkpw", _spy)
+    assert_err(
+        await auth_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "nobody",
+                "password": AUTH_PASSWORD,
+                "tenantName": tenant_name,
+            },
+        ),
+        code="UNAUTHENTICATED",
+        status=401,
+    )
+    assert checks == [AUTH_PASSWORD.encode()]
 
 
 @pytest.mark.asyncio

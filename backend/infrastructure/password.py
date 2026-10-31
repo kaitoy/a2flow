@@ -6,6 +6,7 @@ cryptographic primitive (bcrypt) rather than encoding business rules.
 """
 
 import os
+from functools import lru_cache
 
 import bcrypt
 
@@ -70,3 +71,24 @@ def verify_password(plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     except ValueError:
         return False
+
+
+@lru_cache(maxsize=1)
+def _dummy_hash() -> str:
+    """Return a throwaway hash at the configured cost, computed once per process."""
+    return hash_password("a2flow-dummy-password")
+
+
+def burn_password_check(plain: str) -> None:
+    """Spend one bcrypt verification on a password that cannot log in anyway.
+
+    Login calls this when the account is missing, disabled, deleted, or its
+    tenant is unknown, so those rejections cost the same bcrypt round as a
+    wrong password for a real account. Without it the response time alone --
+    hundreds of milliseconds at cost 12 -- tells an attacker which usernames
+    and tenant slugs exist.
+
+    Args:
+        plain: The submitted plaintext password; its result is discarded.
+    """
+    verify_password(plain, _dummy_hash())
