@@ -12,7 +12,9 @@ this app makes to a user-supplied address: the URL passed the
 :func:`infrastructure.url_safety.assert_public_http_url` check when it was
 registered, and each hop -- the first request and every redirect, which is
 followed by hand for exactly this reason -- is checked again right before
-connecting.
+connecting, and the socket each hop opens is checked once more
+(:func:`infrastructure.url_safety.guard_peer_address`), since the HTTP client
+resolves the host again for itself.
 """
 
 import asyncio
@@ -25,7 +27,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 from markitdown import MarkItDown, StreamInfo
 
-from infrastructure.url_safety import assert_public_http_url
+from infrastructure.url_safety import assert_public_http_url, guard_peer_address
 
 #: File extensions accepted for upload, i.e. the formats the converter reads
 #: without optional extras beyond the ``pdf`` and ``docx`` ones installed.
@@ -86,7 +88,8 @@ async def fetch_url(
         The page's bytes, its ``Content-Type``, and the URL it was served from.
 
     Raises:
-        UnsafeUrlError: If a hop resolves to a non-public address.
+        UnsafeUrlError: If a hop resolves, or connects, to a non-public
+            address.
         KnowledgeFetchError: On a non-2xx answer, too many redirects, or a
             body over ``max_bytes``.
         httpx.HTTPError: On a network failure.
@@ -97,6 +100,7 @@ async def fetch_url(
         timeout=timeout,
         headers={"User-Agent": _USER_AGENT},
         transport=transport,
+        event_hooks={"request": [guard_peer_address]},
     ) as client:
         for _ in range(_MAX_REDIRECTS + 1):
             await asyncio.to_thread(assert_public_http_url, current)

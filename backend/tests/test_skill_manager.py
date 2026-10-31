@@ -400,7 +400,7 @@ def redirecting_server() -> Iterator[str]:
 
 
 def test_no_redirect_pool_manager_does_not_follow_redirect_to_internal_target(
-    tmp_path: Path, redirecting_server: str
+    tmp_path: Path, redirecting_server: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """dulwich must surface the redirect as a failure, not silently follow it.
 
@@ -409,6 +409,11 @@ def test_no_redirect_pool_manager_does_not_follow_redirect_to_internal_target(
     ...)``, dulwich's default urllib3 manager follows the 302 and attempts to
     connect to the (closed) internal target instead of failing fast.
     """
+    # The redirecting server is on loopback; let the peer check through so the
+    # redirect handling is what this test exercises.
+    monkeypatch.setattr(
+        "infrastructure.skill_manager.assert_public_address", lambda *a, **k: None
+    )
     pool_manager = _build_no_redirect_pool_manager(redirecting_server)
 
     with pytest.raises(GitProtocolError):
@@ -418,6 +423,19 @@ def test_no_redirect_pool_manager_does_not_follow_redirect_to_internal_target(
             depth=1,
             pool_manager=pool_manager,  # type: ignore[arg-type]
         )
+
+
+async def test_clone_refuses_a_host_that_rebinds_to_loopback(
+    tmp_path: Path, rebinding_url: tuple[str, list[str]]
+) -> None:
+    """The pre-clone check sees a public IP; the connection itself is refused."""
+    url, requested = rebinding_url
+    manager = _manager(tmp_path)
+
+    with pytest.raises(SkillCloneError, match="disallowed address"):
+        await manager.clone(_make_skill(repo_url=f"{url}/repo.git"))
+
+    assert requested == []
 
 
 async def test_clone_wraps_an_unenumerated_client_error(

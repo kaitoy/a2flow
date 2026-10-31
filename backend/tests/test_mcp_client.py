@@ -50,6 +50,17 @@ async def test_list_server_tools_rejects_loopback_literal() -> None:
         await list_server_tools(HttpConnection(url="http://127.0.0.1/mcp"))
 
 
+async def test_list_server_tools_rejects_host_that_rebinds_to_loopback(
+    rebinding_url: tuple[str, list[str]],
+) -> None:
+    url, requested = rebinding_url
+
+    with pytest.raises(McpConnectionError):
+        await list_server_tools(HttpConnection(url=f"{url}/mcp"))
+
+    assert requested == []
+
+
 async def test_stdio_connection_skips_the_url_safety_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

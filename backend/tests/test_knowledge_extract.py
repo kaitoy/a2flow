@@ -112,6 +112,17 @@ async def test_fetch_refuses_a_redirect_to_a_private_address(
         )
 
 
+async def test_fetch_refuses_a_host_that_rebinds_to_a_private_address(
+    rebinding_url: tuple[str, list[str]],
+) -> None:
+    url, requested = rebinding_url
+
+    with pytest.raises(UnsafeUrlError, match="disallowed address"):
+        await fetch_url(f"{url}/page", max_bytes=100, timeout=5)
+
+    assert requested == []
+
+
 async def test_fetch_refuses_an_oversized_body() -> None:
     transport = httpx.MockTransport(
         lambda request: httpx.Response(200, content=b"x" * 101)

@@ -57,7 +57,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._stream_protocols import ReadStream, WriteStream
 from mcp.shared.message import SessionMessage
 
-from infrastructure.url_safety import assert_public_http_url
+from infrastructure.url_safety import assert_public_http_url, guard_peer_address
 from repositories.exceptions import McpConnectionError
 
 logger = logging.getLogger(__name__)
@@ -168,13 +168,22 @@ def _create_http_client(headers: dict[str, str]) -> httpx2.AsyncClient:
     own ``follow_redirects`` says, so a server URL that passed host validation
     cannot bounce a request to a private/internal address.
 
+    Every new connection's peer address is checked by
+    :func:`~infrastructure.url_safety.guard_peer_address`, so a hostname that
+    passed validation but now resolves to an internal address (DNS rebinding)
+    is refused before any request bytes are sent.
+
     Args:
         headers: Extra headers to send with every request.
 
     Returns:
         A configured ``httpx2.AsyncClient``; the caller closes it.
     """
-    return httpx2.AsyncClient(headers=headers, timeout=_HTTP_TIMEOUT)
+    return httpx2.AsyncClient(
+        headers=headers,
+        timeout=_HTTP_TIMEOUT,
+        event_hooks={"request": [guard_peer_address]},
+    )
 
 
 @asynccontextmanager
@@ -194,9 +203,10 @@ async def _transport_streams(
         infrastructure.url_safety.UnsafeUrlError: For a :class:`HttpConnection`
             whose host resolves to an address that is not globally routable,
             or is multicast. Rechecked here (in addition to the
-            ``HttpUrl`` Pydantic validation at API-input time) as
-            defense-in-depth against DNS-rebinding-after-validation and rows
-            that bypass Pydantic. Not applicable to stdio, which opens no
+            ``HttpUrl`` Pydantic validation at API-input time) against rows
+            that bypass Pydantic; DNS rebinding is caught at connect time by
+            the client from :func:`_create_http_client`, surfacing as a
+            connection failure. Not applicable to stdio, which opens no
             socket.
     """
     if isinstance(connection, StdioConnection):

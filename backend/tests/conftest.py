@@ -1,6 +1,8 @@
 import asyncio
+import http.server
 import math
 import os
+import threading
 from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -249,6 +251,38 @@ def _fake_dns_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "infrastructure.url_safety.resolve_host", lambda host: ["93.184.216.34"]
     )
+
+
+@pytest.fixture()
+def rebinding_url() -> Iterator[tuple[str, list[str]]]:
+    """Yield a URL that simulates DNS rebinding, and the paths it was asked for.
+
+    The URL's host is ``localhost``: the autouse ``_fake_dns_resolution``
+    stub tells the SSRF pre-check it is a public address, but the HTTP client's
+    own lookup reaches a loopback server. The connect-time peer check must
+    refuse it, so the list of requested paths should stay empty.
+    """
+    requested: list[str] = []
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 -- required BaseHTTPRequestHandler name
+            requested.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+
+        do_POST = do_GET  # noqa: N815
+
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://localhost:{server.server_address[1]}", requested
+    finally:
+        server.shutdown()
+        thread.join()
 
 
 @pytest.fixture(autouse=True)

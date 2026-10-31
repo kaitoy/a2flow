@@ -11,13 +11,25 @@ this app performs against user-supplied URLs (``infrastructure.mcp_client``,
 DNS-rebinding-after-validation and against rows that bypass Pydantic entirely
 (``table=True`` SQLModel classes skip field validation; see the precedent
 already documented in ``models.agent_skill``/``models.constraints.RepoPath``).
+
+Neither check pins the address the client then connects to: the HTTP and git
+clients resolve the hostname again themselves, and a rebinding DNS server can
+answer that second lookup with an internal address. :func:`assert_public_address`
+closes that gap by checking the peer of each socket a client actually opens,
+before anything is sent over it -- wired in through :func:`guard_peer_address`
+for the httpx/httpx2 clients and through ``infrastructure.skill_manager``'s
+connection classes for dulwich's urllib3.
 """
 
 import ipaddress
 import socket
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
+from typing import Any
 from urllib.parse import urlsplit
+
+import httpx
+import httpx2
 
 #: Upper bound, in seconds, for one DNS resolution performed during URL
 #: validation. ``socket.getaddrinfo`` has no native timeout parameter, so the
@@ -134,8 +146,57 @@ def assert_public_http_url(url: str) -> None:
 
     addresses = [str(literal)] if literal is not None else resolve_host(host)
     for addr_str in addresses:
-        if _is_unsafe_address(ipaddress.ip_address(addr_str)):
-            raise UnsafeUrlError(
-                f"host {host!r} resolves to disallowed address {addr_str!r} "
-                "(not globally routable, or multicast)"
-            )
+        assert_public_address(addr_str, host=host)
+
+
+def assert_public_address(addr_str: str, *, host: str | None = None) -> None:
+    """Reject ``addr_str`` unless it is globally routable and not multicast.
+
+    Args:
+        addr_str: A numeric IPv4/IPv6 address, e.g. a connected socket's peer.
+            An IPv6 zone suffix (``fe80::1%eth0``) is accepted.
+        host: The hostname the address belongs to, named in the error message.
+
+    Raises:
+        UnsafeUrlError: If the address is not globally routable, or multicast.
+    """
+    if _is_unsafe_address(ipaddress.ip_address(addr_str)):
+        raise UnsafeUrlError(
+            f"host {host or addr_str!r} resolves to disallowed address {addr_str!r} "
+            "(not globally routable, or multicast)"
+        )
+
+
+async def guard_peer_address(request: httpx.Request | httpx2.Request) -> None:
+    """``httpx``/``httpx2`` request hook: refuse a connection to a non-public peer.
+
+    Register it as ``event_hooks={"request": [guard_peer_address]}``. It sets
+    the request's ``trace`` extension, which the transport calls right after
+    opening a new TCP connection and before TLS or any request bytes, and
+    checks the connected socket's peer address with
+    :func:`assert_public_address`. That is the address the client resolved for
+    itself, so a DNS answer that changed since :func:`assert_public_http_url`
+    looked is caught. A connection to a proxy (whose host differs from the
+    request's) is not checked: the proxy resolves the target, not this process.
+    Reused pooled connections were checked when they were opened.
+
+    Args:
+        request: The request about to be sent.
+    """
+    target = request.url.raw_host.decode("ascii")
+    connecting_to_target = False
+
+    async def trace(name: str, info: dict[str, Any]) -> None:
+        nonlocal connecting_to_target
+        if name == "connection.connect_tcp.started":
+            connecting_to_target = info["host"] == target
+        elif name == "connection.connect_tcp.complete" and connecting_to_target:
+            stream = info["return_value"]
+            peer = stream.get_extra_info("server_addr")[0]
+            try:
+                assert_public_address(peer, host=target)
+            except UnsafeUrlError:
+                await stream.aclose()
+                raise
+
+    request.extensions["trace"] = trace

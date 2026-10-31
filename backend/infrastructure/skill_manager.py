@@ -24,6 +24,7 @@ import asyncio
 import logging
 import os
 import shutil
+import socket
 import time
 import uuid
 from functools import lru_cache
@@ -32,9 +33,11 @@ from pathlib import Path
 import urllib3
 from dulwich import porcelain
 from dulwich.client import AuthCallbackPoolManager, default_urllib3_manager
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 
 from config import get_settings
-from infrastructure.url_safety import assert_public_http_url
+from infrastructure.url_safety import assert_public_address, assert_public_http_url
 from models.agent_skill import AgentSkill
 from repositories.exceptions import SkillCloneError
 
@@ -59,6 +62,54 @@ _STAGING_SUFFIX_LENGTH = 8
 _SHA_LENGTH = 40
 
 
+def _checked_peer(sock: socket.socket, conn: HTTPConnection) -> socket.socket:
+    """Return ``sock`` unless ``conn`` connected it straight to a non-public peer.
+
+    urllib3 resolves the host again when it connects, so the address
+    :func:`assert_public_http_url` checked before the clone is not
+    necessarily the one reached (DNS rebinding). Checking the connected
+    socket's peer, before TLS or any request bytes, closes that gap. A
+    connection to a proxy is not checked: the proxy resolves the target.
+
+    Raises:
+        UnsafeUrlError: If the peer is not globally routable, or multicast;
+            ``sock`` is closed first.
+    """
+    if conn.proxy is None:
+        try:
+            assert_public_address(sock.getpeername()[0], host=conn.host)
+        except BaseException:
+            sock.close()
+            raise
+    return sock
+
+
+class _PublicHTTPConnection(HTTPConnection):
+    """``HTTPConnection`` that refuses a non-public peer."""
+
+    def _new_conn(self) -> socket.socket:
+        return _checked_peer(super()._new_conn(), self)
+
+
+class _PublicHTTPSConnection(HTTPSConnection):
+    """``HTTPSConnection`` that refuses a non-public peer."""
+
+    def _new_conn(self) -> socket.socket:
+        return _checked_peer(super()._new_conn(), self)
+
+
+class _PublicHTTPConnectionPool(HTTPConnectionPool):
+    """``HTTPConnectionPool`` opening :class:`_PublicHTTPConnection` connections."""
+
+    ConnectionCls = _PublicHTTPConnection
+
+
+class _PublicHTTPSConnectionPool(HTTPSConnectionPool):
+    """``HTTPSConnectionPool`` opening :class:`_PublicHTTPSConnection` connections."""
+
+    ConnectionCls = _PublicHTTPSConnection
+
+
 def _build_no_redirect_pool_manager(
     base_url: str, timeout: float | None = None
 ) -> urllib3.PoolManager | urllib3.ProxyManager | AuthCallbackPoolManager:
@@ -69,7 +120,10 @@ def _build_no_redirect_pool_manager(
     replaces its retry policy so a 3xx response is returned as-is instead of
     being followed. ``AbstractHttpGitClient`` treats any non-200 response as a
     ``GitProtocolError``, so a redirect to an internal address surfaces as a
-    clone failure instead of being silently fetched.
+    clone failure instead of being silently fetched. Its connection pools
+    also check every connected socket's peer address
+    (:class:`_PublicPeerMixin`), so DNS rebinding cannot reach an internal
+    address either.
 
     Args:
         base_url: The repository URL being cloned (used for proxy-bypass detection).
@@ -79,12 +133,19 @@ def _build_no_redirect_pool_manager(
             job — and the advisory lock it holds — indefinitely.
 
     Returns:
-        A urllib3 pool/proxy manager with redirect-following disabled.
+        A urllib3 pool/proxy manager with redirect-following disabled and
+        non-public peers refused.
     """
     manager = default_urllib3_manager(config=None, base_url=base_url, timeout=timeout)
     manager.connection_pool_kw["retries"] = urllib3.util.Retry(
         redirect=0, raise_on_redirect=False
     )
+    # Only an auth callback in ``config`` makes dulwich wrap the manager.
+    assert isinstance(manager, urllib3.PoolManager)
+    manager.pool_classes_by_scheme = {
+        "http": _PublicHTTPConnectionPool,
+        "https": _PublicHTTPSConnectionPool,
+    }
     return manager
 
 
