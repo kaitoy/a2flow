@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -21,17 +21,22 @@ import {
   toSignInLockoutBody,
   toSignInLockoutFormValues,
 } from "@/components/admin/sign-in-lockout-fields";
+import {
+  refineVaultCredential,
+  savedVaultMethod,
+  VaultConnectionFields,
+  vaultCredentialShape,
+} from "@/components/admin/vault-connection-fields";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input";
-import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
-import { zTenantCreate, zTenantUpdate } from "@/generated/api/zod.gen";
+import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   deleteTenant,
   getTenant,
+  type Tenant,
   type TenantUpdate,
   updateTenant,
   type VaultAuthMethod,
@@ -41,92 +46,77 @@ import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
 import { showToast } from "@/store/toastSlice";
 
-/** How A2Flow logs in to the tenant's Vault. */
-const AUTH_OPTIONS: ReadonlyArray<SegmentedOption<VaultAuthMethod>> = [
-  { value: "token", label: "Token" },
-  { value: "approle", label: "AppRole" },
-];
-
 /**
- * Build the validation schema, mirroring the merged-result rules the backend
- * applies in `TenantService`.
+ * Build the validation schema. `name` is immutable after creation, so it is
+ * kept out of the form and rendered as a read-only field instead. The tenant's
+ * own Vault connection is a tenant setting, edited on the Tenant Settings page;
+ * its credential for the global Vault is edited here.
  *
- * `name` is immutable after creation, so it is kept out of the form and
- * rendered as a read-only field instead. The Vault fields are plain strings
- * (empty meaning "none"); `savedMethod` is the auth method whose credential is
- * stored, if any -- the credential itself never reaches the client, so leaving
- * the field blank is acceptable only while the method stays the same.
+ * @param savedMethod - The auth method whose global Vault credential is
+ *   stored, if any (the credential itself never reaches the client).
  */
 function buildSchema(savedMethod: VaultAuthMethod | null) {
   return zTenantCreate
     .pick({ displayName: true, enabled: true })
-    .extend({
-      vaultAddr: z.string(),
-      vaultAuthMethod: z.enum(["token", "approle"]),
-      vaultRoleId: z.string(),
-      vaultApproleMount: z.string(),
-      vaultCredential: z.string(),
-      ...signInLockoutShape,
-    })
+    .extend(signInLockoutShape)
+    .extend({ globalVaultEnabled: z.boolean(), ...vaultCredentialShape })
     .superRefine((values, ctx) => {
-      if (values.vaultAddr === "") return;
-      if (!zTenantUpdate.shape.vaultAddr.safeParse(values.vaultAddr).success) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["vaultAddr"],
-          message: "Enter an http:// or https:// address",
-        });
-      }
-      if (values.vaultCredential === "" && savedMethod !== values.vaultAuthMethod) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["vaultCredential"],
-          message:
-            values.vaultAuthMethod === "approle" ? "Secret ID is required" : "Token is required",
-        });
-      }
-      if (values.vaultAuthMethod === "approle" && values.vaultRoleId === "") {
-        ctx.addIssue({ code: "custom", path: ["vaultRoleId"], message: "Role ID is required" });
-      }
+      if (values.globalVaultEnabled) refineVaultCredential(values, ctx, savedMethod);
     });
 }
 
 type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 
+/** The stored global Vault credential, in the shape the shared helpers take. */
+function storedGlobalVault(tenant: Partial<Tenant>) {
+  return {
+    vaultAuthMethod: tenant.globalVaultAuthMethod,
+    vaultCredentialSet: tenant.globalVaultCredentialSet,
+  };
+}
+
+/** Convert a tenant into form values. The credential field always starts blank. */
+function toFormValues(tenant: Partial<Tenant>): FormValues {
+  return {
+    displayName: tenant.displayName ?? "",
+    enabled: tenant.enabled ?? true,
+    ...toSignInLockoutFormValues(tenant),
+    globalVaultEnabled: Boolean(tenant.globalVaultCredentialSet || tenant.globalVaultAuthMethod),
+    vaultAuthMethod: tenant.globalVaultAuthMethod ?? "token",
+    vaultRoleId: tenant.globalVaultRoleId ?? "",
+    vaultApproleMount: tenant.globalVaultApproleMount ?? "",
+    vaultCredential: "",
+  };
+}
+
 /**
- * Build the PATCH body. An empty Vault address clears the whole connection,
- * credential included; otherwise an untouched credential field is omitted so
- * the backend keeps the ciphertext it already holds.
+ * Build the PATCH body. Unticking the global Vault clears the whole
+ * credential; otherwise an untouched credential field is omitted so the
+ * backend keeps the ciphertext it holds.
  */
 function toBody(values: FormValues): TenantUpdate {
+  const approle = values.vaultAuthMethod === "approle";
   const body: TenantUpdate = {
     displayName: values.displayName,
     enabled: values.enabled,
     ...toSignInLockoutBody(values),
+    globalVaultAuthMethod: values.globalVaultEnabled ? values.vaultAuthMethod : null,
+    globalVaultRoleId: values.globalVaultEnabled && approle ? values.vaultRoleId : null,
+    globalVaultApproleMount:
+      values.globalVaultEnabled && approle && values.vaultApproleMount
+        ? values.vaultApproleMount
+        : null,
   };
-  if (values.vaultAddr === "") {
-    return {
-      ...body,
-      vaultAddr: null,
-      vaultAuthMethod: null,
-      vaultRoleId: null,
-      vaultApproleMount: null,
-      vaultCredential: null,
-    };
-  }
-  const approle = values.vaultAuthMethod === "approle";
-  body.vaultAddr = values.vaultAddr;
-  body.vaultAuthMethod = values.vaultAuthMethod;
-  body.vaultRoleId = approle ? values.vaultRoleId : null;
-  body.vaultApproleMount = approle && values.vaultApproleMount ? values.vaultApproleMount : null;
-  if (values.vaultCredential !== "") body.vaultCredential = values.vaultCredential;
+  if (!values.globalVaultEnabled) body.globalVaultCredential = null;
+  else if (values.vaultCredential !== "") body.globalVaultCredential = values.vaultCredential;
   return body;
 }
 
 /**
  * Detail page of a tenant: its display name, its immutable URL-safe name,
- * whether it is enabled, how failed sign-ins lock its accounts, and the connection to its own HashiCorp Vault (address,
- * auth method, and a write-only token or AppRole secret id). The page is titled with the tenant's display name —
+ * whether it is enabled, how failed sign-ins lock its accounts, and the
+ * credential it logs in to the global Vault with. The page
+ * is titled with the tenant's display name —
  * the same label its row carries in the list. Reachable only by `super_admin`
  * — `layout.tsx` blocks every other viewer before this page mounts. Name is
  * read-only for everyone, super admins included: it is immutable once the
@@ -145,52 +135,31 @@ export default function TenantDetailPage() {
   // name is immutable after creation, so it lives outside the form state and
   // is rendered read-only.
   const [name, setName] = useState("");
-  // The auth method whose credential is stored, or null when none is. Drives
-  // the credential placeholder and whether leaving it blank is acceptable.
-  const [savedMethod, setSavedMethod] = useState<VaultAuthMethod | null>(null);
-  const schema = useMemo(() => buildSchema(savedMethod), [savedMethod]);
+  // The auth method whose global Vault credential is stored, or null.
+  const [vaultMethod, setVaultMethod] = useState<VaultAuthMethod | null>(null);
 
   const save = useAsyncAction({ showDone: false });
+  const schema = useMemo(() => buildSchema(vaultMethod), [vaultMethod]);
   const {
     register,
     handleSubmit,
     reset,
-    control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: {
-      displayName: "",
-      enabled: true,
-      vaultAddr: "",
-      vaultAuthMethod: "token",
-      vaultRoleId: "",
-      vaultApproleMount: "",
-      vaultCredential: "",
-      ...toSignInLockoutFormValues({}),
-    },
+    defaultValues: toFormValues({}),
   });
-  const authMethod = watch("vaultAuthMethod");
-  const credentialSaved = savedMethod !== null && savedMethod === authMethod;
 
   useEffect(() => {
     getTenant(tenantId)
       .then((tenant) => {
         setDisplayName(tenant.displayName);
         setName(tenant.name);
-        setSavedMethod(tenant.vaultCredentialSet ? (tenant.vaultAuthMethod ?? "token") : null);
-        reset({
-          displayName: tenant.displayName,
-          enabled: tenant.enabled,
-          vaultAddr: tenant.vaultAddr ?? "",
-          vaultAuthMethod: tenant.vaultAuthMethod ?? "token",
-          vaultRoleId: tenant.vaultRoleId ?? "",
-          vaultApproleMount: tenant.vaultApproleMount ?? "",
-          vaultCredential: "",
-          ...toSignInLockoutFormValues(tenant),
-        });
+        setVaultMethod(savedVaultMethod(storedGlobalVault(tenant)));
+        reset(toFormValues(tenant));
         setAudit({
           createdBy: tenant.createdBy,
           updatedBy: tenant.updatedBy,
@@ -290,68 +259,30 @@ export default function TenantDetailPage() {
 
           <hr className="border-outline-variant" />
 
-          <FormField htmlFor="vaultAddr" label="Vault Address" error={errors.vaultAddr?.message}>
-            <Input
-              id="vaultAddr"
-              placeholder="https://vault.example.com:8200"
-              {...register("vaultAddr")}
-            />
+          <div className="flex flex-col gap-1">
+            <Checkbox label="Log in to the global Vault" {...register("globalVaultEnabled")} />
             <p className="text-xs text-on-surface-variant">
-              The HashiCorp Vault this tenant&apos;s Vault-type secrets are read from. Leave empty
-              to disconnect it.
+              Used only while the tenant has no Vault of its own. Register a credential issued for
+              this tenant: the Vault policies attached to it decide which secrets the tenant can
+              read.
             </p>
-          </FormField>
+          </div>
 
-          <FormField htmlFor="vaultAuthMethod" label="Vault Auth Method">
-            <Controller
-              name="vaultAuthMethod"
-              control={control}
-              render={({ field }) => (
-                <SegmentedControl
-                  options={AUTH_OPTIONS}
-                  value={field.value}
-                  onChange={field.onChange}
-                  aria-label="Vault auth method"
-                />
-              )}
+          {watch("globalVaultEnabled") && (
+            <VaultConnectionFields
+              roleId={register("vaultRoleId")}
+              approleMount={register("vaultApproleMount")}
+              credential={register("vaultCredential")}
+              authMethod={watch("vaultAuthMethod")}
+              onAuthMethodChange={(method) => setValue("vaultAuthMethod", method)}
+              savedMethod={vaultMethod}
+              errors={{
+                vaultRoleId: errors.vaultRoleId?.message,
+                vaultApproleMount: errors.vaultApproleMount?.message,
+                vaultCredential: errors.vaultCredential?.message,
+              }}
             />
-          </FormField>
-
-          {authMethod === "approle" && (
-            <>
-              <FormField
-                htmlFor="vaultRoleId"
-                label="Vault Role ID"
-                error={errors.vaultRoleId?.message}
-              >
-                <Input id="vaultRoleId" {...register("vaultRoleId")} />
-              </FormField>
-              <FormField
-                htmlFor="vaultApproleMount"
-                label="AppRole Mount"
-                error={errors.vaultApproleMount?.message}
-              >
-                <Input
-                  id="vaultApproleMount"
-                  placeholder="approle"
-                  {...register("vaultApproleMount")}
-                />
-              </FormField>
-            </>
           )}
-
-          <FormField
-            htmlFor="vaultCredential"
-            label={authMethod === "approle" ? "Vault Secret ID" : "Vault Token"}
-            error={errors.vaultCredential?.message}
-          >
-            <PasswordInput
-              id="vaultCredential"
-              autoComplete="new-password"
-              placeholder={credentialSaved ? "Saved — leave empty to keep it" : ""}
-              {...register("vaultCredential")}
-            />
-          </FormField>
 
           <div className="flex gap-2">
             <Button

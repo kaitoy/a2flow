@@ -30,7 +30,7 @@ sidebar_position: 9
 
 値はどちらの種類でも**返されません**。平文でも暗号文でも返りません。だから Local の詳細ページは、キーだけを並べて値を空にします。キーだけは読めるので、ピッカーが一覧できます。Local なら保存されたマップから、Vault ならその時点で Vault から読みます。
 
-Vault のシークレットは、常に**そのシークレットが属するテナントの** Vault から読まれます。その接続は Super Admin が[テナントの詳細ページ](./users-and-groups.md#tenant-vault)で設定します。テナントに Vault 接続がないうちは、`vault` 種別のシークレットは解決できません。Local のシークレットを暗号化する鍵は、[設定リファレンス](../operations/configuration.md#secret-management)で一度だけ設定します。
+Vault のシークレットは、**そのシークレットが属するテナントの** Vault から読まれます。その接続はテナントの admin が [Tenant Settings](./users-and-groups.md#tenant-vault) で設定します。接続していないテナントは、[テナント自身の資格情報](./users-and-groups.md#global-vault-credential)で[グローバル Vault](./system-settings.md#global-vault) から読みます。何を読めるかは、その資格情報に付いた Vault ポリシーが決めます。どちらもなければ、`vault` 種別のシークレットは解決できません。Local のシークレットを暗号化する鍵は、[設定リファレンス](../operations/configuration.md#secret-management)で一度だけ設定します。
 
 ## 改名と削除 {#renaming-and-deleting}
 

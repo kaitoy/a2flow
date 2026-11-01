@@ -21,9 +21,11 @@ the services package would create an import cycle through
 
 A secret holds a map of entries, so every reference must name a key — even when
 the secret has exactly one entry. ``local`` entries are decrypted from the
-database; ``vault`` entries are read live from the HashiCorp Vault of the
-**secret's own tenant** (:class:`infrastructure.vault_client.TenantVaults`), so
-a secret can never reach a Vault path through another tenant's credential.
+database; ``vault`` entries are read live from the HashiCorp Vault the
+**secret's own tenant** reads from, with that tenant's credential -- its own
+Vault, or the global one logged in to with the tenant's credential for it
+(:class:`infrastructure.vault_client.TenantVaults`) -- so a secret never reads
+with another tenant's credential.
 Every failure
 mode — unknown name, missing key, undecryptable ciphertext, Vault error, Vault
 not configured — raises :class:`~repositories.exceptions.SecretResolutionError`
@@ -69,7 +71,7 @@ class VaultLookup(Protocol):
     """Source of a tenant's Vault client -- :class:`~infrastructure.vault_client.TenantVaults`."""
 
     async def client_for(self, tenant_id: str) -> VaultClient | None:
-        """Return the Vault client of ``tenant_id``, or ``None`` if it has none."""
+        """Return the Vault client ``tenant_id`` reads with, or ``None`` if none."""
         ...
 
 
@@ -87,8 +89,9 @@ class SecretResolver:
         Args:
             repo: Repository used to look secrets up by name.
             cipher: Cipher used to decrypt local secret values.
-            vaults: Source of each tenant's Vault client for ``vault``-type
-                secrets. A tenant with no Vault connection makes resolving its
+            vaults: Source of the Vault client each tenant reads
+                ``vault``-type secrets with. A tenant with neither its own
+                Vault nor a credential for the global one makes resolving its
                 vault secrets fail with :class:`SecretResolutionError`.
         """
         self._repo = repo
@@ -301,7 +304,8 @@ class SecretResolver:
         if vault is None:
             raise SecretResolutionError(
                 secret.name,
-                "the tenant has no Vault connection configured",
+                "the tenant has no Vault connection and no credential for the "
+                "global Vault",
             )
         if not (secret.vault_mount and secret.vault_path):
             raise SecretResolutionError(secret.name, "incomplete Vault reference")

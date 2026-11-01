@@ -202,6 +202,21 @@ async def _configure(engine: Any, **fields: Any) -> None:
         await db.commit()
 
 
+async def _configure_global(engine: Any, **fields: Any) -> None:
+    """Write global Vault fields straight onto the system settings row."""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
+
+    async with AsyncSession(engine) as db:
+        settings = await db.get(SystemSettings, SYSTEM_SETTINGS_ID)
+        assert settings is not None
+        for name, value in fields.items():
+            setattr(settings, name, value)
+        db.add(settings)
+        await db.commit()
+
+
 async def test_tenant_vaults_follow_each_tenants_own_settings() -> None:
     """No settings means no client; a client is reused until the settings change."""
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -258,5 +273,112 @@ async def test_tenant_vaults_refuse_an_undecryptable_credential() -> None:
         async with AsyncSession(engine) as db:
             vaults = TenantVaults(db, cipher)
             assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
+    finally:
+        await engine.dispose()
+
+
+# ---------- global vault ----------
+
+_GLOBAL_ADDR = "https://global-vault.example.com"
+
+
+async def test_global_vault_logs_in_with_the_tenants_own_credential() -> None:
+    """The global address, the tenant's credential -- and nothing without one."""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from infrastructure.vault_client import TenantVaults, TokenAuth
+    from models.tenant import VaultAuthMethod
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    engine, cipher = await _tenant_vaults_env()
+    try:
+        await _configure_global(engine, vault_addr=_GLOBAL_ADDR)
+        async with AsyncSession(engine) as db:
+            vaults = TenantVaults(db, cipher)
+            assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
+
+        await _configure(
+            engine,
+            global_vault_auth_method=VaultAuthMethod.token,
+            global_vault_credential=cipher.encrypt("tenant-tok"),
+        )
+        async with AsyncSession(engine) as db:
+            client = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+        assert client is not None
+        assert client._addr == _GLOBAL_ADDR
+        assert isinstance(client._auth, TokenAuth)
+        assert client._auth._token == "tenant-tok"
+    finally:
+        await engine.dispose()
+
+
+async def test_a_credential_without_a_global_address_is_not_used() -> None:
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from infrastructure.vault_client import TenantVaults
+    from models.tenant import VaultAuthMethod
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    engine, cipher = await _tenant_vaults_env()
+    try:
+        await _configure(
+            engine,
+            global_vault_auth_method=VaultAuthMethod.token,
+            global_vault_credential=cipher.encrypt("tenant-tok"),
+        )
+        async with AsyncSession(engine) as db:
+            vaults = TenantVaults(db, cipher)
+            assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
+    finally:
+        await engine.dispose()
+
+
+async def test_a_tenants_own_vault_wins_over_the_global_one() -> None:
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from infrastructure.vault_client import TenantVaults
+    from models.tenant import VaultAuthMethod
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    engine, cipher = await _tenant_vaults_env()
+    try:
+        await _configure_global(engine, vault_addr=_GLOBAL_ADDR)
+        await _configure(
+            engine,
+            vault_addr=_ADDR,
+            vault_auth_method=VaultAuthMethod.token,
+            vault_credential=cipher.encrypt("tok"),
+            global_vault_auth_method=VaultAuthMethod.token,
+            global_vault_credential=cipher.encrypt("tenant-tok"),
+        )
+        async with AsyncSession(engine) as db:
+            client = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+        assert client is not None
+        assert client._addr == _ADDR
+    finally:
+        await engine.dispose()
+
+
+async def test_a_tenants_own_vault_refuses_a_private_peer() -> None:
+    """The address passed the SSRF check when saved; DNS may since have changed."""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from infrastructure.vault_client import TenantVaults
+    from models.tenant import VaultAuthMethod
+    from tests._seed import DEFAULT_TEST_TENANT_ID
+
+    engine, cipher = await _tenant_vaults_env()
+    try:
+        await _configure(
+            engine,
+            vault_addr="http://127.0.0.1:1",
+            vault_auth_method=VaultAuthMethod.token,
+            vault_credential=cipher.encrypt("tok"),
+        )
+        async with AsyncSession(engine) as db:
+            client = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+        assert client is not None
+        with pytest.raises(VaultError):
+            await client.read_kv2("secret", "app/db")
     finally:
         await engine.dispose()

@@ -126,7 +126,7 @@ The encryption key is resolved at first use, in order:
 
 **Back the key up.** Losing it makes every stored local secret undecryptable, and the same key protects the [approval CA](../architecture/approvals.md)'s signing key.
 
-There is no deployment-wide HashiCorp Vault setting: each tenant connects to its own Vault, set by a Super Admin on the tenant's detail page (see [Tenants](../guides/users-and-groups.md#tenants)). That address is exempt from the SSRF URL checks applied to user-supplied URLs, since only a Super Admin can set it and a Vault typically lives on a private address.
+There is no environment variable for HashiCorp Vault: a tenant's own Vault is set by its admin under [Tenant Settings](../guides/users-and-groups.md#tenant-vault), and the global Vault's address by a Super Admin under [System Settings](../guides/system-settings.md#global-vault), with each tenant's [credential for it](../guides/users-and-groups.md#global-vault-credential) on the tenant's page. A tenant's own Vault address goes through the same SSRF checks as other user-supplied URLs, so it must be public. The global Vault address is exempt, since only a Super Admin can set it and a Vault typically lives on a private address.
 
 ## MCP tools and approvals {#mcp-tools-and-approvals}
 

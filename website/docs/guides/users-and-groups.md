@@ -66,6 +66,28 @@ A Super Admin edits the same two fields on a tenant's detail page under **Tenant
 
 A successful sign-in clears the account's failure count. A username that does not exist is locked after the same number of failures, so a lock never reveals whether an account exists. Nobody needs to unlock an account: the lock lifts on its own.
 
+## The tenant's Vault {#tenant-vault}
+
+The [Vault-type secrets](./secrets.md) of a tenant are read from a HashiCorp Vault (KV v2 only). A tenant can connect **its own** Vault; one that does not reads from the **global Vault** a Super Admin sets up under [System Settings](./system-settings.md#global-vault), logging in with the tenant's own [global Vault credential](#global-vault-credential).
+
+```mermaid
+flowchart LR
+  S[Vault-type secret] --> Q{Tenant has its own Vault?}
+  Q -- yes --> T[The tenant's Vault<br/>Vault Mount / Vault Path as set on the secret]
+  Q -- no --> G[The global Vault<br/>Vault Mount / Vault Path as set on the secret,<br/>read with the tenant's own credential]
+```
+
+To connect the tenant's own Vault, open **Tenant Settings** in the admin sidebar (the `admin` role is required). A Super Admin opens the same page while acting as the tenant.
+
+| Field | Notes |
+|---|---|
+| **Vault Address** | The Vault's address, starting with `http://` or `https://`. It must be reachable on a public address: an address on a private network or the local machine is rejected. Leave it empty and save to disconnect the tenant's Vault, which also deletes the stored credential; the tenant then goes back to the global Vault. |
+| **Vault Auth Method** | **Token** for a static token, or **AppRole** for a role id and secret id that A2Flow exchanges for a short-lived token. |
+| **Vault Role ID** / **AppRole Mount** | AppRole only. The mount defaults to `approle`. |
+| **Vault Token** / **Vault Secret ID** | The credential for the chosen method. It is never shown again: once saved, the field reads "Saved — leave empty to keep it". Switching the auth method requires entering a new one. |
+
+Saving an address without a credential, or AppRole without a role id, is rejected with an error. A tenant with neither its own Vault nor a credential for the global one cannot resolve its Vault-type secrets.
+
 ## Your own account {#your-own-account}
 
 Click the profile button in the app bar and choose **Profile** to review your own account. The page opens with an identity card — a banner, your avatar across its lower edge, your display name as the heading, and your `@username`, roles and status pills beside it — followed by two read-only cards:
@@ -120,7 +142,7 @@ Writing to this section requires the `admin` role. Reads stay open, so a viewer 
 
 Open **Tenants** in the admin sidebar to manage tenants — the top-level organizational boundary for multi-tenancy. What that boundary means for everything else, and how a Super Admin picks a tenant to act as, is covered under [Tenants](../concepts/tenants.md); this section is about the records themselves.
 
-Unlike every other admin section, this one is **Super Admin only** (a tenant's own admin changes its sign-in lockout under **Tenant Settings** instead). It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
+Unlike every other admin section, this one is **Super Admin only** (a tenant's own admin changes its sign-in lockout and its own Vault under **Tenant Settings** instead). It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
 
 | Field | Notes |
 |---|---|
@@ -128,18 +150,19 @@ Unlike every other admin section, this one is **Super Admin only** (a tenant's o
 | **Name** | A URL-safe identifier, lowercase kebab-case. Unique, and not editable after creation. |
 | **Enabled** | Clear it to deactivate a tenant without deleting it: its users can no longer sign in, and anyone already signed in is signed out on their next request. |
 | **Failed Sign-ins Before Lockout** / **Lockout Minutes** | How failed sign-ins lock the tenant's accounts — see [Failed sign-ins](#failed-sign-ins). |
+| **Log in to the global Vault** | Tick it to register the tenant's credential for the global Vault — see below. |
 
-### The tenant's Vault {#tenant-vault}
+### The global Vault credential {#global-vault-credential}
 
-Each tenant connects to **its own** HashiCorp Vault (KV v2 only), which its [Vault-type secrets](./secrets.md) are read from. There is no Vault shared across tenants, so a secret can never read another tenant's Vault data. Set it on the tenant's detail page:
+A tenant without a Vault of its own reads the [global Vault](./system-settings.md#global-vault) with a credential that belongs to the tenant alone. Only a Super Admin registers it, on the tenant's detail page; the tenant's own admin never sees it.
 
 | Field | Notes |
 |---|---|
-| **Vault Address** | The Vault's address, starting with `http://` or `https://`. Leave it empty and save to disconnect the tenant's Vault, which also deletes the stored credential. |
-| **Vault Auth Method** | **Token** for a static token, or **AppRole** for a role id and secret id that A2Flow exchanges for a short-lived token. |
+| **Log in to the global Vault** | Shows the fields below. Clear it and save to delete the stored credential. |
+| **Vault Auth Method** | **Token** or **AppRole**, as for a [tenant's own Vault](#tenant-vault). |
 | **Vault Role ID** / **AppRole Mount** | AppRole only. The mount defaults to `approle`. |
-| **Vault Token** / **Vault Secret ID** | The credential for the chosen method. It is never shown again: once saved, the field reads "Saved — leave empty to keep it". Switching the auth method requires entering a new one. |
+| **Vault Token** / **Vault Secret ID** | Write-only, like every other Vault credential. Switching the auth method requires entering a new one. |
 
-Saving an address without a credential, or AppRole without a role id, is rejected with an error. Until a tenant has a Vault connection, its Vault-type secrets cannot be resolved.
+Issue the credential in Vault with a policy that allows reading only this tenant's data. That policy is what keeps tenants apart on the global Vault: a secret may name any **Vault Mount** and **Vault Path**, and Vault refuses the read if the tenant's credential does not cover it.
 
 A **Default** tenant is seeded on first startup and holds the initial seeded `admin` user. A tenant cannot be deleted while any user is still assigned to it — reassign or delete those accounts first.

@@ -24,6 +24,19 @@ function setup() {
   vi.mocked(useParams).mockReturnValue({ tenantId: "tenant-1" });
 }
 
+/** Serve `tenant` and capture the PATCH body the page sends. */
+function capturePatch(tenant: object) {
+  const captured: { body: Record<string, unknown> | null } = { body: null };
+  server.use(
+    http.get("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(tenant)),
+    http.patch("http://localhost:8000/api/v1/tenants/:tenantId", async ({ request }) => {
+      captured.body = (await request.json()) as Record<string, unknown>;
+      return envelope(tenant);
+    })
+  );
+  return captured;
+}
+
 /** Render the page as a super admin — the role every tenant write requires. */
 function renderPage() {
   return render(<TenantDetailPage />, { preloadedState: SUPER_ADMIN });
@@ -171,52 +184,11 @@ describe("TenantDetailPage", () => {
     );
   });
 
-  describe("Vault connection", () => {
-    const VAULT_TENANT = {
-      ...FULL_TENANT,
-      vaultAddr: "https://vault.acme.internal",
-      vaultAuthMethod: "token",
-      vaultRoleId: null,
-      vaultApproleMount: null,
-      vaultCredentialSet: true,
-    };
-
-    /** Serve `tenant` and capture the PATCH body the page sends. */
-    function capturePatch(tenant: object) {
-      const captured: { body: Record<string, unknown> | null } = { body: null };
-      server.use(
-        http.get("http://localhost:8000/api/v1/tenants/:tenantId", () => envelope(tenant)),
-        http.patch("http://localhost:8000/api/v1/tenants/:tenantId", async ({ request }) => {
-          captured.body = (await request.json()) as Record<string, unknown>;
-          return envelope(tenant);
-        })
-      );
-      return captured;
-    }
-
-    it("keeps a saved token by leaving the field blank", async () => {
-      setup();
-      const captured = capturePatch(VAULT_TENANT);
-      renderPage();
-      await waitFor(() => screen.getByDisplayValue("https://vault.acme.internal"));
-      expect(screen.getByLabelText("Vault Token")).toHaveAttribute(
-        "placeholder",
-        "Saved — leave empty to keep it"
-      );
-      await userEvent.click(screen.getByRole("button", { name: /save/i }));
-
-      await waitFor(() => expect(captured.body).not.toBeNull());
-      expect(captured.body).toMatchObject({
-        vaultAddr: "https://vault.acme.internal",
-        vaultAuthMethod: "token",
-      });
-      expect(captured.body).not.toHaveProperty("vaultCredential");
-    });
-
+  describe("tenant settings", () => {
     it("prefills and sends the sign-in lockout", async () => {
       setup();
       const captured = capturePatch({
-        ...VAULT_TENANT,
+        ...FULL_TENANT,
         loginMaxFailures: 3,
         loginLockoutMinutes: 45,
       });
@@ -232,23 +204,64 @@ describe("TenantDetailPage", () => {
       expect(captured.body).toMatchObject({ loginMaxFailures: 8, loginLockoutMinutes: 45 });
     });
 
-    it("clears the whole connection when the address is emptied", async () => {
+    it("leaves the Vault connection to the Tenant Settings page", async () => {
       setup();
-      const captured = capturePatch(VAULT_TENANT);
+      const captured = capturePatch(FULL_TENANT);
       renderPage();
-      const addr = await screen.findByDisplayValue("https://vault.acme.internal");
-      await userEvent.clear(addr);
+      await screen.findByLabelText(/Failed Sign-ins Before Lockout/);
+      expect(screen.queryByLabelText("Vault Address")).not.toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
       await waitFor(() => expect(captured.body).not.toBeNull());
-      expect(captured.body).toMatchObject({ vaultAddr: null, vaultCredential: null });
+      expect(Object.keys(captured.body ?? {}).some((key) => key.startsWith("vault"))).toBe(false);
+    });
+  });
+
+  describe("global Vault credential", () => {
+    const GLOBAL_VAULT_TENANT = {
+      ...FULL_TENANT,
+      globalVaultAuthMethod: "token",
+      globalVaultRoleId: null,
+      globalVaultApproleMount: null,
+      globalVaultCredentialSet: true,
+    };
+
+    it("keeps a saved token by leaving the field blank", async () => {
+      setup();
+      const captured = capturePatch(GLOBAL_VAULT_TENANT);
+      renderPage();
+      expect(await screen.findByLabelText("Vault Token")).toHaveAttribute(
+        "placeholder",
+        "Saved — leave empty to keep it"
+      );
+      expect(screen.queryByLabelText("Vault Address")).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(captured.body).toMatchObject({ globalVaultAuthMethod: "token" });
+      expect(captured.body).not.toHaveProperty("globalVaultCredential");
+    });
+
+    it("clears the credential when the global Vault is unticked", async () => {
+      setup();
+      const captured = capturePatch(GLOBAL_VAULT_TENANT);
+      renderPage();
+      await userEvent.click(await screen.findByLabelText("Log in to the global Vault"));
+      expect(screen.queryByLabelText("Vault Token")).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(captured.body).toMatchObject({
+        globalVaultAuthMethod: null,
+        globalVaultCredential: null,
+      });
     });
 
     it("asks for a role id and a new secret id when switching to AppRole", async () => {
       setup();
-      const captured = capturePatch(VAULT_TENANT);
+      const captured = capturePatch(GLOBAL_VAULT_TENANT);
       renderPage();
-      await waitFor(() => screen.getByDisplayValue("https://vault.acme.internal"));
+      await screen.findByLabelText("Vault Token");
       await userEvent.click(screen.getByRole("tab", { name: "AppRole" }));
       await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -261,9 +274,9 @@ describe("TenantDetailPage", () => {
       await userEvent.click(screen.getByRole("button", { name: /save/i }));
       await waitFor(() => expect(captured.body).not.toBeNull());
       expect(captured.body).toMatchObject({
-        vaultAuthMethod: "approle",
-        vaultRoleId: "role-1",
-        vaultCredential: "sid-1",
+        globalVaultAuthMethod: "approle",
+        globalVaultRoleId: "role-1",
+        globalVaultCredential: "sid-1",
       });
     });
   });

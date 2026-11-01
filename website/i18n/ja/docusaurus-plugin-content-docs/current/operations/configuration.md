@@ -126,7 +126,7 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 **キーはバックアップしてください。** 失うと保存済みのローカルシークレットがすべて復号できなくなり、同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
 
-HashiCorp Vault の設定は配備全体ではなくテナントごとにあります。各テナントは自分の Vault に接続し、その接続は Super Admin がテナントの詳細ページで設定します([テナント](../guides/users-and-groups.md#tenants)を参照)。このアドレスは、ユーザーが入力した URL に適用される SSRF チェックの対象から外してあります。設定できるのは Super Admin だけで、Vault は通常プライベートアドレスにあるからです。
+HashiCorp Vault 用の環境変数はありません。テナント専用の Vault はテナントの admin が [Tenant Settings](../guides/users-and-groups.md#tenant-vault) で、グローバル Vault のアドレスは Super Admin が [System Settings](../guides/system-settings.md#global-vault) で、各テナントの[その資格情報](../guides/users-and-groups.md#global-vault-credential)はテナントのページで設定します。テナント専用の Vault のアドレスには、ユーザーが入力するほかの URL と同じ SSRF チェックがかかるので、公開アドレスである必要があります。グローバル Vault のアドレスはこのチェックの対象外です。設定できるのは Super Admin だけで、Vault は通常プライベートアドレスにあるからです。
 
 ## MCP ツールと承認 {#mcp-tools-and-approvals}
 

@@ -3,7 +3,8 @@
 Unlike :mod:`routers.tenant` (``super_admin`` only, addressed by tenant id),
 these routes act on the caller's tenant (``CurrentTenantIdDep``: their own, or
 the one a ``super_admin`` selected with ``X-Tenant-Id``) and expose only the
-fields an ``admin`` may change -- today, sign-in throttling.
+fields an ``admin`` may change: sign-in throttling and the tenant's own
+Vault connection (without one, the tenant reads the global Vault).
 """
 
 from fastapi import APIRouter, Depends
@@ -13,21 +14,13 @@ from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep
 from dependencies.service import TenantServiceDep
 from models.response import ApiResponse
-from models.tenant import Tenant, TenantSettings, TenantSettingsUpdate, TenantUpdate
+from models.tenant import TenantSettings, TenantSettingsUpdate
 from models.user import Role
 
 router = APIRouter(prefix="/tenant-settings", tags=["tenant-settings"])
 
 #: Route dependency gating both routes behind ``admin`` (``super_admin`` passes).
 _requires_admin = [Depends(require_roles(Role.admin))]
-
-
-def _to_read(tenant: Tenant) -> TenantSettings:
-    """Project a tenant into its admin-managed settings."""
-    return TenantSettings(
-        login_max_failures=tenant.login_max_failures,
-        login_lockout_minutes=tenant.login_lockout_minutes,
-    )
 
 
 @router.get(
@@ -39,7 +32,9 @@ async def get_tenant_settings(
     meta: ApiMetaDep,
 ) -> ApiResponse[TenantSettings]:
     """Return the caller's tenant's admin-managed settings."""
-    return ApiResponse(meta=meta, data=_to_read(await service.get(tenant_id)))
+    return ApiResponse(
+        meta=meta, data=TenantSettings.from_tenant(await service.get(tenant_id))
+    )
 
 
 @router.patch(
@@ -53,9 +48,5 @@ async def update_tenant_settings(
     meta: ApiMetaDep,
 ) -> ApiResponse[TenantSettings]:
     """Apply a partial update to the caller's tenant's admin-managed settings."""
-    tenant = await service.update(
-        tenant_id,
-        TenantUpdate(**body.model_dump(exclude_unset=True)),
-        user_id=user_id,
-    )
-    return ApiResponse(meta=meta, data=_to_read(tenant))
+    tenant = await service.update(tenant_id, body, user_id=user_id)
+    return ApiResponse(meta=meta, data=TenantSettings.from_tenant(tenant))

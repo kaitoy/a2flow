@@ -7,7 +7,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from models.tenant import Tenant, TenantCreate, TenantRead, TenantUpdate
+from models.tenant import (
+    Tenant,
+    TenantCreate,
+    TenantRead,
+    TenantSettingsUpdate,
+    TenantUpdate,
+)
 from repositories._integrity import is_foreign_key_error, is_unique_error
 from repositories.exceptions import (
     ForeignKeyViolationError,
@@ -37,7 +43,11 @@ class TenantRepository(Protocol):
     async def create(self, data: TenantCreate, *, user_id: str) -> Tenant: ...
 
     async def update(
-        self, tenant_id: str, data: TenantUpdate, *, user_id: str
+        self,
+        tenant_id: str,
+        data: TenantUpdate | TenantSettingsUpdate,
+        *,
+        user_id: str,
     ) -> Tenant: ...
 
     async def delete(self, tenant_id: str) -> None: ...
@@ -121,7 +131,11 @@ class SqlTenantRepository:
         return tenant
 
     async def update(
-        self, tenant_id: str, data: TenantUpdate, *, user_id: str
+        self,
+        tenant_id: str,
+        data: TenantUpdate | TenantSettingsUpdate,
+        *,
+        user_id: str,
     ) -> Tenant:
         tenant = await self._db.get(Tenant, tenant_id)
         if tenant is None:

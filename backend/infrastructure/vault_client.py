@@ -1,16 +1,26 @@
 """HashiCorp Vault KV v2 client used to resolve ``vault``-type secrets.
 
-Each tenant connects to **its own** Vault, configured by a ``super_admin`` on
-the tenant record (:class:`models.tenant.Tenant`): an address plus either a
-static token or AppRole credentials. :class:`TenantVaults` picks the client for
-a secret's own tenant, so a ``vault``-type secret can only ever be read with
-the credential of the tenant it belongs to -- there is no deployment-wide
-connection whose reach would span tenants. Only the KV v2 engine is supported.
+A tenant reads its ``vault``-type secrets from one of two Vaults, picked by
+:class:`TenantVaults`:
 
-A tenant's Vault address is deliberately exempt from
-:func:`infrastructure.url_safety.assert_public_http_url`: only a
-``super_admin`` sets it (not tenant users), and a Vault server typically lives
-on a private address that the SSRF check would reject.
+* **Its own**, configured by the tenant's ``admin`` on the tenant record
+  (:class:`models.tenant.TenantVaultFields`): an address plus either a static
+  token or AppRole credentials. Since a tenant user chose the address, it
+  passed :func:`infrastructure.url_safety.assert_public_http_url` when saved,
+  and the client refuses to connect to a non-public peer
+  (:func:`~infrastructure.url_safety.guard_peer_address`).
+* Otherwise **the global Vault**, whose address a ``super_admin`` sets in
+  :class:`models.system_settings.SystemSettings`. There is no shared
+  credential: each tenant logs in with its own
+  (:class:`models.tenant.TenantGlobalVaultFields`, registered by a
+  ``super_admin``), so what a tenant may read there is decided by the Vault
+  policies attached to that credential -- not by A2Flow. A tenant with no such
+  credential cannot read the global Vault at all. Its address is exempt from
+  the SSRF checks: only a ``super_admin`` sets it, and a Vault typically lives
+  on a private address.
+
+Either way a secret names its own mount and path. Only the KV v2 engine is
+supported.
 """
 
 import asyncio
@@ -22,6 +32,8 @@ import httpx
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.secret_cipher import SecretCipher
+from infrastructure.url_safety import guard_peer_address
+from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import DEFAULT_VAULT_APPROLE_MOUNT, Tenant, VaultAuthMethod
 
 logger = logging.getLogger(__name__)
@@ -259,70 +271,127 @@ class VaultClient:
             raise VaultError(f"Vault request failed: {exc}") from exc
 
 
-#: One client per tenant, with the configuration it was built from. Keeping
-#: the client (not just rebuilding it per call) is what lets an AppRole token
-#: be reused across requests; storing the configuration alongside means an edit
-#: of the tenant's Vault settings replaces the client on its next use.
+#: One client per Vault connection -- keyed by tenant id for a tenant's own
+#: Vault, or ``global:<tenant id>`` for its login to the global Vault -- with the
+#: configuration it was built from. Keeping the client (not just rebuilding it
+#: per call) is what lets an AppRole token be reused across requests; storing
+#: the configuration alongside means an edit of the Vault settings replaces the
+#: client on its next use.
 _clients: dict[str, tuple[tuple[object, ...], VaultClient]] = {}
 
 
 class TenantVaults:
-    """Hands out the Vault client of a given tenant, built from its stored settings."""
+    """Hands out the Vault client a given tenant reads with, built from stored settings.
+
+    A tenant's own Vault wins; a tenant without one logs in to the global Vault
+    of :class:`models.system_settings.SystemSettings` with its own credential.
+    """
 
     def __init__(self, session: AsyncSession, cipher: SecretCipher) -> None:
-        """Store the session the tenant row is read through and the cipher.
+        """Store the session the settings rows are read through and the cipher.
 
         Args:
-            session: The SQLModel async session to read the tenant row with.
-            cipher: Cipher that decrypts the tenant's stored Vault credential.
+            session: The SQLModel async session to read the rows with.
+            cipher: Cipher that decrypts the stored Vault credentials.
         """
         self._db = session
         self._cipher = cipher
 
     async def client_for(self, tenant_id: str) -> VaultClient | None:
-        """Return the Vault client of ``tenant_id``, or ``None`` if it has none.
+        """Return the Vault client ``tenant_id`` reads with, or ``None`` if none.
 
         Args:
-            tenant_id: The tenant whose Vault to connect to.
+            tenant_id: The tenant whose secrets are being read.
 
         Returns:
-            The tenant's client, or ``None`` when the tenant configures no
-            usable Vault connection (no address or credential, or a credential
-            that no longer decrypts because the Fernet key changed).
+            A client for the tenant's own Vault when it has an address,
+            otherwise one for the global Vault logged in with the tenant's
+            credential for it, or ``None`` when neither is usable (no address
+            or credential, or a credential that no longer decrypts because the
+            Fernet key changed).
         """
         tenant = await self._db.get(Tenant, tenant_id)
-        if tenant is None or not tenant.vault_addr or not tenant.vault_credential:
+        if tenant is None:
             return None
-        config = (
-            tenant.vault_addr,
-            tenant.vault_auth_method,
-            tenant.vault_role_id,
-            tenant.vault_approle_mount,
-            tenant.vault_credential,
+        if tenant.vault_addr:
+            return self._client(
+                tenant_id,
+                tenant.vault_addr,
+                tenant.vault_auth_method,
+                tenant.vault_role_id,
+                tenant.vault_approle_mount,
+                tenant.vault_credential,
+                guard_peer=True,
+            )
+        settings = await self._db.get(SystemSettings, SYSTEM_SETTINGS_ID)
+        if settings is None or not settings.vault_addr:
+            return None
+        return self._client(
+            f"global:{tenant_id}",
+            settings.vault_addr,
+            tenant.global_vault_auth_method,
+            tenant.global_vault_role_id,
+            tenant.global_vault_approle_mount,
+            tenant.global_vault_credential,
+            guard_peer=False,
         )
-        cached = _clients.get(tenant_id)
+
+    def _client(
+        self,
+        key: str,
+        addr: str,
+        method: VaultAuthMethod | None,
+        role_id: str | None,
+        approle_mount: str | None,
+        credential: str | None,
+        *,
+        guard_peer: bool,
+    ) -> VaultClient | None:
+        """Return the cached client of a connection, rebuilding it on a change.
+
+        Args:
+            key: :data:`_clients` key of the connection.
+            addr: The Vault address.
+            method: How to log in.
+            role_id: The AppRole role id, for :attr:`VaultAuthMethod.approle`.
+            approle_mount: The AppRole login mount, or ``None`` for the default.
+            credential: The stored (encrypted) token or AppRole secret id.
+            guard_peer: Whether to refuse connecting to a non-public address.
+                Set for a tenant's own Vault, whose address a tenant user
+                chose; the global Vault's address is a ``super_admin``'s.
+
+        Returns:
+            The client, or ``None`` when the connection lacks a credential, or
+            (for AppRole) a role id, or its credential no longer decrypts.
+        """
+        if not credential:
+            return None
+        config = (addr, method, role_id, approle_mount, credential)
+        cached = _clients.get(key)
         if cached is not None and cached[0] == config:
             return cached[1]
         try:
-            credential = self._cipher.decrypt(tenant.vault_credential)
+            plaintext = self._cipher.decrypt(credential)
         except ValueError:
             logger.error(
-                "Stored Vault credential of tenant %s could not be decrypted; "
-                "its vault-type secrets fail until the credential is set again.",
-                tenant_id,
+                "Stored Vault credential (%s) could not be decrypted; its "
+                "vault-type secrets fail until the credential is set again.",
+                key,
             )
             return None
         auth: VaultAuth
-        if tenant.vault_auth_method == VaultAuthMethod.approle:
-            if not tenant.vault_role_id:
+        if method == VaultAuthMethod.approle:
+            if not role_id:
                 return None
             auth = AppRoleAuth(
-                tenant.vault_role_id,
-                credential,
-                tenant.vault_approle_mount or DEFAULT_VAULT_APPROLE_MOUNT,
+                role_id, plaintext, approle_mount or DEFAULT_VAULT_APPROLE_MOUNT
             )
         else:
-            auth = TokenAuth(credential)
-        client = VaultClient(tenant.vault_addr, auth)
-        _clients[tenant_id] = (config, client)
+            auth = TokenAuth(plaintext)
+        http = httpx.AsyncClient(
+            follow_redirects=False,
+            event_hooks={"request": [guard_peer_address]} if guard_peer else None,
+        )
+        client = VaultClient(addr, auth, http)
+        _clients[key] = (config, client)
         return client

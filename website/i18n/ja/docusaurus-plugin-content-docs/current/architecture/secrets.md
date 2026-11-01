@@ -29,7 +29,7 @@ sidebar_position: 8
 
 Vault 型のシークレットについて、A2Flow は値をいっさい保管しません。保管するのは読みに行くためのマウントとパスだけです。値もキーの一覧も、必要になるたびにその場で取得されます。だから Vault 側で値を入れ替えれば、A2Flow に触らなくてもそれが効きます。
 
-Vault への接続は**テナントごとに**あり、[テナントのレコード](../guides/users-and-groups.md#tenant-vault)で設定します。認証は静的トークンか AppRole の資格情報で行います。AppRole のトークンはリースが切れる直前まで再利用され、そのあと改めてログインして更新されます。シークレットは常に、自分が属するテナントの接続を通して読まれます。配備全体で共有する Vault は意図的に設けていません。資格情報が 1 つだと、あるテナントのシークレットが別のテナントのデータがあるパスを指せてしまうからです。テナントに Vault 接続を設定するまで、そのテナントの `vault` 型シークレットはそもそも解決できません。
+シークレットは常に、自分が属するテナントの Vault を通して読まれます。テナントの admin が [Tenant Settings](../guides/users-and-groups.md#tenant-vault) で接続していればテナント**専用の** Vault、そうでなければ Super Admin が設定した[グローバル Vault](../guides/system-settings.md#global-vault) に[テナント自身の資格情報](../guides/users-and-groups.md#global-vault-credential)でログインして読みます。どちらも認証は静的トークンか AppRole の資格情報で行います。AppRole のトークンはリースが切れる直前まで再利用され、そのあと改めてログインして更新されます。グローバル Vault ではテナントごとに資格情報が別なので、テナント同士はその資格情報に付いた Vault ポリシーで分けられます。どちらもなければ、そのテナントの `vault` 型シークレットはそもそも解決できません。
 
 ## 解決される場所 {#where-resolution-happens}
 

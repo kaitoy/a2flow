@@ -43,22 +43,138 @@ async def settings_client() -> AsyncGenerator[AsyncClient, None]:
         await engine.dispose()
 
 
+#: The Vault fields of an unconfigured tenant.
+_NO_VAULT = {
+    "vaultAddr": None,
+    "vaultAuthMethod": None,
+    "vaultRoleId": None,
+    "vaultApproleMount": None,
+    "vaultCredentialSet": False,
+}
+
+#: A Vault on a public IP literal, so the SSRF check needs no DNS lookup.
+_VAULT = {
+    "vaultAddr": "https://93.184.215.14:8200",
+    "vaultAuthMethod": "token",
+    "vaultCredential": "hvs.secret-token",
+}
+
+
 async def test_get_returns_defaults(settings_client: AsyncClient) -> None:
     assert assert_ok(await settings_client.get(_PATH)) == {
         "loginMaxFailures": 5,
         "loginLockoutMinutes": 15,
+        **_NO_VAULT,
     }
 
 
 async def test_patch_updates_and_null_keeps(settings_client: AsyncClient) -> None:
-    assert assert_ok(
-        await settings_client.patch(
-            _PATH, json={"loginMaxFailures": 3, "loginLockoutMinutes": 60}
-        )
-    ) == {"loginMaxFailures": 3, "loginLockoutMinutes": 60}
+    limits = {"loginMaxFailures": 3, "loginLockoutMinutes": 60}
+    assert assert_ok(await settings_client.patch(_PATH, json=limits)) == {
+        **limits,
+        **_NO_VAULT,
+    }
     assert assert_ok(
         await settings_client.patch(_PATH, json={"loginMaxFailures": None})
-    ) == {"loginMaxFailures": 3, "loginLockoutMinutes": 60}
+    ) == {**limits, **_NO_VAULT}
+
+
+async def test_global_vault_credential_is_not_a_tenant_setting(
+    settings_client: AsyncClient,
+) -> None:
+    """Only a super admin registers it (on the tenant record); here it is ignored."""
+    response = await settings_client.patch(
+        _PATH,
+        json={"globalVaultAuthMethod": "token", "globalVaultCredential": "hvs.x"},
+    )
+    body = assert_ok(response)
+    assert body == {"loginMaxFailures": 5, "loginLockoutMinutes": 15, **_NO_VAULT}
+
+
+# ---------- vault connection ----------
+
+
+async def test_vault_credential_is_stored_encrypted_and_never_returned(
+    settings_client: AsyncClient,
+) -> None:
+    response = await settings_client.patch(_PATH, json=_VAULT)
+    body = assert_ok(response)
+    assert body["vaultAddr"] == _VAULT["vaultAddr"]
+    assert body["vaultCredentialSet"] is True
+    assert "vaultCredential" not in body
+    assert "hvs.secret-token" not in response.text
+    assert "hvs.secret-token" not in (await settings_client.get(_PATH)).text
+
+
+async def test_blank_vault_credential_keeps_and_null_clears(
+    settings_client: AsyncClient,
+) -> None:
+    assert_ok(await settings_client.patch(_PATH, json=_VAULT))
+    body = assert_ok(
+        await settings_client.patch(
+            _PATH,
+            json={"vaultAddr": "https://93.184.215.15", "vaultCredential": ""},
+        )
+    )
+    assert body["vaultCredentialSet"] is True
+
+    cleared = assert_ok(
+        await settings_client.patch(
+            _PATH, json={"vaultAddr": None, "vaultCredential": None}
+        )
+    )
+    assert cleared["vaultCredentialSet"] is False
+    assert cleared["vaultAddr"] is None
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"vaultAddr": _VAULT["vaultAddr"]},
+        {**_VAULT, "vaultAuthMethod": "approle"},
+    ],
+)
+async def test_unusable_vault_connection_is_rejected(
+    settings_client: AsyncClient, body: dict[str, str]
+) -> None:
+    assert_err(
+        await settings_client.patch(_PATH, json=body),
+        code="INVALID_TENANT",
+        status=422,
+    )
+
+
+@pytest.mark.parametrize(
+    "addr", ["https://10.0.0.5:8200", "http://127.0.0.1:8200", "https://[::1]"]
+)
+async def test_private_vault_address_is_rejected(
+    settings_client: AsyncClient, addr: str
+) -> None:
+    """A tenant user must not point A2Flow at an internal address."""
+    assert_err(
+        await settings_client.patch(_PATH, json={**_VAULT, "vaultAddr": addr}),
+        code="VALIDATION_ERROR",
+        status=422,
+    )
+
+
+async def test_switching_vault_auth_method_needs_a_new_credential(
+    settings_client: AsyncClient,
+) -> None:
+    """A stored token must not be reused as an AppRole secret id."""
+    assert_ok(await settings_client.patch(_PATH, json=_VAULT))
+    switch = {"vaultAuthMethod": "approle", "vaultRoleId": "role-1"}
+    assert_err(
+        await settings_client.patch(_PATH, json=switch),
+        code="INVALID_TENANT",
+        status=422,
+    )
+    body = assert_ok(
+        await settings_client.patch(
+            _PATH, json={**switch, "vaultCredential": "secret-id-1"}
+        )
+    )
+    assert body["vaultAuthMethod"] == "approle"
 
 
 @pytest.mark.parametrize(

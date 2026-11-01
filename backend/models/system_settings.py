@@ -1,9 +1,16 @@
-"""Platform-wide system settings: the SMTP relay used for notification email.
+"""Platform-wide system settings: the SMTP relay and the global Vault.
 
 A2Flow's notifications are otherwise in-app only — a row in ``notifications``
-that the toolbar bell polls for. This table holds the one piece of
-configuration needed to also deliver them by email: where to hand a message to,
-and what address to send it from.
+that the toolbar bell polls for. This table holds the configuration needed to
+also deliver them by email: where to hand a message to, and what address to
+send it from.
+
+It also holds the address of the **global Vault**, which every tenant without
+a Vault of its own (:class:`models.tenant.TenantVaultFields`) reads its
+``vault``-type secrets from. There is no credential here: each tenant logs in
+with one of its own (:class:`models.tenant.TenantGlobalVaultFields`), and the
+Vault policies attached to it keep tenants apart (see
+:mod:`infrastructure.vault_client`).
 
 The record is **platform-scoped, not tenant-scoped**: it inherits
 :class:`~models.base.BaseEntity` alone, the same shape as
@@ -85,6 +92,11 @@ class SystemSettingsUpdate(SQLModel):
     smtp_password: str | None = Field(default=None, max_length=1024)
     smtp_from_email: EmailStr | None = None
     smtp_from_name: PersonName | None = None
+    #: Address of the global Vault, used by every tenant that has no Vault of
+    #: its own. Deliberately :data:`~models.constraints.AppBaseUrl`, not
+    #: ``HttpUrl``: only a ``super_admin`` sets it, and a Vault typically lives
+    #: on a private address the SSRF guard would refuse.
+    vault_addr: AppBaseUrl | None = None
 
 
 class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
@@ -128,6 +140,7 @@ class SystemSettingsRead(BaseEntity):
     smtp_from_name: str | None = None
     #: Whether a password is stored. The password itself is never serialized.
     smtp_password_set: bool = False
+    vault_addr: str | None = None
 
     @classmethod
     def from_settings(cls, settings: SystemSettings) -> "SystemSettingsRead":

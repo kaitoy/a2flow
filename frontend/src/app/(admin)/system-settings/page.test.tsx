@@ -85,6 +85,32 @@ describe("SystemSettingsPage", () => {
     });
   });
 
+  it("sends the global Vault address and no credential", async () => {
+    server.use(
+      http.get(`${BASE}/api/v1/system-settings`, () =>
+        envelope({ ...CONFIGURED, vaultAddr: "https://vault.internal:8200" })
+      )
+    );
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.patch(`${BASE}/api/v1/system-settings`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return envelope(CONFIGURED);
+      })
+    );
+
+    renderPage();
+    expect(await screen.findByLabelText("Global Vault Address")).toHaveValue(
+      "https://vault.internal:8200"
+    );
+    expect(screen.queryByLabelText("Vault Token")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(body).toBeDefined());
+    expect(body).toMatchObject({ vaultAddr: "https://vault.internal:8200" });
+    expect(Object.keys(body ?? {}).filter((key) => key.startsWith("vault"))).toEqual(["vaultAddr"]);
+  });
+
   it("sends the password when one is typed", async () => {
     serveConfigured();
     let body: Record<string, unknown> | undefined;

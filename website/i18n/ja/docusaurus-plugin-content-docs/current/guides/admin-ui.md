@@ -33,8 +33,8 @@ A2Flow のレコードは、すべて管理画面で作成し、確認し、編�
 | **Workflow Executions** | ワークフローの実行とその履歴 | サインインした全員 |
 | **Approvals** | 承認依頼とその判断 | サインインした全員 |
 | **Audit Logs** | ツール呼び出し、なりすまし、与えた権限、送ったメール | Admin、Super Admin |
-| **Tenant Settings** | 失敗したサインインで自分のテナントのアカウントをどうロックするか。[サインインの失敗](./users-and-groups.md#failed-sign-ins)を参照 | Admin |
-| **System Settings** | 通知メールを送るメールサーバー | Super Admin |
+| **Tenant Settings** | 失敗したサインインで自分のテナントのアカウントをどうロックするか、自分のテナント専用の Vault。[サインインの失敗](./users-and-groups.md#failed-sign-ins)と[テナントの Vault](./users-and-groups.md#tenant-vault) を参照 | Admin |
+| **System Settings** | 通知メールを送るメールサーバーと、グローバル Vault のアドレス | Super Admin |
 
 サイドバーに出ていないセクションは、自分のロールでは書き込めないセクションです。読み取りは開いているので、同僚から中のレコードへの直リンクを受け取れば開けます。詳しくは[ロールと権限](../concepts/authorization.md)を参照してください。
 

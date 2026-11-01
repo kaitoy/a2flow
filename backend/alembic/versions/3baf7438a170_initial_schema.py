@@ -49,6 +49,31 @@ def upgrade() -> None:
             "vault_credential", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
         sa.Column(
+            "global_vault_auth_method",
+            # The column above already creates the type; PostgreSQL must not be
+            # asked to create it a second time.
+            sa.Enum("token", "approle", name="vaultauthmethod").with_variant(
+                postgresql.ENUM(
+                    "token", "approle", name="vaultauthmethod", create_type=False
+                ),
+                "postgresql",
+            ),
+            nullable=True,
+        ),
+        sa.Column(
+            "global_vault_role_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+        ),
+        sa.Column(
+            "global_vault_approle_mount",
+            sqlmodel.sql.sqltypes.AutoString(),
+            nullable=True,
+        ),
+        sa.Column(
+            "global_vault_credential",
+            sqlmodel.sql.sqltypes.AutoString(),
+            nullable=True,
+        ),
+        sa.Column(
             "login_max_failures", sa.Integer(), nullable=False, server_default="5"
         ),
         sa.Column(
@@ -171,6 +196,7 @@ def upgrade() -> None:
         sa.Column("smtp_password", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("smtp_from_email", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("smtp_from_name", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("vault_addr", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),

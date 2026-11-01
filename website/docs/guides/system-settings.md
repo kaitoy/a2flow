@@ -5,7 +5,7 @@ sidebar_position: 13
 
 # System Settings
 
-System Settings is where the mail server that [notification email](./notifications.md#email-delivery) goes through is configured. There is exactly one settings record for the whole deployment, seeded on first startup with email delivery **off**, so a fresh install keeps notifications in-app until an operator turns it on.
+System Settings is where the mail server that [notification email](./notifications.md#email-delivery) goes through, and the global HashiCorp Vault, are configured. There is exactly one settings record for the whole deployment, seeded on first startup with email delivery **off**, so a fresh install keeps notifications in-app until an operator turns it on.
 
 Open **System Settings** in the admin sidebar. Like [Tenants](./users-and-groups.md#tenants), this section is restricted to **Super Admin** — the settings are platform-wide rather than tenant-scoped, so there is no tenant-admin carve-out, and even reading them is refused for anyone else.
 
@@ -25,6 +25,24 @@ Switching delivery on without a host or a sender address is refused, so the form
 Every field here can also be set from the environment, so a deployment can ship its mail configuration rather than leaving it as a manual step — see [Notification email](../operations/configuration.md#notification-email). Those variables are re-applied on every startup, so a value set that way overwrites what was typed here.
 
 The password is **write-only**, the same treatment [secrets](./secrets.md) and user passwords get: it is never shown back. Once one is stored the field shows blank with a "Saved" placeholder, and saving with it left empty keeps the stored password rather than clearing it.
+
+## The global Vault {#global-vault}
+
+The global Vault is the HashiCorp Vault (KV v2 only) that every tenant **without a Vault of its own** reads its [Vault-type secrets](./secrets.md) from. A tenant's admin can connect the tenant's own Vault instead under [Tenant Settings](./users-and-groups.md#tenant-vault), and that one always takes precedence.
+
+| Field | Purpose |
+|---|---|
+| **Global Vault Address** | The Vault's address, starting with `http://` or `https://`. Unlike a tenant's own Vault, it may be on a private network. Leave it empty and save to disconnect the global Vault. |
+
+Only the address is set here. There is no shared credential: each tenant logs in with **a credential of its own**, which a Super Admin registers on the tenant's page (see [The global Vault credential](./users-and-groups.md#global-vault-credential)). A tenant without one cannot read the global Vault at all.
+
+Tenants are kept apart **by Vault itself**: a secret is read from the **Vault Mount** and **Vault Path** it names, and the policies attached to the tenant's credential decide whether that read is allowed. Issue each tenant a credential whose policy covers only that tenant's data — for example, an AppRole per tenant with a policy like this for the `acme` tenant:
+
+```hcl
+path "secret/data/tenants/acme/*" {
+  capabilities = ["read"]
+}
+```
 
 ## Checking the configuration
 

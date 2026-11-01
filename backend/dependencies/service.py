@@ -123,7 +123,7 @@ SkillSyncJobDep = Annotated[SkillSyncJob, Depends(get_skill_sync_job)]
 
 
 def get_tenant_vaults(db: DBSessionDep, cipher: SecretCipherDep) -> TenantVaults:
-    """Create the per-request source of each tenant's own Vault client."""
+    """Create the per-request source of the Vault client each tenant reads with."""
     return TenantVaults(db, cipher)
 
 

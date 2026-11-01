@@ -30,6 +30,7 @@ import {
   getSystemSettings,
   type SmtpSecurity,
   SUPPRESS_FORBIDDEN_TOAST,
+  type SystemSettings,
   type SystemSettingsUpdate,
   sendSmtpTestEmail,
   updateSystemSettings,
@@ -86,6 +87,7 @@ function buildSchema(passwordSet: boolean) {
       smtpPassword: z.string(),
       smtpFromEmail: z.string(),
       smtpFromName: z.string(),
+      vaultAddr: z.string(),
     })
     .superRefine((values, ctx) => {
       validateOptional(
@@ -147,23 +149,42 @@ function buildSchema(passwordSet: boolean) {
           message: "Password is required when a username is set",
         });
       }
+
+      validateOptional(values.vaultAddr, zSystemSettingsUpdate.shape.vaultAddr, ctx, "vaultAddr");
     });
 }
 
 type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 
-/** Blank values, used until the saved settings have loaded. */
-function emptyFormValues(): FormValues {
+/** The SMTP fields at their defaults, as "Clear SMTP settings" leaves them. */
+const EMPTY_SMTP_VALUES = {
+  smtpEnabled: false,
+  smtpHost: "",
+  smtpPort: "587",
+  smtpSecurity: "starttls",
+  smtpUsername: "",
+  smtpPassword: "",
+  smtpFromEmail: "",
+  smtpFromName: "",
+} satisfies Partial<FormValues>;
+
+/**
+ * Convert the stored settings into form values. Every field is listed: one
+ * left out here would be silently cleared on the next save, since `toBody`
+ * sends the whole record.
+ */
+function toFormValues(settings: Partial<SystemSettings>): FormValues {
   return {
-    appBaseUrl: "",
-    smtpEnabled: false,
-    smtpHost: "",
-    smtpPort: "587",
-    smtpSecurity: "starttls",
-    smtpUsername: "",
+    appBaseUrl: settings.appBaseUrl ?? "",
+    smtpEnabled: settings.smtpEnabled ?? false,
+    smtpHost: settings.smtpHost ?? "",
+    smtpPort: String(settings.smtpPort ?? 587),
+    smtpSecurity: settings.smtpSecurity ?? "starttls",
+    smtpUsername: settings.smtpUsername ?? "",
     smtpPassword: "",
-    smtpFromEmail: "",
-    smtpFromName: "",
+    smtpFromEmail: settings.smtpFromEmail ?? "",
+    smtpFromName: settings.smtpFromName ?? "",
+    vaultAddr: settings.vaultAddr ?? "",
   };
 }
 
@@ -184,6 +205,7 @@ function toBody(values: FormValues): SystemSettingsUpdate {
     smtpUsername: values.smtpUsername || null,
     smtpFromEmail: values.smtpFromEmail || null,
     smtpFromName: values.smtpFromName || null,
+    vaultAddr: values.vaultAddr || null,
   };
   if (values.smtpPassword !== "") {
     body.smtpPassword = values.smtpPassword;
@@ -213,7 +235,8 @@ const CLEARED_SMTP_BODY: SystemSettingsUpdate = {
 
 /**
  * The platform-wide settings: the SMTP relay notification email is delivered
- * through, and the base URL those messages link back to. Reachable only by
+ * through, the base URL those messages link back to, and the address of the
+ * global Vault every tenant without a Vault of its own reads from. Reachable only by
  * `super_admin` — `layout.tsx` blocks every other viewer before this page
  * mounts.
  */
@@ -242,26 +265,14 @@ export default function SystemSettingsPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: emptyFormValues(),
+    defaultValues: toFormValues({}),
   });
 
   useEffect(() => {
     getSystemSettings(SUPPRESS_FORBIDDEN_TOAST)
       .then((settings) => {
         setPasswordSet(settings.smtpPasswordSet ?? false);
-        // Every field is listed: one left out here would be silently cleared on
-        // the next save, since `toBody` sends the whole record.
-        reset({
-          appBaseUrl: settings.appBaseUrl ?? "",
-          smtpEnabled: settings.smtpEnabled ?? false,
-          smtpHost: settings.smtpHost ?? "",
-          smtpPort: String(settings.smtpPort ?? 587),
-          smtpSecurity: settings.smtpSecurity ?? "starttls",
-          smtpUsername: settings.smtpUsername ?? "",
-          smtpPassword: "",
-          smtpFromEmail: settings.smtpFromEmail ?? "",
-          smtpFromName: settings.smtpFromName ?? "",
-        });
+        reset(toFormValues(settings));
         setAudit({
           createdBy: settings.createdBy,
           updatedBy: settings.updatedBy,
@@ -282,7 +293,7 @@ export default function SystemSettingsPage() {
         setPasswordSet(saved.smtpPasswordSet ?? false);
         // The password is write-only, so the field goes back to blank: what is
         // stored is reported by the placeholder, not by the input's value.
-        reset({ ...values, smtpPassword: "" });
+        reset(toFormValues(saved));
         dispatch(showToast({ message: "System settings updated" }));
       });
     } catch {
@@ -307,7 +318,7 @@ export default function SystemSettingsPage() {
       await clear.run(async () => {
         const saved = await updateSystemSettings(CLEARED_SMTP_BODY);
         setPasswordSet(saved.smtpPasswordSet ?? false);
-        reset({ ...emptyFormValues(), appBaseUrl: getValues("appBaseUrl") });
+        reset({ ...getValues(), ...EMPTY_SMTP_VALUES });
         dispatch(showToast({ message: "SMTP settings cleared" }));
       });
     } catch {
@@ -323,7 +334,7 @@ export default function SystemSettingsPage() {
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
         <FormLayout header={header}>
-          <FormSkeleton fields={8} />
+          <FormSkeleton fields={12} />
         </FormLayout>
       </AdminPageContainer>
     );
@@ -362,6 +373,25 @@ export default function SystemSettingsPage() {
             />
             <p className="text-xs text-on-surface-variant">
               Where notification email links back to. Leave empty to send messages without a link.
+            </p>
+          </FormField>
+
+          <hr className="border-outline-variant" />
+
+          <FormField
+            htmlFor="vaultAddr"
+            label="Global Vault Address"
+            error={errors.vaultAddr?.message}
+          >
+            <Input
+              id="vaultAddr"
+              placeholder="https://vault.example.com:8200"
+              {...register("vaultAddr")}
+            />
+            <p className="text-xs text-on-surface-variant">
+              The HashiCorp Vault every tenant without a Vault of its own reads from. Each tenant
+              logs in with its own credential, registered on the tenant&apos;s page, so its Vault
+              policies decide what it may read. Leave empty to disconnect it.
             </p>
           </FormField>
 

@@ -422,3 +422,18 @@ async def test_test_send_maps_a_relay_failure_to_502(
     # The raw reason stays server-side: it can quote relay banners and the
     # configured AUTH username back at the caller.
     assert "Connection refused" not in str(err)
+
+
+# ---------- global vault ----------
+
+
+async def test_global_vault_address_may_be_private(
+    settings_client: AsyncClient,
+) -> None:
+    """Only a super admin sets it, and a Vault typically lives on a private address."""
+    body = assert_ok(
+        await settings_client.patch(_PATH, json={"vaultAddr": "https://10.0.0.5:8200"})
+    )
+    assert body["vaultAddr"] == "https://10.0.0.5:8200"
+    # The credential is per tenant (on the tenant record), never global.
+    assert not any(key.startswith("vault") and key != "vaultAddr" for key in body)

@@ -30,7 +30,7 @@ A single entry is always addressed as **`name/key`**. The key is required even w
 
 Values are **never returned** for either type — not in plaintext, not as ciphertext — which is why the local type's detail page shows keys with blank values. Keys alone are readable, so a picker can list them: for a local secret they come from the stored map, and for a Vault secret they are read from Vault at that moment.
 
-A Vault secret is always read from **its own tenant's** Vault, which a Super Admin connects on the [tenant's detail page](./users-and-groups.md#tenant-vault). Until the tenant has one, `vault`-type secrets cannot be resolved. The key local secrets are encrypted with is set up once in the [configuration reference](../operations/configuration.md#secret-management).
+A Vault secret is read from **its own tenant's** Vault, which the tenant's admin connects under [Tenant Settings](./users-and-groups.md#tenant-vault). A tenant without one reads from the [global Vault](./system-settings.md#global-vault) with a [credential of its own](./users-and-groups.md#global-vault-credential), whose Vault policies decide what it may read. With neither, `vault`-type secrets cannot be resolved. The key local secrets are encrypted with is set up once in the [configuration reference](../operations/configuration.md#secret-management).
 
 ## Renaming and deleting
 
