@@ -274,6 +274,19 @@ describe("MessageList", () => {
     expect(screen.queryByText("Agent is thinking…")).not.toBeInTheDocument();
   });
 
+  it("hides the working indicator while an MCP server's question awaits an answer", () => {
+    const messages: Message[] = [
+      {
+        id: "e-1",
+        role: "activity",
+        activityType: "mcp_elicitation",
+        content: { elicitationId: "q1", sessionId: "s1", executionId: "x1" },
+      } as Message,
+    ];
+    render(<MessageList messages={messages} isRunning={true} />);
+    expect(screen.queryByText("Agent is thinking…")).not.toBeInTheDocument();
+  });
+
   it("only the last message receives isThinking=true while running and not streaming", () => {
     const messages: Message[] = [
       { id: "m1", role: "user", content: "hi" },

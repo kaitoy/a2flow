@@ -23,6 +23,7 @@ import {
 import type { WorkflowTask } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 import type { RenderedMessage } from "@/store/chatSlice";
+import { ELICITATION_ACTIVITY_TYPE } from "./ElicitationControls";
 import { MessageBubble } from "./MessageBubble";
 import { EmptyState } from "./ui/empty-state";
 import { WorkflowTaskGroup } from "./WorkflowTaskGroup";
@@ -53,8 +54,9 @@ function renderKeyOf(message: RenderedMessage | undefined): string | undefined {
 /**
  * Whether the agent is working but has nothing on screen yet — true when a run
  * is in progress, no text is streaming, and the latest message is not already a
- * running tool line (which shows its own spinner) or a live reasoning panel
- * (which carries its own "thinking" affordance via the live edge).
+ * running tool line (which shows its own spinner), a live reasoning panel
+ * (which carries its own "thinking" affordance via the live edge), or an MCP
+ * server's question (the turn is waiting on the person, not the agent).
  */
 function shouldShowWorkingIndicator(
   messages: Message[],
@@ -70,6 +72,7 @@ function shouldShowWorkingIndicator(
     ) {
       return false;
     }
+    if (last.activityType === ELICITATION_ACTIVITY_TYPE) return false;
     if (
       last.activityType === REASONING_ACTIVITY_TYPE &&
       (last.content as unknown as ReasoningActivityContent).text
