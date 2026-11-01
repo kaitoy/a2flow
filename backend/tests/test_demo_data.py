@@ -1290,13 +1290,16 @@ async def test_demo_tool_mocks_stub_the_demo_run_tools(
     pod_restart = mocks[DEMO_DELETE_POD_MOCK_ID]
     assert pod_restart.responses[0]["value"]["status"] == "deleted"
     rotation = mocks[DEMO_SECRET_CREATE_MOCK_ID]
-    assert rotation.responses[0]["value"]["version"]
+    # Like the real Azure MCP Server: a write reports when it happened, but no
+    # version id.
+    assert rotation.responses[0]["value"]["createdOn"]
+    assert "version" not in rotation.responses[0]["value"]
     # A mock never carries a secret value, made up or otherwise.
     assert "value" not in rotation.responses[0]["value"]
     listing = mocks[DEMO_SECRET_LIST_MOCK_ID].responses[0]["value"]["secrets"]
-    # The secret the write reports is one the listing offers to choose.
-    assert rotation.responses[0]["value"]["name"] in {s["name"] for s in listing}
-    assert all("value" not in secret for secret in listing)
+    # The real listing is bare names; the secret the write reports is one of them.
+    assert all(isinstance(secret, str) for secret in listing)
+    assert rotation.responses[0]["value"]["name"] in listing
 
 
 async def test_disabling_removes_tool_mocks_before_the_mcp_server(

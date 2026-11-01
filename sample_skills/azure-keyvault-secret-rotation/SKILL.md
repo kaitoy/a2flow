@@ -1,6 +1,6 @@
 ---
 name: azure-keyvault-secret-rotation
-description: Rotate a secret in Azure Key Vault -- write a freshly generated random value as the secret's new version -- through the registered Azure MCP server, gated by a manager's explicit approval of the exact vault and secret before anything is written. Use this skill whenever the user wants to rotate, renew, regenerate, refresh, or replace the value of a Key Vault secret (a password, an API key, a connection-string credential) through the connected MCP tooling. It agrees the exact target with the user, gets explicit manager approval, then writes the new version and reports its version id -- never writing before approval comes back approved, and never showing the secret value.
+description: Rotate a secret in Azure Key Vault -- write a freshly generated random value as the secret's new version -- through the registered Azure MCP server, gated by a manager's explicit approval of the exact vault and secret before anything is written. Use this skill whenever the user wants to rotate, renew, regenerate, refresh, or replace the value of a Key Vault secret (a password, an API key, a connection-string credential) through the connected MCP tooling. It agrees the exact target with the user, gets explicit manager approval, then writes the new version and reports when it was created -- never writing before approval comes back approved, and never showing the secret value.
 ---
 
 # Azure Key Vault Secret Rotation
@@ -16,7 +16,7 @@ There is no dedicated "rotate" operation. Writing a secret under a name that alr
 The new value is a secret from the moment it is generated:
 
 - Generate it with the **Secret Value Generator**'s `generate_secret_value` tool. Never make one up yourself.
-- Pass it only to the write in step 3. Never write it in a chat message, a summary, an approval request, or a task status, and never echo it back to confirm it.
+- Pass it only to the write in step 3. Never write it in a chat message, a summary, an approval request, or a task status, and never echo it back to confirm it -- not even when the write's result repeats it back to you.
 - Never read a secret's value: do not call `keyvault_secret_get` with a `secret` name, since that returns the value. Calling it **without** a `secret` name lists the vault's secrets, and that is the only read you need.
 - The service principal behind the Azure MCP Server should hold only a custom role with the `Microsoft.KeyVault/vaults/secrets/readMetadata/action` (list) and `Microsoft.KeyVault/vaults/secrets/setSecret/action` (write) data actions -- not **Key Vault Secrets Officer**, which can also read values -- so Key Vault itself refuses a value read. If a call is denied for lack of permission, that is the role working: report it and do not look for another way to read the value.
 
@@ -66,9 +66,16 @@ If the call returns an error (permission denied, the vault does not exist, etc.)
 
 ### 4. Confirm the rotation
 
-Don't stop at "the call succeeded". List the vault's secrets again with `keyvault_secret_get` (vault only) and check that the secret now shows the update you just made. Report the new version id and when it was created, taken from the write's result -- never the value.
+Don't stop at "the call succeeded" -- check the write's result itself. The Azure MCP Server reports a write with the secret's name and attributes (enabled, created and updated times). It does **not** report a version id, and its listing returns secret names only, with no attributes, so neither of those is available to check against. Treat the rotation as confirmed when:
 
-Remind the user that the previous version is still enabled: once everything that reads the secret has picked up the new value, they may want to disable the old version in the Azure portal.
+- the name in the write's result is exactly the approved secret, and
+- its `createdOn` is the time of this write (a few seconds before the result came back), not an older time.
+
+The write's result also echoes the value that was written. Read only the name and the timestamps from it; never repeat, quote, or summarize the value.
+
+Report the name and when the new version was created, taken from the write's result. If the result does happen to include a version id, report that too. Do not list the vault again to look for more metadata -- the listing has none.
+
+Remind the user that the previous version is still enabled: once everything that reads the secret has picked up the new value, they may want to check the new version and disable the old one in the Azure portal.
 
 ## Reporting format
 
@@ -77,7 +84,7 @@ Close with a short, factual summary:
 ```
 Rotated Key Vault secret <secret> (<vault>).
   Manager approval: approved by <approver>
-  New version: <version id>
+  New version created: <createdOn from the write's result>
   Previous version: still enabled -- disable it once every consumer has switched over
 ```
 

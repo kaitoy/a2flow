@@ -984,10 +984,6 @@ _DEMO_SECRET_LIST_TOOL = "keyvault_secret_get"
 #: one that gets a new version.
 _DEMO_MOCK_SECRET_NAME = "db-password"
 
-#: Version id of the new secret version the ``keyvault_secret_create`` mock
-#: reports.
-_DEMO_MOCK_SECRET_VERSION = "3f0c2a9d8b7e4f6a9c1d2e3f4a5b6c7d"
-
 #: Instance id shared by the ``call_aws`` and ``run_script`` mock results, so a
 #: run that happens to call both still tells one consistent story.
 _DEMO_MOCK_INSTANCE_ID = "i-0a1b2c3d4e5f67890"
@@ -1067,30 +1063,27 @@ _DEMO_DELETE_POD_RESULT: dict[str, Any] = {
     ),
 }
 
-#: Structured result of the demo ``keyvault_secret_create`` mock: the
-#: identity and attributes of the new secret version, as the Azure MCP server
-#: reports a successful write. The value is deliberately absent -- the sample
-#: skill never repeats a secret value, and a mock has no reason to make one up.
+#: Structured result of the demo ``keyvault_secret_create`` mock: the shape
+#: the real Azure MCP Server reports for a successful write -- the secret's
+#: name and attributes, with no version id. The real result also echoes the
+#: written value; the mock leaves it out, since it cannot know the value the run
+#: generated and has no reason to make one up.
 _DEMO_SECRET_CREATE_RESULT: dict[str, Any] = {
     "name": _DEMO_MOCK_SECRET_NAME,
-    "version": _DEMO_MOCK_SECRET_VERSION,
-    "id": (
-        "https://demo-kv.vault.azure.net/secrets/"
-        f"{_DEMO_MOCK_SECRET_NAME}/{_DEMO_MOCK_SECRET_VERSION}"
-    ),
     "enabled": True,
     "createdOn": "2026-01-01T00:00:00+00:00",
     "updatedOn": "2026-01-01T00:00:00+00:00",
 }
 
-#: Structured result of the demo ``keyvault_secret_get`` mock: a listing of a
-#: vault's secrets -- names and attributes, never values -- so a draft run has
-#: something to pick the secret to rotate from.
+#: Structured result of the demo ``keyvault_secret_get`` mock: what the real
+#: Azure MCP Server returns when listing a vault -- secret names only, with no
+#: attributes or values -- so a draft run has something to pick the secret to
+#: rotate from.
 _DEMO_SECRET_LIST_RESULT: dict[str, Any] = {
     "secrets": [
-        {"name": _DEMO_MOCK_SECRET_NAME, "enabled": True},
-        {"name": "storage-connection-string", "enabled": True},
-        {"name": "third-party-api-key", "enabled": True},
+        _DEMO_MOCK_SECRET_NAME,
+        "storage-connection-string",
+        "third-party-api-key",
     ]
 }
 
@@ -1111,8 +1104,8 @@ _DEMO_RUN_SCRIPT_MOCK_DESCRIPTION = (
 #: Description shown on the demo ``keyvault_secret_create`` tool mock in the
 #: admin UI.
 _DEMO_SECRET_CREATE_MOCK_DESCRIPTION = (
-    "Stubs the Azure MCP Server's keyvault_secret_create tool with a new "
-    "secret version, so a draft run of the demo workflow completes its "
+    "Stubs the Azure MCP Server's keyvault_secret_create tool with a "
+    "successful write, so a draft run of the demo workflow completes its "
     "rotation step without reaching a real Key Vault."
 )
 
