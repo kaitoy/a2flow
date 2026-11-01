@@ -1,7 +1,8 @@
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/lib/api";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { addActivityMessage } from "@/store/chatSlice";
+import { act, render, screen, waitFor } from "@/test/test-utils";
 import { ElicitationControls } from "./ElicitationControls";
 
 vi.mock("@/lib/api", () => ({
@@ -78,6 +79,26 @@ describe("ElicitationControls", () => {
       })
     );
     expect(await screen.findByText("Answered")).toBeInTheDocument();
+  });
+
+  it("marks the chat's copy of the question closed as soon as it is answered", async () => {
+    vi.mocked(api.answerSessionElicitation).mockResolvedValue(question({ status: "declined" }));
+    const { store } = renderControls();
+    act(() => {
+      store.dispatch(
+        addActivityMessage({
+          id: "q1",
+          activityType: "mcp_elicitation",
+          content: { elicitationId: "q1", sessionId: "s1", executionId: "e1" },
+        })
+      );
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Decline" }));
+
+    await waitFor(() =>
+      expect(store.getState().chat.messages[0]?.content).toMatchObject({ status: "declined" })
+    );
   });
 
   it("declines without sending any values", async () => {

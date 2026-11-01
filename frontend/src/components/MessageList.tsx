@@ -56,7 +56,8 @@ function renderKeyOf(message: RenderedMessage | undefined): string | undefined {
  * is in progress, no text is streaming, and the latest message is not already a
  * running tool line (which shows its own spinner), a live reasoning panel
  * (which carries its own "thinking" affordance via the live edge), or an MCP
- * server's question (the turn is waiting on the person, not the agent).
+ * server's still-open question (the turn is waiting on the person, not the
+ * agent; once the stream re-sends it with a `status`, the agent is back at work).
  */
 function shouldShowWorkingIndicator(
   messages: Message[],
@@ -72,7 +73,12 @@ function shouldShowWorkingIndicator(
     ) {
       return false;
     }
-    if (last.activityType === ELICITATION_ACTIVITY_TYPE) return false;
+    if (
+      last.activityType === ELICITATION_ACTIVITY_TYPE &&
+      !(last.content as { status?: string }).status
+    ) {
+      return false;
+    }
     if (
       last.activityType === REASONING_ACTIVITY_TYPE &&
       (last.content as unknown as ReasoningActivityContent).text

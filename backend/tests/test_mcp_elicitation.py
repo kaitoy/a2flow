@@ -32,7 +32,7 @@ from httpx import AsyncClient
 from mcp import types
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
@@ -254,6 +254,32 @@ async def test_the_question_is_shown_in_the_running_turn(access_env: Env) -> Non
         "sessionId": "sess-1",
         "executionId": execution_id,
     }
+
+
+async def test_an_answered_question_is_shown_closed(access_env: Env) -> None:
+    """Re-appended with its status, so viewers stop reading the turn as waiting."""
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    async with AsyncSession(eng) as db:
+        session = await db.get(ExecutionSession, "sess-1")
+        assert session is not None
+        session.active_run_id = "run-1"
+        db.add(session)
+        await db.commit()
+    waiting = asyncio.create_task(_elicit(eng, execution_id))
+
+    question = await _pending(eng)
+    await client.post(
+        _url(execution_id, question.id) + "/answer", json=_APPROVE, headers=OWNER
+    )
+    await asyncio.wait_for(waiting, timeout=5)
+
+    async with AsyncSession(eng) as db:
+        stmt = select(SessionStreamEvent).order_by(col(SessionStreamEvent.id))
+        events = list((await db.exec(stmt)).all())
+    assert [e.payload["messageId"] for e in events] == [question.id, question.id]
+    assert "status" not in events[0].payload["content"]
+    assert events[1].payload["content"]["status"] == "accepted"
 
 
 async def test_asking_notifies_nobody(access_env: Env) -> None:

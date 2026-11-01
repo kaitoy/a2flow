@@ -10,6 +10,8 @@ import {
   type McpElicitation,
   type McpElicitationAnswer,
 } from "@/lib/api";
+import { closeElicitation } from "@/store/chatSlice";
+import { useAppDispatch } from "@/store/hooks";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -131,6 +133,8 @@ function outcomeOf(question: McpElicitation): Outcome {
  * forms, with no super-admin exception; everyone else sees the question and a
  * waiting note. The question is re-read every {@link REFRESH_MS} while open, so
  * an answer given in another tab, or the question's expiry, shows up here too.
+ * Once it reads as closed, the chat's copy of the question is marked closed
+ * (`closeElicitation`) so the "thinking" indicator returns at once.
  * `MCPElicitationService.answer` re-checks every rule server-side.
  */
 export function ElicitationControls({
@@ -158,6 +162,14 @@ export function ElicitationControls({
   const properties = (question?.requestedSchema?.properties ?? {}) as Record<string, FieldSchema>;
   const required = new Set((question?.requestedSchema?.required as string[] | undefined) ?? []);
   const open = question != null && isOpen(question);
+  const dispatch = useAppDispatch();
+  const closedAs = question != null && !open ? outcomeOf(question) : null;
+
+  // Tell the chat the question closed as soon as this tab knows, so the
+  // "thinking" indicator returns without waiting for the stream to say so.
+  useEffect(() => {
+    if (closedAs) dispatch(closeElicitation({ id: elicitationId, status: closedAs }));
+  }, [closedAs, elicitationId, dispatch]);
 
   useEffect(() => {
     let active = true;

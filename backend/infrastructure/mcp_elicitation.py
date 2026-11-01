@@ -10,7 +10,10 @@ something (``elicitation/create``). When it does during a workflow run,
    (``activityType: "mcp_elicitation"``) to the turn the call is running in --
    the same stream every viewer already reads, on any replica;
 3. polls the row until the answer lands -- written by whichever replica the
-   answering request reached -- or the question expires.
+   answering request reached -- or the question expires;
+4. shows that it closed, by appending the same activity again with its
+   ``status``, so every viewer's chat stops reading the turn as waiting on the
+   person.
 
 Only the run's initiator may answer, and nobody is notified here: only a tool a
 task binds with ``elicits`` may ask (:meth:`infrastructure.mcp_gateway.McpGateway.call_tool`),
@@ -190,7 +193,14 @@ class SqlElicitationBroker:
             )
             if row_id is None:
                 return _NO_ANSWER
-            return await self._wait(tenant_id, row_id)
+            result = await self._wait(tenant_id, row_id)
+            await self._announce_closed(
+                tenant_id=tenant_id,
+                execution_id=execution_id,
+                session_id=session_id,
+                row_id=row_id,
+            )
+            return result
         except asyncio.CancelledError:
             # The turn stopped, possibly while the question was still being
             # announced; nobody may answer a question nobody waits on.
@@ -235,24 +245,45 @@ class SqlElicitationBroker:
             )
             row_id = row.id
             asked.append(row_id)
-            session = await SqlExecutionSessionRepository(db, tenant_id=tenant_id).get(
-                session_id
+            await _show(
+                db,
+                tenant_id=tenant_id,
+                execution_id=execution_id,
+                session_id=session_id,
+                row_id=row_id,
             )
-            if session is not None and session.active_run_id is not None:
-                event = ActivitySnapshotEvent(
-                    message_id=row_id,
-                    activity_type=ELICITATION_ACTIVITY_TYPE,
-                    content={
-                        "elicitationId": row_id,
-                        "sessionId": session_id,
-                        "executionId": execution_id,
-                    },
-                )
-                await SessionStreamRepository(db).append(
-                    session_id, session.active_run_id, [serialize(event)]
-                )
-                notify_viewers()
             return row_id
+
+    async def _announce_closed(
+        self, *, tenant_id: str, execution_id: str, session_id: str, row_id: str
+    ) -> None:
+        """Re-show a closed question in the chat, now carrying its ``status``.
+
+        Best effort: the answer still reaches the server if this fails.
+
+        Args:
+            tenant_id: Tenant the run belongs to.
+            execution_id: The run whose tool call asked.
+            session_id: The session (chat) the call runs in.
+            row_id: The question's id.
+        """
+        try:
+            async with self._session_factory() as db:
+                row = await SqlMCPElicitationRepository(db, tenant_id=tenant_id).get(
+                    row_id
+                )
+                if row is None:
+                    return
+                await _show(
+                    db,
+                    tenant_id=tenant_id,
+                    execution_id=execution_id,
+                    session_id=session_id,
+                    row_id=row_id,
+                    status=row.status.value,
+                )
+        except Exception:  # noqa: BLE001 -- best effort; the answer matters more
+            logger.exception("Failed to show that question %s closed", row_id)
 
     async def _wait(self, tenant_id: str, row_id: str) -> types.ElicitResult:
         """Poll the question until it closes or expires.
@@ -299,6 +330,51 @@ class SqlElicitationBroker:
                     )
         except Exception:  # noqa: BLE001 -- best effort on the way out
             logger.exception("Failed to expire abandoned question %s", row_id)
+
+
+async def _show(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    execution_id: str,
+    session_id: str,
+    row_id: str,
+    status: str | None = None,
+) -> None:
+    """Append the question's activity to the session's running turn, if any.
+
+    The activity's ``messageId`` is the question's id, so a later append
+    replaces the earlier one in every viewer's chat.
+
+    Args:
+        db: Session to write on.
+        tenant_id: Tenant the run belongs to.
+        execution_id: The run whose tool call asked.
+        session_id: The session (chat) the call runs in.
+        row_id: The question's id.
+        status: The question's status once closed; omitted while it is open.
+    """
+    session = await SqlExecutionSessionRepository(db, tenant_id=tenant_id).get(
+        session_id
+    )
+    if session is None or session.active_run_id is None:
+        return
+    content = {
+        "elicitationId": row_id,
+        "sessionId": session_id,
+        "executionId": execution_id,
+    }
+    if status is not None:
+        content["status"] = status
+    event = ActivitySnapshotEvent(
+        message_id=row_id,
+        activity_type=ELICITATION_ACTIVITY_TYPE,
+        content=content,
+    )
+    await SessionStreamRepository(db).append(
+        session_id, session.active_run_id, [serialize(event)]
+    )
+    notify_viewers()
 
 
 @lru_cache(maxsize=1)

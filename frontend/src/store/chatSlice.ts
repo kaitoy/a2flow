@@ -604,6 +604,19 @@ const chatSlice = createSlice({
         mocked: isMockedResult(action.payload.result),
       };
     },
+    /**
+     * Mark an MCP server's question in the chat as closed, with the status it
+     * closed as -- the same change the stream brings a moment later, applied at
+     * once in the tab that answered. A question not in the chat is ignored.
+     */
+    closeElicitation(state, action: PayloadAction<{ id: string; status: string }>) {
+      const existing = state.messages.find((m) => m.id === action.payload.id);
+      if (existing?.role !== "activity") return;
+      existing.content = {
+        ...((existing.content ?? {}) as Record<string, unknown>),
+        status: action.payload.status,
+      };
+    },
     startRun(state) {
       state.isRunning = true;
       state.error = null;
@@ -648,6 +661,7 @@ export const {
   endAssistantMessage,
   addActivityMessage,
   attachToolCallResult,
+  closeElicitation,
   startRun,
   finishRun,
   setError,
