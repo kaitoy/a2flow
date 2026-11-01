@@ -254,10 +254,7 @@ export default function ApprovalDetailPage() {
               label="Authorized Calls"
               value={
                 approval.approvedCalls && approval.approvedCalls.length > 0 ? (
-                  <ApprovedCallList
-                    calls={approval.approvedCalls}
-                    serverName={(id) => serverNames.get(id)}
-                  />
+                  <ApprovedCallList calls={approval.approvedCalls} />
                 ) : (
                   EMPTY_VALUE
                 )

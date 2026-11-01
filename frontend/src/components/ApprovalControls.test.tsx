@@ -13,6 +13,7 @@ vi.mock("@/lib/api", () => ({
   resolveApproval: vi.fn(),
   getUserNames: vi.fn(),
   isApprovalAlreadyResolvedError: vi.fn(),
+  listMcpServers: vi.fn(),
 }));
 
 /**
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.mocked(api.getUserNames).mockClear();
   vi.mocked(api.getUserNames).mockResolvedValue(new Map());
   vi.mocked(api.isApprovalAlreadyResolvedError).mockReturnValue(false);
+  vi.mocked(api.listMcpServers).mockResolvedValue([{ id: "srv-1", name: "AWS" }] as never);
   // By default the current user "u1" is the designated approver.
   vi.mocked(api.getApproval).mockResolvedValue({ status: "pending", approver: "u1" } as never);
   vi.mocked(api.resolveApproval).mockResolvedValue({ status: "approved" } as never);
@@ -340,7 +342,8 @@ describe("the calls an approval authorizes", () => {
     });
 
     expect(await screen.findByText("This authorizes")).toBeInTheDocument();
-    expect(screen.getByText("srv-1: run_instances")).toBeInTheDocument();
+    // Labelled with the server's name, not its id.
+    expect(await screen.findByText("AWS: run_instances")).toBeInTheDocument();
     expect(screen.getByText('is "ap-northeast-1"')).toBeInTheDocument();
     expect(screen.getByText("is at most 2")).toBeInTheDocument();
   });
@@ -356,7 +359,7 @@ describe("the calls an approval authorizes", () => {
       preloadedState: authState("u1", ["approver"] as Role[]),
     });
 
-    expect(await screen.findByText("srv-1: run_instances")).toBeInTheDocument();
+    expect(await screen.findByText("AWS: run_instances")).toBeInTheDocument();
   });
 
   it("shows no such section for an approval carrying no declaration", async () => {

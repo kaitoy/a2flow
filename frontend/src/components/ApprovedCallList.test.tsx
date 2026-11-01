@@ -59,14 +59,11 @@ describe("ApprovedCallList", () => {
     expect(screen.getByText("is at most 2")).toBeInTheDocument();
   });
 
-  it("resolves a server id to its name when one is known", () => {
-    render(
-      <ApprovedCallList
-        calls={[call()]}
-        serverName={(id) => (id === "srv-1" ? "AWS" : undefined)}
-      />
-    );
-    expect(screen.getByText("AWS: run_instances")).toBeInTheDocument();
+  it("resolves a server id to the name of a server the viewer can see", async () => {
+    // MSW's server list carries "mcp-1"; "srv-1" is absent, as a hidden one is.
+    render(<ApprovedCallList calls={[call({ mcpServerId: "mcp-1" }), call()]} />);
+    expect(await screen.findByText("my-mcp-server: run_instances")).toBeInTheDocument();
+    expect(screen.getByText("srv-1: run_instances")).toBeInTheDocument();
   });
 
   it("shows a declared call that constrains no arguments", () => {

@@ -4,7 +4,8 @@
  */
 "use client";
 
-import type { ApprovedCall } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { type ApprovedCall, listMcpServers } from "@/lib/api";
 import { Chip } from "./ui/chip";
 
 /** One argument constraint, as stored: exactly one operator plus modifiers. */
@@ -49,8 +50,6 @@ export function describeConstraint(constraint: Constraint): string {
 interface ApprovedCallListProps {
   /** The calls the approval authorizes. Renders nothing when empty. */
   calls: ApprovedCall[];
-  /** Resolves an MCP server id to its name; falls back to the id. */
-  serverName?: (id: string) => string | undefined;
 }
 
 /**
@@ -66,9 +65,33 @@ interface ApprovedCallListProps {
  * its bounds. It is deliberately not left to render as a bare tool name, which
  * is what an entry bounding *no* input at all looks like — the two mean
  * opposite things, and the approver is agreeing to one of them.
+ *
+ * Each call is labelled with its MCP server's name, looked up here so every
+ * place that shows an approval gets it. A server the viewer cannot see (or a
+ * failed lookup) falls back to its id.
  */
-export function ApprovedCallList({ calls, serverName }: ApprovedCallListProps) {
-  if (calls.length === 0) return null;
+export function ApprovedCallList({ calls }: ApprovedCallListProps) {
+  const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
+  const hasCalls = calls.length > 0;
+
+  useEffect(() => {
+    if (!hasCalls) return;
+    let active = true;
+    // The list (not a per-id GET) so a server hidden from the viewer is simply
+    // absent instead of a 404 toast.
+    listMcpServers({ limit: 1000 })
+      .then((servers) => {
+        if (active) setServerNames(new Map(servers.map((s) => [s.id, s.name])));
+      })
+      .catch(() => {
+        // Non-fatal: the ids still identify the servers.
+      });
+    return () => {
+      active = false;
+    };
+  }, [hasCalls]);
+
+  if (!hasCalls) return null;
 
   return (
     <section className="mt-3">
@@ -79,7 +102,7 @@ export function ApprovedCallList({ calls, serverName }: ApprovedCallListProps) {
           return (
             <li key={`${call.mcpServerId}/${call.toolName}`}>
               <Chip
-                label={`${serverName?.(call.mcpServerId) ?? call.mcpServerId}: ${call.toolName}`}
+                label={`${serverNames.get(call.mcpServerId) ?? call.mcpServerId}: ${call.toolName}`}
               />
               {call.unconstrainedArguments === true && (
                 <p className="mt-1 ml-1 text-xs text-on-surface-variant">
