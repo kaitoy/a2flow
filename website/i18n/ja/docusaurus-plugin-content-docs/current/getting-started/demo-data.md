@@ -27,7 +27,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 - AWS、Google Cloud、Azure の認証情報はいずれも任意です。未設定なら `REPLACE_ME` というプレースホルダーが保存されるので、形としてはデモが揃った状態になり、実際の値は[シークレット](../guides/secrets.md)のページから入れられます。
 - `DEMO_AWS_REGION` は、デモの AWS MCP サーバーのツールが操作する対象のリージョンです。既定は `us-east-1` です。
 - `DEMO_GCP_CREDENTIALS_JSON` は Google Cloud の認証情報 JSON を 1 行にしたものです。サービスアカウントの鍵か、OAuth クライアント ID とシークレットで一度サインインしたあとに `gcloud` が書き出す authorized-user JSON のどちらかを入れます。GKE MCP サーバーはここからアクセストークンを発行します。Google の MCP サーバーは API キーを受け付けません。入手方法は [Google Cloud の MCP サーバー](../guides/mcp-servers.md#google-cloud-mcp-servers)を参照してください。
-- `DEMO_AZURE_TENANT_ID`・`DEMO_AZURE_CLIENT_ID`・`DEMO_AZURE_CLIENT_SECRET` は Azure のサービスプリンシパルです。`az ad sp create-for-rbac` が表示するテナント、アプリのクライアント ID、クライアントシークレットをそのまま入れます。デモでシークレットをローテーションする Key Vault に対して、**Key Vault Secrets Officer** ロールを付与しておいてください。
+- `DEMO_AZURE_TENANT_ID`・`DEMO_AZURE_CLIENT_ID`・`DEMO_AZURE_CLIENT_SECRET` は Azure のサービスプリンシパルです。`az ad sp create-for-rbac` が表示するテナント、アプリのクライアント ID、クライアントシークレットをそのまま入れます。デモでシークレットをローテーションする Key Vault に対して、`Microsoft.KeyVault/vaults/secrets/readMetadata/action` と `Microsoft.KeyVault/vaults/secrets/setSecret/action` のデータアクションだけを持つカスタムロールを付与しておいてください。アクセスポリシー方式の Key Vault なら、シークレットの権限は **List** と **Set** だけを付与します。組み込みの **Key Vault Secrets Officer** ロールでも動きますが、すべてのシークレットの値まで読めてしまいます。
 
 ⚠️ AWS・GKE・Azure の MCP サーバーは、読み取りだけでなく、**状態を変える**操作を実行できます。AWS MCP サーバーの認証情報は実際の AWS リソースを作成・削除でき、GKE MCP サーバーの身元は実際のクラスタでワークロードのローリング再起動や Pod の削除を行え、Azure MCP サーバーのサービスプリンシパルは Key Vault のシークレットを書き込めます。いずれも使い捨てのアカウントか、権限を絞った認証情報を使ってください。実際のプロバイダにまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。
 

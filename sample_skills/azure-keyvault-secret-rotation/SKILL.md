@@ -18,6 +18,7 @@ The new value is a secret from the moment it is generated:
 - Generate it with the **Secret Value Generator**'s `generate_secret_value` tool. Never make one up yourself.
 - Pass it only to the write in step 3. Never write it in a chat message, a summary, an approval request, or a task status, and never echo it back to confirm it.
 - Never read a secret's value: do not call `keyvault_secret_get` with a `secret` name, since that returns the value. Calling it **without** a `secret` name lists the vault's secrets, and that is the only read you need.
+- The service principal behind the Azure MCP Server should hold only a custom role with the `Microsoft.KeyVault/vaults/secrets/readMetadata/action` (list) and `Microsoft.KeyVault/vaults/secrets/setSecret/action` (write) data actions -- not **Key Vault Secrets Officer**, which can also read values -- so Key Vault itself refuses a value read. If a call is denied for lack of permission, that is the role working: report it and do not look for another way to read the value.
 
 ## Confirmations from the Azure MCP Server
 
@@ -46,7 +47,11 @@ This step is mandatory. Before anything is written, a manager must explicitly ap
 
 Address the request to a **team** of managers rather than to one named person whenever you can, so the rotation is not blocked on one person's availability. Name a single person only when the decision genuinely belongs to them.
 
-The request needs a short title naming the target (e.g. "Rotate Key Vault secret: `<secret>` (`<vault>`)") and a body carrying the finalized target verbatim, plus one line saying that applications reading the secret's current version will pick up the new value. It must not contain a secret value -- none exists yet. Tell the user in plain text that the request has gone out and who it went to.
+The request needs a short title naming the target (e.g. "Rotate Key Vault secret: `<secret>` (`<vault>`)") and a body carrying the finalized target verbatim, plus one line saying that applications reading the secret's current version will pick up the new value. It must not contain a secret value -- none exists yet.
+
+The request also declares the write it authorizes, argument by argument, and the declaration has to cover the new value without knowing it. Pin the vault and the secret name (and any other argument the tool's input schema needs, such as a subscription) with `eq`, and constrain the value by its shape only: `generate_secret_value` returns URL-safe base64 of the requested length, so declare the value argument as `{"matches": "^[A-Za-z0-9_-]{32}$"}` (with the length you will request). That pattern is all the approver sees, and the server still refuses a write whose value does not match it. Not knowing the value in advance is expected, not a reason to stop.
+
+Tell the user in plain text that the request has gone out and who it went to.
 
 Then wait for the decision. If it comes back approved, continue to step 3. If it comes back rejected, stop -- write nothing -- and tell the user the manager declined, including any comment they left. If there is nobody who can approve, stop as well and say so: writing without an approval is not an option.
 
