@@ -76,6 +76,13 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 
 1. Open **Users** in the admin sidebar and press **Impersonate** on the developer's row. Confirm with **Impersonate** in the **Impersonate User** dialog. You are back on the welcome page, and the header chip reads "Acting as `demo-…-developer`".
 2. Open **Agent Skills**. Only this provider's skill is listed — the others are hidden by their [access-control tags](../guides/tags.md#access-control-tags). Wait until its **Status** reads `ready`, refreshing the list while it still says `Cloning`; **Generate workflow** stays disabled until then.
+
+:::info[AWS: read the price sheet first]
+
+Open **Knowledge Bases** and click **AWS EC2 Pricing**. Its one source, `ec2-on-demand-pricing.pdf`, reads **Not read**. Click **Read** and wait until its status reads **Ready**. The LLM is turning the price sheet into pages, which appear under **Pages**; it takes a minute or two ([Knowledge Bases](../guides/knowledge-bases.md)). In the next step, also click **Select knowledge bases…** in the **Generate Workflow** dialog and choose **AWS EC2 Pricing**, so the run's agent can look prices up.
+
+:::
+
 3. Press **Generate workflow** on the row. Leave **Workflow Name** as it is, paste the prompt below into **Prompt**, and press **Generate**.
 
 <Tabs groupId="provider" queryString>
@@ -105,6 +112,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   Do not create a key pair.
   Resolve the AMI, VPC, and subnet IDs before requesting approval.
   Do not launch the instance before the requested time.
+  Answer questions about what an instance costs from the AWS EC2 Pricing knowledge base, and include the requested instance's monthly cost from it in the approval request.
   ```
 
   </TabItem>
@@ -150,6 +158,8 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
+  Not sure which instance type to pick? Ask, for example "What does t4g.medium cost per month in us-east-2, compared with t3.micro?" The agent looks the prices up in the **AWS EC2 Pricing** knowledge base and names the page it used.
+
   Choose an instance type from the ten in the prompt and a region from the three, give a launch time a few minutes from now so the tour does not stall, and answer whatever else it asks, such as a name for the instance. The agent then looks up the latest Amazon Linux 2023 image in that region and the default VPC and subnet, summarizes the configuration and the launch time, and sends it off for approval.
 
   </TabItem>
@@ -177,7 +187,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  The call on the **AWS MCP Server** that launches the instance. Check it, and the launch time in the summary, against what the requester chose — the image, VPC, and subnet look-ups are not listed, since they ran before the request and needed no approval.
+  The call on the **AWS MCP Server** that launches the instance. Check it, and the launch time and monthly cost in the summary, against what the requester chose — the image, VPC, and subnet look-ups are not listed, since they ran before the request and needed no approval.
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
@@ -192,7 +202,8 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   </TabItem>
 </Tabs>
 
-4. Leave a **Comment** if you like and press **Approve**. The run resumes in the same chat and the agent does the work, then asks the requester to confirm the outcome. That question is the requester's to answer: for you the input is read-only, with "Waiting for the initiator to respond." beneath it.
+4. Want to know more before deciding? Type a question in the chat and send it. On the AWS tab, for example, ask "What would this instance cost per month if it ran only on weekdays during business hours?" The session is waiting for your decision, so a **Consultation** tab opens and the agent answers there, from the request's context and the linked knowledge bases ([Consultations](../guides/workflow-executions.md#consultations)). The requester can join that conversation too. When you are done, click the **Main** tab to return to the request.
+5. Leave a **Comment** if you like and press **Approve**. The decision closes the consultation, if you opened one. The run resumes in the same chat and the agent does the work, then asks the requester to confirm the outcome. That question is the requester's to answer: for you the input is read-only, with "Waiting for the initiator to respond." beneath it.
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
@@ -212,7 +223,7 @@ Every step below starts with **Impersonate** on the **Users** list and ends with
   </TabItem>
 </Tabs>
 
-5. **Stop**.
+6. **Stop**.
 
 ## 6. Back as the requester: confirm the result \{#6-back-as-the-requester-confirm-the-result\}
 

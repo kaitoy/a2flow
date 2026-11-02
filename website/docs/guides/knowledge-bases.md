@@ -42,6 +42,7 @@ A source is read in the background, so you can keep working or leave the page. I
 
 | Status | Meaning |
 |---|---|
+| **Not read** | Registered, but not read yet. Click **Read** to start. Only a source added with the [demo data](../getting-started/demo-data.md) starts this way |
 | **Queued** | Waiting its turn. Sources of one knowledge base are read one at a time, because they edit the same pages |
 | **Reading** | The LLM is reading the source and writing pages |
 | **Ready** | The source's knowledge is in the wiki. **Read At** shows when |

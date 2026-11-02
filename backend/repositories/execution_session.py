@@ -2,7 +2,8 @@
 
 Rows are created by the server, never through the API: a run's main session
 when its tasks are first assigned (:meth:`SqlExecutionSessionRepository.ensure_main`),
-and branch sessions when the task graph forks.
+branch sessions when the task graph forks, and consultation sessions when a
+participant asks a question while a session waits on an approval.
 """
 
 import builtins
@@ -14,7 +15,11 @@ from sqlalchemy import Enum, and_, case, literal
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select, update
 
-from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.execution_session import (
+    ExecutionSession,
+    ExecutionSessionKind,
+    ExecutionSessionStatus,
+)
 from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
 from repositories._scoped import TenantScopedRepository
 
@@ -29,6 +34,8 @@ class ExecutionSessionRepository(Protocol):
     async def ensure_main(
         self, *, execution_id: str, session_id: str, user_id: str
     ) -> ExecutionSession: ...
+
+    async def open_consultation(self, parent_id: str) -> ExecutionSession | None: ...
 
     async def get(self, session_id: str) -> ExecutionSession | None: ...
 
@@ -58,7 +65,12 @@ class ExecutionSessionRepository(Protocol):
     ) -> None: ...
 
     async def create_branch(
-        self, *, execution_id: str, parent_id: str, user_id: str
+        self,
+        *,
+        execution_id: str,
+        parent_id: str,
+        user_id: str,
+        kind: ExecutionSessionKind = ExecutionSessionKind.task,
     ) -> ExecutionSession: ...
 
     async def delete(self, session_id: str) -> None: ...
@@ -226,11 +238,21 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
         )
 
     async def create_branch(
-        self, *, execution_id: str, parent_id: str, user_id: str
+        self,
+        *,
+        execution_id: str,
+        parent_id: str,
+        user_id: str,
+        kind: ExecutionSessionKind = ExecutionSessionKind.task,
     ) -> ExecutionSession:
-        """Create a branch session forked from ``parent_id``, not yet due to run.
+        """Create a session forked from ``parent_id``, not yet due to run.
 
-        Its ADK session is copied from the parent on its first turn, not here
+        A branch that works tasks by default; with ``kind`` set to
+        :attr:`~models.execution_session.ExecutionSessionKind.consultation`,
+        a consultation instead -- or, when ``parent_id`` already has an open
+        one (a concurrent first question got there first, and the
+        ``uq_execution_sessions_open_consultation`` index refused this one),
+        that consultation. Its ADK session is copied from the parent on its first turn, not here
         (:func:`infrastructure.session_fork.fork_adk_session`), so it starts
         from the parent's context as it stands when the branch actually runs.
 
@@ -238,6 +260,7 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             execution_id: Primary key of the workflow execution.
             parent_id: The session it is forked from.
             user_id: Recorded on the audit fields.
+            kind: What the new session is for.
 
         Returns:
             The new ``idle`` row; queueing its first input is what makes it due.
@@ -246,14 +269,42 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             id=str(uuid.uuid4()),
             workflow_execution_id=execution_id,
             parent_id=parent_id,
+            kind=kind,
             tenant_id=self._require_tenant(),
             created_by=user_id,
             updated_by=user_id,
         )
         self._db.add(row)
-        await self._db.commit()
+        try:
+            await self._db.commit()
+        except IntegrityError:
+            await self._db.rollback()
+            if kind is not ExecutionSessionKind.consultation:
+                raise
+            existing = await self.open_consultation(parent_id)
+            if existing is None:
+                raise
+            return existing
         await self._db.refresh(row)
         return row
+
+    async def open_consultation(self, parent_id: str) -> ExecutionSession | None:
+        """Return the consultation still open on ``parent_id``, or ``None``.
+
+        Args:
+            parent_id: The session the consultation was forked from.
+
+        Returns:
+            Its one consultation that is not ``done``, if there is one.
+        """
+        stmt = self._scoped(
+            select(ExecutionSession).where(
+                col(ExecutionSession.parent_id) == parent_id,
+                col(ExecutionSession.kind) == ExecutionSessionKind.consultation,
+                col(ExecutionSession.status) != ExecutionSessionStatus.done,
+            )
+        )
+        return (await self._db.exec(stmt)).first()
 
     async def delete(self, session_id: str) -> None:
         """Delete a session row; a no-op when it does not exist in the tenant."""
@@ -370,7 +421,9 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
 
         The run is ``scheduled`` when at least one of its sessions is
         ``scheduled`` and every other one is ``idle`` or ``done`` -- nothing
-        is happening but a wait on a time -- and ``running`` otherwise. A
+        is happening but a wait on a time -- and ``running`` otherwise.
+        Consultation sessions do not count: a question asked on the side does
+        not move the run along. A
         finished run (``finished_at`` set) is never touched. Runs as one
         ``UPDATE`` and leaves the commit to the caller.
 
@@ -378,7 +431,8 @@ class SqlExecutionSessionRepository(TenantScopedRepository[ExecutionSession]):
             session_id: Any session of the run to recompute.
         """
         siblings = select(ExecutionSession.id).where(
-            col(ExecutionSession.workflow_execution_id) == WorkflowExecution.id
+            col(ExecutionSession.workflow_execution_id) == WorkflowExecution.id,
+            col(ExecutionSession.kind) == ExecutionSessionKind.task,
         )
         quiet = (
             ExecutionSessionStatus.scheduled,

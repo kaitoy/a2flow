@@ -46,6 +46,7 @@ from dependencies.service import (
 )
 from infrastructure import database
 from models.execution_session import (
+    ConsultationCreate,
     ExecutionSession,
     SessionHistory,
     SessionInputCreate,
@@ -414,9 +415,37 @@ async def send_workflow_session_input(
 
     409 ``SESSION_RUN_IN_PROGRESS`` when the session already has a turn queued
     or running, and 409 ``SESSION_AWAITING_APPROVAL`` for a message sent while
-    it waits on an approval.
+    it waits on an approval -- a question then goes to ``.../consultation``.
     """
     session = await service.send_input(execution_id, session_id, data, caller=caller)
+    return ApiResponse(meta=meta, data=session)
+
+
+@router.post(
+    "/{execution_id}/sessions/{session_id}/consultation",
+    response_model=ApiResponse[ExecutionSession],
+    status_code=202,
+)
+async def start_workflow_session_consultation(
+    execution_id: str,
+    session_id: str,
+    data: ConsultationCreate,
+    service: WorkflowExecutionServiceDep,
+    caller: CurrentUserDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[ExecutionSession]:
+    """Ask the agent a question while the session waits on an approval.
+
+    The question goes to the session's open consultation -- a side session
+    forked from it, created on the first question -- and that session is
+    returned; follow-ups go to it through ``.../input`` as usual. Restricted
+    like ``.../input``. 422 ``INVALID_SESSION_INPUT`` when the session is not
+    waiting on an approval, and 409 ``SESSION_RUN_IN_PROGRESS`` while the
+    consultation is still answering the previous question.
+    """
+    session = await service.start_consultation(
+        execution_id, session_id, data, caller=caller
+    )
     return ApiResponse(meta=meta, data=session)
 
 

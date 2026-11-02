@@ -47,7 +47,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from config import get_settings
-from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.execution_session import (
+    ExecutionSession,
+    ExecutionSessionKind,
+    ExecutionSessionStatus,
+)
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories.execution_session import ExecutionSessionRepository
 from repositories.workflow_task import WorkflowTaskRepository
@@ -97,7 +101,11 @@ def plan_assignments(
     """
     by_id = {task.id: task for task in tasks}
     finished = {s.id for s in sessions if s.status == ExecutionSessionStatus.done}
-    alive = len({main_session_id} | {s.id for s in sessions} - finished)
+    # A consultation works no task, so it takes no parallel slot either.
+    alive = len(
+        {main_session_id}
+        | {s.id for s in sessions if s.kind is ExecutionSessionKind.task} - finished
+    )
     busy = {
         t.session_id or main_session_id
         for t in tasks

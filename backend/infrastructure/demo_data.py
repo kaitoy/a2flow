@@ -41,12 +41,17 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
 * three AgentSkills pointing at ``sample_skills/aws-ec2-launch``,
   ``sample_skills/gke-pod-restart``, and
   ``sample_skills/azure-keyvault-secret-rotation`` in this repository,
+* one KnowledgeBase, ``AWS EC2 Pricing``, holding one source: an EC2 price
+  sheet PDF (``demo_assets/ec2-on-demand-pricing.pdf``) stored in the
+  ``unread`` state, so the person trying the demo turns it into wiki pages
+  themselves by pressing **Read** -- after which an EC2-launch workflow
+  linked to it can answer what the requested instance costs,
 * four Tags -- ``AWS`` (an **access-control** tag: visible, and its
   attachments usable, only to ``Demo AWS Group`` members and ``admin``/
   ``super_admin``; attached to the AWS secret, AWS MCP server, EC2 Cost
-  Estimator, the EC2-launch agent skill, and the ``call_aws`` and
-  ``run_script`` tool mocks, showing that one tag classifies across resource
-  types), ``GCP`` (also access-control, gated the same way by
+  Estimator, the EC2-launch agent skill, the pricing knowledge base, and the
+  ``call_aws`` and ``run_script`` tool mocks, showing that one tag classifies
+  across resource types), ``GCP`` (also access-control, gated the same way by
   ``Demo GCP Group``; attached to the Google Cloud secret, the GKE MCP
   server, the Kubernetes Manifest Toolkit, the pod-restart agent skill, and
   the ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks -- GKE
@@ -108,6 +113,7 @@ make application startup depend on working name resolution.
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, TypeVar
 
 from sqlalchemy.exc import IntegrityError
@@ -119,11 +125,18 @@ from infrastructure.bootstrap import DEFAULT_TENANT_NAME, resolve_seed_password
 from infrastructure.password import hash_password
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
+from models.knowledge import (
+    KnowledgeBase,
+    KnowledgeSource,
+    KnowledgeSourceKind,
+    KnowledgeSourceStatus,
+)
 from models.mcp_server import McpCommand, MCPServer, McpTransport, ScriptLanguage
 from models.mcp_tool_mock import REQUEST_APPROVAL_TOOL, MCPToolMock
 from models.secret import Secret, SecretType
 from models.tag import (
     AgentSkillTag,
+    KnowledgeBaseTag,
     McpServerTag,
     McpToolMockTag,
     SecretTag,
@@ -216,23 +229,37 @@ DEMO_GCP_SECRET_ID = "00000000-0000-0000-0000-00000000d102"
 #: Fixed identifier of the demo Secret holding the Azure service principal.
 DEMO_AZURE_SECRET_ID = "00000000-0000-0000-0000-00000000d103"
 
+# The demo MCP servers' ids are random-looking rather than the zero-padded
+# pattern of the other demo ids: the agents copy a server's id into every tool
+# call they make, and a model copying ``00000000-0000-0000-0000-00000000d201``
+# reliably drops one of the repeated ``0000-`` groups, which the gateway then
+# refuses as a tool not bound to the task.
+
 #: Fixed identifier of the demo AWS MCP server.
-DEMO_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d201"
+DEMO_MCP_SERVER_ID = "c4b0932b-0801-4a8d-8004-9e94250bf1c4"
 
 #: Fixed identifier of the demo GKE MCP server.
-DEMO_GKE_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d202"
+DEMO_GKE_MCP_SERVER_ID = "27fb08ed-80b9-4d38-9c58-0507d60609b2"
 
 #: Fixed identifier of the demo EC2 Cost Estimator script MCP server.
-DEMO_COST_ESTIMATOR_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d203"
+DEMO_COST_ESTIMATOR_MCP_SERVER_ID = "8eb9c328-d955-456e-bb7c-e80d789d75aa"
 
 #: Fixed identifier of the demo Kubernetes Manifest Toolkit script MCP server.
-DEMO_K8S_TOOLKIT_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d204"
+DEMO_K8S_TOOLKIT_MCP_SERVER_ID = "f88cf7ae-8f22-4cb4-8b0d-04a7bfe5b3e2"
 
 #: Fixed identifier of the demo Azure MCP server.
-DEMO_AZURE_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d205"
+DEMO_AZURE_MCP_SERVER_ID = "551e6db2-d729-4131-995c-e6371785f607"
 
 #: Fixed identifier of the demo Secret Value Generator script MCP server.
-DEMO_SECRET_GENERATOR_MCP_SERVER_ID = "00000000-0000-0000-0000-00000000d206"
+DEMO_SECRET_GENERATOR_MCP_SERVER_ID = "58e0b2fa-4b1e-4594-8710-18a0bd477dfc"
+
+#: The ids earlier versions of this module seeded the demo MCP servers under,
+#: in the order of the constants above. A row still under one of them is
+#: removed on the next startup (:func:`_retire_old_demo_mcp_servers`) so the
+#: server is registered again under its new id.
+_RETIRED_DEMO_MCP_SERVER_IDS = tuple(
+    f"00000000-0000-0000-0000-00000000d20{n}" for n in range(1, 7)
+)
 
 #: Fixed identifier of the demo ``aws-ec2-launch`` agent skill.
 DEMO_AGENT_SKILL_ID = "00000000-0000-0000-0000-00000000d301"
@@ -277,6 +304,32 @@ DEMO_SECRET_CREATE_MOCK_ID = "00000000-0000-0000-0000-00000000d606"
 #: Fixed identifier of the demo ``keyvault_secret_get`` tool mock (Azure MCP
 #: server).
 DEMO_SECRET_LIST_MOCK_ID = "00000000-0000-0000-0000-00000000d607"
+
+#: Fixed identifier of the demo ``AWS EC2 Pricing`` knowledge base.
+DEMO_PRICING_KB_ID = "00000000-0000-0000-0000-00000000d701"
+
+#: Fixed identifier of the price-sheet PDF registered as that knowledge base's
+#: source.
+DEMO_PRICING_SOURCE_ID = "00000000-0000-0000-0000-00000000d702"
+
+#: Name of the demo knowledge base as shown in the admin UI.
+DEMO_PRICING_KB_NAME = "AWS EC2 Pricing"
+
+#: File name the demo price sheet is registered under, and the file read for
+#: its bytes (built by ``scripts/build_demo_pricing_pdf.py``).
+DEMO_PRICING_FILE_NAME = "ec2-on-demand-pricing.pdf"
+_DEMO_PRICING_FILE = (
+    Path(__file__).resolve().parent / "demo_assets" / DEMO_PRICING_FILE_NAME
+)
+
+#: Description shown on the demo knowledge base, written for the agents that
+#: decide from it whether this knowledge base can answer their question.
+_DEMO_PRICING_KB_DESCRIPTION = (
+    "Amazon EC2 On-Demand prices and specs (vCPU, memory) of the instance "
+    "types offered for launch, in us-east-1, us-east-2, and us-west-2, plus "
+    "storage and public IP charges. Use it to answer what an instance costs "
+    "per hour or per month."
+)
 
 #: Name of the demo tag shared by the secret, MCP server, and agent skill.
 DEMO_AWS_TAG_NAME = "AWS"
@@ -1274,6 +1327,7 @@ async def _seed_demo_data(session: AsyncSession) -> list[str]:
             DEFAULT_TENANT_NAME,
         )
         return []
+    await _retire_old_demo_mcp_servers(session)
     await _seed_demo_users(session, tenant_id)
     await _seed_demo_groups(session, tenant_id)
     await _seed_demo_secrets(session, tenant_id)
@@ -1284,6 +1338,7 @@ async def _seed_demo_data(session: AsyncSession) -> list[str]:
     await _seed_demo_azure_mcp_server(session, tenant_id)
     await _seed_demo_secret_generator_mcp_server(session, tenant_id)
     await _seed_demo_tool_mocks(session, tenant_id)
+    await _seed_demo_knowledge_base(session, tenant_id)
     new_skill_ids = [
         skill_id
         for skill_id in (
@@ -1301,7 +1356,8 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     """Delete every demo record that is still present.
 
     Deletion follows the direction of the foreign keys — tool mocks, then agent
-    skills, then MCP servers, then secrets, then tags, then user groups, then
+    skills, then MCP servers, then secrets, then the knowledge base (its source
+    and any workflow links cascade with it), then tags, then user groups, then
     users — so a record is never orphaned by the removal of something it points
     at. The tool mocks go first because two of them (``call_aws`` and
     ``run_script``) reference the AWS MCP server with ``ondelete="RESTRICT"``,
@@ -1329,6 +1385,7 @@ async def _remove_demo_data(session: AsyncSession) -> None:
         await _delete_demo_row(
             session, MCPToolMock, mock_spec.id, label=f"tool mock {mock_spec.name!r}"
         )
+    await _retire_old_demo_mcp_servers(session)
     await _delete_demo_row(
         session, AgentSkill, DEMO_AGENT_SKILL_ID, label="EC2-launch agent skill"
     )
@@ -1381,6 +1438,12 @@ async def _remove_demo_data(session: AsyncSession) -> None:
         session, Secret, DEMO_AZURE_SECRET_ID, label="Azure credentials secret"
     )
     await _delete_demo_row(
+        session,
+        KnowledgeBase,
+        DEMO_PRICING_KB_ID,
+        label=f"knowledge base '{DEMO_PRICING_KB_NAME}'",
+    )
+    await _delete_demo_row(
         session, Tag, DEMO_AWS_TAG_ID, label=f"tag '{DEMO_AWS_TAG_NAME}'"
     )
     await _delete_demo_row(
@@ -1398,6 +1461,35 @@ async def _remove_demo_data(session: AsyncSession) -> None:
         )
     for spec in _DEMO_USERS:
         await _delete_demo_user(session, spec.id)
+
+
+async def _retire_old_demo_mcp_servers(session: AsyncSession) -> None:
+    """Remove demo MCP servers still stored under a retired id.
+
+    A demo tool mock pointing at one goes first -- it restricts the server's
+    deletion, and seeding registers it again against the server's new id. A
+    retired server that something else has come to reference (a workflow's
+    tool binding) is kept and logged like any referenced demo row; its new
+    namesake is then skipped as a name collision until it is removed.
+
+    Args:
+        session: Database session used to read and delete the rows.
+    """
+    for old_id in _RETIRED_DEMO_MCP_SERVER_IDS:
+        if await session.get(MCPServer, old_id) is None:
+            continue
+        for mock_spec in _DEMO_TOOL_MOCKS:
+            mock = await session.get(MCPToolMock, mock_spec.id)
+            if mock is not None and mock.mcp_server_id == old_id:
+                await _delete_demo_row(
+                    session,
+                    MCPToolMock,
+                    mock_spec.id,
+                    label=f"tool mock {mock_spec.name!r}",
+                )
+        await _delete_demo_row(
+            session, MCPServer, old_id, label=f"MCP server under retired id {old_id}"
+        )
 
 
 async def _default_tenant_id(session: AsyncSession) -> str | None:
@@ -2176,11 +2268,64 @@ async def _seed_demo_azure_agent_skill(
     return DEMO_AZURE_SKILL_ID if created else None
 
 
+async def _seed_demo_knowledge_base(session: AsyncSession, tenant_id: str) -> None:
+    """Create the demo ``AWS EC2 Pricing`` knowledge base and its one source.
+
+    The source is the EC2 price sheet PDF shipped with this module, stored as
+    an uploaded document in the ``unread`` state: no ingest job is started,
+    so the wiki stays empty until someone presses **Read** on it -- the
+    walkthrough has the AWS developer do that, which is how it shows a
+    document turning into knowledge base pages. Each row is checked on its
+    own, so a source deleted in the admin UI is registered again on the next
+    startup while a knowledge base renamed there is left alone.
+
+    Args:
+        session: Database session used to read and insert the rows.
+        tenant_id: Id of the ``Default`` tenant the rows belong to.
+    """
+    if await session.get(KnowledgeBase, DEMO_PRICING_KB_ID) is None and not (
+        await _insert(
+            session,
+            KnowledgeBase(
+                id=DEMO_PRICING_KB_ID,
+                tenant_id=tenant_id,
+                name=DEMO_PRICING_KB_NAME,
+                description=_DEMO_PRICING_KB_DESCRIPTION,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            ),
+            label=f"knowledge base '{DEMO_PRICING_KB_NAME}'",
+        )
+    ):
+        return
+    if await session.get(KnowledgeSource, DEMO_PRICING_SOURCE_ID) is not None:
+        return
+    data = _DEMO_PRICING_FILE.read_bytes()
+    await _insert(
+        session,
+        KnowledgeSource(
+            id=DEMO_PRICING_SOURCE_ID,
+            tenant_id=tenant_id,
+            knowledge_base_id=DEMO_PRICING_KB_ID,
+            kind=KnowledgeSourceKind.file,
+            file_name=DEMO_PRICING_FILE_NAME,
+            content_type="application/pdf",
+            size_bytes=len(data),
+            data=data,
+            status=KnowledgeSourceStatus.unread,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        ),
+        label=f"knowledge source '{DEMO_PRICING_FILE_NAME}'",
+    )
+
+
 async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo tags and attach them across five of the six taggable kinds.
+    """Create the demo tags and attach them across six of the seven taggable kinds.
 
     ``AWS`` lands on the AWS secret, AWS MCP server, EC2 Cost Estimator, the
-    EC2-launch agent skill, and the ``call_aws`` and ``run_script`` tool mocks;
+    EC2-launch agent skill, the ``AWS EC2 Pricing`` knowledge base, and the
+    ``call_aws`` and ``run_script`` tool mocks;
     ``GCP`` lands on the Google Cloud secret, the GKE MCP server, the
     Kubernetes Manifest Toolkit, the pod-restart agent skill, and the
     ``patch_k8s_resource`` and ``delete_k8s_resource`` tool mocks; ``Azure``
@@ -2200,8 +2345,8 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     :func:`_seed_demo_gke_mcp_server`, :func:`_seed_demo_azure_mcp_server`,
     :func:`_seed_demo_secret_generator_mcp_server`,
     :func:`_seed_demo_agent_skill`, :func:`_seed_demo_gke_agent_skill`,
-    :func:`_seed_demo_azure_agent_skill`, :func:`_seed_demo_tool_mocks`, and
-    :func:`_seed_demo_groups`: attaching a tag looks up the record it attaches
+    :func:`_seed_demo_azure_agent_skill`, :func:`_seed_demo_tool_mocks`,
+    :func:`_seed_demo_knowledge_base`, and :func:`_seed_demo_groups`: attaching a tag looks up the record it attaches
     to, including the two user groups. The demo Workflow does not exist — see
     the module docstring — so no tag is attached to one; an operator is free
     to attach one once they build a workflow from these records themselves.
@@ -2271,6 +2416,16 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             tag_id=DEMO_AWS_TAG_ID,
             label=(
                 f"tag '{DEMO_AWS_TAG_NAME}' on tool mock '{DEMO_RUN_SCRIPT_MOCK_NAME}'"
+            ),
+        )
+        await _link_tag(
+            session,
+            KnowledgeBaseTag,
+            resource_model=KnowledgeBase,
+            resource_id=DEMO_PRICING_KB_ID,
+            tag_id=DEMO_AWS_TAG_ID,
+            label=(
+                f"tag '{DEMO_AWS_TAG_NAME}' on knowledge base '{DEMO_PRICING_KB_NAME}'"
             ),
         )
         await _link_tag(

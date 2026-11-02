@@ -1110,3 +1110,219 @@ async def test_only_the_initiator_resumes_a_task_whose_tool_asks(
     assert (await _session(engine, sid)).status is (
         ExecutionSessionStatus.waiting_for_initiator
     )
+
+
+async def _paused_on_approval(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> tuple[dict[str, Any], str]:
+    """A run whose main session has paused on an approval addressed to ``bob``."""
+    client, engine, runner, registry = runner_env
+    execution = await _execute(client)
+    approval_id = await _insert_approval(engine, execution["id"])
+    registry.get.return_value = ScriptedAgent(_asks_for_approval(approval_id))
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+    return execution, approval_id
+
+
+_BOB = {"X-User-Id": "bob", "X-User-Roles": "approver"}
+
+
+async def test_a_question_while_awaiting_approval_opens_a_consultation(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """The approver asks before deciding; the waiting session stays untouched."""
+    client, engine, runner, registry = runner_env
+    execution, _approval_id = await _paused_on_approval(runner_env)
+    main = execution["sessionId"]
+
+    consultation = assert_ok(
+        await client.post(
+            f"{_base(execution)}/consultation",
+            json={"message": "What does it cost?"},
+            headers=_BOB,
+        ),
+        status=202,
+    )
+    assert consultation["kind"] == "consultation"
+    assert consultation["parentId"] == main
+    assert consultation["status"] == "queued"
+    assert (await _session(engine, main)).status is (
+        ExecutionSessionStatus.waiting_for_approval
+    )
+
+    agent = ScriptedAgent()
+    registry.get.return_value = agent
+    await runner.run_turn(consultation["id"], DEFAULT_TEST_TENANT_ID)
+
+    (sent,) = agent.inputs
+    assert [m.content for m in sent.messages if isinstance(m, UserMessage)] == [
+        "What does it cost?"
+    ]
+    assert (sent.state or {})["temp:actingUserId"] == "bob"
+    descriptions = [c.description for c in sent.context or []]
+    assert "Consultation session" in descriptions
+    assert "Branch session" not in descriptions
+    assert {t.name for t in sent.tools or []} == {"render_a2ui"}
+    # No task, yet it stays open for the next question, and reports nothing.
+    row = await _session(engine, consultation["id"])
+    assert row.status is ExecutionSessionStatus.idle
+    assert row.summary is None
+
+    # A second question -- from the initiator this time -- goes to the same one.
+    again = assert_ok(
+        await client.post(
+            f"{_base(execution)}/consultation", json={"message": "And per hour?"}
+        ),
+        status=202,
+    )
+    assert again["id"] == consultation["id"]
+
+
+async def test_a_consultation_needs_a_session_awaiting_approval(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, _engine, runner, registry = runner_env
+    execution = await _execute(client)
+    registry.get.return_value = ScriptedAgent()
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    response = await client.post(
+        f"{_base(execution)}/consultation", json={"message": "hi"}
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_SESSION_INPUT"
+
+
+async def test_a_consultation_is_for_the_run_s_participants(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, _engine, _runner, _registry = runner_env
+    execution, _approval_id = await _paused_on_approval(runner_env)
+
+    response = await client.post(
+        f"{_base(execution)}/consultation",
+        json={"message": "hi"},
+        headers={"X-User-Id": "mallory", "X-User-Roles": "approver"},
+    )
+    assert response.status_code == 403
+
+
+async def test_the_decision_closes_the_consultation(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution, approval_id = await _paused_on_approval(runner_env)
+    consultation = assert_ok(
+        await client.post(
+            f"{_base(execution)}/consultation", json={"message": "?"}, headers=_BOB
+        ),
+        status=202,
+    )
+    registry.get.return_value = ScriptedAgent()
+    await runner.run_turn(consultation["id"], DEFAULT_TEST_TENANT_ID)
+
+    await _decide(client, approval_id)
+
+    assert (await _session(engine, consultation["id"])).status is (
+        ExecutionSessionStatus.done
+    )
+    assert (await _session(engine, execution["sessionId"])).status is (
+        ExecutionSessionStatus.queued
+    )
+    late = await client.post(
+        f"/api/v1/workflow-executions/{execution['id']}/sessions/"
+        f"{consultation['id']}/input",
+        json={"message": "one more"},
+        headers=_BOB,
+    )
+    assert late.status_code == 422
+
+
+async def test_a_decision_during_a_consultation_turn_closes_it_when_it_settles(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    client, engine, runner, registry = runner_env
+    execution, approval_id = await _paused_on_approval(runner_env)
+    consultation = assert_ok(
+        await client.post(
+            f"{_base(execution)}/consultation", json={"message": "?"}, headers=_BOB
+        ),
+        status=202,
+    )
+
+    class DecidingAgent(ScriptedAgent):
+        async def run(self, input_data: RunAgentInput) -> AsyncGenerator[Any, None]:
+            await _decide(client, approval_id)
+            async for event in super().run(input_data):
+                yield event
+
+    registry.get.return_value = DecidingAgent()
+    await runner.run_turn(consultation["id"], DEFAULT_TEST_TENANT_ID)
+
+    assert (await _session(engine, consultation["id"])).status is (
+        ExecutionSessionStatus.done
+    )
+
+
+async def test_a_consultation_cannot_change_the_run(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """Task status, a scheduled wait, and run-wide files are all refused."""
+    from infrastructure.session_file_tools import write_session_file
+
+    client, engine, _runner, _registry = runner_env
+    execution, _approval_id = await _paused_on_approval(runner_env)
+    consultation = assert_ok(
+        await client.post(
+            f"{_base(execution)}/consultation", json={"message": "?"}, headers=_BOB
+        ),
+        status=202,
+    )
+    tasks = assert_ok(
+        await client.get(
+            f"/api/v1/workflow-executions/{execution['id']}/workflow-tasks"
+        )
+    )
+    ctx = SimpleNamespace(
+        session=SimpleNamespace(id=consultation["id"]),
+        user_id=execution["initiatorId"],
+        state=None,
+    )
+
+    changed = await update_workflow_task(tasks[0]["id"], ctx, status="skipped")  # type: ignore[arg-type]
+    waited = await wait_until(
+        (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        ctx,  # type: ignore[arg-type]
+    )
+    written = await write_session_file("a.txt", "x", "text/plain", ctx)  # type: ignore[arg-type]
+
+    for result in (changed, waited, written):
+        assert "consultation session" in result["error"]
+    assert (await _session(engine, consultation["id"])).resume_at is None
+
+
+async def test_only_one_consultation_is_open_per_session(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """A racing second insert gets the open one; a closed one frees the slot."""
+    from models.execution_session import ExecutionSessionKind
+
+    _client, engine, _runner, _registry = runner_env
+    execution, _approval_id = await _paused_on_approval(runner_env)
+    main = execution["sessionId"]
+    async with AsyncSession(engine, expire_on_commit=False) as db:
+        repo = SqlExecutionSessionRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID)
+
+        async def fork() -> str:
+            row = await repo.create_branch(
+                execution_id=execution["id"],
+                parent_id=main,
+                user_id="alice",
+                kind=ExecutionSessionKind.consultation,
+            )
+            return row.id
+
+        first = await fork()
+        assert await fork() == first  # the index refused a second open one
+        await repo.set_state(first, status=ExecutionSessionStatus.done, user_id="alice")
+        assert await fork() != first

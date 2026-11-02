@@ -31,11 +31,19 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from infrastructure import database
 from infrastructure.agent import AgentRegistry, tenant_app_name, with_user_id
-from infrastructure.client_tools import a2ui_context, client_tools
+from infrastructure.client_tools import (
+    RENDER_APPROVAL_TOOL_NAME,
+    a2ui_context,
+    client_tools,
+)
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
 from infrastructure.session_fork import fork_adk_session
 from infrastructure.skill_manager import SkillManager
-from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.execution_session import (
+    ExecutionSession,
+    ExecutionSessionKind,
+    ExecutionSessionStatus,
+)
 from models.workflow_execution import WorkflowExecution
 from repositories.agent_skill import SqlAgentSkillRepository
 from repositories.approval import SqlApprovalRepository
@@ -83,6 +91,26 @@ _BRANCH_CONTEXT = (
     "assigned to you any more, reply with a short summary of what this branch "
     "did and its results -- it is handed on to whoever continues from here -- "
     "and stop."
+)
+
+#: Told to a consultation session on every turn, so its agent answers
+#: questions and leaves the run alone.
+_CONSULTATION_CONTEXT = (
+    "This is a consultation session. It was forked from a session of this run "
+    "that is waiting for an approval decision, so the run's participants -- "
+    "the approver deciding it and the person who started the run -- can ask "
+    "questions before the decision; each message says who sent it. Its "
+    "history up to the fork is that session's context, ending with the "
+    "approval request. Answer from that context, from the knowledge bases "
+    "linked to the workflow, and from what the run itself records: its tasks, "
+    "its approvals, and the files attached to it. MCP server tools cannot be "
+    "called here -- no task is in progress in this session -- so do not try; "
+    "if a question needs one, say it cannot be answered until the run goes "
+    "on. Do not change any task, request an approval, schedule a wait, or "
+    "write files either -- those tools refuse here too, and the work "
+    "continues in the waiting session once the decision is made. When a message is addressed to the "
+    "other person rather than to you, acknowledge it in one short sentence. "
+    "Nothing said here is passed back to the waiting session."
 )
 
 #: Stands in for the input of a ``running`` session whose turn was cut off.
@@ -205,7 +233,17 @@ class SessionRunner:
                 app_name=app_name, user_id=initiator, session_id=session_id
             )
         context = await self._context(db, tenant_id, execution)
-        if parent_id is not None:
+        consultation = row.kind is ExecutionSessionKind.consultation
+        tools = client_tools()
+        if consultation:
+            context.insert(
+                0,
+                Context(
+                    description="Consultation session", value=_CONSULTATION_CONTEXT
+                ),
+            )
+            tools = [t for t in tools if t.name != RENDER_APPROVAL_TOOL_NAME]
+        elif parent_id is not None:
             context.insert(
                 0, Context(description="Branch session", value=_BRANCH_CONTEXT)
             )
@@ -225,7 +263,7 @@ class SessionRunner:
                 run_id=run_id,
                 state={},
                 messages=build_messages(waiting, session_input),
-                tools=client_tools(),
+                tools=tools,
                 context=context,
                 forwarded_props={},
             ),
@@ -344,7 +382,9 @@ class SessionRunner:
         branches = [
             s
             for s in await sessions.list_for_execution(execution_id)
-            if s.parent_id is not None and s.summary
+            if s.parent_id is not None
+            and s.kind is ExecutionSessionKind.task
+            and s.summary
         ]
         if not branches:
             return ""

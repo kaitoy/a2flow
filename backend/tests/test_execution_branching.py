@@ -19,7 +19,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.approval_tools import request_approval
 from infrastructure.mcp_policies import _in_progress_tasks
-from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.execution_session import (
+    ExecutionSession,
+    ExecutionSessionKind,
+    ExecutionSessionStatus,
+)
 from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories.mcp_server import SqlMCPServerRepository
@@ -127,6 +131,20 @@ def test_at_the_cap_a_branch_queues_on_its_target() -> None:
     assert _plan(tasks, [_session(BRANCH)], max_sessions=2) == [
         Assignment("b", MAIN),
         Assignment("c", MAIN),
+    ]
+
+
+def test_a_consultation_takes_no_parallel_slot() -> None:
+    tasks = [
+        _task("a", completed, session_id=MAIN),
+        _task("b", deps=["a"]),
+        _task("c", deps=["a"]),
+    ]
+    consultation = _session(BRANCH)
+    consultation.kind = ExecutionSessionKind.consultation
+    assert _plan(tasks, [consultation], max_sessions=2) == [
+        Assignment("b", MAIN),
+        Assignment("c", None, fork_from=MAIN),
     ]
 
 

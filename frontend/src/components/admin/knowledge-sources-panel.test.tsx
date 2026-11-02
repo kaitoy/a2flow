@@ -100,6 +100,20 @@ describe("KnowledgeSourcesPanel", () => {
     await waitFor(() => expect(reread).toHaveBeenCalledWith("src-b"));
   });
 
+  it("offers Read on a source nobody has asked to read yet", async () => {
+    server.use(
+      http.get(SOURCES_URL, () =>
+        envelope([{ ...KNOWLEDGE_SOURCE_READY, status: "unread", ingestedAt: null }])
+      )
+    );
+    render(<KnowledgeSourcesPanel knowledgeBaseId="kb-1" canEdit />);
+    await screen.findByText("vpn.pdf");
+
+    expect(screen.getByText("Not read")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Read again" })).not.toBeInTheDocument();
+  });
+
   it("offers no controls to a viewer who cannot edit", async () => {
     render(<KnowledgeSourcesPanel knowledgeBaseId="kb-1" canEdit={false} />);
     await screen.findByText("vpn.pdf");

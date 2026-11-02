@@ -64,6 +64,12 @@ class KnowledgeSourceKind(StrEnum):
 class KnowledgeSourceStatus(StrEnum):
     """Lifecycle of a knowledge source's contribution to its wiki."""
 
+    unread = "unread"
+    """Registered, but nobody has asked for it to be read yet. Only the demo
+    dataset creates a source in this state (``infrastructure.demo_data``), so
+    the person trying the demo can start the ingest themselves; **Read** (the
+    re-ingest action) moves it on to ``pending``."""
+
     pending = "pending"
     """Registered; the ingest job is queued behind other jobs of the same knowledge base."""
 

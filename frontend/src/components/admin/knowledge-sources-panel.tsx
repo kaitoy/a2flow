@@ -194,7 +194,7 @@ export function KnowledgeSourcesPanel({
               <div className="flex justify-center gap-2">
                 <ActionIconButton
                   icon={RefreshCw}
-                  label="Read again"
+                  label={source.status === "unread" ? "Read" : "Read again"}
                   onClick={() =>
                     void act(() => reingestKnowledgeSource(knowledgeBaseId, source.id))
                   }

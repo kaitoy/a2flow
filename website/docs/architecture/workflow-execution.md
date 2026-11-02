@@ -52,6 +52,7 @@ flowchart LR
 | A **join** — dependencies worked by more than one session | The main session, once every branch feeding it has finished |
 
 - A branch session that runs out of tasks finishes with a short summary of what it did. The main session reads those summaries before it works a join.
+- A session waiting for an approval can also fork a **consultation**. It is opened when someone asks a question there, works no task and changes nothing, and closes when the approval is decided. It never counts toward the limit below, and nothing it says reaches the run ([Consultations](../guides/workflow-executions.md#consultations)).
 - A branch can fork again, but only so many sessions run at once. At the limit, a ready task waits for its session instead — the run falls back to working one task after another.
 - A failed task stops only its own chain: the tasks waiting on it, and any join it feeds, are `skipped` as described above, while other branches finish their work. The run then settles as `failed`.
 

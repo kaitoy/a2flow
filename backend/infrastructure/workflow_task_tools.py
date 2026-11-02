@@ -57,6 +57,7 @@ from infrastructure.approval_scope import (
     governing_approvals,
     may_change_governed_task_status,
 )
+from models.execution_session import ExecutionSessionKind
 from models.notification import NotificationCreate, NotificationType
 from models.user import Role, has_any_role
 from models.workflow_task import (
@@ -104,6 +105,35 @@ logger = logging.getLogger(__name__)
 
 _NO_SESSION = "no workflow execution is bound to the current run; cannot manage tasks"
 
+#: What a consultation session's agent is told when it tries to change the run.
+CONSULTATION_REFUSAL = (
+    "this is a consultation session: it only answers questions while the run "
+    "waits on an approval, and cannot change tasks, schedule itself, or write "
+    "files. Answer from what you can look up, and leave the work to the "
+    "session that asked for the approval."
+)
+
+
+async def is_consultation_session(
+    db: AsyncSession, tenant_id: str, session_id: str | None
+) -> bool:
+    """Return whether ``session_id`` is a consultation session of its run.
+
+    Args:
+        db: Database session to read the row with.
+        tenant_id: Tenant the run belongs to.
+        session_id: The ADK session a tool is called from.
+
+    Returns:
+        ``True`` for a consultation session, ``False`` for any other session
+        and for an unknown one.
+    """
+    if session_id is None:
+        return False
+    row = await SqlExecutionSessionRepository(db, tenant_id=tenant_id).get(session_id)
+    return row is not None and row.kind is ExecutionSessionKind.consultation
+
+
 #: Upper bound on how many of a run's tasks the status guard reads when working
 #: out which approval governs the one being advanced. Mirrors
 #: ``infrastructure.approval_tools._MAX_TASKS`` and
@@ -147,6 +177,13 @@ class _Scope:
     user_repo: UserRepository
     effective_role_repo: EffectiveRoleRepository
     group_repo: UserGroupRepository
+
+    async def is_consultation(self, session_id: str | None) -> bool:
+        """Return whether ``session_id`` is a consultation session of this run."""
+        if session_id is None:
+            return False
+        row = await self.session_repo.get(session_id)
+        return row is not None and row.kind is ExecutionSessionKind.consultation
 
 
 async def _resolve_scope(
@@ -799,7 +836,7 @@ async def update_workflow_task(
 
     Only the tasks assigned to you (``assigned_to_you`` in
     ``list_workflow_tasks``) may be changed; a task another session of the run
-    is working is refused. A task cannot be set ``in_progress`` until every
+    is working is refused, and a consultation session may change none. A task cannot be set ``in_progress`` until every
     task in its ``depends_on_ids`` is ``completed``.
 
     A task binding a tool marked ``elicits`` -- one that asks the person who
@@ -851,6 +888,9 @@ async def update_workflow_task(
         return _invalid_error_kind_error(error_kind)
     try:
         async with _repos(tool_context) as s:
+            calling = _calling_session_id(tool_context)
+            if await s.is_consultation(calling):
+                return {"error": CONSULTATION_REFUSAL}
             existing = await s.task_repo.get(task_id)
             if existing is None or existing.workflow_execution_id != s.execution_id:
                 return _not_in_session_error(task_id)
@@ -862,7 +902,6 @@ async def update_workflow_task(
             if error_message is not None:
                 fields["error_message"] = error_message
             acting_user_id = _user_id(tool_context)
-            calling = _calling_session_id(tool_context)
             if status_enum is not None and status_enum != existing.status:
                 denied = await _session_denied_reason(
                     s, existing, calling, status_enum, acting_user_id
@@ -937,6 +976,8 @@ async def wait_until(resume_at: str, tool_context: ToolContext) -> dict[str, Any
         async with _repos(tool_context) as s:
             if calling is None:
                 return {"error": _NO_SESSION}
+            if await s.is_consultation(calling):
+                return {"error": CONSULTATION_REFUSAL}
             await s.session_repo.set_resume_at(
                 calling, at, user_id=_user_id(tool_context)
             )

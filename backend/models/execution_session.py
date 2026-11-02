@@ -6,6 +6,13 @@ shares that id. When the run's task graph branches, further **branch sessions**
 are forked from an existing one (``parent_id``) so independent branches can be
 worked in parallel; each is its own ADK session and its own row.
 
+A third kind, the **consultation session**, is forked from a session paused on
+an approval, so the run's participants can put questions to the agent -- and
+to each other -- before the decision is made, while the paused session itself
+takes no messages. It is never assigned a task, may not change one, and is
+closed (``done``) once the approval it was opened for is decided
+(:attr:`ExecutionSession.kind`).
+
 Which session works a task is recorded on the task itself
 (:attr:`models.workflow_task.WorkflowTask.session_id`): the server assigns
 tasks to sessions (:mod:`services.execution_branching`), and a session may only
@@ -18,7 +25,7 @@ from typing import Any
 
 from pydantic import field_serializer, model_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import Column, ForeignKeyConstraint, Index, Text
+from sqlalchemy import Column, ForeignKeyConstraint, Index, Text, text
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -60,6 +67,24 @@ class ExecutionSessionStatus(StrEnum):
     """Its last turn failed; the next input queues it again."""
 
 
+class ExecutionSessionKind(StrEnum):
+    """What an ExecutionSession is for, declared in sort order."""
+
+    task = "task"
+    """Works the run's tasks: the main session, or a branch forked from one."""
+
+    consultation = "consultation"
+    """A side conversation forked from a session paused on an approval, for
+    questions before the decision. Works no task, changes none, feeds nothing
+    back into the run, and closes once that approval is decided."""
+
+
+#: The rows ``uq_execution_sessions_open_consultation`` covers: consultations
+#: not yet closed. Spelled as SQL because a partial index takes a literal
+#: predicate, and both dialects store these enums by their value names.
+_OPEN_CONSULTATION = "kind = 'consultation' AND status != 'done'"
+
+
 class ExecutionSession(TenantScoped, BaseEntity, table=True):
     """Database-persisted ADK session of a WorkflowExecution.
 
@@ -73,6 +98,15 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
     __tablename__ = "execution_sessions"
     __table_args__ = (
         Index("ix_execution_sessions_workflow_execution_id", "workflow_execution_id"),
+        # At most one open consultation per session: two first questions
+        # racing each other must land in the same one, not open two.
+        Index(
+            "uq_execution_sessions_open_consultation",
+            "parent_id",
+            unique=True,
+            sqlite_where=text(_OPEN_CONSULTATION),
+            postgresql_where=text(_OPEN_CONSULTATION),
+        ),
         ForeignKeyConstraint(
             ["workflow_execution_id"],
             ["workflow_executions.id"],
@@ -89,6 +123,12 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
 
     workflow_execution_id: str
     parent_id: str | None = None
+    #: Whether the session works tasks or is a consultation; see
+    #: :class:`ExecutionSessionKind`.
+    kind: ExecutionSessionKind = Field(
+        default=ExecutionSessionKind.task,
+        sa_column_kwargs={"server_default": ExecutionSessionKind.task.value},
+    )
     status: ExecutionSessionStatus = Field(default=ExecutionSessionStatus.idle)
     #: The input the next server-driven turn runs on, as a
     #: :class:`services.session_inputs.SessionInput` dump: at most one, since a
@@ -184,6 +224,13 @@ class SessionInputCreate(SQLModel):
         if (self.message is None) == (self.a2ui_action is None):
             raise ValueError("send exactly one of message or a2uiAction")
         return self
+
+
+class ConsultationCreate(SQLModel):
+    """The first message of a consultation opened on a session awaiting approval."""
+
+    model_config = _alias_config
+    message: str = Field(min_length=1, max_length=100_000)
 
 
 class SessionStreamEvent(SQLModel, table=True):

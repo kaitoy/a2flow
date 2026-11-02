@@ -71,7 +71,7 @@ The two are linked both ways:
 
 Every participant watching the run sees each reply as it is written — whoever's message started it, and also the turns A2Flow runs on its own, such as the kickoff, the resumption after an approval, and the resumption of a session that was waiting for a time. The view follows new messages to the bottom only when you are already scrolled near the bottom.
 
-A message you send waits for the agent: while it is still working on a turn, the message is refused and you can send it again once the reply has finished. While the run is waiting for an approval, the chat takes no messages at all — the approval's decision is what moves it on.
+A message you send waits for the agent: while it is still working on a turn, the message is refused and you can send it again once the reply has finished. A session waiting for an approval takes no messages, because the approval's decision is what moves it on. A question you send then goes to a [consultation](#consultations) instead.
 
 The [design session](./workflows.md#adjusting-the-task-templates) is a shared chat too, with the same avatars. It is shared by the tenant's Developers rather than by a run's participants, and it refreshes itself every few seconds rather than showing other people's replies as they are written.
 
@@ -83,6 +83,7 @@ When the run's task graph branches, A2Flow may split the run across several sess
 |---|---|
 | **Main** | The session the run started in. It works the joins and the tasks that follow a finished branch |
 | **Branch 1**, **Branch 2**, … | A branch session, forked when a branch became ready while its session was busy |
+| **Consultation 1**, … | A [consultation](#consultations), opened by a question asked while a session waited for an approval |
 
 | Status | Meaning |
 |---|---|
@@ -96,7 +97,24 @@ When the run's task graph branches, A2Flow may split the run across several sess
 | Done | The session finished its work. A finished branch leaves a summary for the main session |
 | Error | The last turn failed |
 
-Click a tab to open that session's chat; the view follows the selected session, and the URL keeps it, so a link to the page opens the same tab. A run that never branches shows no tabs.
+Click a tab to open that session's chat; the view follows the selected session, and the URL keeps it, so a link to the page opens the same tab. A run that never branches and has no consultation shows no tabs.
+
+### Consultations {#consultations}
+
+A session waiting for an approval takes no messages, but the request may still raise questions, such as what the instance will cost or why this target was chosen. While the session waits, a note above the chat input says that a question goes to a consultation.
+
+1. Type the question in the waiting session's chat and send it.
+2. A **Consultation** tab opens with your question, and the agent answers there. It starts from everything the waiting session knew up to the approval request, and it can also read the [knowledge bases](./knowledge-bases.md) linked to the workflow. It cannot use the MCP servers' tools, so a question that needs a fresh look at the target system has to wait until the run continues.
+3. Keep asking in that tab. Everyone who shares the chat can write there, so the approver and the person who started the run can also discuss the request with each other. Each message shows who sent it.
+4. Decide the approval as usual. The decision closes the consultation: its tab changes to **Done** and accepts no more messages.
+
+| A consultation | |
+|---|---|
+| Can | Answer from the request's context, the linked knowledge bases, the run's tasks and approvals, and the files in the session |
+| Cannot | Use any MCP server tool, change a task, request an approval, schedule a wait, or add a file |
+| Leaves behind | Nothing in the run. The waiting session never sees what was said there; the conversation stays readable in its tab |
+
+Another question asked before the same approval is decided goes to the same consultation.
 
 ### Suggested replies {#suggested-replies}
 

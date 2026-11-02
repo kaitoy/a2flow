@@ -1685,7 +1685,8 @@ export type SessionInput =
  *
  * Fails with 409 `SESSION_RUN_IN_PROGRESS` while the session already has a turn
  * queued or running, and with 409 `SESSION_AWAITING_APPROVAL` for a message
- * sent while it waits on an approval.
+ * sent while it waits on an approval — ask through
+ * {@link startSessionConsultation} then.
  */
 export async function sendSessionInput(
   executionId: string,
@@ -1700,6 +1701,33 @@ export async function sendSessionInput(
     }),
     options
   );
+}
+
+/**
+ * Ask the agent a question while a workflow session waits on an approval.
+ *
+ * The waiting session takes no messages, so the question goes to its
+ * consultation — a side session forked from it, created on the first question
+ * and shared by the run's participants until the approval is decided. Returns
+ * that session; later messages go to it through {@link sendSessionInput}.
+ * Fails with 422 `INVALID_SESSION_INPUT` when the session is not waiting on an
+ * approval.
+ */
+export async function startSessionConsultation(
+  executionId: string,
+  sessionId: string,
+  message: string,
+  options?: CallOptions
+): Promise<ExecutionSession> {
+  return unwrap(
+    sdk.startWorkflowSessionConsultationApiV1WorkflowExecutionsExecutionIdSessionsSessionIdConsultationPost(
+      {
+        path: { execution_id: executionId, session_id: sessionId },
+        body: { message },
+      }
+    ),
+    options
+  ) as Promise<ExecutionSession>;
 }
 
 /** Fetch one question an MCP server asked during a turn of a workflow session. */

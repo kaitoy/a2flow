@@ -41,9 +41,10 @@ export interface ExecutionSessionTabsProps {
 
 /**
  * Switches the workflow session view between the ADK sessions a run is worked
- * in: the main session, and the branch sessions forked when its task graph
- * branched, each with its status — so a viewer can see which branch is waiting
- * on them and open it to answer.
+ * in: the main session, the branch sessions forked when its task graph
+ * branched, and the consultations opened to ask questions while a session waited
+ * on an approval, each with its status — so a viewer can see which branch is
+ * waiting on them and open it to answer.
  *
  * Renders nothing while the run has only its main session: there is nothing to
  * switch between, and most runs never branch.
@@ -56,8 +57,14 @@ export function ExecutionSessionTabs({
 }: ExecutionSessionTabsProps) {
   if (sessions.length < 2) return null;
   let branch = 0;
+  let consultation = 0;
   const options = sessions.map((session) => {
-    const name = session.id === mainSessionId ? "Main" : `Branch ${++branch}`;
+    const name =
+      session.id === mainSessionId
+        ? "Main"
+        : session.kind === "consultation"
+          ? `Consultation ${++consultation}`
+          : `Branch ${++branch}`;
     const status = statusLabel(session);
     return { value: session.id ?? "", label: status ? `${name} · ${status}` : name };
   });

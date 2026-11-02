@@ -536,6 +536,45 @@ async def test_binding_policy_allows_the_union_of_in_progress_tasks(
         assert result.is_error is False
 
 
+async def test_binding_policy_denies_a_consultation_session(
+    engine: AsyncEngine,
+) -> None:
+    """A consultation works no task, so even the run's in-progress task's tools are out."""
+    from models.execution_session import ExecutionSession, ExecutionSessionKind
+
+    server_id = await _seed_server(engine)
+    execution_id = await _seed_session(engine)
+    await _seed_task(engine, execution_id, bindings=[(server_id, "search")])
+    async with AsyncSession(engine) as db:
+        db.add(
+            ExecutionSession(
+                id="sess-abc",
+                workflow_execution_id=execution_id,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await db.commit()
+        db.add(
+            ExecutionSession(
+                id="consult-1",
+                workflow_execution_id=execution_id,
+                parent_id="sess-abc",
+                kind=ExecutionSessionKind.consultation,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await db.commit()
+    with pytest.raises(McpPolicyDeniedError) as excinfo:
+        await McpGateway(policies=default_policies()).call_tool(
+            CallToolRequest(_principal("consult-1"), server_id, "search", {})
+        )
+    assert "in_progress" in excinfo.value.message
+
+
 async def test_binding_policy_ignores_listings(engine: AsyncEngine) -> None:
     """A listing is allowed with no execution at all: design is where binding happens."""
     identity = McpIdentity(tenant_id=DEFAULT_TEST_TENANT_ID, execution_id=None)

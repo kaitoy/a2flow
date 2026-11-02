@@ -74,6 +74,10 @@ from infrastructure.demo_data import (
     DEMO_MCP_SERVER_ID,
     DEMO_MCP_SERVER_NAME,
     DEMO_PATCH_WORKLOAD_MOCK_ID,
+    DEMO_PRICING_FILE_NAME,
+    DEMO_PRICING_KB_ID,
+    DEMO_PRICING_KB_NAME,
+    DEMO_PRICING_SOURCE_ID,
     DEMO_REQUEST_APPROVAL_MOCK_ID,
     DEMO_REQUESTERS_GROUP_ID,
     DEMO_REVIEWERS_GROUP_ID,
@@ -88,6 +92,12 @@ from infrastructure.demo_data import (
 from infrastructure.password import verify_password
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill, SkillSyncStatus
+from models.knowledge import (
+    KnowledgeBase,
+    KnowledgeSource,
+    KnowledgeSourceKind,
+    KnowledgeSourceStatus,
+)
 from models.mcp_server import (
     McpCommand,
     MCPServer,
@@ -99,6 +109,7 @@ from models.mcp_tool_mock import MCPToolMock
 from models.secret import Secret, SecretType
 from models.tag import (
     AgentSkillTag,
+    KnowledgeBaseTag,
     McpServerTag,
     McpToolMockTag,
     SecretTag,
@@ -261,6 +272,8 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     assert len(await _rows(engine, AgentSkill)) == 3
     assert len(await _rows(engine, Tag)) == 4
     assert len(await _rows(engine, UserGroup)) == 7
+    assert len(await _rows(engine, KnowledgeBase)) == 1
+    assert len(await _rows(engine, KnowledgeSource)) == 1
 
 
 async def test_sync_demo_data_returns_the_new_skill_ids(
@@ -297,14 +310,17 @@ async def test_sync_demo_data_is_idempotent(
     assert len(await _rows(engine, AgentSkill)) == 3
     assert len(await _rows(engine, Tag)) == 4
     assert len(await _rows(engine, UserGroup)) == 7
+    assert len(await _rows(engine, KnowledgeBase)) == 1
+    assert len(await _rows(engine, KnowledgeSource)) == 1
     assert len(await _rows(engine, SecretTag)) == 3
     assert len(await _rows(engine, McpServerTag)) == 6
     assert len(await _rows(engine, AgentSkillTag)) == 6
     assert len(await _rows(engine, McpToolMockTag)) == 6
     assert len(await _rows(engine, UserGroupTag)) == 6
+    assert len(await _rows(engine, KnowledgeBaseTag)) == 1
 
 
-async def test_demo_tags_classify_records_across_five_taggable_kinds(
+async def test_demo_tags_classify_records_across_six_taggable_kinds(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _enable(monkeypatch)
@@ -361,6 +377,45 @@ async def test_demo_tags_classify_records_across_five_taggable_kinds(
         (DEMO_SECRET_CREATE_MOCK_ID, DEMO_AZURE_TAG_ID),
         (DEMO_SECRET_LIST_MOCK_ID, DEMO_AZURE_TAG_ID),
     }
+    knowledge_base_tags = {
+        (row.resource_id, row.tag_id) for row in await _rows(engine, KnowledgeBaseTag)
+    }
+    assert knowledge_base_tags == {(DEMO_PRICING_KB_ID, DEMO_AWS_TAG_ID)}
+
+
+async def test_demo_knowledge_base_holds_the_price_sheet_unread(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The PDF is registered but not ingested: the walkthrough reads it."""
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        kb = await session.get(KnowledgeBase, DEMO_PRICING_KB_ID)
+        source = await session.get(KnowledgeSource, DEMO_PRICING_SOURCE_ID)
+    assert kb is not None
+    assert kb.name == DEMO_PRICING_KB_NAME
+    assert source is not None
+    assert source.knowledge_base_id == DEMO_PRICING_KB_ID
+    assert source.kind is KnowledgeSourceKind.file
+    assert source.file_name == DEMO_PRICING_FILE_NAME
+    assert source.content_type == "application/pdf"
+    assert source.status is KnowledgeSourceStatus.unread
+    assert source.data is not None
+    assert source.data.startswith(b"%PDF")
+    assert source.size_bytes == len(source.data)
+
+
+async def test_a_deleted_demo_source_is_registered_again(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        source = await session.get(KnowledgeSource, DEMO_PRICING_SOURCE_ID)
+        await session.delete(source)
+        await session.commit()
+    await _sync(engine)
+    assert len(await _rows(engine, KnowledgeSource)) == 1
 
 
 async def test_demo_users_hold_no_direct_roles(
@@ -970,6 +1025,54 @@ async def test_an_older_azure_server_stops_skipping_consent_on_restart(
     assert migrated.args[-2:] == ["--mode", "all"]
 
 
+async def test_a_demo_server_under_its_retired_id_is_registered_again(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A server seeded under the old zero-padded id moves to the new one."""
+    retired = "00000000-0000-0000-0000-00000000d201"
+    _enable(monkeypatch)
+    await _sync(engine)
+    # Rebuild what an older version left: the AWS server, and the mocks
+    # pointing at it, under the old id.
+    async with AsyncSession(engine) as session:
+        server = await session.get(MCPServer, DEMO_MCP_SERVER_ID)
+        assert server is not None
+        mocks = (
+            await session.exec(
+                select(MCPToolMock).where(
+                    col(MCPToolMock.mcp_server_id) == DEMO_MCP_SERVER_ID
+                )
+            )
+        ).all()
+        legacy_server = server.model_dump()
+        legacy_mocks = [m.model_dump() for m in mocks]
+        for mock in mocks:
+            await session.delete(mock)
+        await session.flush()
+        await session.delete(server)
+        await session.commit()
+        session.add(MCPServer.model_validate({**legacy_server, "id": retired}))
+        await session.flush()
+        for fields in legacy_mocks:
+            session.add(
+                MCPToolMock.model_validate({**fields, "mcp_server_id": retired})
+            )
+        await session.commit()
+    async with AsyncSession(engine) as session:
+        assert await session.get(MCPServer, retired) is not None
+
+    await _sync(engine)
+
+    async with AsyncSession(engine) as session:
+        assert await session.get(MCPServer, retired) is None
+        assert await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None
+        reseeded = await session.get(MCPToolMock, DEMO_CALL_AWS_MOCK_ID)
+    assert reseeded is not None
+    assert reseeded.mcp_server_id == DEMO_MCP_SERVER_ID
+    assert len(await _rows(engine, MCPServer)) == 6
+    assert len(await _rows(engine, MCPToolMock)) == 7
+
+
 async def test_demo_secret_generator_is_a_javascript_script_server(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1100,6 +1203,9 @@ async def test_disabling_removes_the_full_dataset(
     assert await _rows(engine, AgentSkillTag) == []
     assert await _rows(engine, McpToolMockTag) == []
     assert await _rows(engine, UserGroupTag) == []
+    assert await _rows(engine, KnowledgeBase) == []
+    assert await _rows(engine, KnowledgeSource) == []
+    assert await _rows(engine, KnowledgeBaseTag) == []
 
 
 async def test_removal_on_a_database_without_demo_data_is_a_noop(

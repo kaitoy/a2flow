@@ -27,7 +27,7 @@ from ag_ui.core import (
 
 from infrastructure.client_tools import RENDER_A2UI_TOOL_NAME, RENDER_APPROVAL_TOOL_NAME
 from models.approval import ApprovalStatus
-from models.execution_session import ExecutionSessionStatus
+from models.execution_session import ExecutionSessionKind, ExecutionSessionStatus
 from models.workflow_task import WorkflowTaskStatus
 from repositories.approval import ApprovalRepository
 from repositories.execution_session import ExecutionSessionRepository
@@ -72,6 +72,12 @@ async def settle_turn(
     ``done``, the main session is ``done`` once the run has finished, and
     either is ``idle`` until then. A failed turn leaves it in ``error``.
 
+    A consultation session works no task, so only two of those apply: it
+    waits for input on an open form, and is ``idle`` otherwise -- or ``done``
+    once the session it was opened from no longer waits on an approval, which
+    covers a decision made while its turn was still running. Nothing it does
+    assigns tasks or nudges it about them.
+
     Args:
         sessions: Repository holding the session.
         approvals: Repository used to see whether a waited-on approval is
@@ -108,6 +114,28 @@ async def settle_turn(
     ]
 
     summary: str | None = None
+    if row.kind is ExecutionSessionKind.consultation:
+        parent = await sessions.get(row.parent_id) if row.parent_id else None
+        # The approval tool is never offered here; keep only an open form.
+        waiting = [c for c in waiting if c.name == RENDER_A2UI_TOOL_NAME]
+        if parent is None or (
+            parent.status is not ExecutionSessionStatus.waiting_for_approval
+        ):
+            status = ExecutionSessionStatus.done
+        elif failed:
+            status = ExecutionSessionStatus.error
+        elif waiting:
+            status = ExecutionSessionStatus.waiting_for_input
+        else:
+            status = ExecutionSessionStatus.idle
+        await sessions.set_state(
+            session_id,
+            status=status,
+            user_id=user_id,
+            waiting_on=[call.model_dump() for call in waiting],
+            clear_input=True,
+        )
+        return
     if failed:
         status = ExecutionSessionStatus.error
     elif RENDER_APPROVAL_TOOL_NAME in names:

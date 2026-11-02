@@ -19,7 +19,9 @@ from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.client_tools import RENDER_A2UI_TOOL_NAME
 from infrastructure.skill_manager import SkillManager
 from models.execution_session import (
+    ConsultationCreate,
     ExecutionSession,
+    ExecutionSessionKind,
     ExecutionSessionStatus,
     SessionHistory,
     SessionInputCreate,
@@ -621,7 +623,7 @@ class WorkflowExecutionService:
         await self._access.assert_access(execution_id, execution.initiator_id, caller)
         row = await self._session_of(execution_id, session_id)
         if row.parent_id is not None and row.status is ExecutionSessionStatus.done:
-            raise SessionInputValidationError("this branch session has finished")
+            raise SessionInputValidationError("this session has finished")
         waiting = [WaitingCall.model_validate(c) for c in row.waiting_on]
         if data.a2ui_action is not None:
             if caller.id != execution.initiator_id:
@@ -655,6 +657,74 @@ class WorkflowExecutionService:
         ):
             raise SessionRunInProgressError(session_id)
         return await self._session_of(execution_id, session_id)
+
+    async def start_consultation(
+        self,
+        execution_id: str,
+        session_id: str,
+        data: ConsultationCreate,
+        *,
+        caller: User,
+    ) -> ExecutionSession:
+        """Put a question to the agent while a session waits on an approval.
+
+        The waiting session takes no messages, so the question goes to a
+        consultation session forked from it: the one still open for that
+        session if there is one, a new one otherwise. Its agent starts from
+        the waiting session's context, may read the linked knowledge bases and
+        the run's own records but call no MCP server tool and change nothing,
+        and its conversation never reaches the run; the decision closes it
+        (:meth:`services.approval.ApprovalService.resolve`). The same
+        participants who may drive the chat may ask -- the initiator, a
+        designated approver, or a super admin -- and they all share the
+        consultation.
+
+        Args:
+            execution_id: Identifier of the WorkflowExecution.
+            session_id: The session waiting on an approval.
+            data: The question.
+            caller: The authenticated user asking it.
+
+        Returns:
+            The consultation session, now ``queued``.
+
+        Raises:
+            NotFoundError: If the execution or the session does not exist.
+            ForbiddenError: If the caller may not drive the run.
+            SessionInputValidationError: If the message is blank, or the
+                session is not waiting on an approval.
+            SessionRunInProgressError: If the consultation already has a turn
+                queued or running.
+        """
+        execution = await self._get(execution_id)
+        await self._access.assert_access(execution_id, execution.initiator_id, caller)
+        parent = await self._session_of(execution_id, session_id)
+        if parent.status is not ExecutionSessionStatus.waiting_for_approval:
+            raise SessionInputValidationError(
+                "the session is not waiting on an approval"
+            )
+        text = data.message.strip()
+        if not text:
+            raise SessionInputValidationError("the message is empty")
+        # Plain values from here on: every commit below expires the rows.
+        parent_id, caller_id = parent.id, caller.id
+        consultation = await self._sessions.open_consultation(
+            parent_id
+        ) or await self._sessions.create_branch(
+            execution_id=execution_id,
+            parent_id=parent_id,
+            user_id=caller_id,
+            kind=ExecutionSessionKind.consultation,
+        )
+        consultation_id = consultation.id
+        session_input = SessionInput(
+            kind="message", text=text, sender_id=caller_id, acting_user_id=caller_id
+        )
+        if not await queue_input(
+            self._sessions, consultation_id, session_input, user_id=caller_id
+        ):
+            raise SessionRunInProgressError(consultation_id)
+        return await self._session_of(execution_id, consultation_id)
 
     async def _session_of(self, execution_id: str, session_id: str) -> ExecutionSession:
         """Return a session of the execution ``execution_id``, or raise NotFoundError.

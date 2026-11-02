@@ -8,7 +8,7 @@ so the router never repeats the null check.
 from collections.abc import Collection
 
 from models.approval import Approval, ApprovalRead, ApprovalStatus, ApprovalUpdate
-from models.execution_session import ExecutionSessionStatus
+from models.execution_session import ExecutionSessionKind, ExecutionSessionStatus
 from models.user import Role, User, has_any_role
 from repositories.approval import ApprovalRepository
 from repositories.exceptions import (
@@ -240,24 +240,44 @@ class ApprovalService:
         paused on it -- its turn is still running -- finds the decision when
         that turn ends instead (:func:`services.session_queue.settle_turn`).
 
+        Any consultation opened on that session is closed with it: the
+        decision it was there to inform has been made. One still answering
+        closes when its turn settles.
+
         Args:
             approval: The approval just decided.
             user_id: The deciding user, recorded on the session's audit field.
         """
-        for session in await self._sessions.list_for_execution(
+        sessions = await self._sessions.list_for_execution(
             approval.workflow_execution_id
-        ):
+        )
+        for session in sessions:
             if session.status is not ExecutionSessionStatus.waiting_for_approval:
                 continue
             for raw in session.waiting_on:
                 call = WaitingCall.model_validate(raw)
                 if call.approval_id == approval.id:
+                    # Read before queueing: its commit expires these rows.
+                    consultations = [
+                        c.id
+                        for c in sessions
+                        if c.kind is ExecutionSessionKind.consultation
+                        and c.parent_id == session.id
+                        and c.status is not ExecutionSessionStatus.done
+                    ]
                     await queue_input(
                         self._sessions,
                         session.id,
                         decision_input(call, approval.status, approval.decided_by),
                         user_id=user_id,
                     )
+                    for consultation_id in consultations:
+                        await self._sessions.set_state(
+                            consultation_id,
+                            status=ExecutionSessionStatus.done,
+                            user_id=user_id,
+                            clear_input=True,
+                        )
                     return
 
     async def _assert_may_resolve(self, approval: Approval, caller: User) -> None:

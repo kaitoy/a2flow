@@ -37,7 +37,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from infrastructure import database
-from infrastructure.workflow_task_tools import ACTING_USER_STATE_KEY
+from infrastructure.workflow_task_tools import (
+    ACTING_USER_STATE_KEY,
+    CONSULTATION_REFUSAL,
+    is_consultation_session,
+)
 from models.session_file import SessionFileOrigin, SessionFileRead
 from repositories.exceptions import NotFoundError, SessionFileValidationError
 from repositories.tenant_bootstrap import (
@@ -57,7 +61,7 @@ _NO_SESSION = "no workflow execution is bound to the current run; cannot use fil
 
 @asynccontextmanager
 async def _store(
-    tool_context: ToolContext,
+    tool_context: ToolContext, *, writing: bool = False
 ) -> AsyncIterator[tuple[str, "SessionFileStore"]]:
     """Open a database session and yield the current run's id and file store.
 
@@ -67,12 +71,15 @@ async def _store(
 
     Args:
         tool_context: The ADK tool context for the current invocation.
+        writing: Whether the call adds a file, which a consultation session
+            may not: its files would reach every session of the run.
 
     Yields:
         The ``(workflow_execution_id, store)`` pair for this call.
 
     Raises:
         NoTenantSessionError: If no WorkflowExecution is bound to the current run.
+        SessionFileValidationError: If ``writing`` from a consultation session.
     """
     from services.session_file import build_session_file_store
 
@@ -88,6 +95,8 @@ async def _store(
         if resolved is None:
             raise NoTenantSessionError()
         execution_id, tenant_id = resolved
+        if writing and await is_consultation_session(db, tenant_id, session_id):
+            raise SessionFileValidationError(CONSULTATION_REFUSAL)
         yield (
             execution_id,
             build_session_file_store(
@@ -238,11 +247,12 @@ async def write_session_file(
     Returns:
         ``{"fileId", "name", "contentType", "sizeBytes", "origin"}`` for the
         stored file, or ``{"error": <message>}`` if the session cannot be
-        resolved or the file was rejected (empty, too large, unusably named, or
-        the session is at its total size limit).
+        resolved or the file was rejected (empty, too large, unusably named,
+        the session is at its total size limit, or the call comes from a
+        consultation session).
     """
     try:
-        async with _store(tool_context) as (execution_id, store):
+        async with _store(tool_context, writing=True) as (execution_id, store):
             stored = await store.add(
                 execution_id,
                 name=name,

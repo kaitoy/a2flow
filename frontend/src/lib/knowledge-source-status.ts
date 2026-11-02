@@ -3,13 +3,16 @@
  * a knowledge source shows its state the same way.
  *
  * Reuses the palette of `lib/agent-skill-sync-status.ts`: accent while the
- * background job still has work to do, green once done, red on failure.
+ * background job still has work to do, green once done, red on failure, and
+ * the muted gray `lib/workflow-task-status.ts` gives a task not yet started for
+ * a source nobody has asked to be read yet.
  */
 
 import type { KnowledgeSourceStatus } from "@/lib/api";
 
 /** Tailwind background-color class for the status dot of each state. */
 export const KNOWLEDGE_SOURCE_STATUS_DOT_CLASS: Record<KnowledgeSourceStatus, string> = {
+  unread: "bg-on-surface-variant",
   pending: "bg-accent",
   ingesting: "bg-accent",
   ready: "bg-success/80",
@@ -19,6 +22,7 @@ export const KNOWLEDGE_SOURCE_STATUS_DOT_CLASS: Record<KnowledgeSourceStatus, st
 
 /** Human-readable label for each state. */
 const LABELS: Record<KnowledgeSourceStatus, string> = {
+  unread: "Not read",
   pending: "Queued",
   ingesting: "Reading",
   ready: "Ready",

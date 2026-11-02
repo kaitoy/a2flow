@@ -3,6 +3,7 @@ import { formatKnowledgeSourceStatus, isKnowledgeSourceBusy } from "./knowledge-
 
 describe("knowledge source status", () => {
   it("labels each state", () => {
+    expect(formatKnowledgeSourceStatus("unread")).toBe("Not read");
     expect(formatKnowledgeSourceStatus("pending")).toBe("Queued");
     expect(formatKnowledgeSourceStatus("ingesting")).toBe("Reading");
     expect(formatKnowledgeSourceStatus("removing")).toBe("Removing");
@@ -14,5 +15,6 @@ describe("knowledge source status", () => {
     expect(isKnowledgeSourceBusy("removing")).toBe(true);
     expect(isKnowledgeSourceBusy("ready")).toBe(false);
     expect(isKnowledgeSourceBusy("failed")).toBe(false);
+    expect(isKnowledgeSourceBusy("unread")).toBe(false);
   });
 });

@@ -279,6 +279,14 @@ the result into the dark variant, and exports both SVGs. After changing an Engli
 update its entry in `specs.py` (the script fails if a translated string no longer matches)
 and rerun it; never hand-edit the generated Japanese files.
 
+## Demo assets
+
+The demo `AWS EC2 Pricing` knowledge base is seeded with
+`backend/infrastructure/demo_assets/ec2-on-demand-pricing.pdf`. To change its figures, edit
+`backend/scripts/build_demo_pricing_pdf.py`, run `cd backend && uv run scripts/build_demo_pricing_pdf.py`
+(its inline metadata pulls in `fpdf2`, which is not a backend dependency), and commit the
+regenerated PDF.
+
 ## Further reading
 
 - [backend/README.md](backend/README.md) — API reference, implementation notes, environment variables

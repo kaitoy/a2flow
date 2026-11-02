@@ -55,6 +55,27 @@ describe("ExecutionSessionTabs", () => {
     );
   });
 
+  it("numbers consultations apart from branches", () => {
+    render(
+      <ExecutionSessionTabs
+        sessions={[
+          session("main", "waiting_for_approval"),
+          session("b1", "idle", "main"),
+          { ...session("c1", "idle", "main"), kind: "consultation" },
+        ]}
+        mainSessionId="main"
+        value="c1"
+        onChange={() => {}}
+      />
+    );
+    const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
+    expect(tabs).toEqual([
+      "Main · Waiting for approval",
+      "Branch 1 · Idle",
+      "Consultation 1 · Idle",
+    ]);
+  });
+
   it("shows when a scheduled session resumes", () => {
     const resumeAt = "2026-10-04T00:00:00Z";
     render(

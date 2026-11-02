@@ -48,8 +48,28 @@ vi.mock("@/components/MessageList", () => ({
 }));
 
 vi.mock("@/components/ChatInput", () => ({
-  ChatInput: () => <div data-testid="chat-input-mock" />,
+  ChatInput: ({ onSend }: { onSend: (message: string, files: File[]) => void }) => (
+    <button type="button" data-testid="chat-input-mock" onClick={() => onSend("How much?", [])}>
+      Send
+    </button>
+  ),
 }));
+
+/** A session row as `GET /workflow-executions/{id}/sessions` lists it. */
+function sessionRow(fields: Record<string, unknown>) {
+  return {
+    parentId: null,
+    kind: "task",
+    workflowExecutionId: "execution-1",
+    tenantId: "tenant-1",
+    waitingOn: [],
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    createdBy: "user",
+    updatedBy: "user",
+    ...fields,
+  };
+}
 
 /** Builds a preloaded auth slice so `AuthProvider` renders its children immediately. */
 function authState(roles: string[]): Partial<RootState> {
@@ -250,5 +270,41 @@ describe("WorkflowSessionPage", () => {
     screen.getByRole("button", { name: "Resume" }).click();
 
     expect(sendMessage).toHaveBeenCalledWith("I'm here — resume the workflow.");
+  });
+
+  it("sends a question to a consultation while the session awaits a decision", async () => {
+    const sendMessage = vi.fn();
+    const asked = vi.fn();
+    useExecutionSessionChatMock.mockReturnValue({ ...useExecutionSessionChatMock(), sendMessage });
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id/sessions", () =>
+        envelope([sessionRow({ id: "executed-session-id", status: "waiting_for_approval" })])
+      ),
+      http.post(
+        "http://localhost:8000/api/v1/workflow-executions/:id/sessions/:sid/consultation",
+        async ({ params, request }) => {
+          asked(params.sid, await request.json());
+          return envelope(
+            sessionRow({
+              id: "consultation-1",
+              kind: "consultation",
+              parentId: "executed-session-id",
+              status: "queued",
+            }),
+            202
+          );
+        }
+      )
+    );
+    render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+
+    expect(await screen.findByText(/opens a consultation/)).toBeInTheDocument();
+    screen.getByTestId("chat-input-mock").click();
+
+    await waitFor(() =>
+      expect(asked).toHaveBeenCalledWith("executed-session-id", { message: "How much?" })
+    );
+    expect(await screen.findByRole("tab", { name: "Consultation 1 · Queued" })).toBeInTheDocument();
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

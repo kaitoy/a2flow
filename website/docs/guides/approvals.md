@@ -31,6 +31,8 @@ The agent is instructed to prefer a group whenever any member of a team may deci
 
 The agent explains the request in plain text, and the controls appear in the chat below it — but **only for the designated approver**. For a group destination, several people may hold them at once. Everyone else sees a read-only "waiting" message.
 
+Before you decide, you can ask the agent about the request. Type a question in the chat, and it opens a [consultation](./workflow-executions.md#consultations) where the agent answers, and where the person who started the run can join in. The decision closes it.
+
 | Decision | What it means | What the agent does |
 |---|---|---|
 | **Approve** | Go ahead | Proceeds, with the covered steps' tools unlocked |

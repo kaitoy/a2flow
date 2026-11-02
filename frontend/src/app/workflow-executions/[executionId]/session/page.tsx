@@ -15,6 +15,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
+import { ConsultationNotice } from "@/components/ConsultationNotice";
 import { ExecutionSessionTabs } from "@/components/ExecutionSessionTabs";
 import { InitiatorResumeNotice } from "@/components/InitiatorResumeNotice";
 import { MessageList } from "@/components/MessageList";
@@ -33,6 +34,7 @@ import {
   isForbiddenError,
   listExecutionSessions,
   SUPPRESS_FORBIDDEN_TOAST,
+  startSessionConsultation,
   type WorkflowExecution,
 } from "@/lib/api";
 import { clearError } from "@/store/chatSlice";
@@ -75,14 +77,19 @@ function useSessionSelection(execution: WorkflowExecution) {
     },
     [router, execution.id, execution.sessionId]
   );
-  return { sessions, selected, select };
+
+  /** Show a session the server just returned, without waiting for the next poll. */
+  const add = useCallback((session: ExecutionSession) => {
+    setSessions((list) => [...list.filter((s) => s.id !== session.id), session]);
+  }, []);
+  return { sessions, selected, select, add };
 }
 
 /** Renders the chat UI for an already-loaded WorkflowExecution, including the task timeline and message list. */
 function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s) => s.auth.user);
-  const { sessions, selected, select } = useSessionSelection(execution);
+  const { sessions, selected, select, add } = useSessionSelection(execution);
   const {
     messages,
     isRunning,
@@ -146,6 +153,24 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
   // The selected session, while it holds a task back for its initiator.
   const waitingForInitiator = sessions.find(
     (s) => s.id === selected && s.status === "waiting_for_initiator"
+  );
+  // While the selected session waits on an approval it takes no messages: a
+  // question opens (or continues) its consultation, shown in a tab of its own.
+  const awaitingApproval = sessions.some(
+    (s) => s.id === selected && s.status === "waiting_for_approval"
+  );
+  const askInConsultation = useCallback(
+    async (message: string) => {
+      try {
+        const consultation = await startSessionConsultation(execution.id, selected, message);
+        add(consultation);
+        select(consultation.id ?? selected);
+      } catch (err) {
+        // The error toast already explains it.
+        console.error("failed to open a consultation", err);
+      }
+    },
+    [execution.id, selected, add, select]
   );
 
   if (chatForbidden) {
@@ -237,10 +262,15 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
             />
           </div>
         )}
+        {awaitingApproval && !isRunning && (
+          <div className="shrink-0 mx-4 mb-2">
+            <ConsultationNotice />
+          </div>
+        )}
         <ChatInput
-          onSend={sendMessage}
+          onSend={awaitingApproval ? askInConsultation : sendMessage}
           disabled={isRunning}
-          allowAttachments
+          allowAttachments={!awaitingApproval}
           suggestions={suggestions}
         />
       </div>

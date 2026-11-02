@@ -76,6 +76,13 @@ import TabItem from '@theme/TabItem';
 
 1. 管理サイドバーの **Users** を開き、developer の行で **Impersonate** を押します。**Impersonate User** ダイアログの **Impersonate** で確定します。ウェルカムページに戻り、ヘッダーのチップに「Acting as `demo-…-developer`」と出ます。
 2. **Agent Skills** を開きます。並ぶのはこのプロバイダのスキルだけです。ほかのスキルは[アクセス制御タグ](../guides/tags.md#access-control-tags)で隠れています。**Status** が `ready` になるまで待ちます。`Cloning` のうちは一覧を更新してください。それまで **Generate workflow** は押せません。
+
+:::info[AWS: 先に価格表を読み込む]
+
+**Knowledge Bases** を開き、**AWS EC2 Pricing** をクリックします。ソースは `ec2-on-demand-pricing.pdf` の 1 つで、**Not read** と表示されています。**Read** を押し、ステータスが **Ready** になるまで待ちます。LLM が価格表をページに書き起こしていて、できたページは **Pages** に並びます。1〜2 分かかります([ナレッジベース](../guides/knowledge-bases.md))。次の手順では **Generate Workflow** ダイアログで **Select knowledge bases…** も押して **AWS EC2 Pricing** を選んでください。実行のエージェントが価格を調べられるようになります。
+
+:::
+
 3. 行の **Generate workflow** を押します。**Workflow Name** はそのまま、**Prompt** に下のプロンプトを貼り、**Generate** を押します。
 
 <Tabs groupId="provider" queryString>
@@ -105,6 +112,7 @@ import TabItem from '@theme/TabItem';
   キーペアは作成しない。
   AMIとVPCとサブネットのIDは承認依頼前に解決しておく。
   指定された日時になるまではインスタンスを起動しない。
+  インスタンスの費用についての質問にはAWS EC2 Pricingナレッジベースをもとに答え、承認依頼には申請されたインスタンスの月額をそのナレッジベースから引いて含める。
   ```
 
   </TabItem>
@@ -150,6 +158,8 @@ import TabItem from '@theme/TabItem';
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
+  どのインスタンスタイプにするか迷ったら、「us-east-2 で t4g.medium は月いくら? t3.micro と比べて」のように聞いてみてください。エージェントは **AWS EC2 Pricing** ナレッジベースで価格を調べ、参照したページを示して答えます。
+
   プロンプトの 10 種からインスタンスタイプを、3 つからリージョンを選び、起動日時には数分後の時刻を伝え(ツアーが止まらないように)、インスタンスの名前など、ほかに聞かれたことにも答えます。エージェントはそのリージョンの Amazon Linux 2023 の最新イメージと、デフォルトの VPC とサブネットを調べ、構成と起動日時を要約して承認に回します。
 
   </TabItem>
@@ -177,7 +187,7 @@ import TabItem from '@theme/TabItem';
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  **AWS MCP Server** の、インスタンスを起動する呼び出しです。この呼び出しと要約にある起動日時を、申請者が選んだ内容と突き合わせてください。イメージ、VPC、サブネットの検索は並びません。依頼の前に済んでいて、承認の要らない呼び出しだからです。
+  **AWS MCP Server** の、インスタンスを起動する呼び出しです。この呼び出しと、要約にある起動日時と月額を、申請者が選んだ内容と突き合わせてください。イメージ、VPC、サブネットの検索は並びません。依頼の前に済んでいて、承認の要らない呼び出しだからです。
 
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
@@ -192,7 +202,8 @@ import TabItem from '@theme/TabItem';
   </TabItem>
 </Tabs>
 
-4. 必要なら **Comment** を書いて、**Approve** を押します。同じチャットで実行が再開し、エージェントが作業を終えると、申請者に結果の確認を求めます。この質問に答えるのは申請者です。承認者には入力欄が読み取り専用で出て、下に「Waiting for the initiator to respond.」と表示されます。
+4. 判断の前にもっと知りたいことがあれば、チャットに質問を入力して送ります。AWS タブなら、たとえば「平日の営業時間だけ動かしたら月額はいくら?」と聞いてみてください。セッションはあなたの判断を待っているので、**Consultation** タブが開き、エージェントが依頼までの文脈とリンクされたナレッジベースをもとにそこで答えます([相談セッション](../guides/workflow-executions.md#consultations))。申請者もこの会話に加われます。終わったら **Main** タブをクリックして依頼に戻ります。
+5. 必要なら **Comment** を書いて、**Approve** を押します。相談セッションを開いていれば、判断でそれも閉じます。同じチャットで実行が再開し、エージェントが作業を終えると、申請者に結果の確認を求めます。この質問に答えるのは申請者です。承認者には入力欄が読み取り専用で出て、下に「Waiting for the initiator to respond.」と表示されます。
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
@@ -212,7 +223,7 @@ import TabItem from '@theme/TabItem';
   </TabItem>
 </Tabs>
 
-5. **Stop** します。
+6. **Stop** します。
 
 ## 6. requester に戻って、結果を確認する \{#6-back-as-the-requester-confirm-the-result\}
 
