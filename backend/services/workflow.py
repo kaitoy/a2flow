@@ -169,7 +169,8 @@ def prompt_hidden_from(caller_roles: Collection[str]) -> bool:
     shown only to the roles that design, review, or administer workflows.
     Everyone else is served ``None`` in their place, and the list queries
     treat the columns as ``NULL`` for them so a filter cannot read them back
-    either.
+    either. A workflow's ``internal_notes`` follow the same rule: they are
+    written for exactly these roles.
 
     Args:
         caller_roles: The caller's effective roles.
@@ -184,18 +185,21 @@ def prompt_hidden_from(caller_roles: Collection[str]) -> bool:
 def _without_hidden_prompt(
     read: WorkflowRead, caller_roles: Collection[str]
 ) -> WorkflowRead:
-    """Blank a read view's prompts when the caller may not read them.
+    """Blank a read view's prompts and notes when the caller may not read them.
 
     Args:
         read: The read view about to be returned.
         caller_roles: The caller's effective roles.
 
     Returns:
-        ``read`` itself, or a copy without ``prompt`` and ``generated_prompt``.
+        ``read`` itself, or a copy without ``prompt``, ``generated_prompt``,
+        and ``internal_notes``.
     """
     if not prompt_hidden_from(caller_roles):
         return read
-    return read.model_copy(update={"prompt": None, "generated_prompt": None})
+    return read.model_copy(
+        update={"prompt": None, "generated_prompt": None, "internal_notes": None}
+    )
 
 
 def draft_hidden_from(workflow: Workflow, caller_roles: Collection[str]) -> bool:
@@ -802,6 +806,31 @@ class WorkflowService:
         # above, and serializing an expired one outside the request's greenlet
         # context would fail.
         return await self.get(workflow_id)
+
+    async def update_internal_notes(
+        self, workflow_id: str, notes: str | None, *, user_id: str
+    ) -> Workflow:
+        """Replace a workflow's internal notes.
+
+        Gated to an ``admin``, ``developer``, or ``reviewer`` at the router.
+        The notes are not part of the design, so a ``published`` workflow
+        stays ``published``.
+
+        Args:
+            workflow_id: Identifier of the workflow.
+            notes: The new notes; ``None`` or an empty string clears them.
+            user_id: ID of the acting user.
+
+        Returns:
+            The updated Workflow.
+
+        Raises:
+            NotFoundError: If no workflow exists with the given ID.
+        """
+        await self.get(workflow_id)
+        return await self._workflows.set_internal_notes(
+            workflow_id, notes, user_id=user_id
+        )
 
     async def delete(self, workflow_id: str) -> None:
         """Delete a Workflow.

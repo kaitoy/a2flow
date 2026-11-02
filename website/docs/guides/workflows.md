@@ -124,6 +124,17 @@ To roll back to an earlier design (Developer):
 
 Changed your mind before publishing? **Discard changes** puts the current published version back. A version that binds a tool on an MCP server deleted since cannot be restored; the restore is rejected with an error.
 
+### Internal notes {#internal-notes}
+
+**Internal notes** on the workflow detail page is a place to record why you rolled back, or anything else the team running the workflow should know.
+
+| | |
+|---|---|
+| Who sees it | Admin, Developer, and Reviewer. Hidden from everyone else. |
+| Who can edit it | The same three roles. Type in the field and click its save icon. |
+| Effect on the workflow | None. Saving does not change the status, and runs never read the notes. |
+| Versions | Not versioned. Publishing, restoring a version, and **Discard changes** all leave the notes as they are. |
+
 ## Deactivating a workflow
 
 **Deactivate** — the power-off icon that appears next to Publish while a workflow is `published` or `modified`, and available to the same **Reviewer** role as Publish — returns it to `draft`. That revokes the `requester` role's execute access, the same gate a never-published workflow starts under, while a Developer or Super Admin can still run it for testing. Task templates, both description fields, and the published snapshot are left exactly as they were, so publishing again promotes it straight back.

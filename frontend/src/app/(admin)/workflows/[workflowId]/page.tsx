@@ -11,6 +11,7 @@ import {
   Play,
   PowerOff,
   Rocket,
+  Save,
   Sparkles,
   Undo2,
   Workflow as WorkflowIcon,
@@ -60,6 +61,7 @@ import {
   listWorkflowKnowledgeBases,
   publishWorkflow,
   SUPPRESS_FORBIDDEN_TOAST,
+  setWorkflowInternalNotes,
   setWorkflowKnowledgeBases,
   setWorkflowTags,
   updateWorkflow,
@@ -128,6 +130,13 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * carries a button opening a word-level diff of the two current (possibly
  * unsaved) values. Both prompt fields are shown only to an admin, developer,
  * or reviewer — the backend blanks them for everyone else.
+ *
+ * Internal notes follow the same visibility rule: a scratchpad for those three
+ * roles (why a version was restored, say). They are not part of the design, so
+ * any of the three can save them on the spot through the field's own save
+ * button, which never moves a published workflow to `modified`; the form's
+ * Save also writes them when they changed, so a developer's typed notes are not
+ * lost on submit.
  *
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
@@ -200,6 +209,10 @@ export default function WorkflowDetailPage() {
   const [kbIds, setKbIds] = useState<string[]>([]);
   const [savedKbIds, setSavedKbIds] = useState<string[]>([]);
   const [kbOptions, setKbOptions] = useState<PickerOption[]>([]);
+  // Internal notes are saved through their own route and, like tags, kept out
+  // of `applyWorkflow` so a generation poll never clobbers an in-progress edit.
+  const [notes, setNotes] = useState("");
+  const [savedNotes, setSavedNotes] = useState("");
 
   const save = useAsyncAction({ showDone: false });
   const publish = useAsyncAction({ showDone: false });
@@ -207,6 +220,7 @@ export default function WorkflowDetailPage() {
   const deactivate = useAsyncAction({ showDone: false });
   const run = useAsyncAction({ showDone: false });
   const generatePrompt = useAsyncAction({ showDone: false });
+  const saveNotes = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -252,6 +266,8 @@ export default function WorkflowDetailPage() {
         applyWorkflow(wf);
         setTagIds(wf.tagIds ?? []);
         setSavedTagIds(wf.tagIds ?? []);
+        setNotes(wf.internalNotes ?? "");
+        setSavedNotes(wf.internalNotes ?? "");
         listWorkflowKnowledgeBases(workflowId)
           .then((kbs) => {
             const ids = kbs.map((kb) => kb.id);
@@ -306,9 +322,24 @@ export default function WorkflowDetailPage() {
         if (!sameIds(kbIds, savedKbIds)) {
           await setWorkflowKnowledgeBases(workflowId, kbIds);
         }
+        if (notes !== savedNotes) {
+          await setWorkflowInternalNotes(workflowId, notes);
+        }
         dispatch(showToast({ message: "Workflow updated" }));
         // Return to the list on success, matching every other admin edit page.
         router.push("/workflows");
+      });
+    } catch {
+      // Failure toast is shown globally by api.ts; nothing else to do here.
+    }
+  }
+
+  async function handleSaveNotes() {
+    try {
+      await saveNotes.run(async () => {
+        const updated = await setWorkflowInternalNotes(workflowId, notes);
+        setSavedNotes(updated.internalNotes ?? "");
+        dispatch(showToast({ message: "Internal notes saved" }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -679,6 +710,36 @@ export default function WorkflowDetailPage() {
           />
 
           <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
+
+          {canViewPrompt && (
+            <FormField
+              htmlFor="internalNotes"
+              label="Internal notes"
+              action={
+                <ActionIconButton
+                  icon={Save}
+                  label="Save internal notes"
+                  onClick={handleSaveNotes}
+                  disabled={notes === savedNotes || saveNotes.inFlight}
+                  spinning={saveNotes.inFlight}
+                />
+              }
+            >
+              <Textarea
+                id="internalNotes"
+                rows={3}
+                maxLength={10000}
+                placeholder="e.g. why a version was restored"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              <p className="text-xs text-on-surface-variant">
+                Visible only to admins, developers, and reviewers. Not part of the design: saving
+                does not change the workflow status, and the notes are kept across publishing and
+                restoring versions.
+              </p>
+            </FormField>
+          )}
 
           <div className="flex flex-wrap gap-2">
             {canEdit && (

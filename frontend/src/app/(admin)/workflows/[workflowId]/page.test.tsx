@@ -103,6 +103,51 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(put).toHaveBeenCalledWith({ knowledgeBaseIds: [] }));
   });
 
+  it("lets a reviewer save internal notes without touching the design", async () => {
+    const put = vi.fn();
+    const patch = vi.fn();
+    server.use(
+      http.put("http://localhost:8000/api/v1/workflows/:id/internal-notes", async ({ request }) => {
+        put(await request.json());
+        return envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
+          status: "published",
+          internalNotes: "Rolled back to v1",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "",
+        });
+      }),
+      http.patch("http://localhost:8000/api/v1/workflows/:id", () => {
+        patch();
+        return envelope({});
+      })
+    );
+    const user = userEvent.setup();
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    const notes = await screen.findByLabelText(/^internal notes/i);
+    const saveNotes = screen.getByRole("button", { name: "Save internal notes" });
+    expect(saveNotes).toBeDisabled();
+    await user.type(notes, "Rolled back to v1");
+    await user.click(saveNotes);
+
+    await waitFor(() => expect(put).toHaveBeenCalledWith({ internalNotes: "Rolled back to v1" }));
+    await waitFor(() => expect(saveNotes).toBeDisabled());
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it("hides internal notes from a requester", async () => {
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await screen.findByRole("heading", { name: "my-workflow" });
+    expect(screen.queryByLabelText(/^internal notes/i)).not.toBeInTheDocument();
+  });
+
   it("shows the workflow status", async () => {
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
@@ -633,7 +678,7 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(nameInput).toHaveValue("my-workflow"));
     await user.clear(nameInput);
     await user.type(nameInput, "Renamed");
-    await user.click(screen.getByRole("button", { name: /save/i }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
       expect(receivedBody).toEqual({ name: "Renamed", description: null, prompt: null })
@@ -658,7 +703,7 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(nameInput).toHaveValue("my-workflow"));
     await user.clear(nameInput);
     await user.type(nameInput, "Renamed");
-    await user.click(screen.getByRole("button", { name: /save/i }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows"));
   });
@@ -766,7 +811,7 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(field).toHaveValue("AI summary"));
     await user.clear(field);
     await user.type(field, "Edited by admin");
-    await user.click(screen.getByRole("button", { name: /save/i }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
       expect(receivedBody).toEqual({

@@ -1003,6 +1003,24 @@ export async function setWorkflowTags(id: string, tagIds: string[]): Promise<Wor
   ) as Promise<Workflow>;
 }
 
+/**
+ * Replace a workflow's internal notes. An empty string clears them.
+ *
+ * Open to an admin, developer, or reviewer. The notes are not part of the
+ * design, so a published workflow stays published.
+ */
+export async function setWorkflowInternalNotes(
+  id: string,
+  internalNotes: string
+): Promise<Workflow> {
+  return unwrap(
+    sdk.setWorkflowInternalNotesApiV1WorkflowsWorkflowIdInternalNotesPut({
+      path: { workflow_id: id },
+      body: { internalNotes },
+    })
+  ) as Promise<Workflow>;
+}
+
 /** Replace an MCP server's tags wholesale. An empty array detaches every tag. */
 export async function setMcpServerTags(id: string, tagIds: string[]): Promise<McpServer> {
   return unwrap(

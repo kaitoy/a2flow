@@ -634,6 +634,11 @@ export const handlers = [
     envelope({ ...WORKFLOW_1, status: "modified" })
   ),
 
+  http.put(`${BASE}/api/v1/workflows/:id/internal-notes`, async ({ request }) => {
+    const { internalNotes } = (await request.json()) as { internalNotes: string | null };
+    return envelope({ ...WORKFLOW_1, internalNotes: internalNotes || null });
+  }),
+
   http.get(`${BASE}/api/v1/workflows/:id/task-templates`, () =>
     envelope([WORKFLOW_TASK_TEMPLATE_1])
   ),

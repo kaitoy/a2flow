@@ -15,6 +15,14 @@ the **prompt**: handed to every run of the workflow as context (see
 ``admin``, ``developer``, or ``reviewer``. ``description`` is a plain,
 human-facing explanation of what the workflow is for; no run ever reads it.
 
+``internal_notes`` is a third kind: a scratchpad for the people who run the
+workflow -- why a version was restored, say. Like the prompt it is shown only to
+an ``admin``, ``developer``, or ``reviewer``, and any of them may write it
+through ``PUT /workflows/{id}/internal-notes``. It is not part of the design:
+no run reads it, it is not versioned (publishing, restoring, and discarding
+changes all leave it alone), and editing it never moves a ``published``
+workflow to ``modified``.
+
 The chat those templates are produced and refined in is the workflow's
 **design session** — the ADK session named by :attr:`WorkflowCreate.session_id`
 and keyed by the workflow's ``created_by``. It is the design-time counterpart
@@ -35,7 +43,13 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
-from models.constraints import DescText, EntityName, PromptText, WorkflowPromptText
+from models.constraints import (
+    DescText,
+    EntityName,
+    NotesText,
+    PromptText,
+    WorkflowPromptText,
+)
 from models.knowledge import KnowledgeBaseIdsUpdate
 from models.tenant_scoped import TenantScoped
 
@@ -139,6 +153,10 @@ class WorkflowUpdate(SQLModel):
     conversation summary; ``prompt`` is the free-form field a user can set to
     override it. See :attr:`Workflow.effective_prompt` for how the two
     combine. ``description`` is never handed to a run.
+
+    ``internal_notes`` is deliberately absent: it is not part of the design, so
+    it has a route of its own (:class:`WorkflowInternalNotesUpdate`) that does
+    not mark the workflow ``modified``.
     """
 
     model_config = _alias_config
@@ -173,6 +191,11 @@ class WorkflowCreate(WorkflowUpdate):
 
 class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     """Database-persisted workflow binding task templates to an agent skill.
+
+    ``internal_notes`` is likewise declared on the table class only, but for a
+    different reason: it is written through its own route,
+    ``PUT /workflows/{id}/internal-notes``, which an ``admin`` or ``reviewer``
+    may call too and which never marks the workflow ``modified``.
 
     ``status`` and ``generation_error`` are server-managed: they are declared
     on the table class only, so they are absent from ``WorkflowCreate`` /
@@ -209,6 +232,7 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     tenant_id: str = Field(foreign_key="tenants.id", ondelete="RESTRICT")
     status: WorkflowStatus = Field(default=WorkflowStatus.draft)
     generation_error: str | None = None
+    internal_notes: str | None = None
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_workflows_tenant_id_name"),
@@ -251,6 +275,8 @@ class WorkflowRead(BaseEntity):
     agent_skill_commit_sha: str
     status: WorkflowStatus = WorkflowStatus.draft
     generation_error: str | None = None
+    #: Notes for admins, developers, and reviewers; ``None`` for anyone else.
+    internal_notes: str | None = None
     #: Ids of the tags attached to this workflow.
     tag_ids: list[str] = []
 
@@ -266,6 +292,17 @@ class WorkflowRead(BaseEntity):
             A read view carrying the workflow's columns plus its tags.
         """
         return cls(**workflow.model_dump(), tag_ids=tag_ids)
+
+
+class WorkflowInternalNotesUpdate(SQLModel):
+    """Request body of ``PUT /workflows/{workflow_id}/internal-notes``.
+
+    Replaces the workflow's internal notes as a whole; ``null`` (or an empty
+    string) clears them.
+    """
+
+    model_config = _alias_config
+    internal_notes: NotesText | None = None
 
 
 class GenerateWorkflowRequest(KnowledgeBaseIdsUpdate):

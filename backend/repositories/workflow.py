@@ -92,6 +92,10 @@ class WorkflowRepository(Protocol):
 
     async def mark_modified(self, workflow_id: str, *, user_id: str) -> None: ...
 
+    async def set_internal_notes(
+        self, workflow_id: str, notes: str | None, *, user_id: str
+    ) -> Workflow: ...
+
     async def mark_design_edited(self, workflow_id: str, *, user_id: str) -> None: ...
 
     async def delete(self, workflow_id: str) -> None: ...
@@ -190,8 +194,8 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         :func:`models.workflow_published_version.published_workflow_read`'s job,
         and the two must agree.
 
-        ``hide_prompt`` filters and sorts ``prompt`` and ``generated_prompt``
-        as ``NULL``, for a caller who is not shown them
+        ``hide_prompt`` filters and sorts ``prompt``, ``generated_prompt``, and
+        ``internal_notes`` as ``NULL``, for a caller who is not shown them
         (:func:`services.workflow.prompt_hidden_from`), so a filter cannot
         read them back either.
         """
@@ -215,6 +219,7 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
                 **(columns or {}),
                 "prompt": ColumnOverride(expression=null()),
                 "generated_prompt": ColumnOverride(expression=null()),
+                "internal_notes": ColumnOverride(expression=null()),
             }
         stmt = apply_filters(
             stmt, Workflow, filters, readable=WorkflowRead, columns=columns
@@ -452,6 +457,36 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         workflow.updated_by = user_id
         self._db.add(workflow)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
+
+    async def set_internal_notes(
+        self, workflow_id: str, notes: str | None, *, user_id: str
+    ) -> Workflow:
+        """Replace a workflow's internal notes, leaving its status alone.
+
+        The notes are not part of the design, so unlike every other write to a
+        workflow's own fields this never moves it to ``modified``.
+
+        Args:
+            workflow_id: Identifier of the workflow.
+            notes: The new notes; ``None`` or an empty string clears them.
+            user_id: ID of the acting user recorded on ``updated_by``.
+
+        Returns:
+            The updated workflow.
+
+        Raises:
+            NotFoundError: If no workflow exists with the given ID.
+        """
+        self._require_tenant()
+        workflow = await self._get_scoped(workflow_id)
+        if workflow is None:
+            raise NotFoundError("Workflow", workflow_id)
+        workflow.internal_notes = notes or None
+        workflow.updated_by = user_id
+        self._db.add(workflow)
+        await commit_or_translate_user_fk(self._db, user_id=user_id)
+        await self._db.refresh(workflow)
+        return workflow
 
     async def mark_design_edited(self, workflow_id: str, *, user_id: str) -> None:
         """Settle a workflow's status after a write to its task templates.

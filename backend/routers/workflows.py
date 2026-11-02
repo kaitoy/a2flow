@@ -57,6 +57,7 @@ from models.user import Role
 from models.workflow import (
     ExecuteWorkflowRequest,
     WorkflowDesignSource,
+    WorkflowInternalNotesUpdate,
     WorkflowRead,
     WorkflowUpdate,
 )
@@ -74,6 +75,12 @@ _requires_developer = [Depends(require_roles(Role.developer))]
 #: Route dependency gating publish/deactivate behind the ``reviewer`` role —
 #: the one pair of write actions ``developer`` no longer performs.
 _requires_reviewer = [Depends(require_roles(Role.reviewer))]
+
+#: Route dependency gating the internal notes behind the roles that may read
+#: them -- see :func:`services.workflow.prompt_hidden_from`.
+_requires_notes_access = [
+    Depends(require_roles(Role.admin, Role.developer, Role.reviewer))
+]
 
 #: Route dependency gating workflow execution behind the ``requester`` or
 #: ``developer`` role. ``developer`` (and, via the ``super_admin`` bypass,
@@ -326,6 +333,33 @@ async def update_workflow(
     caller who reaches this route.
     """
     workflow = await service.update(workflow_id, body, caller=caller)
+    return ApiResponse(
+        meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
+    )
+
+
+@router.put(
+    "/{workflow_id}/internal-notes",
+    response_model=ApiResponse[WorkflowRead],
+    dependencies=_requires_notes_access,
+)
+async def set_workflow_internal_notes(
+    workflow_id: str,
+    body: WorkflowInternalNotesUpdate,
+    service: WorkflowServiceDep,
+    user_id: CurrentUserIdDep,
+    caller_roles: EffectiveRolesDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[WorkflowRead]:
+    """Replace a workflow's internal notes.
+
+    Open to an ``admin``, ``developer``, or ``reviewer`` -- the roles that can
+    read the notes. The notes are not part of the design, so this never marks
+    a published workflow ``modified``.
+    """
+    workflow = await service.update_internal_notes(
+        workflow_id, body.internal_notes, user_id=user_id
+    )
     return ApiResponse(
         meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
     )

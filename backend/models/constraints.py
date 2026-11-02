@@ -312,6 +312,11 @@ DescText = Annotated[str, StringConstraints(max_length=2000)]
 #: conversation, which runs longer than a :data:`DescText` description.
 WorkflowPromptText = Annotated[str, StringConstraints(max_length=10000)]
 
+#: Free-text internal notes on a Workflow: up to 10000 characters. Notes
+#: accumulate over a workflow's life (one entry per rollback, say), so they get
+#: the same headroom as a prompt rather than a :data:`DescText` description.
+NotesText = Annotated[str, StringConstraints(max_length=10000)]
+
 
 #: Notification body text: up to 4000 characters.
 BodyText = Annotated[str, StringConstraints(max_length=4000)]
