@@ -23,6 +23,8 @@ Ask the user for whatever isn't already given. At minimum, you need:
 
 Do not guess network- or access-related fields (security group, subnet, key pair) — a wrong choice here can expose the instance publicly or hand it the wrong permissions. Ask instead of defaulting. For a genuinely low-stakes field (e.g. count defaulting to 1), you may propose a default, but say what you're defaulting to and let the user override it.
 
+Do every AWS lookup here, in this step, before the approval is requested — resolving the AMI and checking that the VPC, subnet, security groups, and key pair exist. These are the read-only calls `ssm GetParameter`, `ec2 DescribeImages`, `DescribeVpcs`, `DescribeSubnets`, `DescribeSecurityGroups`, and `DescribeKeyPairs`. Once the approval has been requested, every AWS call falls under it, and a lookup made then needs the approver's agreement too.
+
 Once you have everything, summarize the finalized configuration back to the user before moving on. This exact summary is also what the approver decides on in the next step.
 
 ### 2. Get manager approval
@@ -41,9 +43,9 @@ Launch exactly the configuration that was approved. Nothing may change between t
 
 Run every AWS operation through the **AWS MCP Server**'s `aws___run_script` tool. Give it a short script that launches the approved instance — an `aws ec2 run-instances` CLI call, or a boto3 `call_boto3` step. The tool may name its fields differently from the terms used here, so map the approved configuration onto the names and units it actually accepts (e.g. "AMI" onto an `ImageId` field) and pass only the fields it accepts.
 
-Call only the AWS operations this skill needs: the read-only lookups that resolve the configuration (`ssm GetParameter`, `ec2 DescribeImages`, `DescribeVpcs`, `DescribeSubnets`, `DescribeSecurityGroups`, `DescribeKeyPairs`), `RunInstances` itself, and `DescribeInstances` to report the result. Do not call anything else — no pre-flight checks of credit specifications, quotas, or account defaults — since none of it is part of the approved configuration.
+This step makes exactly one AWS call: `RunInstances`. The lookups all happened in step 1, and the result is reported from what `RunInstances` returns, so do not call `DescribeInstances` or anything else afterwards. Never call anything outside this skill either — no pre-flight checks of credit specifications, quotas, or account defaults — since none of it is part of the approved configuration.
 
-**`call_boto3` caveat:** the `operation_name` argument and every key in `params` are **PascalCase**, mirroring the AWS API model — `operation_name` is `RunInstances` or `DescribeInstances`, and the `params` keys are `ImageId`, `InstanceType`, `MinCount`, `MaxCount`, `KeyName`, and the like. snake_case (`run_instances`, `image_id`) and camelCase (`runInstances`, `imageId`) are both rejected. Singular and plural forms must match the model exactly as well (`InstanceFamily` is not `InstanceFamilies`).
+**`call_boto3` caveat:** the `operation_name` argument and every key in `params` are **PascalCase**, mirroring the AWS API model — `operation_name` is `RunInstances` or `GetParameter`, and the `params` keys are `ImageId`, `InstanceType`, `MinCount`, `MaxCount`, `KeyName`, and the like. snake_case (`run_instances`, `image_id`) and camelCase (`runInstances`, `imageId`) are both rejected. Singular and plural forms must match the model exactly as well (`InstanceFamily` is not `InstanceFamilies`).
 
 If the launch returns an error (invalid AMI, insufficient permissions, quota exceeded, etc.), report the exact error to the user and stop — do not retry with silently altered parameters or guess a fix.
 
