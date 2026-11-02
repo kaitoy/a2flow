@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ClipboardList,
   GitCompare,
+  History,
   Loader2,
   MessageSquareText,
   Play,
@@ -481,6 +482,13 @@ export default function WorkflowDetailPage() {
                     <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
                   </HeaderIconButton>
                 )}
+                <HeaderIconButton
+                  label="Version history"
+                  onClick={() => router.push(`/workflows/${workflowId}/versions`)}
+                  disabled={generating}
+                >
+                  <History size={18} strokeWidth={1.8} aria-hidden="true" />
+                </HeaderIconButton>
               </>
             }
           />

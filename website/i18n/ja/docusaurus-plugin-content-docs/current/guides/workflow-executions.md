@@ -20,6 +20,8 @@ sidebar_position: 4
 
 [**Columns** メニュー](./admin-ui.md#choosing-columns)には、既定で隠れている列がもう 2 つあります。**Workflow** はその実行のもとになったワークフローを今の名前で示し、そこへリンクします。行そのものの名前は実行開始時のスナップショットで固定なので、そのワークフローが今どう呼ばれているかはこの列で分かります。**Draft** は[テスト実行](./workflows.md#running-a-workflow) — `draft` のままのワークフローから始めた実行か、`modified` のワークフローの[未公開の編集内容](./workflows.md#trying-the-edits-out)を実行したもの — にチェックマークを付けます。どちらも誰も承認していない設計を動かしたものなので、[運用メトリクス](../operations/metrics.md)には数えられません。この列は Yes/No のフィルターとしても働くので隠せます。
 
+実行の詳細ページには **Version** が表示されます。その実行がタスクを写したワークフローの公開済みの版(`v3` など)です。テスト実行はどの版にも記録されていない設計を動かしたので `—` になります。[版の履歴とロールバック](./workflows.md#version-history)も参照してください。
+
 ## 実行のステータス {#run-status}
 
 ![実行が running で始まり、時刻を待つだけの間は scheduled になって再開すると running に戻り、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。](./img/workflow-executions-status.svg#gh-light-mode-only)

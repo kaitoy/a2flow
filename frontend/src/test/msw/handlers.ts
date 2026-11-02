@@ -112,6 +112,7 @@ const WORKFLOW_EXECUTION_1 = {
   initiatorId: "user",
   status: "completed",
   isDraft: false,
+  workflowVersion: 3,
   finishedAt: "2026-01-01T00:05:00Z",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -599,6 +600,37 @@ export const handlers = [
 
   http.post(`${BASE}/api/v1/workflows/:id/deactivate`, () =>
     envelope({ ...WORKFLOW_1, status: "draft" })
+  ),
+
+  http.get(`${BASE}/api/v1/workflows/:id/versions`, () =>
+    envelope([
+      {
+        id: "ver-2",
+        workflowId: "wf-1",
+        version: 2,
+        name: "my-workflow",
+        description: "Second publish",
+        createdAt: "2026-01-02T00:00:00Z",
+        updatedAt: "2026-01-02T00:00:00Z",
+        createdBy: "",
+        updatedBy: "",
+      },
+      {
+        id: "ver-1",
+        workflowId: "wf-1",
+        version: 1,
+        name: "first-name",
+        description: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdBy: "",
+        updatedBy: "",
+      },
+    ])
+  ),
+
+  http.post(`${BASE}/api/v1/workflows/:id/versions/:version/restore`, () =>
+    envelope({ ...WORKFLOW_1, status: "modified" })
   ),
 
   http.get(`${BASE}/api/v1/workflows/:id/task-templates`, () =>

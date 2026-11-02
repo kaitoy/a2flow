@@ -97,6 +97,7 @@ import type {
   WorkflowTaskTemplateUpdate,
   WorkflowTaskUpdate,
   WorkflowUpdate,
+  WorkflowVersionRead as WorkflowVersionModel,
 } from "@/generated/api/types.gen";
 import { store } from "@/store";
 import { showToast } from "@/store/toastSlice";
@@ -369,6 +370,8 @@ export type UserGroup = WithAudit<UserGroupModel>;
 export type Workflow = WithAudit<WorkflowModel>;
 export type WorkflowExecution = WithAudit<WorkflowExecutionModel>;
 export type WorkflowTask = WithAudit<WorkflowTaskModel>;
+/** One entry in a workflow's version history: a design as it was published. */
+export type WorkflowVersion = WithAudit<WorkflowVersionModel>;
 /**
  * One ADK session a workflow execution is worked in: its main session, or a
  * branch session forked from one when the task graph branched.
@@ -1363,6 +1366,35 @@ export async function discardWorkflowChanges(id: string): Promise<Workflow> {
   return unwrap(
     sdk.discardWorkflowChangesApiV1WorkflowsWorkflowIdDiscardChangesPost({
       path: { workflow_id: id },
+    })
+  ) as Promise<Workflow>;
+}
+
+/**
+ * List the versions a workflow was published as (newest first by default),
+ * without their task templates.
+ */
+export async function listWorkflowVersions(
+  workflowId: string,
+  query: ListQuery = {}
+): Promise<WorkflowVersion[]> {
+  return unwrap(
+    sdk.listWorkflowVersionsApiV1WorkflowsWorkflowIdVersionsGet({
+      path: { workflow_id: workflowId },
+      query: listQuery(query),
+    })
+  ) as Promise<WorkflowVersion[]>;
+}
+
+/**
+ * Restore a published version as the workflow's live design without
+ * publishing it: a published workflow becomes `modified` (or stays `published`
+ * when the latest version is restored), a draft stays draft.
+ */
+export async function restoreWorkflowVersion(id: string, version: number): Promise<Workflow> {
+  return unwrap(
+    sdk.restoreWorkflowVersionApiV1WorkflowsWorkflowIdVersionsVersionRestorePost({
+      path: { workflow_id: id, version },
     })
   ) as Promise<Workflow>;
 }

@@ -20,6 +20,8 @@ Open **Workflow Executions** in the admin sidebar to browse them. Unlike the oth
 
 The [**Columns** menu](./admin-ui.md#choosing-columns) offers two more columns that start hidden. **Workflow** shows the run's parent workflow under its current name and links to it — each row's own name is a snapshot fixed when the run started, so this column is how you see what that workflow is called today. **Draft** shows a checkmark for a [test run](./workflows.md#running-a-workflow) — one started from a workflow that was still `draft`, or from the [unpublished edits](./workflows.md#trying-the-edits-out) of a `modified` one. Either way it exercised a design nobody had approved, so it is left out of the [operations metrics](../operations/metrics.md); the column works as a Yes/No filter to hide them.
 
+A run's detail page shows its **Version**: the published version of the workflow it copied its tasks from, such as `v3`, or `—` for a test run, which ran a design no version recorded. See [Version history and rolling back](./workflows.md#version-history).
+
 ## Run status
 
 ![State machine showing a run starting as running, moving to scheduled while it only waits on a time and back when it resumes, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.](./img/workflow-executions-status.svg#gh-light-mode-only)

@@ -61,6 +61,7 @@ from models.workflow import (
     WorkflowUpdate,
 )
 from models.workflow_execution import WorkflowExecutionRead
+from models.workflow_published_version import WorkflowVersionRead
 from models.workflow_task_template import WorkflowTaskTemplateRead
 from repositories.exceptions import NotFoundError, SessionRunInProgressError
 from services.session_stream import SSE_HEADERS
@@ -409,6 +410,61 @@ async def discard_workflow_changes(
     (``WORKFLOW_NOT_MODIFIED``) when the workflow has no unpublished changes.
     """
     workflow = await service.discard_changes(workflow_id, user_id=user_id)
+    return ApiResponse(
+        meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
+    )
+
+
+@router.get(
+    "/{workflow_id}/versions",
+    response_model=ApiResponse[list[WorkflowVersionRead]],
+)
+async def list_workflow_versions(
+    workflow_id: str,
+    service: WorkflowServiceDep,
+    pagination: PaginationDep,
+    sort: SortDep,
+    filters: FilterDep,
+    caller_roles: EffectiveRolesDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[list[WorkflowVersionRead]]:
+    """List every version the workflow was published as, newest first.
+
+    Raises HTTP 404 when the workflow does not exist or is a ``draft`` the
+    caller may not see.
+    """
+    items = await service.list_versions(
+        workflow_id,
+        caller_roles=caller_roles,
+        limit=pagination.limit,
+        offset=pagination.offset,
+        sort=sort.sort,
+        filters=filters.filters,
+    )
+    return ApiResponse(meta=meta, data=items)
+
+
+@router.post(
+    "/{workflow_id}/versions/{version}/restore",
+    response_model=ApiResponse[WorkflowRead],
+    dependencies=_requires_developer,
+)
+async def restore_workflow_version(
+    workflow_id: str,
+    version: int,
+    service: WorkflowServiceDep,
+    user_id: CurrentUserIdDep,
+    caller_roles: EffectiveRolesDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[WorkflowRead]:
+    """Restore a published version as the workflow's live design, without publishing it.
+
+    A published workflow becomes ``modified`` (``published`` again when the
+    latest version is restored); a ``draft`` one stays ``draft``. Raises HTTP
+    404 when the version does not exist, and HTTP 409
+    (``WORKFLOW_NOT_RUNNABLE``) while the design run is still in progress.
+    """
+    workflow = await service.restore_version(workflow_id, version, user_id=user_id)
     return ApiResponse(
         meta=meta, data=await service.to_read(workflow, caller_roles=caller_roles)
     )

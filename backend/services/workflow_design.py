@@ -277,8 +277,9 @@ class WorkflowDesignService:
         The workflow's name, effective description (the user's ``description``
         override if set, else its ``generated_description`` — see
         :attr:`~models.workflow.Workflow.effective_description`), and full
-        task-template list are frozen into its ``WorkflowPublishedVersion``
-        snapshot, replacing the previous one. Runs started while the workflow
+        task-template list are frozen into a new ``WorkflowPublishedVersion``
+        snapshot, numbered one past the previous one; earlier snapshots stay
+        in the workflow's version history. Runs started while the workflow
         is ``modified`` use that snapshot instead of the live templates, so a
         published design keeps executing exactly as it was approved.
 
@@ -318,7 +319,7 @@ class WorkflowDesignService:
         if not templates:
             raise WorkflowNotRunnableError(workflow_id, "it has no task templates")
 
-        await self._versions.upsert(
+        await self._versions.create(
             workflow_id,
             name=name,
             description=effective_description,

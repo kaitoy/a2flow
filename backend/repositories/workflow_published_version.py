@@ -1,8 +1,13 @@
 """WorkflowPublishedVersion repository: Protocol interface and SQLModel-backed implementation.
 
-Holds the snapshot of a workflow taken at publish time — at most one row per
-workflow, replaced wholesale by every publish. There is no ``delete``: the row
-disappears with its workflow through the ``ON DELETE CASCADE`` foreign key.
+Holds the snapshots of a workflow taken at publish time — one row per publish,
+numbered by ``version``. Everything that means "the published snapshot"
+(:meth:`~SqlWorkflowPublishedVersionRepository.get`, ``get_many``,
+``list_templates``) reads only the latest row, through
+:func:`models.workflow_published_version.latest_version_clause`; the rest of the
+history is reached through ``list_versions`` and ``get_version``. There is no
+``delete``: the rows disappear with their workflow through the
+``ON DELETE CASCADE`` foreign key.
 
 :meth:`SqlWorkflowPublishedVersionRepository.list_templates` reads *into* the
 snapshot's JSON ``templates`` column, because a non-``developer`` browsing a
@@ -24,6 +29,8 @@ from sqlmodel import col, select
 from models.workflow_published_version import (
     WorkflowPublishedVersion,
     WorkflowPublishedVersionTemplate,
+    WorkflowVersionRead,
+    latest_version_clause,
 )
 from models.workflow_task_template import (
     WorkflowTaskTemplate,
@@ -59,7 +66,21 @@ class WorkflowPublishedVersionRepository(Protocol):
         filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowPublishedVersionTemplate]: ...
 
-    async def upsert(
+    async def list_versions(
+        self,
+        workflow_id: str,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[WorkflowPublishedVersion]: ...
+
+    async def get_version(
+        self, workflow_id: str, version: int
+    ) -> WorkflowPublishedVersion | None: ...
+
+    async def create(
         self,
         workflow_id: str,
         *,
@@ -83,22 +104,23 @@ class SqlWorkflowPublishedVersionRepository(
     model = WorkflowPublishedVersion
 
     async def _get_scoped(self, workflow_id: str) -> WorkflowPublishedVersion | None:
-        """Return the snapshot row of ``workflow_id`` within the current tenant."""
+        """Return the latest snapshot row of ``workflow_id`` within the current tenant."""
         stmt = select(WorkflowPublishedVersion).where(
-            WorkflowPublishedVersion.workflow_id == workflow_id
+            WorkflowPublishedVersion.workflow_id == workflow_id,
+            latest_version_clause(WorkflowPublishedVersion),
         )
         stmt = self._scoped(stmt)
         result = await self._db.exec(stmt)
         return result.first()
 
     async def get(self, workflow_id: str) -> WorkflowPublishedVersion | None:
-        """Return the workflow's last published snapshot, or ``None`` if never published."""
+        """Return the workflow's latest published snapshot, or ``None`` if never published."""
         return await self._get_scoped(workflow_id)
 
     async def get_many(
         self, workflow_ids: Sequence[str]
     ) -> dict[str, WorkflowPublishedVersion]:
-        """Return the snapshots of the given workflows, keyed by workflow id.
+        """Return the latest snapshots of the given workflows, keyed by workflow id.
 
         Exists so projecting a page of workflows into the published view a
         non-``developer`` sees costs one query rather than one per row.
@@ -113,7 +135,8 @@ class SqlWorkflowPublishedVersionRepository(
         if not workflow_ids:
             return {}
         stmt = select(WorkflowPublishedVersion).where(
-            col(WorkflowPublishedVersion.workflow_id).in_(list(workflow_ids))
+            col(WorkflowPublishedVersion.workflow_id).in_(list(workflow_ids)),
+            latest_version_clause(WorkflowPublishedVersion),
         )
         stmt = self._scoped(stmt)
         result = await self._db.exec(stmt)
@@ -205,7 +228,7 @@ class SqlWorkflowPublishedVersionRepository(
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
     ) -> list[WorkflowPublishedVersionTemplate]:
-        """Return a page of the task templates held by a workflow's snapshot.
+        """Return a page of the task templates held by a workflow's latest snapshot.
 
         Paging, filtering, and sorting run in the database against the JSON
         array itself, so they mean exactly what they mean on the live rows in
@@ -238,7 +261,10 @@ class SqlWorkflowPublishedVersionRepository(
             select(payload)
             .select_from(WorkflowPublishedVersion)
             .join(elem, true())
-            .where(WorkflowPublishedVersion.workflow_id == workflow_id)
+            .where(
+                WorkflowPublishedVersion.workflow_id == workflow_id,
+                latest_version_clause(WorkflowPublishedVersion),
+            )
         )
         stmt = self._scoped(stmt)
         stmt = apply_filters(
@@ -259,7 +285,72 @@ class SqlWorkflowPublishedVersionRepository(
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return [_parse_template(row) for row in result.all()]
 
-    async def upsert(
+    async def list_versions(
+        self,
+        workflow_id: str,
+        *,
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> list[WorkflowPublishedVersion]:
+        """Return a page of a workflow's version history, newest first by default.
+
+        ``templates`` is not addressable: ``readable`` is
+        :class:`~models.workflow_published_version.WorkflowVersionRead`, which
+        leaves it out.
+
+        Args:
+            workflow_id: The workflow whose history to list.
+            limit: Maximum number of versions to return.
+            offset: Number of versions to skip.
+            sort: Ordering instructions; empty means ``version`` descending.
+            filters: Field filters applied to the query.
+
+        Returns:
+            The requested page of snapshots.
+
+        Raises:
+            QueryValidationError: If a spec names an unaddressable field, an
+                unknown operator, or an uncoercible value.
+        """
+        stmt = select(WorkflowPublishedVersion).where(
+            WorkflowPublishedVersion.workflow_id == workflow_id
+        )
+        stmt = self._scoped(stmt)
+        stmt = apply_filters(
+            stmt, WorkflowPublishedVersion, filters, readable=WorkflowVersionRead
+        )
+        stmt = apply_sort(
+            stmt,
+            WorkflowPublishedVersion,
+            sort,
+            default=[col(WorkflowPublishedVersion.version).desc()],
+            readable=WorkflowVersionRead,
+        )
+        result = await self._db.exec(stmt.limit(limit).offset(offset))
+        return list(result.all())
+
+    async def get_version(
+        self, workflow_id: str, version: int
+    ) -> WorkflowPublishedVersion | None:
+        """Return one numbered snapshot of a workflow, or ``None`` if there is none.
+
+        Args:
+            workflow_id: The workflow the snapshot belongs to.
+            version: The snapshot's version number.
+
+        Returns:
+            The snapshot, or ``None``.
+        """
+        stmt = select(WorkflowPublishedVersion).where(
+            WorkflowPublishedVersion.workflow_id == workflow_id,
+            WorkflowPublishedVersion.version == version,
+        )
+        result = await self._db.exec(self._scoped(stmt))
+        return result.first()
+
+    async def create(
         self,
         workflow_id: str,
         *,
@@ -268,10 +359,13 @@ class SqlWorkflowPublishedVersionRepository(
         templates: list[dict[str, Any]],
         user_id: str,
     ) -> WorkflowPublishedVersion:
-        """Record the workflow's current state as its published snapshot.
+        """Record the workflow's current state as its next published version.
 
-        Replaces the previous snapshot when one exists, so a workflow never
-        accumulates more than one row.
+        The new row is numbered one past the workflow's latest, so it becomes
+        the current published snapshot. Two concurrent publishes of the same
+        workflow would pick the same number; the unique constraint on
+        ``(workflow_id, version)`` rejects the second rather than letting them
+        collide.
 
         Args:
             workflow_id: Identifier of the workflow being published.
@@ -285,22 +379,17 @@ class SqlWorkflowPublishedVersionRepository(
             The stored snapshot.
         """
         tenant_id = self._require_tenant()
-        version = await self._get_scoped(workflow_id)
-        if version is None:
-            version = WorkflowPublishedVersion(
-                workflow_id=workflow_id,
-                name=name,
-                description=description,
-                templates=templates,
-                tenant_id=tenant_id,
-                created_by=user_id,
-                updated_by=user_id,
-            )
-        else:
-            version.name = name
-            version.description = description
-            version.templates = templates
-            version.updated_by = user_id
+        latest = await self._get_scoped(workflow_id)
+        version = WorkflowPublishedVersion(
+            workflow_id=workflow_id,
+            version=latest.version + 1 if latest else 1,
+            name=name,
+            description=description,
+            templates=templates,
+            tenant_id=tenant_id,
+            created_by=user_id,
+            updated_by=user_id,
+        )
         self._db.add(version)
         await commit_or_translate_user_fk(self._db, user_id=user_id)
         await self._db.refresh(version)

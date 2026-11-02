@@ -18,7 +18,10 @@ from models.workflow import (
     WorkflowStatus,
     WorkflowUpdate,
 )
-from models.workflow_published_version import WorkflowPublishedVersion
+from models.workflow_published_version import (
+    WorkflowPublishedVersion,
+    latest_version_clause,
+)
 from repositories._integrity import commit_or_translate_user_fk, is_foreign_key_error
 from repositories._scoped import TenantScopedRepository
 from repositories.agent_skill import AgentSkillRepository
@@ -191,7 +194,13 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         columns = None
         if published_view:
             version = aliased(WorkflowPublishedVersion)
-            stmt = stmt.outerjoin(version, col(Workflow.id) == version.workflow_id)
+            stmt = stmt.outerjoin(
+                version,
+                and_(
+                    col(Workflow.id) == version.workflow_id,
+                    latest_version_clause(version),
+                ),
+            )
             columns = self._published_view_columns(version)
         stmt = apply_filters(
             stmt, Workflow, filters, readable=WorkflowRead, columns=columns

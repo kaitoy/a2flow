@@ -51,6 +51,7 @@ from models.workflow_execution import WorkflowExecutionCreate, WorkflowExecution
 from models.workflow_published_version import (
     WorkflowPublishedVersion,
     WorkflowPublishedVersionTemplate,
+    WorkflowVersionRead,
     parse_templates,
     published_workflow_read,
     snapshot_template,
@@ -911,7 +912,7 @@ class WorkflowService:
             raise NotFoundError("AgentSkill", workflow.agent_skill_id)
         if skill.commit_sha is None:
             raise SkillNotReadyError(skill.id)
-        name, description, templates = await self._resolve_design(
+        name, description, templates, version_number = await self._resolve_design(
             workflow, design_source=design_source
         )
         if not templates:
@@ -936,6 +937,7 @@ class WorkflowService:
             agent_skill_repo_path=skill.repo_path,
             agent_skill_commit_sha=skill.commit_sha,
             initiator_id=user,
+            workflow_version=version_number,
         )
         execution = await self._execution_repo.create(
             execution_create,
@@ -1024,16 +1026,17 @@ class WorkflowService:
         workflow: Workflow,
         *,
         design_source: WorkflowDesignSource = WorkflowDesignSource.published,
-    ) -> tuple[str, str | None, _SnapshotTemplateList]:
-        """Return the name, description, and task templates a run should use.
+    ) -> tuple[str, str | None, _SnapshotTemplateList, int | None]:
+        """Return the name, description, task templates, and version a run should use.
 
         A ``modified`` workflow runs its last published snapshot unless the
         caller asked for :attr:`~models.workflow.WorkflowDesignSource.live`;
         every other status runs the live rows (for ``published`` the two are
-        identical by construction). A ``modified`` workflow without a snapshot
-        should not exist — the status is only reachable from ``published``,
-        which always writes one — so that case is logged and falls back to the
-        live task templates rather than refusing to run.
+        identical by construction, so the run is still attributed to the
+        latest version). A ``modified`` workflow without a snapshot should not
+        exist — the status is only reachable from ``published``, which always
+        writes one — so that case is logged and falls back to the live task
+        templates rather than refusing to run.
 
         Args:
             workflow: The workflow being executed.
@@ -1042,7 +1045,9 @@ class WorkflowService:
                 ``live`` for any other status.
 
         Returns:
-            The workflow name, description, and task templates to copy.
+            The workflow name, description, and task templates to copy, and
+            the published version they came from — ``None`` when they are a
+            design no version recorded (a draft run).
         """
         if (
             workflow.status is WorkflowStatus.modified
@@ -1050,12 +1055,21 @@ class WorkflowService:
         ):
             version = await self._versions.get(workflow.id)
             if version is not None:
-                return version.name, version.description, parse_templates(version)
+                return (
+                    version.name,
+                    version.description,
+                    parse_templates(version),
+                    version.version,
+                )
             logger.warning(
                 "Workflow %s is 'modified' but has no published snapshot; "
                 "running its current task templates instead.",
                 workflow.id,
             )
+        version_number = None
+        if workflow.status is WorkflowStatus.published:
+            latest = await self._versions.get(workflow.id)
+            version_number = latest.version if latest else None
         live = await self._templates.list(
             limit=MAX_TASK_TEMPLATES, offset=0, workflow_id=workflow.id
         )
@@ -1063,6 +1077,7 @@ class WorkflowService:
             workflow.name,
             workflow.effective_description,
             [snapshot_template(t) for t in live],
+            version_number,
         )
 
     async def discard_changes(self, workflow_id: str, *, user_id: str) -> Workflow:
@@ -1095,6 +1110,29 @@ class WorkflowService:
         version = await self._versions.get(workflow_id)
         if version is None:  # pragma: no cover - unreachable via publish
             raise WorkflowNotModifiedError(workflow_id)
+        await self._write_back(workflow_id, version, user_id=user_id)
+        return await self._workflows.set_status(
+            workflow_id, WorkflowStatus.published, user_id=user_id
+        )
+
+    async def _write_back(
+        self, workflow_id: str, version: WorkflowPublishedVersion, *, user_id: str
+    ) -> None:
+        """Overwrite a workflow's live design with a published snapshot.
+
+        Rewrites the task templates (reusing the snapshot's template IDs) and
+        restores the name and description recorded alongside them. The status
+        is left to the caller.
+
+        Args:
+            workflow_id: Identifier of the workflow to overwrite.
+            version: The snapshot to write back.
+            user_id: ID of the user performing the write.
+
+        Raises:
+            ForeignKeyViolationError: If the snapshot binds an MCP tool on a
+                server that has since been deleted.
+        """
         # Capture before the commits below: each commit on the shared request
         # session expires loaded instances, and a plain attribute read on an
         # expired instance fails outside an explicit refresh.
@@ -1110,9 +1148,99 @@ class WorkflowService:
             WorkflowUpdate(name=name, description=description),
             user_id=user_id,
         )
-        return await self._workflows.set_status(
-            workflow_id, WorkflowStatus.published, user_id=user_id
+
+    async def list_versions(
+        self,
+        workflow_id: str,
+        *,
+        caller_roles: Collection[str],
+        limit: int,
+        offset: int,
+        sort: Sequence[SortSpec] = (),
+        filters: Sequence[FilterSpec] = (),
+    ) -> builtins.list[WorkflowVersionRead]:
+        """Return a page of a workflow's version history.
+
+        Every published version is listed, newest first unless ``sort`` says
+        otherwise. They were all published, so nothing here is hidden from a
+        caller allowed to read the workflow at all.
+
+        Args:
+            workflow_id: Identifier of the workflow.
+            caller_roles: The caller's effective roles, for the draft
+                visibility rule of :meth:`get_for_read`.
+            limit: Maximum number of versions to return.
+            offset: Number of versions to skip.
+            sort: Ordering instructions applied to the query.
+            filters: Field filters applied to the query.
+
+        Returns:
+            The requested page of versions, without their task templates.
+
+        Raises:
+            NotFoundError: If the workflow does not exist or is hidden from
+                the caller.
+        """
+        await self.get_for_read(workflow_id, caller_roles=caller_roles)
+        rows = await self._versions.list_versions(
+            workflow_id, limit=limit, offset=offset, sort=sort, filters=filters
         )
+        return [
+            WorkflowVersionRead.model_validate(r, from_attributes=True) for r in rows
+        ]
+
+    async def restore_version(
+        self, workflow_id: str, version: int, *, user_id: str
+    ) -> Workflow:
+        """Bring an earlier published version back as the workflow's live design.
+
+        The version's name, description, and task templates overwrite the
+        live ones, exactly as :meth:`discard_changes` does with the latest
+        version. Restoring does **not** publish: the restored design has to be
+        published again to reach runs, so the approval publishing stands for
+        is never skipped. The status therefore becomes:
+
+        ===================== =============================================
+        before                after
+        ===================== =============================================
+        ``published``,        ``published`` when ``version`` is the latest
+        ``modified``          (nothing is left unpublished), else
+                              ``modified``
+        ``draft``, ``failed`` unchanged
+        ``generating``        rejected
+        ===================== =============================================
+
+        Args:
+            workflow_id: Identifier of the workflow to restore.
+            version: Number of the published version to restore.
+            user_id: ID of the user restoring it.
+
+        Returns:
+            The restored Workflow.
+
+        Raises:
+            NotFoundError: If the workflow or the version does not exist.
+            WorkflowNotRunnableError: If the design run is still in progress.
+            ForeignKeyViolationError: If the version binds an MCP tool on a
+                server that has since been deleted.
+        """
+        workflow = await self.get(workflow_id)
+        status = workflow.status
+        if status is WorkflowStatus.generating:
+            raise WorkflowNotRunnableError(
+                workflow_id, "the design run is still in progress"
+            )
+        snapshot = await self._versions.get_version(workflow_id, version)
+        if snapshot is None:
+            raise NotFoundError("WorkflowVersion", f"{workflow_id}/v{version}")
+        latest = await self._versions.get(workflow_id)
+        is_latest = latest is not None and latest.version == version
+        await self._write_back(workflow_id, snapshot, user_id=user_id)
+        if status in (WorkflowStatus.published, WorkflowStatus.modified):
+            status = WorkflowStatus.published if is_latest else WorkflowStatus.modified
+        # Always set: the writes above move a ``published`` workflow to
+        # ``modified`` on their own, and this puts the intended status back.
+        return await self._workflows.set_status(workflow_id, status, user_id=user_id)
 
     async def deactivate(self, workflow_id: str, *, user_id: str) -> Workflow:
         """Return a published workflow to draft, revoking requester execute access.

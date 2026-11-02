@@ -197,6 +197,10 @@ export default function WorkflowExecutionDetailPage() {
                 )
               }
             />
+            <DetailItem
+              label="Version"
+              value={session.workflowVersion != null ? `v${session.workflowVersion}` : EMPTY_VALUE}
+            />
             <DetailItem label="Description" value={session.description || EMPTY_VALUE} />
             <DetailItem
               label="Agent Skill"

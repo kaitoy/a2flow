@@ -62,6 +62,13 @@ describe("WorkflowExecutionDetailPage", () => {
     expect(link).toHaveAttribute("href", "/users/user");
   });
 
+  it("shows the published version the run started from", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "My Workflow" });
+    const term = screen.getByText("Version", { selector: "dt" });
+    expect(term.parentElement).toHaveTextContent("v3");
+  });
+
   it("shows the execution's status", async () => {
     renderPage();
     expect(await screen.findByText("completed")).toBeInTheDocument();
@@ -105,6 +112,9 @@ describe("WorkflowExecutionDetailPage", () => {
     await screen.findByRole("heading", { name: "My Workflow" });
     const card = screen.getByRole("region", { name: "Workflow execution status" });
     expect(within(card).getByText("Draft")).toBeInTheDocument();
+    // A draft run copied a design no published version recorded.
+    const term = screen.getByText("Version", { selector: "dt" });
+    expect(term.parentElement).not.toHaveTextContent(/v\d/);
   });
 
   it("navigates to the task list from the header action", async () => {

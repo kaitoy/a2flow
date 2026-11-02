@@ -1,15 +1,20 @@
-"""Snapshot of a Workflow as it looked the last time it was published.
+"""Snapshots of a Workflow, one per time it was published.
 
 Publishing a workflow freezes its design: the workflow's name, its summarized
 description, and its full task-template list (dependency edges and MCP tool
-bindings included) are copied into a
-:class:`WorkflowPublishedVersion` row. Editing the workflow afterwards moves it
-to :attr:`models.workflow.WorkflowStatus.modified`, and runs started from that
-point keep using this snapshot — so the design that was approved by publishing is
-the design that executes, until it is published again.
+bindings included) are copied into a new
+:class:`WorkflowPublishedVersion` row numbered one past the previous one
+(``version`` 1, 2, ...). Editing the workflow afterwards moves it to
+:attr:`models.workflow.WorkflowStatus.modified`, and runs started from that
+point keep using the **latest** snapshot — so the design that was approved by
+publishing is the design that executes, until it is published again.
 
-There is at most one row per workflow: each publish replaces the previous
-snapshot. The templates are stored as a JSON list rather than as rows of their
+Earlier snapshots are kept as the workflow's version history, so any of them
+can be restored into the live design
+(:meth:`services.workflow.WorkflowService.restore_version`). Restoring never
+publishes, so the row with the highest ``version`` is always the current
+published design; every query that means "the published snapshot" narrows to
+it through :func:`latest_version_clause`. The templates are stored as a JSON list rather than as rows of their
 own because the snapshot is read and written whole and is never queried by
 individual step; :func:`parse_templates` turns them back into typed objects.
 
@@ -28,8 +33,15 @@ from datetime import datetime
 from typing import Any
 
 from pydantic.alias_generators import to_camel
-from sqlalchemy import Column, ForeignKeyConstraint, UniqueConstraint
-from sqlmodel import Field, SQLModel
+from sqlalchemy import (
+    Column,
+    ColumnElement,
+    ForeignKeyConstraint,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.orm import aliased
+from sqlmodel import Field, SQLModel, col, select
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity, JSONColumn
@@ -70,20 +82,24 @@ class WorkflowPublishedVersionTemplate(SQLModel):
 
 
 class WorkflowPublishedVersion(TenantScoped, BaseEntity, table=True):
-    """Database-persisted snapshot of the last published state of a Workflow.
+    """Database-persisted snapshot of one published state of a Workflow.
 
-    Not exposed through the API as a resource of its own: the row is read only
-    by :class:`services.workflow.WorkflowService` and
-    :class:`services.workflow_task_template.WorkflowTaskTemplateService`, which
-    project it into the ordinary ``Workflow`` / ``WorkflowTaskTemplate`` read
-    models. The row is replaced on every publish and cascade-deleted with its
+    The latest row is projected into the ordinary ``Workflow`` /
+    ``WorkflowTaskTemplate`` read models by
+    :class:`services.workflow.WorkflowService` and
+    :class:`services.workflow_task_template.WorkflowTaskTemplateService`; the
+    whole history is listed (without its templates) as
+    :class:`WorkflowVersionRead` under ``GET /workflows/{id}/versions``. A new
+    row is added on every publish, and every row is cascade-deleted with its
     workflow.
     """
 
     __tablename__ = "workflow_published_versions"
     __table_args__ = (
         UniqueConstraint(
-            "workflow_id", name="uq_workflow_published_versions_workflow_id"
+            "workflow_id",
+            "version",
+            name="uq_workflow_published_versions_workflow_id_version",
         ),
         ForeignKeyConstraint(
             ["workflow_id"],
@@ -93,6 +109,8 @@ class WorkflowPublishedVersion(TenantScoped, BaseEntity, table=True):
     )
 
     workflow_id: str
+    #: 1-based publish counter, unique per workflow; the highest is current.
+    version: int = 1
     name: str
     description: str | None = None
     #: The workflow's task templates at publish time, stored as a JSON list of
@@ -100,6 +118,42 @@ class WorkflowPublishedVersion(TenantScoped, BaseEntity, table=True):
     #: Read back through :func:`parse_templates`.
     templates: list[dict[str, Any]] = Field(
         default_factory=list, sa_column=Column(JSONColumn, nullable=False)
+    )
+
+
+class WorkflowVersionRead(BaseEntity):
+    """Read view of one entry in a workflow's version history.
+
+    Every column of :class:`WorkflowPublishedVersion` except ``templates`` and
+    ``tenant_id``: the history lists *which* designs were published, by whom
+    and when; restoring one is what brings its templates back.
+    """
+
+    workflow_id: str
+    version: int
+    name: str
+    description: str | None = None
+
+
+def latest_version_clause(
+    version: type[WorkflowPublishedVersion],
+) -> ColumnElement[bool]:
+    """Narrow ``version`` rows to each workflow's current published snapshot.
+
+    Restoring an older version never publishes it, so the current snapshot is
+    always the one with the highest ``version`` number.
+
+    Args:
+        version: The snapshot table, or an alias of it, being queried.
+
+    Returns:
+        A predicate true only for the latest row of each workflow.
+    """
+    latest = aliased(WorkflowPublishedVersion)
+    return col(version.version) == (
+        select(func.max(latest.version))
+        .where(latest.workflow_id == version.workflow_id)
+        .scalar_subquery()
     )
 
 

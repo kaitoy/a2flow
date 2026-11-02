@@ -116,7 +116,16 @@ async def _seed(engine: AsyncEngine) -> None:
             (OTHER_TENANT_ID, OTHER_WORKFLOW_ID),
         ):
             repo = SqlWorkflowPublishedVersionRepository(session, tenant_id=tenant_id)
-            await repo.upsert(
+            # An older version first, so every "published snapshot" read below
+            # also proves it ignores the history and reads only the latest.
+            await repo.create(
+                workflow_id,
+                name="first published name",
+                description=None,
+                templates=dump_templates([_template("t-old", "Old", 5)]),
+                user_id=SYSTEM_USER_ID,
+            )
+            await repo.create(
                 workflow_id,
                 name=f"published name for {tenant_id}",
                 description="published description",
@@ -386,3 +395,60 @@ async def test_get_many_of_nothing_queries_nothing(
 ) -> None:
     """An empty request short-circuits instead of building a degenerate IN ()."""
     assert await repo.get_many([]) == {}
+
+
+# ---------- version history ----------
+
+
+async def test_create_numbers_each_publish_and_get_reads_the_latest(
+    repo: SqlWorkflowPublishedVersionRepository,
+) -> None:
+    """Each publish adds the next version; ``get`` returns the newest one."""
+    latest = await repo.get(WORKFLOW_ID)
+    assert latest is not None
+    assert latest.version == 2
+    assert [t.title for t in parse_templates(latest)] == ["Charlie", "alpha", "Bravo"]
+
+
+async def test_get_many_reads_only_the_latest_version(
+    repo: SqlWorkflowPublishedVersionRepository,
+) -> None:
+    """Older versions never surface through the bulk read either."""
+    found = await repo.get_many([WORKFLOW_ID])
+    assert found[WORKFLOW_ID].version == 2
+
+
+async def test_list_versions_is_newest_first_without_crossing_tenants(
+    repo: SqlWorkflowPublishedVersionRepository,
+) -> None:
+    """The history lists every version, newest first, of this tenant only."""
+    rows = await repo.list_versions(WORKFLOW_ID, limit=10, offset=0)
+    assert [(v.version, v.name) for v in rows] == [
+        (2, f"published name for {DEFAULT_TEST_TENANT_ID}"),
+        (1, "first published name"),
+    ]
+    assert await repo.list_versions(OTHER_WORKFLOW_ID, limit=10, offset=0) == []
+
+
+async def test_list_versions_hides_the_templates_from_queries(
+    repo: SqlWorkflowPublishedVersionRepository,
+) -> None:
+    """``templates`` is not part of the read model, so it cannot be queried."""
+    with pytest.raises(QueryValidationError):
+        await repo.list_versions(
+            WORKFLOW_ID,
+            limit=10,
+            offset=0,
+            filters=[FilterSpec(field="templates", op="like", value="Old")],
+        )
+
+
+async def test_get_version_reads_an_older_snapshot(
+    repo: SqlWorkflowPublishedVersionRepository,
+) -> None:
+    """A numbered version is reachable by number; a missing one is ``None``."""
+    first = await repo.get_version(WORKFLOW_ID, 1)
+    assert first is not None
+    assert [t.title for t in parse_templates(first)] == ["Old"]
+    assert await repo.get_version(WORKFLOW_ID, 3) is None
+    assert await repo.get_version(OTHER_WORKFLOW_ID, 1) is None

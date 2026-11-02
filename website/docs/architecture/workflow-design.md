@@ -47,7 +47,7 @@ So a binding written here is not a hint to the model. It is the grant the [gatew
 
 ## Publishing
 
-Publishing freezes the design. The workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as the published version, replacing the previous one. No AI runs at this point; publishing is a snapshot, not a review.
+Publishing freezes the design. The workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as a new numbered published version; earlier versions stay in the [version history](../guides/workflows.md#version-history). No AI runs at this point; publishing is a snapshot, not a review.
 
 Editing afterwards moves the workflow to `modified` and changes nothing about what runs: runs keep using the published version until it is published again. A run already under way is unaffected either way, because it took its own copy the moment it started.
 

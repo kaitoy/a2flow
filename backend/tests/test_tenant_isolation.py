@@ -177,7 +177,7 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
     rows.workflow_task_template = template.id
 
     versions = SqlWorkflowPublishedVersionRepository(db, tenant_id=tenant_id)
-    await versions.upsert(
+    await versions.create(
         workflow.id,
         name=workflow.name,
         description=None,

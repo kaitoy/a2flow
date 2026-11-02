@@ -86,7 +86,7 @@ Templates mirror a run's tasks structurally — title, description, dependency e
 
 **Publish**, on the workflow detail page, is what makes a workflow executable. It is a **Reviewer** action — a Developer builds and edits a workflow but no longer publishes it, so the person promoting a design is not the same person who wrote it. It needs at least one template, and no generation in flight.
 
-Publishing **freezes the design**: the workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as the published version, replacing the previous one. No AI runs here; refreshing the summary is a [separate action](./workflows.md#regenerating-the-description). Re-adjust and re-publish as often as you like: runs already started are unaffected, because each run took its own copy of the tasks.
+Publishing **freezes the design**: the workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as a new published version — **v1**, **v2**, and so on. Earlier versions are kept in the [version history](#version-history). No AI runs here; refreshing the summary is a [separate action](./workflows.md#regenerating-the-description). Re-adjust and re-publish as often as you like: runs already started are unaffected, because each run took its own copy of the tasks.
 
 ## Editing a published workflow
 
@@ -103,6 +103,23 @@ Editing a workflow after it has been published does not silently change what run
 **Discard changes** is the undo icon in the detail page's status bar, next to Publish. Discarding a workflow that has no unpublished changes does nothing but report as much.
 
 Everyone without the Developer or Reviewer role is served the published version instead, throughout: the workflow's name and description on the list and detail pages, its **Task Templates** screens, and even what a name search in the list matches. Its status reads `published`, and a task template added since the last publish is simply not there for them. So an unfinished redesign never confuses the people who only need to run the workflow — and what they see always matches what their run would do.
+
+## Version history and rolling back {#version-history}
+
+Every publish is kept. **Version history** — the clock icon in the workflow detail page's header — lists them newest first, with each version's number, name, description, and when and by whom it was published. Anyone who can open the workflow can browse it.
+
+To roll back to an earlier design (Developer):
+
+1. Open **Version history** and click **Restore** on the version you want.
+2. Confirm. The version's templates, name, and description replace the workflow's current design, and you are taken back to the workflow.
+3. Check the result. Restoring does **not** publish: runs keep using the current published version until a Reviewer clicks **Publish**, which records the restored design as a new version.
+
+| Status before | Status after restoring |
+|---|---|
+| `published` or `modified` | `modified` — or `published` if you restored the latest version, since nothing is then left unpublished |
+| `draft` | `draft` |
+
+Changed your mind before publishing? **Discard changes** puts the current published version back. A version that binds a tool on an MCP server deleted since cannot be restored; the restore is rejected with an error.
 
 ## Deactivating a workflow
 

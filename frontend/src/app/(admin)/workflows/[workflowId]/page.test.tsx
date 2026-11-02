@@ -347,6 +347,25 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows/wf-1/design-session"));
   });
 
+  it("opens the workflow's version history", async () => {
+    const user = userEvent.setup();
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: pushMock,
+      replace: vi.fn(),
+      back: vi.fn(),
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+      forward: vi.fn(),
+      bfcacheId: "",
+    });
+
+    render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
+    await screen.findByRole("heading", { name: "my-workflow" });
+    await user.click(screen.getByRole("button", { name: /version history/i }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows/wf-1/versions"));
+  });
+
   it("hides the Run action from a viewer without the requester or developer role", async () => {
     render(<WorkflowDetailPage />);
     await screen.findByRole("heading", { name: "my-workflow" });

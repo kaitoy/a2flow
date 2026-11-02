@@ -72,7 +72,12 @@ class WorkflowExecutionCreate(SQLModel):
     the absolute local path this field replaced, it resolves the same way on
     whichever replica happens to serve the next agent run.
 
-    It is nullable because rows created before the revisioned skill store
+    ``workflow_version`` names the published version of the workflow the run
+    copied its design from (see
+    :class:`models.workflow_published_version.WorkflowPublishedVersion`), or is
+    ``None`` for a draft run, which executes a design no version recorded.
+
+    ``agent_skill_commit_sha`` is nullable because rows created before the revisioned skill store
     existed have no revision to name; those fall back to the skill's current
     ``commit_sha`` (see ``WorkflowExecutionService.resolve_agent``).
     """
@@ -88,6 +93,7 @@ class WorkflowExecutionCreate(SQLModel):
     agent_skill_repo_path: str
     agent_skill_commit_sha: str | None = None
     initiator_id: str
+    workflow_version: int | None = None
 
 
 class WorkflowExecution(WorkflowExecutionCreate, TenantScoped, BaseEntity, table=True):
@@ -187,6 +193,7 @@ class WorkflowExecutionRead(BaseEntity):
     agent_skill_repo_path: str
     agent_skill_commit_sha: str | None = None
     initiator_id: str
+    workflow_version: int | None = None
     workflow_id: str | None = None
     is_draft: bool = False
     tool_mocks: list[dict[str, Any]] = []
