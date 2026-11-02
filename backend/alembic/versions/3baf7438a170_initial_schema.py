@@ -496,10 +496,12 @@ def upgrade() -> None:
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("prompt", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
-            "generated_description", sqlmodel.sql.sqltypes.AutoString(), nullable=True
+            "generated_prompt", sqlmodel.sql.sqltypes.AutoString(), nullable=True
         ),
+        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("internal_notes", sa.String(), nullable=True),
         sa.Column("agent_skill_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
@@ -617,7 +619,9 @@ def upgrade() -> None:
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("prompt", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
             "templates",
@@ -630,7 +634,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "workflow_id", name="uq_workflow_published_versions_workflow_id"
+            "workflow_id",
+            "version",
+            name="uq_workflow_published_versions_workflow_id_version",
         ),
     )
     op.create_index(
@@ -648,7 +654,7 @@ def upgrade() -> None:
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("session_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("prompt", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("agent_skill_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column(
             "agent_skill_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False
@@ -664,6 +670,7 @@ def upgrade() -> None:
         ),
         sa.Column("initiator_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("workflow_version", sa.Integer(), nullable=True),
         sa.Column("is_draft", sa.Boolean(), nullable=False),
         sa.Column(
             "tool_mocks",
@@ -976,6 +983,12 @@ def upgrade() -> None:
         ),
         sa.Column("parent_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column(
+            "kind",
+            sa.Enum("task", "consultation", name="executionsessionkind"),
+            nullable=False,
+            server_default="task",
+        ),
+        sa.Column(
             "status",
             sa.Enum(
                 "queued",
@@ -1034,6 +1047,17 @@ def upgrade() -> None:
         "ix_execution_sessions_workflow_execution_id",
         "execution_sessions",
         ["workflow_execution_id"],
+    )
+    # At most one open (not ``done``) consultation per session, so two first
+    # questions racing each other share one.
+    _open_consultation = sa.text("kind = 'consultation' AND status != 'done'")
+    op.create_index(
+        "uq_execution_sessions_open_consultation",
+        "execution_sessions",
+        ["parent_id"],
+        unique=True,
+        sqlite_where=_open_consultation,
+        postgresql_where=_open_consultation,
     )
     op.create_table(
         "session_stream_events",
@@ -1511,6 +1535,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             sa.Enum(
+                "unread",
                 "pending",
                 "ingesting",
                 "ready",
@@ -1944,6 +1969,9 @@ def downgrade() -> None:
         "ix_session_stream_events_session_id_id", table_name="session_stream_events"
     )
     op.drop_table("session_stream_events")
+    op.drop_index(
+        "uq_execution_sessions_open_consultation", table_name="execution_sessions"
+    )
     op.drop_index(
         "ix_execution_sessions_workflow_execution_id", table_name="execution_sessions"
     )
