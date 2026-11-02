@@ -136,7 +136,8 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * any of the three can save them on the spot through the field's own save
  * button, which never moves a published workflow to `modified`; the form's
  * Save also writes them when they changed, so a developer's typed notes are not
- * lost on submit.
+ * lost on submit. The Version history button is shown to the same three roles
+ * too — the backend refuses the history to a requester or approver.
  *
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
@@ -519,13 +520,15 @@ export default function WorkflowDetailPage() {
                     <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
                   </HeaderIconButton>
                 )}
-                <HeaderIconButton
-                  label="Version history"
-                  onClick={() => router.push(`/workflows/${workflowId}/versions`)}
-                  disabled={generating}
-                >
-                  <History size={18} strokeWidth={1.8} aria-hidden="true" />
-                </HeaderIconButton>
+                {canViewPrompt && (
+                  <HeaderIconButton
+                    label="Version history"
+                    onClick={() => router.push(`/workflows/${workflowId}/versions`)}
+                    disabled={generating}
+                  >
+                    <History size={18} strokeWidth={1.8} aria-hidden="true" />
+                  </HeaderIconButton>
+                )}
               </>
             }
           />

@@ -11,7 +11,7 @@ from typing import Any
 
 from httpx import AsyncClient
 
-from tests._envelope import assert_ok
+from tests._envelope import assert_err, assert_ok
 from tests._workflow import (
     add_template,
     create_skill,
@@ -105,16 +105,17 @@ async def test_a_run_hides_its_prompt_from_its_requester(
     )
 
 
-async def test_version_history_hides_the_prompt_from_a_requester(
+async def test_version_history_shows_the_prompt_to_whoever_may_open_it(
     workflow_client: AsyncClient,
 ) -> None:
+    """The history is closed to a requester outright, so its readers see the prompt."""
     wf = await _published(workflow_client)
     path = f"/api/v1/workflows/{wf['id']}/versions"
-    [hidden] = assert_ok(await workflow_client.get(path, headers=REQUESTER))
-    [shown] = assert_ok(await workflow_client.get(path, headers=DEVELOPER))
-    assert hidden["prompt"] is None
-    assert hidden["description"] == "What it is for"
-    assert shown["prompt"] == PROMPT
+    assert_err(await workflow_client.get(path, headers=REQUESTER), "FORBIDDEN", 403)
+    for headers in (DEVELOPER, REVIEWER, ADMIN):
+        [shown] = assert_ok(await workflow_client.get(path, headers=headers))
+        assert shown["prompt"] == PROMPT
+        assert shown["description"] == "What it is for"
 
 
 async def test_editing_the_description_is_a_change_to_publish(

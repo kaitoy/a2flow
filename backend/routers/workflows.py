@@ -76,9 +76,10 @@ _requires_developer = [Depends(require_roles(Role.developer))]
 #: the one pair of write actions ``developer`` no longer performs.
 _requires_reviewer = [Depends(require_roles(Role.reviewer))]
 
-#: Route dependency gating the internal notes behind the roles that may read
-#: them -- see :func:`services.workflow.prompt_hidden_from`.
-_requires_notes_access = [
+#: Route dependency gating the internal notes and the version history behind
+#: the roles that design, review, or administer workflows -- the same set
+#: :func:`services.workflow.prompt_hidden_from` reveals the prompts to.
+_requires_staff_read = [
     Depends(require_roles(Role.admin, Role.developer, Role.reviewer))
 ]
 
@@ -341,7 +342,7 @@ async def update_workflow(
 @router.put(
     "/{workflow_id}/internal-notes",
     response_model=ApiResponse[WorkflowRead],
-    dependencies=_requires_notes_access,
+    dependencies=_requires_staff_read,
 )
 async def set_workflow_internal_notes(
     workflow_id: str,
@@ -452,6 +453,7 @@ async def discard_workflow_changes(
 @router.get(
     "/{workflow_id}/versions",
     response_model=ApiResponse[list[WorkflowVersionRead]],
+    dependencies=_requires_staff_read,
 )
 async def list_workflow_versions(
     workflow_id: str,
@@ -464,7 +466,9 @@ async def list_workflow_versions(
 ) -> ApiResponse[list[WorkflowVersionRead]]:
     """List every version the workflow was published as, newest first.
 
-    Raises HTTP 404 when the workflow does not exist or is a ``draft`` the
+    Open to an ``admin``, ``developer``, or ``reviewer`` only; a ``requester``
+    or ``approver`` gets HTTP 403, as the history is design detail they do not
+    need to run or approve a workflow. Raises HTTP 404 when the workflow does not exist or is a ``draft`` the
     caller may not see.
     """
     items = await service.list_versions(

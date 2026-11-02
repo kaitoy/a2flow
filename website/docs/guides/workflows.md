@@ -65,7 +65,7 @@ A workflow carries two kinds of text, and only one of them affects a run.
 
 The prompt in effect is handed to the execution agent as context for every run: **Prompt** wins when it is non-empty; otherwise **Generated prompt** is used. Since the override usually starts life as a copy of the summary, the Prompt field carries a **Show diff from the generated prompt** action, which opens a word-level diff between the two. It reads the values currently in the form, so unsaved edits are diffed too.
 
-The Description is what the workflow list shows, and what the **Run Workflow** dialog shows under its confirmation, so whoever starts a run can check they picked the right one. The prompt fields are hidden from every other role — on the detail page, in the list's optional **Prompt** column, in the version history, and on a run's detail page.
+The Description is what the workflow list shows, and what the **Run Workflow** dialog shows under its confirmation, so whoever starts a run can check they picked the right one. The prompt fields are hidden from every other role — on the detail page, in the list's optional **Prompt** column, and on a run's detail page.
 
 ### Regenerating the prompt {#regenerating-the-prompt}
 
@@ -109,7 +109,7 @@ Everyone without the Developer or Reviewer role is served the published version 
 
 ## Version history and rolling back {#version-history}
 
-Every publish is kept. **Version history** — the clock icon in the workflow detail page's header — lists them newest first, with each version's number, name, description, and when and by whom it was published. Anyone who can open the workflow can browse it.
+Every publish is kept. **Version history** — the clock icon in the workflow detail page's header — lists them newest first, with each version's number, name, description, and when and by whom it was published. Only an **Admin**, **Developer**, **Reviewer**, or **Super Admin** can browse it — a Requester or Approver does not see the clock icon at all.
 
 To roll back to an earlier design (Developer):
 

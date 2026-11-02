@@ -40,7 +40,7 @@ The initial seeded **`root`** user holds `super_admin` and is platform-scoped (n
 
 **Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role.
 
-A workflow's **Prompt** and **Generated prompt** — the text a run is told — are shown only to an Admin, Developer, Reviewer, or Super Admin. Everyone else reads the workflow, its version history, and its runs with those fields left empty. The workflow's **Description** stays visible to everyone who can open it.
+A workflow's **Prompt** and **Generated prompt** — the text a run is told — are shown only to an Admin, Developer, Reviewer, or Super Admin. Everyone else reads the workflow and its runs with those fields left empty. The workflow's [version history](../guides/workflows.md#version-history) is limited to the same roles; a Requester or Approver cannot open it. The workflow's **Description** stays visible to everyone who can open it.
 
 The one exception is not a role at all: a record carrying an [access-control tag](../guides/tags.md#access-control-tags) is visible only to users whose groups, between them, carry every such tag on it — and to an Admin or a Super Admin, both of whom bypass it. Everyone else sees neither the record nor any sign it exists.
 

@@ -88,7 +88,9 @@ function buildColumns(
 
 /**
  * Admin list of every version the workflow in the URL was published as, newest
- * first. Any reader of the workflow may browse it; a `developer` additionally
+ * first. Only an `admin`, `developer`, or `reviewer` may browse it (the backend
+ * refuses a `requester` or `approver`, and the detail page hides its link from
+ * them); a `developer` additionally
  * gets a Restore action per row, which writes that version's design back into
  * the workflow without publishing it, then returns to the workflow's page.
  */

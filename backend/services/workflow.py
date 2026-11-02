@@ -1245,9 +1245,9 @@ class WorkflowService:
         """Return a page of a workflow's version history.
 
         Every published version is listed, newest first unless ``sort`` says
-        otherwise. They were all published, so nothing here is hidden from a
-        caller allowed to read the workflow at all -- except each version's
-        ``prompt``, which follows :func:`prompt_hidden_from`.
+        otherwise. The router opens this to an ``admin``, ``developer``, or
+        ``reviewer`` only; each version's ``prompt`` still follows
+        :func:`prompt_hidden_from` for any other caller.
 
         Args:
             workflow_id: Identifier of the workflow.

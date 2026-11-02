@@ -164,31 +164,23 @@ async def test_restoring_requires_the_developer_role(
     assert_ok(await _restore(workflow_client, wf["id"], 1, headers=DEVELOPER_ONLY))
 
 
-async def test_any_reader_may_list_the_history(
+async def test_only_staff_may_list_the_history(
     workflow_client: AsyncClient,
 ) -> None:
-    """Every listed version was published, so a requester may see them."""
+    """A requester or approver is refused; a developer or reviewer is served."""
     wf, _ = await _two_versions(workflow_client)
-    versions = assert_ok(
-        await workflow_client.get(
-            f"/api/v1/workflows/{wf['id']}/versions", headers=REQUESTER
+    url = f"/api/v1/workflows/{wf['id']}/versions"
+    for role in ("requester", "approver"):
+        assert_err(
+            await workflow_client.get(url, headers={"X-User-Roles": role}),
+            "FORBIDDEN",
+            403,
         )
-    )
-    assert len(versions) == 2
-
-
-async def test_the_history_of_a_hidden_draft_is_404(
-    workflow_client: AsyncClient,
-) -> None:
-    skill = await create_skill(workflow_client)
-    wf = await generate_workflow(workflow_client, skill["id"])
-    assert_err(
-        await workflow_client.get(
-            f"/api/v1/workflows/{wf['id']}/versions", headers=REQUESTER
-        ),
-        "NOT_FOUND",
-        404,
-    )
+    for role in ("developer", "reviewer", "admin"):
+        versions = assert_ok(
+            await workflow_client.get(url, headers={"X-User-Roles": role})
+        )
+        assert len(versions) == 2
 
 
 async def test_runs_record_the_version_they_started_from(

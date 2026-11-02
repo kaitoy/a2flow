@@ -148,6 +148,17 @@ describe("WorkflowDetailPage", () => {
     expect(screen.queryByLabelText(/^internal notes/i)).not.toBeInTheDocument();
   });
 
+  it("offers the version history to a reviewer but not to a requester", async () => {
+    const { unmount } = render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
+    await screen.findByRole("heading", { name: "my-workflow" });
+    expect(screen.getByRole("button", { name: "Version history" })).toBeInTheDocument();
+    unmount();
+
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    await screen.findByRole("heading", { name: "my-workflow" });
+    expect(screen.queryByRole("button", { name: "Version history" })).not.toBeInTheDocument();
+  });
+
   it("shows the workflow status", async () => {
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => expect(screen.getByText("published")).toBeInTheDocument());
