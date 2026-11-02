@@ -13,7 +13,7 @@ Launch an AWS EC2 instance. The core principle: a running instance costs money a
 
 Ask the user for whatever isn't already given. At minimum, you need:
 
-- **AMI** — which image to boot (an AMI id, or a description you can resolve to one, e.g. "latest Amazon Linux 2023").
+- **AMI** — which image to boot (an AMI id, or a description you can resolve to one, e.g. "latest Amazon Linux 2023"). Resolve an Amazon Linux description by reading its SSM public parameter with `GetParameter`, e.g. `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64`.
 - **Instance type** — e.g. `t3.medium`.
 - **Region** (and availability zone if it matters to them).
 - **Key pair** — which key pair to attach for SSH access.
@@ -41,7 +41,9 @@ Launch exactly the configuration that was approved. Nothing may change between t
 
 Run every AWS operation through the **AWS MCP Server**'s `aws___run_script` tool. Give it a short script that launches the approved instance — an `aws ec2 run-instances` CLI call, or a boto3 `call_boto3` step. The tool may name its fields differently from the terms used here, so map the approved configuration onto the names and units it actually accepts (e.g. "AMI" onto an `ImageId` field) and pass only the fields it accepts.
 
-**`call_boto3` caveat:** the `operation_name` argument and every key in `params` are **PascalCase**, mirroring the AWS API model — `operation_name` is `RunInstances` or `DescribeInstances`, and the `params` keys are `ImageId`, `InstanceType`, `MinCount`, `MaxCount`, `KeyName`, and the like. snake_case (`run_instances`, `image_id`) and camelCase (`runInstances`, `imageId`) are both rejected.
+Call only the AWS operations this skill needs: the read-only lookups that resolve the configuration (`ssm GetParameter`, `ec2 DescribeImages`, `DescribeVpcs`, `DescribeSubnets`, `DescribeSecurityGroups`, `DescribeKeyPairs`), `RunInstances` itself, and `DescribeInstances` to report the result. Do not call anything else — no pre-flight checks of credit specifications, quotas, or account defaults — since none of it is part of the approved configuration.
+
+**`call_boto3` caveat:** the `operation_name` argument and every key in `params` are **PascalCase**, mirroring the AWS API model — `operation_name` is `RunInstances` or `DescribeInstances`, and the `params` keys are `ImageId`, `InstanceType`, `MinCount`, `MaxCount`, `KeyName`, and the like. snake_case (`run_instances`, `image_id`) and camelCase (`runInstances`, `imageId`) are both rejected. Singular and plural forms must match the model exactly as well (`InstanceFamily` is not `InstanceFamilies`).
 
 If the launch returns an error (invalid AMI, insufficient permissions, quota exceeded, etc.), report the exact error to the user and stop — do not retry with silently altered parameters or guess a fix.
 
