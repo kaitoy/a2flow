@@ -37,6 +37,11 @@ export interface RunWorkflowDialogProps {
   /** Name of the workflow about to run, shown in the confirmation sentence. */
   workflowName: string;
   /**
+   * The workflow's description, shown under the confirmation sentence so the
+   * operator can check they picked the right workflow. Never its prompt.
+   */
+  workflowDescription?: string | null;
+  /**
    * Whether the workflow is still `draft`. A draft workflow only ever runs its
    * live design, so it gets the mock picker without the design choice.
    */
@@ -88,6 +93,7 @@ export function RunWorkflowDialog({
   open,
   workflowId,
   workflowName,
+  workflowDescription,
   isDraft,
   canChooseDesign,
   onConfirm,
@@ -182,6 +188,9 @@ export function RunWorkflowDialog({
       }
     >
       <div className="flex flex-col gap-5">
+        {workflowDescription && (
+          <p className="whitespace-pre-wrap text-sm text-on-surface">{workflowDescription}</p>
+        )}
         {canChooseDesign && (
           <section className="flex flex-col gap-2">
             <h3 className="text-label-caps text-on-surface-variant">Which design to run</h3>

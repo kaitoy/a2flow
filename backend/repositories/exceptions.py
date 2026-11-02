@@ -399,10 +399,10 @@ class WorkflowNotDeactivatableError(RepositoryError):
         return {"workflowId": self.workflow_id}
 
 
-class WorkflowDescriptionNotGeneratableError(RepositoryError):
-    """Raised when a Workflow's description cannot be generated in its current state.
+class WorkflowPromptNotGeneratableError(RepositoryError):
+    """Raised when a Workflow's prompt cannot be generated in its current state.
 
-    ``POST /workflows/{id}/generate-description`` summarizes the workflow's
+    ``POST /workflows/{id}/generate-prompt`` summarizes the workflow's
     design conversation, so it needs that conversation to exist and to be
     settled: a workflow still ``generating`` has a design run in flight, and
     one without a design session (or with an empty one) has nothing to
@@ -413,14 +413,14 @@ class WorkflowDescriptionNotGeneratableError(RepositoryError):
     returning HTTP 409.
     """
 
-    code = "WORKFLOW_DESCRIPTION_NOT_GENERATABLE"
+    code = "WORKFLOW_PROMPT_NOT_GENERATABLE"
     http_status = 409
 
     def __init__(self, workflow_id: str, reason: str) -> None:
         self.workflow_id = workflow_id
         self.reason = reason
         super().__init__(
-            f"Workflow {workflow_id!r} has no description to generate: {reason}"
+            f"Workflow {workflow_id!r} has no prompt to generate: {reason}"
         )
 
     def details(self) -> dict[str, Any]:
@@ -433,7 +433,7 @@ class SummarizationFailedError(RepositoryError):
 
     Unlike the background generation job — which records the failure on the
     workflow row and moves on — the on-demand
-    ``POST /workflows/{id}/generate-description`` has nothing else to deliver,
+    ``POST /workflows/{id}/generate-prompt`` has nothing else to deliver,
     so the failure surfaces as HTTP 502.
 
     Carries the ``workflow_id`` and a ``reason``. The HTTP layer logs ``reason``

@@ -20,7 +20,8 @@ const WORKFLOW_1 = {
   tenantId: "tenant-1",
   name: "my-workflow",
   description: null,
-  generatedDescription: null,
+  prompt: null,
+  generatedPrompt: null,
   agentSkillId: "skill-1",
   sessionId: "design-session-id",
   agentSkillCommitSha: "a".repeat(40),
@@ -246,7 +247,7 @@ describe("DesignSessionPage", () => {
     expect(screen.queryByTestId("chat-input-mock")).not.toBeInTheDocument();
   });
 
-  it("generates a description, shows a toast, and opens the diff preview", async () => {
+  it("generates a prompt, shows a toast, and opens the diff preview", async () => {
     mockMe(["developer"]);
     const { store } = render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
     const chatInputMock = await screen.findByTestId("chat-input-mock");
@@ -255,27 +256,27 @@ describe("DesignSessionPage", () => {
     });
 
     await userEvent.click(menuTrigger);
-    await userEvent.click(screen.getByRole("menuitem", { name: /Generate description/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /Generate prompt/ }));
 
     await waitFor(() =>
       expect(store.getState().toast.items.at(-1)).toMatchObject({
-        message: "Description generated",
+        message: "Prompt generated",
       })
     );
-    const dialog = await screen.findByRole("dialog", { name: "Description diff" });
-    // WORKFLOW_1's `description` stays null after generation (only
-    // `generatedDescription` is set), so the dialog falls back to its
-    // empty-description copy instead of rendering a word-level diff.
-    expect(within(dialog).getByText(/Description is empty/)).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: "Prompt diff" });
+    // WORKFLOW_1's `prompt` stays null after generation (only
+    // `generatedPrompt` is set), so the dialog falls back to its
+    // empty-prompt copy instead of rendering a word-level diff.
+    expect(within(dialog).getByText(/Prompt is empty/)).toBeInTheDocument();
   });
 
   it("opens the diff dialog immediately with a loading skeleton, then swaps in the diff", async () => {
     mockMe(["developer"]);
     server.use(
-      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", async () => {
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-prompt", async () => {
         // Outlast useAsyncAction's 200ms pending gate so the loading state is reached.
         await delay(400);
-        return envelope({ ...WORKFLOW_1, generatedDescription: "A freshly generated summary" });
+        return envelope({ ...WORKFLOW_1, generatedPrompt: "A freshly generated summary" });
       })
     );
     render(<DesignSessionPage />, { preloadedState: AUTH_STATE });
@@ -285,10 +286,10 @@ describe("DesignSessionPage", () => {
     });
 
     await userEvent.click(menuTrigger);
-    await userEvent.click(screen.getByRole("menuitem", { name: /Generate description/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /Generate prompt/ }));
 
     // The dialog opens right away, while the request is still in flight.
-    const dialog = await screen.findByRole("dialog", { name: "Description diff" });
+    const dialog = await screen.findByRole("dialog", { name: "Prompt diff" });
     expect(within(dialog).getByRole("status", { name: "Generating" })).toBeInTheDocument();
     await waitFor(() => expect(dialog).toHaveClass("live-edge"));
 
@@ -297,13 +298,13 @@ describe("DesignSessionPage", () => {
       expect(within(dialog).queryByRole("status", { name: "Generating" })).not.toBeInTheDocument()
     );
     expect(dialog).not.toHaveClass("live-edge");
-    expect(within(dialog).getByText(/Description is empty/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Prompt is empty/)).toBeInTheDocument();
   });
 
-  it("closes the diff dialog if generating the description fails", async () => {
+  it("closes the diff dialog if generating the prompt fails", async () => {
     mockMe(["developer"]);
     server.use(
-      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", () =>
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-prompt", () =>
         envelopeErr("INTERNAL", "Something went wrong", 500)
       )
     );
@@ -314,15 +315,15 @@ describe("DesignSessionPage", () => {
     });
 
     await userEvent.click(menuTrigger);
-    await userEvent.click(screen.getByRole("menuitem", { name: /Generate description/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /Generate prompt/ }));
 
-    await screen.findByRole("dialog", { name: "Description diff" });
+    await screen.findByRole("dialog", { name: "Prompt diff" });
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Description diff" })).not.toBeInTheDocument()
+      expect(screen.queryByRole("dialog", { name: "Prompt diff" })).not.toBeInTheDocument()
     );
   });
 
-  it("disables the generate-description item while the workflow is generating", async () => {
+  it("disables the generate-prompt item while the workflow is generating", async () => {
     mockMe(["developer"]);
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
@@ -331,7 +332,7 @@ describe("DesignSessionPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: null,
+          generatedPrompt: null,
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -352,7 +353,7 @@ describe("DesignSessionPage", () => {
 
     await userEvent.click(menuTrigger);
 
-    expect(screen.getByRole("menuitem", { name: /Generate description/ })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: /Generate prompt/ })).toBeDisabled();
   });
 
   it("shows the reason a background design run failed", async () => {

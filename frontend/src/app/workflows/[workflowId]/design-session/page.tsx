@@ -14,7 +14,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { DescriptionDiffDialog } from "@/components/admin/description-diff-dialog";
+import { PromptDiffDialog } from "@/components/admin/prompt-diff-dialog";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { ChatInputMenu } from "@/components/ChatInputMenu";
@@ -30,7 +30,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDesignSessionChat } from "@/hooks/useDesignSessionChat";
 import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
 import {
-  generateWorkflowDescription,
+  generateWorkflowPrompt,
   getWorkflow,
   isForbiddenError,
   listWorkflowTaskTemplates,
@@ -58,7 +58,7 @@ const WORKFLOW_POLL_INTERVAL_MS = 2_000;
  * Templates are re-fetched after every agent turn (and on an interval) so the
  * timeline follows the task templates the agent is editing. A developer can also open
  * the chat input's action menu to re-summarize the conversation into the
- * workflow's description; `DescriptionDiffDialog` opens immediately (showing
+ * workflow's generated prompt; `PromptDiffDialog` opens immediately (showing
  * a loading skeleton and the live edge while the request is in flight) and
  * then reviews the change once it lands.
  *
@@ -76,7 +76,7 @@ function DesignSessionView({
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
   const currentUser = useAppSelector((s) => s.auth.user);
-  const generateDescription = useAsyncAction({ showDone: false });
+  const generatePrompt = useAsyncAction({ showDone: false });
   const [diffOpen, setDiffOpen] = useState(false);
   const {
     messages,
@@ -165,15 +165,15 @@ function DesignSessionView({
 
   const taskIndexById = useMemo(() => new Map(templates.map((t, i) => [t.id, i + 1])), [templates]);
 
-  async function handleGenerateDescription() {
+  async function handleGeneratePrompt() {
     // Open the dialog immediately, before the request resolves, so the
     // skeleton + live edge give feedback the moment the action starts.
     setDiffOpen(true);
     try {
-      await generateDescription.run(async () => {
-        const updated = await generateWorkflowDescription(workflow.id);
+      await generatePrompt.run(async () => {
+        const updated = await generateWorkflowPrompt(workflow.id);
         onWorkflowUpdate(updated);
-        dispatch(showToast({ message: "Description generated" }));
+        dispatch(showToast({ message: "Prompt generated" }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; close the dialog rather
@@ -256,27 +256,27 @@ function DesignSessionView({
             disabled={isRunning}
             leading={
               <ChatInputMenu
-                onGenerateDescription={handleGenerateDescription}
-                disabled={workflow.status === "generating" || generateDescription.inFlight}
-                pending={generateDescription.inFlight}
+                onGeneratePrompt={handleGeneratePrompt}
+                disabled={workflow.status === "generating" || generatePrompt.inFlight}
+                pending={generatePrompt.inFlight}
               />
             }
           />
         )}
       </div>
-      <DescriptionDiffDialog
+      <PromptDiffDialog
         open={diffOpen}
-        generated={workflow.generatedDescription ?? ""}
-        description={workflow.description ?? ""}
+        generated={workflow.generatedPrompt ?? ""}
+        prompt={workflow.prompt ?? ""}
         onClose={() => setDiffOpen(false)}
         // Unlike the live-edge convention elsewhere (gated on the 200ms
         // `status === "pending"` stage to avoid flashing on fast responses),
         // this has to flip true the instant the dialog opens: `open`,
-        // `generated`, and `description` above are still last render's
+        // `generated`, and `prompt` above are still last render's
         // (stale, usually empty) values until the request resolves, so a
         // `pending`-gated `loading` would show a misleading "no diff" beat
         // before the skeleton ever appears.
-        loading={generateDescription.inFlight}
+        loading={generatePrompt.inFlight}
       />
     </div>
   );

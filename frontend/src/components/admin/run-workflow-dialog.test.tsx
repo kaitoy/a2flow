@@ -63,6 +63,11 @@ function liveRadio() {
 }
 
 describe("RunWorkflowDialog", () => {
+  it("shows the workflow's description so the operator can confirm the pick", async () => {
+    renderDialog({ isDraft: false, workflowDescription: "Collects the weekly report." });
+    expect(await screen.findByText("Collects the weekly report.")).toBeInTheDocument();
+  });
+
   it("confirms with no mocks for a published workflow", async () => {
     const user = userEvent.setup();
     const { onConfirm } = renderDialog({ isDraft: false });

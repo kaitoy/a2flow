@@ -264,13 +264,13 @@ async def test_a_requester_sees_the_published_workflow_instead(
     assert body["name"] == "my-workflow"
 
 
-async def test_a_requester_is_not_shown_the_generated_description(
+async def test_a_requester_is_not_shown_the_generated_prompt(
     workflow_client: AsyncClient,
 ) -> None:
     """The snapshot resolved the two descriptions into one at publish time."""
     wf = await _modified(workflow_client)
     body = await _get(workflow_client, wf["id"], REQUESTER)
-    assert body["generatedDescription"] is None
+    assert body["generatedPrompt"] is None
 
 
 async def test_a_user_without_roles_still_reads_the_workflow(

@@ -22,7 +22,7 @@ between dialects, and :meth:`_template_query` is the one place that knows it.
 from collections.abc import Sequence
 from typing import Any, Protocol
 
-from sqlalchemy import Integer, Text, column, func, literal, true
+from sqlalchemy import Integer, Text, column, func, literal, null, true
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import col, select
 
@@ -74,6 +74,7 @@ class WorkflowPublishedVersionRepository(Protocol):
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        hide_prompt: bool = False,
     ) -> list[WorkflowPublishedVersion]: ...
 
     async def get_version(
@@ -86,6 +87,7 @@ class WorkflowPublishedVersionRepository(Protocol):
         *,
         name: str,
         description: str | None,
+        prompt: str | None,
         templates: list[dict[str, Any]],
         user_id: str,
     ) -> WorkflowPublishedVersion: ...
@@ -293,6 +295,7 @@ class SqlWorkflowPublishedVersionRepository(
         offset: int,
         sort: Sequence[SortSpec] = (),
         filters: Sequence[FilterSpec] = (),
+        hide_prompt: bool = False,
     ) -> list[WorkflowPublishedVersion]:
         """Return a page of a workflow's version history, newest first by default.
 
@@ -306,6 +309,8 @@ class SqlWorkflowPublishedVersionRepository(
             offset: Number of versions to skip.
             sort: Ordering instructions; empty means ``version`` descending.
             filters: Field filters applied to the query.
+            hide_prompt: Filter and sort ``prompt`` as ``NULL``, for a caller
+                who is not shown it, so a filter cannot read it back.
 
         Returns:
             The requested page of snapshots.
@@ -318,8 +323,13 @@ class SqlWorkflowPublishedVersionRepository(
             WorkflowPublishedVersion.workflow_id == workflow_id
         )
         stmt = self._scoped(stmt)
+        columns = {"prompt": ColumnOverride(expression=null())} if hide_prompt else None
         stmt = apply_filters(
-            stmt, WorkflowPublishedVersion, filters, readable=WorkflowVersionRead
+            stmt,
+            WorkflowPublishedVersion,
+            filters,
+            readable=WorkflowVersionRead,
+            columns=columns,
         )
         stmt = apply_sort(
             stmt,
@@ -327,6 +337,7 @@ class SqlWorkflowPublishedVersionRepository(
             sort,
             default=[col(WorkflowPublishedVersion.version).desc()],
             readable=WorkflowVersionRead,
+            columns=columns,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
@@ -356,6 +367,7 @@ class SqlWorkflowPublishedVersionRepository(
         *,
         name: str,
         description: str | None,
+        prompt: str | None,
         templates: list[dict[str, Any]],
         user_id: str,
     ) -> WorkflowPublishedVersion:
@@ -371,6 +383,7 @@ class SqlWorkflowPublishedVersionRepository(
             workflow_id: Identifier of the workflow being published.
             name: The workflow's name at publish time.
             description: The workflow's description at publish time.
+            prompt: The workflow's effective prompt at publish time.
             templates: The serialized task templates (see
                 :func:`models.workflow_published_version.dump_templates`).
             user_id: ID of the user publishing the workflow.
@@ -385,6 +398,7 @@ class SqlWorkflowPublishedVersionRepository(
             version=latest.version + 1 if latest else 1,
             name=name,
             description=description,
+            prompt=prompt,
             templates=templates,
             tenant_id=tenant_id,
             created_by=user_id,

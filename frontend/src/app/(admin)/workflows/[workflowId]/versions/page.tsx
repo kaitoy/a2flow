@@ -32,7 +32,8 @@ const ALL_LIMIT = 1000;
 function buildColumns(
   names: Map<string, string>,
   onRestore: (version: WorkflowVersion) => void,
-  canRestore: boolean
+  canRestore: boolean,
+  canViewPrompt: boolean
 ): ColumnDef<WorkflowVersion>[] {
   const columns: ColumnDef<WorkflowVersion>[] = [
     idColumn<WorkflowVersion>(),
@@ -56,6 +57,18 @@ function buildColumns(
       filterField: "description",
       cell: (v) => v.description || "—",
     },
+    // The backend blanks prompts for anyone else, so the column would be empty.
+    ...(canViewPrompt
+      ? [
+          {
+            header: "Prompt",
+            sortField: "prompt",
+            filterField: "prompt",
+            visibility: "optional" as const,
+            cell: (v: WorkflowVersion) => v.prompt || "—",
+          },
+        ]
+      : []),
     ...auditColumns<WorkflowVersion>(names),
   ];
   if (canRestore) {
@@ -84,6 +97,7 @@ export default function WorkflowVersionsPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canRestore = useHasRole(Role.DEVELOPER);
+  const canViewPrompt = useHasRole(Role.ADMIN, Role.DEVELOPER, Role.REVIEWER);
   const [versions, setVersions] = useState<WorkflowVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState<SortSpec | null>(null);
@@ -129,7 +143,8 @@ export default function WorkflowVersionsPage() {
   }
 
   const names = useUserNames(versions.flatMap((v) => [v.createdBy, v.updatedBy]));
-  const columns = buildColumns(names, setConfirmTarget, canRestore);
+  const columns = buildColumns(names, setConfirmTarget, canRestore, canViewPrompt);
+
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowVersions",
     columns

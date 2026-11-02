@@ -60,6 +60,7 @@ class WorkflowRepository(Protocol):
         filters: Sequence[FilterSpec] = (),
         tag_ids: Sequence[str] = (),
         published_view: bool = False,
+        hide_prompt: bool = False,
     ) -> list[Workflow]: ...
 
     async def commit_shas_for_skill(self, agent_skill_id: str) -> set[str]: ...
@@ -84,7 +85,8 @@ class WorkflowRepository(Protocol):
         status: WorkflowStatus,
         *,
         generation_error: str | None = None,
-        generated_description: str | None = None,
+        generated_prompt: str | None = None,
+        description: str | None = None,
         user_id: str,
     ) -> Workflow: ...
 
@@ -173,6 +175,7 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         filters: Sequence[FilterSpec] = (),
         tag_ids: Sequence[str] = (),
         published_view: bool = False,
+        hide_prompt: bool = False,
     ) -> list[Workflow]:
         """Return a page of Workflows, defaulting to ``created_at`` descending.
 
@@ -186,6 +189,11 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         values is
         :func:`models.workflow_published_version.published_workflow_read`'s job,
         and the two must agree.
+
+        ``hide_prompt`` filters and sorts ``prompt`` and ``generated_prompt``
+        as ``NULL``, for a caller who is not shown them
+        (:func:`services.workflow.prompt_hidden_from`), so a filter cannot
+        read them back either.
         """
         stmt = select(Workflow)
         stmt = self._scoped(stmt)
@@ -202,6 +210,12 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
                 ),
             )
             columns = self._published_view_columns(version)
+        if hide_prompt:
+            columns = {
+                **(columns or {}),
+                "prompt": ColumnOverride(expression=null()),
+                "generated_prompt": ColumnOverride(expression=null()),
+            }
         stmt = apply_filters(
             stmt, Workflow, filters, readable=WorkflowRead, columns=columns
         )
@@ -222,8 +236,9 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
     ) -> dict[str, ColumnOverride]:
         """Return the expressions a non-``developer`` caller queries workflows by.
 
-        While a workflow is ``modified``, its live name, description, and
-        status describe edits that caller is not allowed to see, so filtering
+        While a workflow is ``modified``, its live name, description, prompt,
+        and status describe edits that caller is not allowed to see, so filtering
+
         and sorting read the joined snapshot instead and report the status as
         ``published``. Every other status already equals its snapshot by
         construction and passes through, as does a ``modified`` workflow whose
@@ -258,10 +273,16 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
                     else_=col(Workflow.description),
                 )
             ),
-            "generated_description": ColumnOverride(
+            "prompt": ColumnOverride(
+                expression=case(
+                    (published, col(version.prompt)),
+                    else_=col(Workflow.prompt),
+                )
+            ),
+            "generated_prompt": ColumnOverride(
                 expression=case(
                     (published, null()),
-                    else_=col(Workflow.generated_description),
+                    else_=col(Workflow.generated_prompt),
                 )
             ),
             "status": ColumnOverride(
@@ -357,7 +378,8 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         status: WorkflowStatus,
         *,
         generation_error: str | None = None,
-        generated_description: str | None = None,
+        generated_prompt: str | None = None,
+        description: str | None = None,
         user_id: str,
     ) -> Workflow:
         """Set the server-managed lifecycle fields of a workflow.
@@ -366,16 +388,21 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
         so they cannot be written through the API; the generation job and the
         publish use case go through this method instead. ``generation_error``
         is always overwritten (a successful transition clears a stale error).
-        ``generated_description`` is only written when non-``None`` — the
+        ``generated_prompt`` is only written when non-``None`` — the
         callers pass the freshly generated conversation summary here so it
-        lands in the same commit as the status change.
+        lands in the same commit as the status change. ``description`` is the
+        generation job's requester-facing blurb; it only fills an empty
+        ``description``, so text a developer typed while the design was still
+        generating is never overwritten.
 
         Args:
             workflow_id: Identifier of the workflow to update.
             status: The new lifecycle status.
             generation_error: Failure reason to record, or ``None`` to clear.
-            generated_description: New AI-generated summary, or ``None`` to
+            generated_prompt: New AI-generated summary, or ``None`` to
                 keep as is.
+            description: AI-generated description to use when the workflow
+                has none yet, or ``None`` to keep as is.
             user_id: ID of the acting user recorded on ``updated_by``.
 
         Returns:
@@ -390,8 +417,11 @@ class SqlWorkflowRepository(TenantScopedRepository[Workflow]):
             raise NotFoundError("Workflow", workflow_id)
         workflow.status = status
         workflow.generation_error = generation_error
-        if generated_description is not None:
-            workflow.generated_description = generated_description
+        if generated_prompt is not None:
+            workflow.generated_prompt = generated_prompt
+        if description is not None and not workflow.description:
+            workflow.description = description
+
         workflow.updated_by = user_id
         self._db.add(workflow)
         await commit_or_translate_user_fk(self._db, user_id=user_id)

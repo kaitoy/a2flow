@@ -57,7 +57,8 @@ async def test_generate_workflow_response_is_generating(
     assert body["name"] == "my-workflow"
     assert body["status"] == "generating"
     assert body["tagIds"] == []
-    assert "prompt" not in body
+    # The design request is not the run prompt; it is never stored.
+    assert body["prompt"] is None
 
 
 async def test_generate_workflow_copies_the_skills_tags(
@@ -677,13 +678,13 @@ async def test_publish_workflow_does_not_resummarize(
 
     body = await publish_workflow(workflow_client, wf["id"])
     assert body["status"] == "published"
-    assert body["generatedDescription"] is None
+    assert body["generatedPrompt"] is None
 
 
 # ---------- generate description ----------
 
 
-async def test_generate_description_summarizes_the_design_conversation(
+async def test_generate_prompt_summarizes_the_design_conversation(
     workflow_client: AsyncClient,
     real_session_service: InMemorySessionService,
     monkeypatch: pytest.MonkeyPatch,
@@ -696,15 +697,15 @@ async def test_generate_description_summarizes_the_design_conversation(
     await seed_design_transcript(workflow_client, real_session_service, wf["id"])
 
     body = assert_ok(
-        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-description")
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-prompt")
     )
-    assert body["generatedDescription"] == "A summary of the design"
+    assert body["generatedPrompt"] == "A summary of the design"
     # The user's own description is left alone -- the two fields are separate.
     assert body["description"] is None
     assert body["status"] == "draft"
 
 
-async def test_generate_description_marks_a_published_workflow_modified(
+async def test_generate_prompt_marks_a_published_workflow_modified(
     workflow_client: AsyncClient,
     real_session_service: InMemorySessionService,
     monkeypatch: pytest.MonkeyPatch,
@@ -718,25 +719,25 @@ async def test_generate_description_marks_a_published_workflow_modified(
     await seed_design_transcript(workflow_client, real_session_service, wf["id"])
 
     body = assert_ok(
-        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-description")
+        await workflow_client.post(f"/api/v1/workflows/{wf['id']}/generate-prompt")
     )
     assert body["status"] == "modified"
-    assert body["generatedDescription"] == "A summary of the design"
+    assert body["generatedPrompt"] == "A summary of the design"
 
 
-async def test_generate_description_without_a_conversation_returns_409(
+async def test_generate_prompt_without_a_conversation_returns_409(
     workflow_client: AsyncClient,
 ) -> None:
     skill = await create_skill(workflow_client)
     wf = await generate_workflow(workflow_client, skill["id"])
     response = await workflow_client.post(
-        f"/api/v1/workflows/{wf['id']}/generate-description"
+        f"/api/v1/workflows/{wf['id']}/generate-prompt"
     )
-    err = assert_err(response, code="WORKFLOW_DESCRIPTION_NOT_GENERATABLE", status=409)
+    err = assert_err(response, code="WORKFLOW_PROMPT_NOT_GENERATABLE", status=409)
     assert err["details"]["workflowId"] == wf["id"]
 
 
-async def test_generate_description_while_generating_returns_409(
+async def test_generate_prompt_while_generating_returns_409(
     workflow_client: AsyncClient,
     real_session_service: InMemorySessionService,
     mock_generation_job: AsyncMock,
@@ -746,21 +747,21 @@ async def test_generate_description_while_generating_returns_409(
     wf = await generate_workflow(workflow_client, skill["id"])
     await seed_design_transcript(workflow_client, real_session_service, wf["id"])
     response = await workflow_client.post(
-        f"/api/v1/workflows/{wf['id']}/generate-description"
+        f"/api/v1/workflows/{wf['id']}/generate-prompt"
     )
-    assert_err(response, code="WORKFLOW_DESCRIPTION_NOT_GENERATABLE", status=409)
+    assert_err(response, code="WORKFLOW_PROMPT_NOT_GENERATABLE", status=409)
 
 
-async def test_generate_description_unknown_id_returns_404(
+async def test_generate_prompt_unknown_id_returns_404(
     workflow_client: AsyncClient,
 ) -> None:
     response = await workflow_client.post(
-        "/api/v1/workflows/nonexistent/generate-description"
+        "/api/v1/workflows/nonexistent/generate-prompt"
     )
     assert_err(response, code="NOT_FOUND", status=404)
 
 
-async def test_generate_description_summarizer_failure_returns_502(
+async def test_generate_prompt_summarizer_failure_returns_502(
     workflow_client: AsyncClient,
     real_session_service: InMemorySessionService,
     monkeypatch: pytest.MonkeyPatch,
@@ -774,7 +775,7 @@ async def test_generate_description_summarizer_failure_returns_502(
     await seed_design_transcript(workflow_client, real_session_service, wf["id"])
 
     response = await workflow_client.post(
-        f"/api/v1/workflows/{wf['id']}/generate-description"
+        f"/api/v1/workflows/{wf['id']}/generate-prompt"
     )
     err = assert_err(response, code="SUMMARIZATION_FAILED", status=502)
     assert err["details"] == {"workflowId": wf["id"]}
@@ -887,14 +888,14 @@ async def test_modified_workflow_run_snapshots_the_published_name(
     assert_ok(
         await workflow_client.patch(
             f"/api/v1/workflows/{wf['id']}",
-            json={"name": "Renamed", "description": "Edited description"},
+            json={"name": "Renamed", "prompt": "Edited prompt"},
         )
     )
     execution = assert_ok(
         await workflow_client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
     )
     assert execution["name"].startswith("my-workflow-")
-    assert execution["description"] != "Edited description"
+    assert execution["prompt"] != "Edited prompt"
 
 
 async def test_republishing_promotes_the_edits_into_runs(

@@ -12,7 +12,7 @@ sidebar_position: 3
 
 | 実行に写されるもの | 写し元 |
 |---|---|
-| 名前と実効的な説明 | 最後の公開版。まだ `draft` のワークフローの場合、および Developer が `modified` のワークフローの[未公開の編集内容](../guides/workflows.md#trying-the-edits-out)を選んだ場合は現在の内容 |
+| 名前と実効的なプロンプト | 最後の公開版。まだ `draft` のワークフローの場合、および Developer が `modified` のワークフローの[未公開の編集内容](../guides/workflows.md#trying-the-edits-out)を選んだ場合は現在の内容 |
 | タスク(すべて `pending`)と、その依存とツールバインディング | 同じ設計のタスクテンプレート |
 | 実行が従うエージェントスキルのリビジョン | その時点でスキルが公開しているリビジョン |
 | 選ばれた[ツールモック](./mcp-gateway-and-proxy.md#tool-mocks-and-dry-runs)(値のまま) | その時点でのモックの内容 |

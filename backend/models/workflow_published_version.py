@@ -1,7 +1,7 @@
 """Snapshots of a Workflow, one per time it was published.
 
-Publishing a workflow freezes its design: the workflow's name, its summarized
-description, and its full task-template list (dependency edges and MCP tool
+Publishing a workflow freezes its design: the workflow's name, description, effective
+prompt, and its full task-template list (dependency edges and MCP tool
 bindings included) are copied into a new
 :class:`WorkflowPublishedVersion` row numbered one past the previous one
 (``version`` 1, 2, ...). Editing the workflow afterwards moves it to
@@ -113,6 +113,9 @@ class WorkflowPublishedVersion(TenantScoped, BaseEntity, table=True):
     version: int = 1
     name: str
     description: str | None = None
+    #: The workflow's effective prompt at publish time -- its ``prompt``
+    #: override if set, else its ``generated_prompt``.
+    prompt: str | None = None
     #: The workflow's task templates at publish time, stored as a JSON list of
     #: :class:`WorkflowPublishedVersionTemplate` payloads (camelCase keys).
     #: Read back through :func:`parse_templates`.
@@ -133,6 +136,7 @@ class WorkflowVersionRead(BaseEntity):
     version: int
     name: str
     description: str | None = None
+    prompt: str | None = None
 
 
 def latest_version_clause(
@@ -251,7 +255,7 @@ def published_workflow_read(
     """Project a Workflow as a non-``developer`` caller is allowed to see it.
 
     A ``modified`` workflow's live row carries edits nobody has approved yet, so
-    its name, description, and status are taken from ``version`` instead and the
+    its name, description, prompt, and status are taken from ``version`` instead and the
     status is reported as ``published`` — the workflow's unpublished state is
     not disclosed at all. Every other status already matches its snapshot by
     construction and passes through untouched.
@@ -276,10 +280,11 @@ def published_workflow_read(
     return read.model_copy(
         update={
             "name": version.name,
-            # The snapshot stored the resolved description at publish time, so
-            # the generated one it was resolved from has nothing left to add.
+            # The snapshot stored the resolved prompt at publish time, so the
+            # generated one it was resolved from has nothing left to add.
             "description": version.description,
-            "generated_description": None,
+            "prompt": version.prompt,
+            "generated_prompt": None,
             "status": WorkflowStatus.published,
         }
     )

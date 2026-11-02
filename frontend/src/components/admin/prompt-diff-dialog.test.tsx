@@ -2,17 +2,17 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { DescriptionDiffDialog } from "./description-diff-dialog";
+import { PromptDiffDialog } from "./prompt-diff-dialog";
 
-/** Wraps {@link DescriptionDiffDialog} with a real trigger button, matching how
+/** Wraps {@link PromptDiffDialog} with a real trigger button, matching how
  * it's opened in practice, so focus restoration on close is testable. */
 function TriggerHarness({
   generated,
-  description,
+  prompt,
   loading,
 }: {
   generated: string;
-  description: string;
+  prompt: string;
   loading?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -21,10 +21,10 @@ function TriggerHarness({
       <button type="button" onClick={() => setOpen(true)}>
         open dialog
       </button>
-      <DescriptionDiffDialog
+      <PromptDiffDialog
         open={open}
         generated={generated}
-        description={description}
+        prompt={prompt}
         onClose={() => setOpen(false)}
         loading={loading}
       />
@@ -33,21 +33,21 @@ function TriggerHarness({
 }
 
 /** Opens the harness dialog and returns its panel. */
-async function openDialog(generated: string, description: string, loading?: boolean) {
+async function openDialog(generated: string, prompt: string, loading?: boolean) {
   const user = userEvent.setup();
-  render(<TriggerHarness generated={generated} description={description} loading={loading} />);
+  render(<TriggerHarness generated={generated} prompt={prompt} loading={loading} />);
   await user.click(screen.getByText("open dialog"));
   return { user, dialog: await screen.findByRole("dialog") };
 }
 
-describe("DescriptionDiffDialog", () => {
+describe("PromptDiffDialog", () => {
   it("renders nothing while closed", () => {
-    render(<TriggerHarness generated="Runs monthly." description="Runs weekly." />);
+    render(<TriggerHarness generated="Runs monthly." prompt="Runs weekly." />);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("strikes out words only in the generated description and highlights added ones", async () => {
+  it("strikes out words only in the generated prompt and highlights added ones", async () => {
     const { dialog } = await openDialog(
       "Collects the monthly sales report.",
       "Collects the weekly sales report."
@@ -71,11 +71,11 @@ describe("DescriptionDiffDialog", () => {
     expect(dialog.querySelectorAll("ins")).toHaveLength(0);
   });
 
-  it("explains the fallback instead of diffing when the description is empty", async () => {
+  it("explains the fallback instead of diffing when the prompt is empty", async () => {
     const { dialog } = await openDialog("Runs every Monday.", "   ");
 
     expect(
-      within(dialog).getByText("Description is empty, so the generated description is used as is.")
+      within(dialog).getByText("Prompt is empty, so the generated prompt is used as is.")
     ).toBeInTheDocument();
     expect(dialog.querySelectorAll("del")).toHaveLength(0);
   });

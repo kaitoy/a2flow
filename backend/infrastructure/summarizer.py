@@ -1,11 +1,14 @@
 """Rendering and one-shot LLM summarization of a workflow's design conversation.
 
 Used by the workflow generation job and by ``POST
-/workflows/{id}/generate-description`` to distill a design session's
-transcript into the workflow's ``generated_description``, which is later handed
+/workflows/{id}/generate-prompt`` to distill a design session's
+transcript into the workflow's ``generated_prompt``, which is later handed
 to the execution agent as context. :func:`build_design_transcript` turns the
 ADK session's raw events into that transcript;
-:func:`summarize_design_transcript` summarizes it. The latter reuses the
+:func:`summarize_design_transcript` summarizes it into the prompt, and
+:func:`describe_design_transcript` into the short description shown to the
+people who run the workflow (generation job only). Both reuse the
+
 application's model selection (``config.Settings.llm_model`` via
 :func:`infrastructure.agent.resolve_model`) so the summarizer always runs on
 the same LLM as the agents.
@@ -66,6 +69,17 @@ _SUMMARY_PROMPT = (
     "Conversation:\n{transcript}"
 )
 
+_DESCRIPTION_PROMPT = (
+    "Read the following workflow-design conversation and write a short "
+    "description of the workflow it produced, for the people who will run it. "
+    "Say what the workflow does for them and, if they need to have something "
+    "ready, what that is. Do not describe internal steps, tools, systems, "
+    "credentials, or how the work is carried out. Write one to three plain "
+    "sentences (no headings, no lists), in the language the conversation was "
+    "held in, and keep it under 300 characters.\n\n"
+    "Conversation:\n{transcript}"
+)
+
 
 def build_llm() -> BaseLlm:
     """Instantiate a :class:`BaseLlm` for one-shot calls from the configured model.
@@ -83,18 +97,18 @@ def build_llm() -> BaseLlm:
 async def summarize_design_transcript(
     transcript: str, *, max_chars: int = 10000
 ) -> str:
-    """Summarize a design-session transcript into a workflow description.
+    """Summarize a design-session transcript into a workflow prompt.
 
     Sends a single user turn to the configured LLM and concatenates the text
     parts of its response. The transcript is truncated to
     :data:`_TRANSCRIPT_MAX_CHARS` before sending, and the result is hard-cut to
-    ``max_chars`` so it always fits the ``WorkflowDescText`` column constraint.
+    ``max_chars`` so it always fits the ``WorkflowPromptText`` column constraint.
 
     Args:
         transcript: The design conversation as plain text (one line per
             message, speaker-prefixed).
         max_chars: Upper bound on the returned summary length; defaults to the
-            ``WorkflowDescText`` maximum.
+            ``WorkflowPromptText`` maximum.
 
     Returns:
         The summary text.
@@ -105,8 +119,53 @@ async def summarize_design_transcript(
             callers decide the fallback (the generation job falls back to the
             transcript head; the on-demand endpoint surfaces HTTP 502).
     """
+    summary = await _complete(_SUMMARY_PROMPT, transcript)
+    return summary[:max_chars].rstrip()
+
+
+async def describe_design_transcript(transcript: str, *, max_chars: int = 2000) -> str:
+    """Write a short, requester-facing description from a design transcript.
+
+    Unlike :func:`summarize_design_transcript`, whose output is the prompt a
+    run is told, this is meant for everyone who may run the workflow: a few
+    sentences on what it does for them, leaving out the internal steps,
+    tools, and systems that only the prompt's readers may see.
+
+    Args:
+        transcript: The design conversation as plain text (one line per
+            message, speaker-prefixed).
+        max_chars: Upper bound on the returned text; defaults to the
+            ``DescText`` maximum of a workflow's ``description``.
+
+    Returns:
+        The description text.
+
+    Raises:
+        ValueError: If the LLM returned no usable text.
+        Exception: Whatever the underlying LLM client raises on failure.
+    """
+    description = await _complete(_DESCRIPTION_PROMPT, transcript)
+    return description[:max_chars].rstrip()
+
+
+async def _complete(template: str, transcript: str) -> str:
+    """Send one prompt built from ``template`` and return the reply text.
+
+    The transcript is truncated to :data:`_TRANSCRIPT_MAX_CHARS` before it is
+    substituted into ``template``'s ``{transcript}`` placeholder.
+
+    Args:
+        template: The instruction, with a ``{transcript}`` placeholder.
+        transcript: The design conversation as plain text.
+
+    Returns:
+        The reply's concatenated text parts, stripped.
+
+    Raises:
+        ValueError: If the LLM returned no usable text.
+    """
     llm = build_llm()
-    prompt = _SUMMARY_PROMPT.format(transcript=transcript[:_TRANSCRIPT_MAX_CHARS])
+    prompt = template.format(transcript=transcript[:_TRANSCRIPT_MAX_CHARS])
     request = LlmRequest(
         model=getattr(llm, "model", None),
         contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
@@ -119,7 +178,7 @@ async def summarize_design_transcript(
         for part in content.parts:
             if part.text:
                 chunks.append(part.text)
-    summary = "".join(chunks).strip()
-    if not summary:
+    text = "".join(chunks).strip()
+    if not text:
         raise ValueError("LLM returned an empty summary")
-    return summary[:max_chars].rstrip()
+    return text

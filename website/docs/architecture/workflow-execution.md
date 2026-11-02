@@ -12,7 +12,7 @@ Running a workflow does not point a run at the workflow. It **copies** the publi
 
 | Copied onto the run | Taken from |
 |---|---|
-| Name and effective description | The last published version — or the current rows, for a workflow still in `draft`, or when a Developer chose to run a `modified` workflow's [unpublished edits](../guides/workflows.md#trying-the-edits-out) |
+| Name and effective prompt | The last published version — or the current rows, for a workflow still in `draft`, or when a Developer chose to run a `modified` workflow's [unpublished edits](../guides/workflows.md#trying-the-edits-out) |
 | Tasks, all `pending`, with their dependencies and tool bindings | The same design's task templates |
 | The agent skill revision the run follows | The skill's published revision at that moment |
 | The chosen [tool mocks](./mcp-gateway-and-proxy.md#tool-mocks-and-dry-runs), by value | The mocks as they read at that moment |

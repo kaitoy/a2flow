@@ -10,6 +10,7 @@ from infrastructure import summarizer
 from infrastructure.summarizer import (
     _TRANSCRIPT_MAX_CHARS,
     build_llm,
+    describe_design_transcript,
     summarize_design_transcript,
 )
 
@@ -79,6 +80,29 @@ async def test_summarize_raises_on_empty_response(
 
     with pytest.raises(ValueError):
         await summarize_design_transcript("t")
+
+
+async def test_describe_asks_for_a_requester_facing_blurb(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    llm = _FakeLlm(["Builds your weekly report."])
+    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+
+    result = await describe_design_transcript("User: do the thing")
+
+    assert result == "Builds your weekly report."
+    prompt = llm.requests[0].contents[0].parts[0].text
+    assert "User: do the thing" in prompt
+    assert "people who will run it" in prompt
+
+
+async def test_describe_truncates_to_max_chars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    llm = _FakeLlm(["x" * 5000])
+    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+
+    assert len(await describe_design_transcript("t")) == 2000
 
 
 def test_build_llm_uses_litellm_for_prefixed_models(

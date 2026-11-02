@@ -38,7 +38,7 @@ There is no way to create a bare workflow: generating one from a skill is how a 
 | **Task Templates** | The workflow detail page's Task Templates link | Add, edit and reorder the steps by hand, as a Table or a Graph |
 | Design session | **Open design session** on the detail page | Refine the steps by talking to the design agent |
 
-Each workflow record carries a **Name**, the [tags](./tags.md) it is classified by, the **Agent Skill** it follows, its status, and two description fields.
+Each workflow record carries a **Name**, the [tags](./tags.md) it is classified by, the **Agent Skill** it follows, its status, a **Description**, and two prompt fields.
 
 ## Generating a workflow {#generating-a-workflow}
 
@@ -47,30 +47,33 @@ Each workflow record carries a **Name**, the [tags](./tags.md) it is classified 
 1. Fill in the **Workflow Name** (prefilled with the skill name) and the **Prompt** describing the work. Optionally pick [knowledge bases](./knowledge-bases.md) under **Knowledge Bases**: they are linked to the new workflow right away, so the design agent can already look things up in them. Because generating navigates away, the detail page offers to save unsaved edits first — declining leaves the page untouched and does not generate.
 2. The workflow is registered right away as `generating`, and you land on its detail page, which refreshes itself while the work runs.
 3. In the background, the prompt is sent as the first message of the workflow's **design session**. The design agent follows the skill, breaks the request into steps, and registers them as the workflow's task templates — a dependency graph, where each step declares which steps must finish before it, plus any [MCP tools](./workflows.md#mcp-tools-for-tasks) it needs.
-4. When the run finishes, the design conversation is summarized into **Generated description**, the status becomes `draft`, and a [notification](./notifications.md) deep-links you back to the workflow.
+4. When the run finishes, the design conversation is summarized into **Generated prompt**, a short **Description** for the people who will run the workflow is written alongside it, the status becomes `draft`, and a [notification](./notifications.md) deep-links you back to the workflow.
 
 If the run fails — or finishes without registering a single template — the workflow lands on `failed` with the reason, and a notification says so. The design chat stays usable: writing the task templates from there, or from the Task Templates admin pages, recovers the workflow to `draft` and clears the failure.
 
-The prompt itself is not stored on the workflow. It lives on as the first message of the design conversation, and the generated summary carries the intent forward.
+The request you typed into the Generate Workflow dialog is not stored on the workflow. It lives on as the first message of the design conversation, and the generated summary carries the intent forward.
 
-## The two description fields
+## Description and prompt {#description-and-prompt}
 
-Whichever description is in effect is handed to the execution agent as context for the run, so it is worth knowing which one that is.
+A workflow carries two kinds of text, and only one of them affects a run.
 
-| Field | Written by | Who can edit it directly |
-|---|---|---|
-| **Generated description** | The AI, summarizing the design conversation | Super Admin only |
-| **Description** | A person, usually by hand-editing the AI's summary | Any Developer |
+| Field | What it is | Written by | Who can edit it | Who can see it |
+|---|---|---|---|---|
+| **Description** | A plain explanation of what the workflow is for. No run ever reads it. | The AI when the workflow is generated, then a person | Any Developer | Everyone who can open the workflow |
+| **Prompt** | An override of the generated prompt | A person, usually by hand-editing the AI's summary | Any Developer | Admin, Developer, Reviewer |
+| **Generated prompt** | The AI's summary of the design conversation | The AI | Super Admin only | Admin, Developer, Reviewer |
 
-**Description** wins when it is non-empty; otherwise **Generated description** is used. Since the override usually starts life as a copy of the summary, the Description field carries a **Show diff from the generated description** action, which opens a word-level diff between the two. It reads the values currently in the form, so unsaved edits are diffed too.
+The prompt in effect is handed to the execution agent as context for every run: **Prompt** wins when it is non-empty; otherwise **Generated prompt** is used. Since the override usually starts life as a copy of the summary, the Prompt field carries a **Show diff from the generated prompt** action, which opens a word-level diff between the two. It reads the values currently in the form, so unsaved edits are diffed too.
 
-### Regenerating the description {#regenerating-the-description}
+The Description is what the workflow list shows, and what the **Run Workflow** dialog shows under its confirmation, so whoever starts a run can check they picked the right one. The prompt fields are hidden from every other role — on the detail page, in the list's optional **Prompt** column, in the version history, and on a run's detail page.
 
-The AI summary goes stale as the task templates are adjusted, so **Generated description** carries a **Generate from the design conversation** action that re-summarizes the design conversation on demand and saves the result straight away. Nothing is summarized at publish time: whether and when to refresh it is your call.
+### Regenerating the prompt {#regenerating-the-prompt}
+
+The AI summary goes stale as the task templates are adjusted, so **Generated prompt** carries a **Generate from the design conversation** action that re-summarizes the design conversation on demand and saves the result straight away. Nothing is summarized at publish time: whether and when to refresh it is your call.
 
 The same action is offered from the design session's chat input, under its "+" menu, where it previews the change through the same diff dialog before saving — handy for regenerating without leaving the conversation. The menu is hidden while the task templates are still generating.
 
-Both are Developer actions. Rewriting the summary of a `published` workflow moves it to `modified`, because a run whose Description is empty falls back to the summary and would otherwise drift from the published version.
+Both are Developer actions. Rewriting the summary of a `published` workflow moves it to `modified`, because a run whose Prompt is empty falls back to the summary and would otherwise drift from the published version.
 
 ## Adjusting the task templates {#adjusting-the-task-templates}
 
@@ -86,19 +89,19 @@ Templates mirror a run's tasks structurally — title, description, dependency e
 
 **Publish**, on the workflow detail page, is what makes a workflow executable. It is a **Reviewer** action — a Developer builds and edits a workflow but no longer publishes it, so the person promoting a design is not the same person who wrote it. It needs at least one template, and no generation in flight.
 
-Publishing **freezes the design**: the workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as a new published version — **v1**, **v2**, and so on. Earlier versions are kept in the [version history](#version-history). No AI runs here; refreshing the summary is a [separate action](./workflows.md#regenerating-the-description). Re-adjust and re-publish as often as you like: runs already started are unaffected, because each run took its own copy of the tasks.
+Publishing **freezes the design**: the workflow's name, its description, its effective prompt, and its full template list — dependency edges and tool bindings included — are captured as a new published version — **v1**, **v2**, and so on. Earlier versions are kept in the [version history](#version-history). No AI runs here; refreshing the summary is a [separate action](./workflows.md#regenerating-the-prompt). Re-adjust and re-publish as often as you like: runs already started are unaffected, because each run took its own copy of the tasks.
 
 ## Editing a published workflow
 
-Editing a workflow after it has been published does not silently change what runs. Saving the detail form, regenerating the AI description, or adding, editing or deleting a task template — including a change the design agent makes in the chat — moves the workflow to `modified`.
+Editing a workflow after it has been published does not silently change what runs. Saving the detail form, regenerating the AI prompt, or adding, editing or deleting a task template — including a change the design agent makes in the chat — moves the workflow to `modified`.
 
 | While `modified` | |
 |---|---|
-| What runs use | The **last published version** — its name, effective description, and templates — not the edits, unless a Developer asks for them (see [Trying the edits out](#trying-the-edits-out)) |
+| What runs use | The **last published version** — its name, effective prompt, and templates — not the edits, unless a Developer asks for them (see [Trying the edits out](#trying-the-edits-out)) |
 | Who can run it | The same people as while `published`; the Run button is not gated differently |
 | Who sees the edits | Developer, Reviewer, and Super Admin only |
 | **Publish** (Reviewer) | Promotes the edits into future runs, and into what everyone else sees |
-| **Discard changes** (Developer) | Throws the edits away: the templates are rewritten from the published version, the name is restored, the published version's description is written back, and the workflow returns to `published` |
+| **Discard changes** (Developer) | Throws the edits away: the templates are rewritten from the published version, the name and description are restored, the published version's prompt is written back, and the workflow returns to `published` |
 
 **Discard changes** is the undo icon in the detail page's status bar, next to Publish. Discarding a workflow that has no unpublished changes does nothing but report as much.
 
@@ -111,7 +114,7 @@ Every publish is kept. **Version history** — the clock icon in the workflow de
 To roll back to an earlier design (Developer):
 
 1. Open **Version history** and click **Restore** on the version you want.
-2. Confirm. The version's templates, name, and description replace the workflow's current design, and you are taken back to the workflow.
+2. Confirm. The version's templates, name, description, and prompt replace the workflow's current design, and you are taken back to the workflow.
 3. Check the result. Restoring does **not** publish: runs keep using the current published version until a Reviewer clicks **Publish**, which records the restored design as a new version.
 
 | Status before | Status after restoring |
@@ -149,7 +152,8 @@ Everything the run needs is copied onto the execution when it starts, so later e
 
 | Copied onto the run | Taken from |
 |---|---|
-| Name and effective description | The last published version — or the editor's current state, for a `draft` workflow, or when a Developer chose the unpublished edits |
+| Name and effective prompt | The last published version
+ — or the editor's current state, for a `draft` workflow, or when a Developer chose the unpublished edits |
 | Task templates, as `pending` tasks with their dependencies and tool bindings | The same design |
 | The agent skill revision the run is pinned to | The skill's published revision |
 | The chosen tool mocks, by value | The mocks as they read at that moment |

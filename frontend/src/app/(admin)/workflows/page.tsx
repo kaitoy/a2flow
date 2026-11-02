@@ -79,7 +79,7 @@ function StatusCell({ workflow }: { workflow: Workflow }) {
 function buildColumns(
   skillMap: Map<string, string>,
   names: Map<string, string>,
-  onRun: (id: string, name: string, isDraft: boolean, isModified: boolean) => void,
+  onRun: (workflow: Workflow) => void,
   runningId: string | null,
   onDelete: (id: string, name: string) => void,
   onOpenDesign: (id: string) => void,
@@ -87,7 +87,8 @@ function buildColumns(
   canPublish: boolean,
   tagsById: Map<string, Tag>,
   tenantNames: Map<string, string>,
-  isAllTenantsView: boolean
+  isAllTenantsView: boolean,
+  canViewPrompt: boolean
 ): ColumnDef<Workflow>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<Workflow>(tenantNames)] : []),
@@ -139,10 +140,22 @@ function buildColumns(
       header: "Description",
       sortField: "description",
       filterField: "description",
-      // Falls back to the AI-generated summary, mirroring the workflow
-      // session's own fallback rule (see WorkflowDetailPage).
-      cell: (w) => w.description || w.generatedDescription || "—",
+      cell: (w) => w.description || "—",
     },
+    // The backend blanks prompts for anyone else, so the column would be empty.
+    ...(canViewPrompt
+      ? [
+          {
+            header: "Prompt",
+            sortField: "prompt",
+            filterField: "prompt",
+            visibility: "optional" as const,
+            // Falls back to the AI-generated summary, mirroring the workflow
+            // execution's own fallback rule (see WorkflowDetailPage).
+            cell: (w: Workflow) => w.prompt || w.generatedPrompt || "—",
+          },
+        ]
+      : []),
     {
       header: "Created At",
       sortField: "createdAt",
@@ -174,7 +187,7 @@ function buildColumns(
             <ActionIconButton
               icon={runningId === w.id ? Loader2 : Play}
               label="Run"
-              onClick={() => onRun(w.id, w.name, w.status === "draft", w.status === "modified")}
+              onClick={() => onRun(w)}
               // Published workflows are executable by anyone with Run access;
               // drafts are executable only by someone who can also edit
               // workflows (developer/super_admin), for pre-publish testing.
@@ -194,6 +207,7 @@ export default function WorkflowsPage() {
   const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
   const canPublish = useHasRole(Role.REVIEWER);
+  const canViewPrompt = useHasRole(Role.ADMIN, Role.DEVELOPER, Role.REVIEWER);
   const {
     rows,
     loading,
@@ -217,12 +231,7 @@ export default function WorkflowsPage() {
   // admin spends a request that can only come back 403 — and toasts.
   const tenantNames = useTenantNames(isAllTenantsView ? rows.map((w) => w.tenantId) : []);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
-  const [runTarget, setRunTarget] = useState<{
-    id: string;
-    name: string;
-    isDraft: boolean;
-    isModified: boolean;
-  } | null>(null);
+  const [runTarget, setRunTarget] = useState<Workflow | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
 
   // Load the agent-skill name map once, to label the Agent Skill column.
@@ -263,10 +272,6 @@ export default function WorkflowsPage() {
     }
   }
 
-  function handleRun(id: string, name: string, isDraft: boolean, isModified: boolean) {
-    setRunTarget({ id, name, isDraft, isModified });
-  }
-
   async function executeRun({ designSource, toolMockIds }: RunWorkflowChoice) {
     if (!runTarget) return;
     const id = runTarget.id;
@@ -291,7 +296,7 @@ export default function WorkflowsPage() {
   const columns = buildColumns(
     skillMap,
     names,
-    handleRun,
+    setRunTarget,
     runningId,
     handleDelete,
     handleOpenDesign,
@@ -299,7 +304,8 @@ export default function WorkflowsPage() {
     canPublish,
     tagsById,
     tenantNames,
-    isAllTenantsView
+    isAllTenantsView,
+    canViewPrompt
   );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflows",
@@ -356,10 +362,11 @@ export default function WorkflowsPage() {
         open={runTarget !== null}
         workflowId={runTarget?.id ?? ""}
         workflowName={runTarget?.name ?? ""}
-        isDraft={runTarget?.isDraft ?? false}
+        workflowDescription={runTarget?.description}
+        isDraft={runTarget?.status === "draft"}
         // Only a developer ever sees `modified` — for everyone else the backend
         // reports the workflow as `published` — so the status alone is the gate.
-        canChooseDesign={(runTarget?.isModified ?? false) && canEdit}
+        canChooseDesign={runTarget?.status === "modified" && canEdit}
         onConfirm={executeRun}
         onCancel={() => setRunTarget(null)}
       />

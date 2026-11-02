@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
-from sqlalchemy import ColumnElement, or_
+from sqlalchemy import ColumnElement, null, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -19,7 +19,13 @@ from models.workflow_execution import (
 from repositories._integrity import commit_or_translate_user_fk
 from repositories._scoped import TenantScopedRepository
 from repositories.exceptions import NotFoundError
-from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
+from repositories.query import (
+    ColumnOverride,
+    FilterSpec,
+    SortSpec,
+    apply_filters,
+    apply_sort,
+)
 from repositories.tags import TagLinks
 
 _StrList = list[str]
@@ -49,6 +55,7 @@ class WorkflowExecutionRepository(Protocol):
         filters: Sequence[FilterSpec] = (),
         visible_to_user_id: str | None = None,
         visible_to_group_ids: Sequence[str] = (),
+        hide_prompt: bool = False,
     ) -> list[WorkflowExecution]: ...
 
     async def create(
@@ -186,6 +193,7 @@ class SqlWorkflowExecutionRepository(TenantScopedRepository[WorkflowExecution]):
         filters: Sequence[FilterSpec] = (),
         visible_to_user_id: str | None = None,
         visible_to_group_ids: Sequence[str] = (),
+        hide_prompt: bool = False,
     ) -> list[WorkflowExecution]:
         """Return WorkflowExecutions, defaulting to ``created_at`` descending (newest first).
 
@@ -204,6 +212,8 @@ class SqlWorkflowExecutionRepository(TenantScopedRepository[WorkflowExecution]):
                 execution holding an approval addressed to one of them is
                 visible for the same reason a directly addressed one is.
                 Ignored when ``visible_to_user_id`` is ``None``.
+            hide_prompt: Filter and sort ``prompt`` as ``NULL``, for a caller
+                who is not shown it, so a filter cannot read it back.
 
         Returns:
             The matching executions.
@@ -227,8 +237,13 @@ class SqlWorkflowExecutionRepository(TenantScopedRepository[WorkflowExecution]):
                     ),
                 )
             )
+        columns = {"prompt": ColumnOverride(expression=null())} if hide_prompt else None
         stmt = apply_filters(
-            stmt, WorkflowExecution, filters, readable=WorkflowExecution
+            stmt,
+            WorkflowExecution,
+            filters,
+            readable=WorkflowExecution,
+            columns=columns,
         )
         stmt = apply_sort(
             stmt,
@@ -236,6 +251,7 @@ class SqlWorkflowExecutionRepository(TenantScopedRepository[WorkflowExecution]):
             sort,
             default=[col(WorkflowExecution.created_at).desc()],
             readable=WorkflowExecution,
+            columns=columns,
         )
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())

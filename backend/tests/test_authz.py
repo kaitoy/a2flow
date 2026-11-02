@@ -223,7 +223,7 @@ async def test_generate_workflow_description_requires_developer_role(
 ) -> None:
     wf = await _create_workflow(workflow_client)
     res = await workflow_client.post(
-        f"/api/v1/workflows/{wf['id']}/generate-description",
+        f"/api/v1/workflows/{wf['id']}/generate-prompt",
         headers=_roles("requester"),
     )
     assert_err(res, "FORBIDDEN", 403)
@@ -293,7 +293,7 @@ async def test_delete_workflow_requires_developer_role(
     assert_err(res, "FORBIDDEN", 403)
 
 
-# ---------- workflow update: developer role; generatedDescription is super_admin-only ----------
+# ---------- workflow update: developer role; generatedPrompt is super_admin-only ----------
 
 
 async def test_update_workflow_requires_developer_role(
@@ -311,7 +311,7 @@ async def test_update_workflow_requires_developer_role(
 async def test_developer_can_update_description(
     workflow_client: AsyncClient,
 ) -> None:
-    """``description`` stays open to any ``developer``, unlike ``generatedDescription``."""
+    """``description`` stays open to any ``developer``, unlike ``generatedPrompt``."""
     wf = await _create_workflow(workflow_client)
     res = await workflow_client.patch(
         f"/api/v1/workflows/{wf['id']}",
@@ -322,19 +322,19 @@ async def test_developer_can_update_description(
     assert body["description"] == "My own summary"
 
 
-async def test_developer_cannot_change_generated_description(
+async def test_developer_cannot_change_generated_prompt(
     workflow_client: AsyncClient,
 ) -> None:
     wf = await _create_workflow(workflow_client)
     res = await workflow_client.patch(
         f"/api/v1/workflows/{wf['id']}",
-        json={"generatedDescription": "Sneaky override"},
+        json={"generatedPrompt": "Sneaky override"},
         headers=_roles("developer"),
     )
     assert_err(res, "FORBIDDEN", 403)
 
 
-async def test_developer_can_resubmit_the_unchanged_generated_description(
+async def test_developer_can_resubmit_the_unchanged_generated_prompt(
     workflow_client: AsyncClient,
 ) -> None:
     """Only an actual change is gated; resubmitting the current value passes through."""
@@ -342,29 +342,29 @@ async def test_developer_can_resubmit_the_unchanged_generated_description(
     assert_ok(
         await workflow_client.patch(
             f"/api/v1/workflows/{wf['id']}",
-            json={"generatedDescription": "Set by an admin"},
+            json={"generatedPrompt": "Set by an admin"},
             headers=_roles("super_admin"),
         )
     )
     res = await workflow_client.patch(
         f"/api/v1/workflows/{wf['id']}",
-        json={"generatedDescription": "Set by an admin"},
+        json={"generatedPrompt": "Set by an admin"},
         headers=_roles("developer"),
     )
     assert_ok(res)
 
 
-async def test_super_admin_can_change_generated_description(
+async def test_super_admin_can_change_generated_prompt(
     workflow_client: AsyncClient,
 ) -> None:
     wf = await _create_workflow(workflow_client)
     res = await workflow_client.patch(
         f"/api/v1/workflows/{wf['id']}",
-        json={"generatedDescription": "Corrected by an admin"},
+        json={"generatedPrompt": "Corrected by an admin"},
         headers=_roles("super_admin"),
     )
     body = assert_ok(res)
-    assert body["generatedDescription"] == "Corrected by an admin"
+    assert body["generatedPrompt"] == "Corrected by an admin"
 
 
 # ---------- workflow execution: requester, developer ----------

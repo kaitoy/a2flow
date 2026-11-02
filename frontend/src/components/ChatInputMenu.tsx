@@ -1,4 +1,4 @@
-/** @module ChatInputMenu — "+" dropdown in the chat input for extra, page-specific chat actions; currently a single "Generate description" item. */
+/** @module ChatInputMenu — "+" dropdown in the chat input for extra, page-specific chat actions; currently a single "Generate prompt" item. */
 "use client";
 
 import { animated, useTransition } from "@react-spring/web";
@@ -10,9 +10,9 @@ import { useMotionConfig } from "@/lib/motion";
 
 /** Props for {@link ChatInputMenu}. */
 interface ChatInputMenuProps {
-  /** Re-summarizes the design conversation into the workflow's generated description. */
-  onGenerateDescription: () => void;
-  /** Disables the "Generate description" item (e.g. while the workflow's task templates are still generating). */
+  /** Re-summarizes the design conversation into the workflow's generated prompt. */
+  onGeneratePrompt: () => void;
+  /** Disables the "Generate prompt" item (e.g. while the workflow's task templates are still generating). */
   disabled?: boolean;
   /** Shows a spin animation on the item's icon while the generate request is in flight. */
   pending?: boolean;
@@ -40,7 +40,7 @@ interface Coords {
  * externally-driven one.
  */
 export function ChatInputMenu({
-  onGenerateDescription,
+  onGeneratePrompt,
   disabled = false,
   pending = false,
 }: ChatInputMenuProps) {
@@ -131,7 +131,7 @@ export function ChatInputMenu({
                     role="menuitem"
                     disabled={disabled}
                     onClick={() => {
-                      onGenerateDescription();
+                      onGeneratePrompt();
                       setOpen(false);
                     }}
                     className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -142,7 +142,7 @@ export function ChatInputMenu({
                       aria-hidden="true"
                       className={pending ? "motion-safe:animate-spin-y" : undefined}
                     />
-                    Generate description
+                    Generate prompt
                   </button>
                 </animated.div>
               )

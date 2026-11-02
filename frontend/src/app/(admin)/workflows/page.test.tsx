@@ -141,7 +141,7 @@ describe("WorkflowsPage", () => {
     );
   });
 
-  it("falls back to the generated description when the user description is empty", async () => {
+  it("shows the description, and keeps the prompt out of view by default", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows", () =>
         envelope([
@@ -149,8 +149,9 @@ describe("WorkflowsPage", () => {
             id: "wf-1",
             tenantId: "tenant-1",
             name: "my-workflow",
-            description: null,
-            generatedDescription: "AI summary of the design",
+            description: "What it is for",
+            prompt: null,
+            generatedPrompt: "AI summary of the design",
             agentSkillId: "skill-1",
             sessionId: "design-session-id",
             agentSkillCommitSha: "a".repeat(40),
@@ -165,34 +166,8 @@ describe("WorkflowsPage", () => {
       )
     );
     render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
-    await waitFor(() => expect(screen.getByText("AI summary of the design")).toBeInTheDocument());
-  });
-
-  it("prefers the user description over the generated description", async () => {
-    server.use(
-      http.get("http://localhost:8000/api/v1/workflows", () =>
-        envelope([
-          {
-            id: "wf-1",
-            tenantId: "tenant-1",
-            name: "my-workflow",
-            description: "User's own summary",
-            generatedDescription: "AI summary of the design",
-            agentSkillId: "skill-1",
-            sessionId: "design-session-id",
-            agentSkillCommitSha: "a".repeat(40),
-            status: "published",
-            generationError: null,
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-01T00:00:00Z",
-            createdBy: "user",
-            updatedBy: "",
-          },
-        ])
-      )
-    );
-    render(<WorkflowsPage />, { preloadedState: FULL_ACCESS });
-    await waitFor(() => expect(screen.getByText("User's own summary")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("What it is for")).toBeInTheDocument());
+    // The Prompt column is optional: offered in the column picker, hidden until chosen.
     expect(screen.queryByText("AI summary of the design")).not.toBeInTheDocument();
   });
 

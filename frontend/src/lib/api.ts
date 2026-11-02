@@ -1346,13 +1346,13 @@ export async function publishWorkflow(id: string): Promise<Workflow> {
 }
 
 /**
- * Summarize a workflow's design conversation into its AI-generated
- * description, overwriting the previous summary. A published workflow becomes
+ * Summarize a workflow's design conversation into its AI-generated prompt,
+ * overwriting the previous summary. A published workflow becomes
  * `modified`.
  */
-export async function generateWorkflowDescription(id: string): Promise<Workflow> {
+export async function generateWorkflowPrompt(id: string): Promise<Workflow> {
   return unwrap(
-    sdk.generateWorkflowDescriptionApiV1WorkflowsWorkflowIdGenerateDescriptionPost({
+    sdk.generateWorkflowPromptApiV1WorkflowsWorkflowIdGeneratePromptPost({
       path: { workflow_id: id },
     })
   ) as Promise<Workflow>;

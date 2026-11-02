@@ -308,9 +308,9 @@ class SessionRunner:
             max_total_bytes=settings.session_files_max_total_bytes,
         ).list(execution.id)
         context = [Context(description="Current time", value=current_time())]
-        if execution.description:
+        if execution.prompt:
             context.append(
-                Context(description="Workflow description", value=execution.description)
+                Context(description="Workflow prompt", value=execution.prompt)
             )
         if files:
             context.append(

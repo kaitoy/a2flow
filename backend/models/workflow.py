@@ -6,8 +6,14 @@ created directly through a plain POST — they are born from
 ``POST /agent-skills/{skill_id}/workflows`` ("Generate workflow"), which
 registers a draft row and schedules a background design run that fills in
 the task templates and the first conversation summary
-(``generated_description``); later summaries are produced on demand by
-``POST /workflows/{id}/generate-description``.
+(``generated_prompt``); later summaries are produced on demand by
+``POST /workflows/{id}/generate-prompt``.
+
+A workflow carries two kinds of text. ``prompt`` / ``generated_prompt`` are
+the **prompt**: handed to every run of the workflow as context (see
+:attr:`Workflow.effective_prompt`), and therefore shown only to an
+``admin``, ``developer``, or ``reviewer``. ``description`` is a plain,
+human-facing explanation of what the workflow is for; no run ever reads it.
 
 The chat those templates are produced and refined in is the workflow's
 **design session** — the ADK session named by :attr:`WorkflowCreate.session_id`
@@ -29,7 +35,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
-from models.constraints import EntityName, PromptText, WorkflowDescText
+from models.constraints import DescText, EntityName, PromptText, WorkflowPromptText
 from models.knowledge import KnowledgeBaseIdsUpdate
 from models.tenant_scoped import TenantScoped
 
@@ -122,22 +128,24 @@ class WorkflowDesignSource(StrEnum):
 class WorkflowUpdate(SQLModel):
     """Partial update payload for a Workflow — all fields are optional.
 
-    ``name`` and ``description`` are client-writable by any ``developer``: the
-    bound skill is fixed at generation time (the task templates were designed
-    against it), and ``status`` is server-managed via generation and publish.
+    ``name``, ``description``, and ``prompt`` are client-writable by any
+    ``developer``: the bound skill is fixed at generation time (the task
+    templates were designed against it), and ``status`` is server-managed via
+    generation and publish.
 
-    ``generated_description`` is also client-writable here, but only by a
+    ``generated_prompt`` is also client-writable here, but only by a
     ``super_admin`` — see the guard in
     :meth:`services.workflow.WorkflowService.update`. It holds the AI-produced
-    conversation summary; ``description`` is the free-form field a user can
-    set to override it. See :attr:`Workflow.effective_description` for how the
-    two combine.
+    conversation summary; ``prompt`` is the free-form field a user can set to
+    override it. See :attr:`Workflow.effective_prompt` for how the two
+    combine. ``description`` is never handed to a run.
     """
 
     model_config = _alias_config
     name: EntityName | None = None
-    description: WorkflowDescText | None = None
-    generated_description: WorkflowDescText | None = None
+    description: DescText | None = None
+    prompt: WorkflowPromptText | None = None
+    generated_prompt: WorkflowPromptText | None = None
 
 
 class WorkflowCreate(WorkflowUpdate):
@@ -177,12 +185,12 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     moves a ``published`` workflow to ``modified``, and a task-template write
     additionally recovers a ``failed`` one to ``draft``.
 
-    ``generated_description`` is written only by the design generation job
-    and by ``POST /workflows/{id}/generate-description``, the on-demand
+    ``generated_prompt`` is written only by the design generation job
+    and by ``POST /workflows/{id}/generate-prompt``, the on-demand
     re-summarization a ``developer`` triggers from the UI (or, as a correction,
-    by a ``super_admin`` through ``PATCH``); ``description`` is the free-form
+    by a ``super_admin`` through ``PATCH``); ``prompt`` is the free-form
     field any ``developer`` can set to override it. See
-    :attr:`effective_description`.
+    :attr:`effective_prompt`.
 
     ``session_id`` is the workflow's design session and is indexed so the
     design agent's tools can map the session they run in back to the workflow
@@ -212,13 +220,13 @@ class Workflow(WorkflowCreate, TenantScoped, BaseEntity, table=True):
     )
 
     @property
-    def effective_description(self) -> str | None:
-        """Return the description a workflow execution should use.
+    def effective_prompt(self) -> str | None:
+        """Return the prompt a workflow execution should use.
 
-        ``description`` wins whenever a user has set it; otherwise falls back
-        to the AI-generated ``generated_description``.
+        ``prompt`` wins whenever a user has set it; otherwise falls back
+        to the AI-generated ``generated_prompt``.
         """
-        return self.description or self.generated_description
+        return self.prompt or self.generated_prompt
 
 
 class WorkflowRead(BaseEntity):
@@ -236,7 +244,8 @@ class WorkflowRead(BaseEntity):
     tenant_id: str
     name: str
     description: str | None = None
-    generated_description: str | None = None
+    prompt: str | None = None
+    generated_prompt: str | None = None
     agent_skill_id: str
     session_id: str
     agent_skill_commit_sha: str

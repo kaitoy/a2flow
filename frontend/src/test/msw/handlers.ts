@@ -85,7 +85,8 @@ const WORKFLOW_1 = {
   tenantId: "tenant-1",
   name: "my-workflow",
   description: null,
-  generatedDescription: null,
+  prompt: null,
+  generatedPrompt: null,
   agentSkillId: "skill-1",
   sessionId: "design-session-id",
   agentSkillCommitSha: "a".repeat(40),
@@ -590,8 +591,8 @@ export const handlers = [
     envelope({ ...WORKFLOW_1, status: "published" })
   ),
 
-  http.post(`${BASE}/api/v1/workflows/:id/generate-description`, () =>
-    envelope({ ...WORKFLOW_1, generatedDescription: "A freshly generated summary" })
+  http.post(`${BASE}/api/v1/workflows/:id/generate-prompt`, () =>
+    envelope({ ...WORKFLOW_1, generatedPrompt: "A freshly generated summary" })
   ),
 
   http.post(`${BASE}/api/v1/workflows/:id/discard-changes`, () =>

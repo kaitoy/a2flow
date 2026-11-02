@@ -13,7 +13,7 @@ design into a ``WorkflowPublishedVersion`` snapshot and marks the workflow
 ``published``. Later edits move it to ``modified`` and keep running against
 that snapshot until it is published again. Publishing runs no LLM of its own —
 re-summarizing the design conversation is a separate, user-triggered step
-(``WorkflowDesignService.generate_description``).
+(``WorkflowDesignService.generate_prompt``).
 """
 
 import logging
@@ -33,6 +33,7 @@ from infrastructure.locks import advisory_lock, agent_run_key
 from infrastructure.skill_manager import SkillManager
 from infrastructure.summarizer import (
     build_design_transcript,
+    describe_design_transcript,
     summarize_design_transcript,
 )
 from models.notification import NotificationCreate, NotificationType
@@ -50,8 +51,8 @@ from repositories.exceptions import (
     NotFoundError,
     SkillNotReadyError,
     SummarizationFailedError,
-    WorkflowDescriptionNotGeneratableError,
     WorkflowNotRunnableError,
+    WorkflowPromptNotGeneratableError,
 )
 from repositories.knowledge import KnowledgeBaseRepository
 from repositories.workflow import WorkflowRepository
@@ -149,10 +150,10 @@ class WorkflowDesignService:
                 linking a generated workflow to the knowledge bases picked
                 for it; a hidden one is rejected like a missing one.
             session_service: ADK session store, read by
-                :meth:`generate_description` to build the design transcript.
+                :meth:`generate_prompt` to build the design transcript.
             app_name: ADK application name keying sessions in the store.
             summarize: One-shot summarizer turning the transcript into the
-                workflow's ``generated_description``; injectable for tests.
+                workflow's ``generated_prompt``; injectable for tests.
                 Defaults to :func:`~infrastructure.summarizer.summarize_design_transcript`,
                 resolved here rather than as a parameter default so a test that
                 monkeypatches the module attribute reaches the service the
@@ -270,13 +271,13 @@ class WorkflowDesignService:
         nothing new to freeze, so re-publishing it is rejected rather than
         rewritten. Editing a published workflow moves it to ``modified``, which
         publishes again normally. No LLM runs here — the
-        ``generated_description`` is whatever the initial generation job wrote
-        or the user last produced through :meth:`generate_description`, so
+        ``generated_prompt`` is whatever the initial generation job wrote
+        or the user last produced through :meth:`generate_prompt`, so
         publishing is a pure snapshot-and-promote step.
 
-        The workflow's name, effective description (the user's ``description``
-        override if set, else its ``generated_description`` — see
-        :attr:`~models.workflow.Workflow.effective_description`), and full
+        The workflow's name, description, effective prompt (the user's
+        ``prompt`` override if set, else its ``generated_prompt`` — see
+        :attr:`~models.workflow.Workflow.effective_prompt`), and full
         task-template list are frozen into a new ``WorkflowPublishedVersion``
         snapshot, numbered one past the previous one; earlier snapshots stay
         in the workflow's version history. Runs started while the workflow
@@ -312,7 +313,8 @@ class WorkflowDesignService:
         # session expires loaded instances, and a plain attribute read on an
         # expired instance fails outside an explicit refresh.
         name = workflow.name
-        effective_description = workflow.effective_description
+        description = workflow.description
+        effective_prompt = workflow.effective_prompt
         templates = await self._templates.list(
             limit=MAX_TASK_TEMPLATES, offset=0, workflow_id=workflow_id
         )
@@ -322,7 +324,8 @@ class WorkflowDesignService:
         await self._versions.create(
             workflow_id,
             name=name,
-            description=effective_description,
+            description=description,
+            prompt=effective_prompt,
             templates=dump_templates(
                 [snapshot_template(t) for t in templates],
             ),
@@ -334,17 +337,18 @@ class WorkflowDesignService:
             user_id=user_id,
         )
 
-    async def generate_description(self, workflow_id: str, *, user_id: str) -> Workflow:
-        """Re-summarize a workflow's design conversation into its description.
+    async def generate_prompt(self, workflow_id: str, *, user_id: str) -> Workflow:
+        """Re-summarize a workflow's design conversation into its prompt.
 
         The on-demand half of the AI summary: the initial generation job writes
-        ``generated_description`` once, and this method rewrites it whenever the
+        ``generated_prompt`` once, and this method rewrites it whenever the
         user asks for it — after adjusting the task templates through the design chat,
         for instance. The summary is persisted immediately, so the caller gets
         back a workflow that already carries it.
 
         Editing a ``published`` workflow moves it to ``modified`` (a run using
-        the workflow's ``description`` fallback would otherwise drift from the
+        the workflow's ``prompt`` fallback would otherwise drift from the
+
         published snapshot), exactly as a ``PATCH`` of the same field does.
 
         Args:
@@ -352,11 +356,11 @@ class WorkflowDesignService:
             user_id: ID of the user requesting the summary.
 
         Returns:
-            The updated Workflow, carrying the fresh ``generated_description``.
+            The updated Workflow, carrying the fresh ``generated_prompt``.
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            WorkflowDescriptionNotGeneratableError: If generation is still in
+            WorkflowPromptNotGeneratableError: If generation is still in
                 progress, or the workflow has no design conversation to
                 summarize.
             SummarizationFailedError: If the summarizer LLM call fails.
@@ -365,12 +369,12 @@ class WorkflowDesignService:
         if workflow is None:
             raise NotFoundError("Workflow", workflow_id)
         if workflow.status is WorkflowStatus.generating:
-            raise WorkflowDescriptionNotGeneratableError(
+            raise WorkflowPromptNotGeneratableError(
                 workflow_id, "its task templates are still generating"
             )
         transcript = await self._design_transcript(workflow_id)
         if not transcript:
-            raise WorkflowDescriptionNotGeneratableError(
+            raise WorkflowPromptNotGeneratableError(
                 workflow_id, "it has no design conversation to summarize"
             )
         try:
@@ -380,7 +384,7 @@ class WorkflowDesignService:
 
         await self._workflows.update(
             workflow_id,
-            WorkflowUpdate(generated_description=summary),
+            WorkflowUpdate(generated_prompt=summary),
             user_id=user_id,
         )
         await self._workflows.mark_modified(workflow_id, user_id=user_id)
@@ -431,8 +435,9 @@ async def generate_workflow_design(
     message of the workflow's design session and drives the
     ``initial_design`` agent to completion; the agent registers the task
     templates through its design tools. Afterwards the conversation is
-    summarized into the workflow's ``generated_description``, the status
-    becomes ``draft``, and a ``workflow_draft_ready`` notification is sent to
+    summarized into the workflow's ``generated_prompt``, a short
+    requester-facing ``description`` is written alongside it (unless one was
+    already typed in), the status becomes ``draft``, and a ``workflow_draft_ready`` notification is sent to
     the generating user. Like the skill sync job, this function never raises.
 
     Any failure lands on the row as ``status=failed`` plus a reason (which the
@@ -604,9 +609,9 @@ async def generate_workflow_design(
             app_name=scoped_app_name, user_id=owner_id, session_id=session_id
         )
         transcript = build_design_transcript(session.events) if session else ""
-        generated_description: str | None
+        generated_prompt: str | None
         try:
-            generated_description = await summarize_design_transcript(transcript)
+            generated_prompt = await summarize_design_transcript(transcript)
         except Exception:
             logger.warning(
                 "Failed to summarize the design conversation of workflow %s; "
@@ -614,7 +619,19 @@ async def generate_workflow_design(
                 workflow_id,
                 exc_info=True,
             )
-            generated_description = transcript[:2000].rstrip() or None
+            generated_prompt = transcript[:2000].rstrip() or None
+        description: str | None
+        try:
+            description = await describe_design_transcript(transcript)
+        except Exception:
+            # No transcript fallback here: the transcript is exactly what a
+            # requester must not be shown, so a failure leaves it empty.
+            logger.warning(
+                "Failed to describe workflow %s; leaving its description empty.",
+                workflow_id,
+                exc_info=True,
+            )
+            description = None
 
         async with AsyncSession(database.engine, expire_on_commit=False) as db:
             workflows = SqlWorkflowRepository(
@@ -625,7 +642,8 @@ async def generate_workflow_design(
             await workflows.set_status(
                 workflow_id,
                 WorkflowStatus.draft,
-                generated_description=generated_description,
+                generated_prompt=generated_prompt,
+                description=description,
                 user_id=user_id,
             )
             try:

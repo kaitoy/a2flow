@@ -161,6 +161,43 @@ async def build_workflow_read(
     )
 
 
+def prompt_hidden_from(caller_roles: Collection[str]) -> bool:
+    """Return whether this caller may not read workflow prompts.
+
+    A workflow's ``prompt`` and ``generated_prompt`` -- and the ``prompt`` a
+    run copied from them -- are what its runs are told to do, so they are
+    shown only to the roles that design, review, or administer workflows.
+    Everyone else is served ``None`` in their place, and the list queries
+    treat the columns as ``NULL`` for them so a filter cannot read them back
+    either.
+
+    Args:
+        caller_roles: The caller's effective roles.
+
+    Returns:
+        ``True`` unless the caller is an ``admin``, ``developer``, or
+        ``reviewer`` (or, via the bypass, a ``super_admin``).
+    """
+    return not has_any_role(caller_roles, Role.admin, Role.developer, Role.reviewer)
+
+
+def _without_hidden_prompt(
+    read: WorkflowRead, caller_roles: Collection[str]
+) -> WorkflowRead:
+    """Blank a read view's prompts when the caller may not read them.
+
+    Args:
+        read: The read view about to be returned.
+        caller_roles: The caller's effective roles.
+
+    Returns:
+        ``read`` itself, or a copy without ``prompt`` and ``generated_prompt``.
+    """
+    if not prompt_hidden_from(caller_roles):
+        return read
+    return read.model_copy(update={"prompt": None, "generated_prompt": None})
+
+
 def draft_hidden_from(workflow: Workflow, caller_roles: Collection[str]) -> bool:
     """Return whether ``workflow`` is a draft this caller may not see.
 
@@ -604,6 +641,7 @@ class WorkflowService:
             filters=filters,
             tag_ids=tag_ids,
             published_view=self._published_view(caller_roles),
+            hide_prompt=prompt_hidden_from(caller_roles),
         )
 
     @staticmethod
@@ -643,10 +681,12 @@ class WorkflowService:
         """Project one Workflow into its API read view, attaching its tags.
 
         A caller who is not a ``developer`` gets the **published view**: a
-        ``modified`` workflow is reported with the name, description, and status
-        recorded at publish time, so unpublished edits never leave the design
-        session. See
+        ``modified`` workflow is reported with the name, description, prompt,
+        and status recorded at publish time, so unpublished edits never leave
+        the design session. See
         :func:`~models.workflow_published_version.published_workflow_read`.
+        A caller who may not read prompts at all (:func:`prompt_hidden_from`)
+        gets ``prompt`` and ``generated_prompt`` blanked as well.
 
         Args:
             workflow: The persisted workflow to project.
@@ -658,10 +698,13 @@ class WorkflowService:
         versions = await self._versions_for([workflow], caller_roles=caller_roles)
         if not self._published_view(caller_roles):
             return await build_workflow_read(self._workflows, workflow)
-        return published_workflow_read(
-            workflow,
-            versions.get(workflow.id),
-            tag_ids=await self._workflows.tag_ids_for(workflow.id),
+        return _without_hidden_prompt(
+            published_workflow_read(
+                workflow,
+                versions.get(workflow.id),
+                tag_ids=await self._workflows.tag_ids_for(workflow.id),
+            ),
+            caller_roles,
         )
 
     async def to_read_many(
@@ -687,7 +730,12 @@ class WorkflowService:
                 for x in workflows
             ]
         return [
-            published_workflow_read(x, versions.get(x.id), tag_ids=by_id.get(x.id, []))
+            _without_hidden_prompt(
+                published_workflow_read(
+                    x, versions.get(x.id), tag_ids=by_id.get(x.id, [])
+                ),
+                caller_roles,
+            )
             for x in workflows
         ]
 
@@ -718,7 +766,7 @@ class WorkflowService:
         An update that sets no fields changes nothing and leaves the status
         alone.
 
-        ``generated_description`` may only be changed by a ``super_admin``
+        ``generated_prompt`` may only be changed by a ``super_admin``
         (see :class:`~models.workflow.WorkflowUpdate`); every other field
         stays open to any caller who reached this route (gated to the
         ``developer`` role at the router).
@@ -733,21 +781,19 @@ class WorkflowService:
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
-            ForbiddenError: If the update would change ``generated_description``
+            ForbiddenError: If the update would change ``generated_prompt``
                 and the caller is not a super admin.
         """
         current = await self.get(workflow_id)
         update = data.model_dump(exclude_unset=True)
         if (
-            "generated_description" in update
-            and update["generated_description"] != current.generated_description
+            "generated_prompt" in update
+            and update["generated_prompt"] != current.generated_prompt
             # Direct roles, not effective ones: this asks only about
             # ``super_admin``, which a user group can never grant.
             and not has_any_role(caller.roles, Role.super_admin)
         ):
-            raise ForbiddenError(
-                "Only a super admin can edit the generated description"
-            )
+            raise ForbiddenError("Only a super admin can edit the generated prompt")
         updated = await self._workflows.update(workflow_id, data, user_id=caller.id)
         if not update:
             return updated
@@ -912,7 +958,7 @@ class WorkflowService:
             raise NotFoundError("AgentSkill", workflow.agent_skill_id)
         if skill.commit_sha is None:
             raise SkillNotReadyError(skill.id)
-        name, description, templates, version_number = await self._resolve_design(
+        name, prompt, templates, version_number = await self._resolve_design(
             workflow, design_source=design_source
         )
         if not templates:
@@ -930,7 +976,7 @@ class WorkflowService:
         execution_create = WorkflowExecutionCreate(
             session_id=session_id,
             name=self._generate_execution_name(name),
-            description=description,
+            prompt=prompt,
             agent_skill_id=skill.id,
             agent_skill_name=skill.name,
             agent_skill_repo_url=skill.repo_url,
@@ -1003,7 +1049,11 @@ class WorkflowService:
         created = await self._execution_repo.get(execution_id)
         if created is None:  # pragma: no cover - just created above
             raise NotFoundError("WorkflowExecution", execution_id)
-        return WorkflowExecutionRead.from_execution(created, tag_ids=workflow_tag_ids)
+        return WorkflowExecutionRead.from_execution(
+            created,
+            tag_ids=workflow_tag_ids,
+            hide_prompt=prompt_hidden_from(caller_roles),
+        )
 
     def _generate_execution_name(self, name: str) -> str:
         """Build a WorkflowExecution name from the workflow name plus a random suffix.
@@ -1027,7 +1077,7 @@ class WorkflowService:
         *,
         design_source: WorkflowDesignSource = WorkflowDesignSource.published,
     ) -> tuple[str, str | None, _SnapshotTemplateList, int | None]:
-        """Return the name, description, task templates, and version a run should use.
+        """Return the name, prompt, task templates, and version a run should use.
 
         A ``modified`` workflow runs its last published snapshot unless the
         caller asked for :attr:`~models.workflow.WorkflowDesignSource.live`;
@@ -1045,7 +1095,8 @@ class WorkflowService:
                 ``live`` for any other status.
 
         Returns:
-            The workflow name, description, and task templates to copy, and
+            The workflow name, prompt, and task templates to copy, and
+
             the published version they came from — ``None`` when they are a
             design no version recorded (a draft run).
         """
@@ -1057,7 +1108,7 @@ class WorkflowService:
             if version is not None:
                 return (
                     version.name,
-                    version.description,
+                    version.prompt,
                     parse_templates(version),
                     version.version,
                 )
@@ -1075,7 +1126,7 @@ class WorkflowService:
         )
         return (
             workflow.name,
-            workflow.effective_description,
+            workflow.effective_prompt,
             [snapshot_template(t) for t in live],
             version_number,
         )
@@ -1138,6 +1189,7 @@ class WorkflowService:
         # expired instance fails outside an explicit refresh.
         name = version.name
         description = version.description
+        prompt = version.prompt
         templates = parse_templates(version)
 
         await self._templates.replace_all_for_workflow(
@@ -1145,7 +1197,9 @@ class WorkflowService:
         )
         await self._workflows.update(
             workflow_id,
-            WorkflowUpdate(name=name, description=description),
+            # The snapshot holds the resolved prompt, so it comes back as the
+            # override; the generated one is left as it is.
+            WorkflowUpdate(name=name, description=description, prompt=prompt),
             user_id=user_id,
         )
 
@@ -1163,7 +1217,8 @@ class WorkflowService:
 
         Every published version is listed, newest first unless ``sort`` says
         otherwise. They were all published, so nothing here is hidden from a
-        caller allowed to read the workflow at all.
+        caller allowed to read the workflow at all -- except each version's
+        ``prompt``, which follows :func:`prompt_hidden_from`.
 
         Args:
             workflow_id: Identifier of the workflow.
@@ -1182,12 +1237,22 @@ class WorkflowService:
                 the caller.
         """
         await self.get_for_read(workflow_id, caller_roles=caller_roles)
+        hide_prompt = prompt_hidden_from(caller_roles)
         rows = await self._versions.list_versions(
-            workflow_id, limit=limit, offset=offset, sort=sort, filters=filters
+            workflow_id,
+            limit=limit,
+            offset=offset,
+            sort=sort,
+            filters=filters,
+            hide_prompt=hide_prompt,
         )
-        return [
+        reads = [
             WorkflowVersionRead.model_validate(r, from_attributes=True) for r in rows
         ]
+        if hide_prompt:
+            for read in reads:
+                read.prompt = None
+        return reads
 
     async def restore_version(
         self, workflow_id: str, version: int, *, user_id: str

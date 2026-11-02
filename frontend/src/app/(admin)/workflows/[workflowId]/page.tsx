@@ -25,12 +25,12 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
-import { DescriptionDiffDialog } from "@/components/admin/description-diff-dialog";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import { HeaderIconButton } from "@/components/admin/header-icon-button";
 import { KnowledgeBasePicker } from "@/components/admin/knowledge-base-picker";
+import { PromptDiffDialog } from "@/components/admin/prompt-diff-dialog";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { type RunWorkflowChoice, RunWorkflowDialog } from "@/components/admin/run-workflow-dialog";
@@ -53,7 +53,7 @@ import {
   deleteWorkflow,
   discardWorkflowChanges,
   executeWorkflow,
-  generateWorkflowDescription,
+  generateWorkflowPrompt,
   getAgentSkill,
   getWorkflow,
   isForbiddenError,
@@ -79,15 +79,16 @@ import { showToast } from "@/store/toastSlice";
 /** How often (ms) to re-fetch the workflow while its task templates are still generating. */
 const POLL_INTERVAL_MS = 2000;
 
-// name and description are client-writable by any developer; reuse the
-// generated name constraint and allow a free-form (bounded) description.
-// generatedDescription is only ever submitted for a super_admin caller (see
+// name, description, and prompt are client-writable by any developer; reuse
+// the generated name constraint and allow free-form (bounded) text.
+// generatedPrompt is only ever submitted for a super_admin caller (see
 // isSuperAdmin below), but stays part of the schema so register()/reset() can
 // address it regardless of role.
 const schema = z.object({
   name: zGenerateWorkflowRequest.shape.name,
-  description: z.string().max(10000),
-  generatedDescription: z.string().max(10000),
+  description: z.string().max(2000),
+  prompt: z.string().max(10000),
+  generatedPrompt: z.string().max(10000),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -105,7 +106,7 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
 
 /**
  * Detail page of a generated workflow, titled with the workflow's own name:
- * edit name/description, watch the design run settle, open the design
+ * edit name/description/prompt, watch the design run settle, open the design
  * session to adjust the task templates by chat, run the workflow, manage the task
  * templates, and publish the workflow to make it executable.
  *
@@ -115,16 +116,18 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * (pre-publish testing) — and, on success, navigates to the new run's
  * `WorkflowExecution` page just like the list's Run action.
  *
- * `description` is a free-form field any developer can set; the workflow
- * session falls back to the AI-generated `generatedDescription` whenever it's
- * empty. `generatedDescription` itself is read-only for everyone except a
+ * `description` is plain prose explaining the workflow to people; no run ever
+ * reads it. `prompt` is what a run is told: a free-form field any developer
+ * can set, falling back to the AI-generated `generatedPrompt` whenever it's
+ * empty. `generatedPrompt` itself is read-only for everyone except a
  * super admin, who can edit it directly to correct the AI's summary. Any
  * developer can instead re-derive it from the design conversation through
  * the field's own generate button, which saves the new summary server-side
  * right away (and so moves a published workflow to `modified`). Since the
- * override is usually a hand-edit of that summary, the Description field also
+ * override is usually a hand-edit of that summary, the Prompt field also
  * carries a button opening a word-level diff of the two current (possibly
- * unsaved) values.
+ * unsaved) values. Both prompt fields are shown only to an admin, developer,
+ * or reviewer — the backend blanks them for everyone else.
  *
  * Editing a published workflow moves it to `modified` — runs keep using the
  * last published version — so the status bar then also offers "Discard
@@ -145,7 +148,7 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  *
  * Neither the live design nor `modified` reaches anyone else: the backend
  * serves a plain viewer (e.g. `requester`) a `modified` workflow as
- * `published`, carrying its last published name, description, and task
+ * `published`, carrying its last published name, description, prompt, and task
  * templates. So this page never has to hide the edits itself for them — it
  * simply never receives them.
  *
@@ -173,6 +176,7 @@ export default function WorkflowDetailPage() {
   const canPublish = useHasRole(Role.REVIEWER);
   const canViewDesign = useHasRole(Role.DEVELOPER, Role.REVIEWER);
   const canViewTemplates = useHasRole(Role.REQUESTER, Role.DEVELOPER, Role.REVIEWER);
+  const canViewPrompt = useHasRole(Role.ADMIN, Role.DEVELOPER, Role.REVIEWER);
   const isAllTenantsView = useIsAllTenantsView();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -202,7 +206,7 @@ export default function WorkflowDetailPage() {
   const discard = useAsyncAction({ showDone: false });
   const deactivate = useAsyncAction({ showDone: false });
   const run = useAsyncAction({ showDone: false });
-  const generateDescription = useAsyncAction({ showDone: false });
+  const generatePrompt = useAsyncAction({ showDone: false });
   const {
     register,
     handleSubmit,
@@ -213,14 +217,14 @@ export default function WorkflowDetailPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: { name: "", description: "", generatedDescription: "" },
+    defaultValues: { name: "", description: "", prompt: "", generatedPrompt: "" },
   });
 
   // Subscribed rather than read through getValues() so the diff dialog — and
   // the enabled state of the button that opens it — track what is in the
   // textareas right now, including edits that have not been saved yet.
-  const descriptionValue = watch("description");
-  const generatedDescriptionValue = watch("generatedDescription");
+  const promptValue = watch("prompt");
+  const generatedPromptValue = watch("generatedPrompt");
 
   const applyWorkflow = useCallback(
     (wf: Workflow) => {
@@ -228,7 +232,8 @@ export default function WorkflowDetailPage() {
       reset({
         name: wf.name,
         description: wf.description ?? "",
-        generatedDescription: wf.generatedDescription ?? "",
+        prompt: wf.prompt ?? "",
+        generatedPrompt: wf.generatedPrompt ?? "",
       });
       setAudit({
         createdBy: wf.createdBy,
@@ -290,7 +295,8 @@ export default function WorkflowDetailPage() {
         await updateWorkflow(workflowId, {
           name: values.name,
           description: values.description || null,
-          ...(isSuperAdmin ? { generatedDescription: values.generatedDescription || null } : {}),
+          prompt: values.prompt || null,
+          ...(isSuperAdmin ? { generatedPrompt: values.generatedPrompt || null } : {}),
         });
         // Tags are a separate sub-resource, so they are only written when the
         // selection actually changed.
@@ -322,12 +328,12 @@ export default function WorkflowDetailPage() {
     }
   }
 
-  async function handleGenerateDescription() {
+  async function handleGeneratePrompt() {
     try {
-      await generateDescription.run(async () => {
-        const updated = await generateWorkflowDescription(workflowId);
+      await generatePrompt.run(async () => {
+        const updated = await generateWorkflowPrompt(workflowId);
         applyWorkflow(updated);
-        dispatch(showToast({ message: "Description generated" }));
+        dispatch(showToast({ message: "Prompt generated" }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -573,25 +579,12 @@ export default function WorkflowDetailPage() {
             </div>
           </FormField>
 
-          <FormField
-            htmlFor="description"
-            label="Description"
-            action={
-              <ActionIconButton
-                icon={GitCompare}
-                label="Show diff from the generated description"
-                onClick={() => setDiffOpen(true)}
-                // Without a generated description there is no baseline to diff
-                // against, so the dialog would have nothing to show.
-                disabled={generatedDescriptionValue.trim() === ""}
-              />
-            }
-          >
+          <FormField htmlFor="description" label="Description" error={errors.description?.message}>
             {canEdit ? (
               <Textarea
                 id="description"
-                rows={4}
-                placeholder="Overrides the generated description below for the workflow execution"
+                rows={3}
+                placeholder="What this workflow is for. Not used by the workflow execution."
                 {...register("description")}
               />
             ) : (
@@ -601,50 +594,82 @@ export default function WorkflowDetailPage() {
             )}
           </FormField>
 
-          <FormField
-            htmlFor="generatedDescription"
-            label="Generated description"
-            action={
-              canEdit ? (
+          {canViewPrompt && (
+            <FormField
+              htmlFor="prompt"
+              label="Prompt"
+              action={
                 <ActionIconButton
-                  icon={Sparkles}
-                  label="Generate from the design conversation"
-                  onClick={handleGenerateDescription}
-                  // While the task templates are still generating the background job owns
-                  // this field and there is no settled conversation to
-                  // summarize yet.
-                  disabled={generating || generateDescription.inFlight}
-                  spinning={generateDescription.inFlight}
-                  spinAnimation="spin-y"
+                  icon={GitCompare}
+                  label="Show diff from the generated prompt"
+                  onClick={() => setDiffOpen(true)}
+                  // Without a generated prompt there is no baseline to diff
+                  // against, so the dialog would have nothing to show.
+                  disabled={generatedPromptValue.trim() === ""}
                 />
-              ) : undefined
-            }
-          >
-            <div
-              className={["rounded-xl", generateDescription.status === "pending" ? "live-edge" : ""]
-                .filter(Boolean)
-                .join(" ")}
+              }
             >
-              {isSuperAdmin ? (
+              {canEdit ? (
                 <Textarea
-                  id="generatedDescription"
+                  id="prompt"
                   rows={4}
-                  placeholder="Summarized from the design conversation"
-                  {...register("generatedDescription")}
+                  placeholder="Overrides the generated prompt below for the workflow execution"
+                  {...register("prompt")}
                 />
               ) : (
                 <ReadOnlyField className="whitespace-pre-wrap">
-                  {workflow.generatedDescription || "—"}
+                  {workflow.prompt || "—"}
                 </ReadOnlyField>
               )}
-            </div>
-            <p className="text-xs text-on-surface-variant">
-              {isSuperAdmin
-                ? "AI-generated summary. Only a super admin can edit it directly."
-                : "AI-generated summary, read-only."}{" "}
-              Used for the workflow execution whenever Description above is empty.
-            </p>
-          </FormField>
+            </FormField>
+          )}
+
+          {canViewPrompt && (
+            <FormField
+              htmlFor="generatedPrompt"
+              label="Generated prompt"
+              action={
+                canEdit ? (
+                  <ActionIconButton
+                    icon={Sparkles}
+                    label="Generate from the design conversation"
+                    onClick={handleGeneratePrompt}
+                    // While the task templates are still generating the background job owns
+                    // this field and there is no settled conversation to
+                    // summarize yet.
+                    disabled={generating || generatePrompt.inFlight}
+                    spinning={generatePrompt.inFlight}
+                    spinAnimation="spin-y"
+                  />
+                ) : undefined
+              }
+            >
+              <div
+                className={["rounded-xl", generatePrompt.status === "pending" ? "live-edge" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {isSuperAdmin ? (
+                  <Textarea
+                    id="generatedPrompt"
+                    rows={4}
+                    placeholder="Summarized from the design conversation"
+                    {...register("generatedPrompt")}
+                  />
+                ) : (
+                  <ReadOnlyField className="whitespace-pre-wrap">
+                    {workflow.generatedPrompt || "—"}
+                  </ReadOnlyField>
+                )}
+              </div>
+              <p className="text-xs text-on-surface-variant">
+                {isSuperAdmin
+                  ? "AI-generated summary. Only a super admin can edit it directly."
+                  : "AI-generated summary, read-only."}{" "}
+                Used for the workflow execution whenever Prompt above is empty.
+              </p>
+            </FormField>
+          )}
 
           <KnowledgeBasePicker
             value={kbIds}
@@ -719,6 +744,7 @@ export default function WorkflowDetailPage() {
         open={confirmRunOpen}
         workflowId={workflowId}
         workflowName={workflow.name}
+        workflowDescription={workflow.description}
         isDraft={workflow.status === "draft"}
         // Only a developer ever sees `modified` — for everyone else the backend
         // reports the workflow as `published` — so the status alone is the gate.
@@ -726,10 +752,10 @@ export default function WorkflowDetailPage() {
         onConfirm={handleRun}
         onCancel={() => setConfirmRunOpen(false)}
       />
-      <DescriptionDiffDialog
+      <PromptDiffDialog
         open={diffOpen}
-        generated={generatedDescriptionValue}
-        description={descriptionValue}
+        generated={generatedPromptValue}
+        prompt={promptValue}
         onClose={() => setDiffOpen(false)}
       />
     </AdminPageContainer>

@@ -65,6 +65,6 @@ Three rules define them:
 
 The agent may read and add, never replace or remove — a write under a name already taken is stored under a numbered variant. So a file a participant attached stays exactly as they attached it, whatever the run does afterwards.
 
-What the agent knows about the files does not come from the browser. The server reads the session's file list and injects it into the run's context alongside the workflow description, the same way and for the same reason: a client-supplied list would be a client-supplied instruction.
+What the agent knows about the files does not come from the browser. The server reads the session's file list and injects it into the run's context alongside the workflow prompt, the same way and for the same reason: a client-supplied list would be a client-supplied instruction.
 
 Files are stored in the database, so they inherit its durability and its backup, and need no shared volume across replicas. Downloads are always served as an attachment under a generic content type, so nothing a participant or the agent stored can be rendered by a browser.

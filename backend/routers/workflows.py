@@ -321,7 +321,7 @@ async def update_workflow(
 ) -> ApiResponse[WorkflowRead]:
     """Apply a partial update to a Workflow.
 
-    Changing ``generated_description`` is restricted to a ``super_admin``
+    Changing ``generated_prompt`` is restricted to a ``super_admin``
     (HTTP 403 ``FORBIDDEN`` otherwise); every other field stays open to any
     caller who reaches this route.
     """
@@ -369,25 +369,25 @@ async def publish_workflow(
 
 
 @router.post(
-    "/{workflow_id}/generate-description",
+    "/{workflow_id}/generate-prompt",
     response_model=ApiResponse[WorkflowRead],
     dependencies=_requires_developer,
 )
-async def generate_workflow_description(
+async def generate_workflow_prompt(
     workflow_id: str,
     service: WorkflowDesignServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[WorkflowRead]:
-    """Summarize the workflow's design conversation into its description.
+    """Summarize the workflow's design conversation into its prompt.
 
-    Overwrites the workflow's AI-generated description and returns the updated
+    Overwrites the workflow's AI-generated prompt and returns the updated
     workflow; a ``published`` workflow becomes ``modified``. Raises HTTP 409
-    (``WORKFLOW_DESCRIPTION_NOT_GENERATABLE``) while generation is in flight or
+    (``WORKFLOW_PROMPT_NOT_GENERATABLE``) while generation is in flight or
     when there is no design conversation to summarize, and HTTP 502
     (``SUMMARIZATION_FAILED``) when the summarizer call fails.
     """
-    workflow = await service.generate_description(workflow_id, user_id=user_id)
+    workflow = await service.generate_prompt(workflow_id, user_id=user_id)
     return ApiResponse(meta=meta, data=await service.to_read(workflow))
 
 

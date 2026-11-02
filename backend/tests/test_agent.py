@@ -638,7 +638,7 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
     assert "assigned_to_you" in rendered
     assert "A2UI Rules" in rendered
     assert "render_a2ui" in rendered
-    # Known allowed values (e.g. listed in the workflow description) must be
+    # Known allowed values (e.g. listed in the workflow prompt) must be
     # offered as ChoicePicker options rather than typed into a TextField. The
     # rule is a decision gate ("decide this before you emit any input") with a
     # guardrail against inventing a picker for a semi-open value.

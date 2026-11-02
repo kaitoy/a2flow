@@ -678,6 +678,35 @@ async def test_a_turn_is_told_which_files_the_session_holds(
     assert "input.csv" in entries["Files attached to this session"]
 
 
+async def test_a_turn_is_given_the_prompt_but_never_the_description(
+    runner_env: tuple[AsyncClient, AsyncEngine, SessionRunner, MagicMock],
+) -> None:
+    """The prompt steers the run; the description is for people only."""
+    from tests._workflow import add_template, generate_workflow, publish_workflow
+
+    client, _engine, runner, registry = runner_env
+    skill = await create_skill(client)
+    wf = await generate_workflow(client, skill["id"])
+    assert_ok(
+        await client.patch(
+            f"/api/v1/workflows/{wf['id']}",
+            json={"prompt": "Do the steps", "description": "For humans"},
+        )
+    )
+    await add_template(client, wf["id"])
+    await publish_workflow(client, wf["id"])
+    execution = assert_ok(
+        await client.post(f"/api/v1/workflows/{wf['id']}/execute"), status=201
+    )
+    agent = ScriptedAgent()
+    registry.get.return_value = agent
+    await runner.run_turn(execution["sessionId"], DEFAULT_TEST_TENANT_ID)
+
+    entries = {c.description: c.value for c in agent.inputs[0].context or []}
+    assert entries["Workflow prompt"] == "Do the steps"
+    assert "For humans" not in entries.values()
+
+
 # ---------- parallel branches ----------
 
 

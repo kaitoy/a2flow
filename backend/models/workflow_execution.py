@@ -86,7 +86,9 @@ class WorkflowExecutionCreate(SQLModel):
     """ADK/AG-UI id of this execution's workflow session — the chat it runs in."""
 
     name: str
-    description: str | None = None
+    #: The workflow's effective prompt when the run started, handed to the
+    #: run's agent as context. Hidden from callers who may not read prompts.
+    prompt: str | None = None
     agent_skill_id: str
     agent_skill_name: str
     agent_skill_repo_url: str
@@ -186,7 +188,7 @@ class WorkflowExecutionRead(BaseEntity):
     tenant_id: str
     session_id: str
     name: str
-    description: str | None = None
+    prompt: str | None = None
     agent_skill_id: str
     agent_skill_name: str
     agent_skill_repo_url: str
@@ -217,15 +219,25 @@ class WorkflowExecutionRead(BaseEntity):
 
     @classmethod
     def from_execution(
-        cls, execution: WorkflowExecution, *, tag_ids: list[str]
+        cls,
+        execution: WorkflowExecution,
+        *,
+        tag_ids: list[str],
+        hide_prompt: bool = False,
     ) -> "WorkflowExecutionRead":
         """Build the read view of a stored execution with its tags attached.
 
         Args:
             execution: The persisted execution to project.
             tag_ids: Ids of the tags attached to ``execution``.
+            hide_prompt: Blank out ``prompt`` for a caller who may not read
+                workflow prompts (see
+                :func:`services.workflow.prompt_hidden_from`).
 
         Returns:
             A read view carrying the execution's columns plus its tags.
         """
-        return cls(**execution.model_dump(), tag_ids=tag_ids)
+        read = cls(**execution.model_dump(), tag_ids=tag_ids)
+        if hide_prompt:
+            read.prompt = None
+        return read

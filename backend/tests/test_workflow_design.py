@@ -174,8 +174,14 @@ async def test_generation_job_success_sets_draft_and_notifies(
     async def _fake_summarize(transcript: str, **_: Any) -> str:
         return "A summary of the design"
 
+    async def _fake_describe(transcript: str, **_: Any) -> str:
+        return "Builds the weekly report for you."
+
     monkeypatch.setattr(
         "services.workflow_design.summarize_design_transcript", _fake_summarize
+    )
+    monkeypatch.setattr(
+        "services.workflow_design.describe_design_transcript", _fake_describe
     )
 
     await generate_workflow_design(
@@ -191,8 +197,8 @@ async def test_generation_job_success_sets_draft_and_notifies(
     workflow = await _workflow_row(engine, wf_id)
     assert workflow.status is WorkflowStatus.draft
     assert workflow.generation_error is None
-    assert workflow.generated_description == "A summary of the design"
-    assert workflow.description is None
+    assert workflow.generated_prompt == "A summary of the design"
+    assert workflow.description == "Builds the weekly report for you."
 
     # The run went through the initial-design agent with the prompt as the
     # user message, keyed by the session owner.
@@ -375,3 +381,71 @@ async def test_generation_job_summarizer_failure_falls_back(
 
     workflow = await _workflow_row(engine, wf_id)
     assert workflow.status is WorkflowStatus.draft
+
+
+async def _generate_with_description(
+    engine: AsyncEngine,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    describe: Any,
+    *,
+    typed: str | None = None,
+) -> Workflow:
+    """Run the generation job with ``describe`` standing in for the describer.
+
+    ``typed`` is a description a developer saved while the design was still
+    generating.
+    """
+    wf_id, _session_id = await _seed(engine)
+    if typed is not None:
+        async with AsyncSession(engine) as db:
+            row = await db.get(Workflow, wf_id)
+            assert row is not None
+            row.description = typed
+            db.add(row)
+            await db.commit()
+    registry, session_service, store = _fakes(tmp_path, run_registers=True, eng=engine)
+
+    async def _fake_summarize(transcript: str, **_: Any) -> str:
+        return "A summary of the design"
+
+    monkeypatch.setattr(
+        "services.workflow_design.summarize_design_transcript", _fake_summarize
+    )
+    monkeypatch.setattr("services.workflow_design.describe_design_transcript", describe)
+    await generate_workflow_design(
+        wf_id,
+        "Build me a report",
+        user_id="owner",
+        registry=registry,
+        session_service=session_service,
+        skills_store=store,
+        app_name="A2Flow",
+    )
+    return await _workflow_row(engine, wf_id)
+
+
+async def test_generation_job_keeps_a_description_typed_meanwhile(
+    engine: AsyncEngine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _describe(transcript: str, **_: Any) -> str:
+        return "AI blurb"
+
+    workflow = await _generate_with_description(
+        engine, tmp_path, monkeypatch, _describe, typed="Typed by a developer"
+    )
+    assert workflow.description == "Typed by a developer"
+
+
+async def test_generation_job_describer_failure_leaves_description_empty(
+    engine: AsyncEngine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Never falls back to the transcript: that is what requesters must not see."""
+
+    async def _boom(transcript: str, **_: Any) -> str:
+        raise RuntimeError("LLM down")
+
+    workflow = await _generate_with_description(engine, tmp_path, monkeypatch, _boom)
+    assert workflow.status is WorkflowStatus.draft
+    assert workflow.description is None
+    assert workflow.generated_prompt == "A summary of the design"

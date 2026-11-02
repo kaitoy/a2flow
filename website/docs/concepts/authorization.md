@@ -29,7 +29,7 @@ A group is also addressable in its own right: an [approval](../guides/approvals.
 |---|---|
 | `super_admin` | Everything (bypasses every role gate; does **not** bypass the two designated-approver checks in the [matrix below](./authorization.md#workflow-execution-access)) |
 | `admin` | User CRUD, secrets CRUD, deleting workflow executions, and read-only visibility into every workflow execution, its tasks, and its chat history, and every approval, in their tenant (see [Workflow execution and its workflow session](./authorization.md#workflow-execution-access) — apart from deleting one, an Admin cannot drive an execution's agent, change one of its tasks' status, or resolve an approval) |
-| `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](../guides/tool-mocks.md) CRUD, agent-skill CRUD, workflow generation/editing — including regenerating a workflow's AI-generated `generatedDescription`, though only a Super Admin may edit that field directly — task-template CRUD, driving the design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows and the unpublished edits of a `modified` one, for pre-publish testing. Publishing and deactivating are **not** included — that's `reviewer`'s job |
+| `developer` | Secrets CRUD, MCP server CRUD, [tool-mock](../guides/tool-mocks.md) CRUD, agent-skill CRUD, workflow generation/editing — including regenerating a workflow's AI-generated **Generated prompt**, though only a Super Admin may edit that field directly — task-template CRUD, driving the design-session chat, running workflows (`POST /workflows/{id}/execute`) — including `draft` workflows and the unpublished edits of a `modified` one, for pre-publish testing. Publishing and deactivating are **not** included — that's `reviewer`'s job |
 | `reviewer` | Publishing and deactivating a workflow — the two operations `developer` no longer performs. Shares `developer`'s full read visibility into a workflow: a `draft` workflow, a `modified` workflow's unpublished edits, and the design-session chat history all read the same way for a Reviewer as for a Developer. Cannot edit a workflow, its task templates, or drive its design session |
 | `requester` | Running **published** (and `modified`) workflows (`POST /workflows/{id}/execute`), always against the last published design |
 | `approver` | Eligibility to be a workflow approval's designated approver — individually, or as a member of a group an approval is addressed to — and resolving their own approvals |
@@ -39,6 +39,8 @@ The initial seeded **`root`** user holds `super_admin` and is platform-scoped (n
 ## What roles gate {#what-roles-gate}
 
 **Reads stay open.** Only writes, workflow execution, and approvals are role-gated; every authenticated user may `GET` the collections (the UI needs them to resolve names, pick approvers, and list workflows). Secret *values* are never returned by the API regardless of role.
+
+A workflow's **Prompt** and **Generated prompt** — the text a run is told — are shown only to an Admin, Developer, Reviewer, or Super Admin. Everyone else reads the workflow, its version history, and its runs with those fields left empty. The workflow's **Description** stays visible to everyone who can open it.
 
 The one exception is not a role at all: a record carrying an [access-control tag](../guides/tags.md#access-control-tags) is visible only to users whose groups, between them, carry every such tag on it — and to an Admin or a Super Admin, both of whom bypass it. Everyone else sees neither the record nor any sign it exists.
 

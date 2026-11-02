@@ -48,6 +48,7 @@ from repositories.workflow_task import WorkflowTaskRepository
 from services import session_attribution
 from services.session_inputs import SessionInput, WaitingCall
 from services.session_queue import queue_input
+from services.workflow import prompt_hidden_from
 from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 
 logger = logging.getLogger(__name__)
@@ -191,7 +192,9 @@ class WorkflowExecutionService:
                 inherited from their groups.
 
         Returns:
-            The matching execution, with its tag ids attached.
+            The matching execution, with its tag ids attached; its ``prompt``
+            is blanked for a caller who may not read workflow prompts (see
+            :func:`services.workflow.prompt_hidden_from`).
 
         Raises:
             NotFoundError: If no execution exists with the given ID, or it is
@@ -204,7 +207,9 @@ class WorkflowExecutionService:
             execution_id, caller=caller, caller_roles=caller_roles
         )
         tag_ids = await self._execution_repo.tag_ids_for(execution_id)
-        return WorkflowExecutionRead.from_execution(execution, tag_ids=tag_ids)
+        return WorkflowExecutionRead.from_execution(
+            execution, tag_ids=tag_ids, hide_prompt=prompt_hidden_from(caller_roles)
+        )
 
     async def list(
         self,
@@ -247,6 +252,7 @@ class WorkflowExecutionService:
             visible_to_group_ids = await self._access.approver_group_ids(
                 caller, caller_roles
             )
+        hide_prompt = prompt_hidden_from(caller_roles)
         executions = await self._execution_repo.list(
             limit=limit,
             offset=offset,
@@ -254,13 +260,14 @@ class WorkflowExecutionService:
             filters=filters,
             visible_to_user_id=visible_to_user_id,
             visible_to_group_ids=visible_to_group_ids,
+            hide_prompt=hide_prompt,
         )
         tags_by_execution = await self._execution_repo.tag_ids_for_many(
             [e.id for e in executions]
         )
         return [
             WorkflowExecutionRead.from_execution(
-                e, tag_ids=tags_by_execution.get(e.id, [])
+                e, tag_ids=tags_by_execution.get(e.id, []), hide_prompt=hide_prompt
             )
             for e in executions
         ]

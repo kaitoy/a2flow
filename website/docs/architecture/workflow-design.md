@@ -19,9 +19,9 @@ Generating registers the workflow immediately and does the design work in the ba
 1. The prompt from the Generate dialog is sent as the first message of the workflow's **design session**.
 2. The design agent reads the skill, breaks the request into steps, and registers them as **task templates** — a dependency graph, each step declaring which steps must finish before it.
 3. For each step that needs one, it binds the MCP tools that step is allowed to call.
-4. The conversation is summarized into the workflow's **Generated description**, and the workflow becomes `draft`.
+4. The conversation is summarized into the workflow's **Generated prompt** — the text handed to every run as context — plus a short **Description** for the people who run it, and the workflow becomes `draft`.
 
-The prompt is not kept as a field of the workflow. It lives on as the first message of the design conversation, which is why the same chat can be reopened later to refine the result — and why a run that registered nothing still leaves a usable starting point rather than an empty record.
+The request typed into the Generate dialog is not kept as a field of the workflow. It lives on as the first message of the design conversation, which is why the same chat can be reopened later to refine the result — and why a run that registered nothing still leaves a usable starting point rather than an empty record.
 
 ## What a task template carries
 
@@ -47,8 +47,9 @@ So a binding written here is not a hint to the model. It is the grant the [gatew
 
 ## Publishing
 
-Publishing freezes the design. The workflow's name, its effective description, and its full template list — dependency edges and tool bindings included — are captured as a new numbered published version; earlier versions stay in the [version history](../guides/workflows.md#version-history). No AI runs at this point; publishing is a snapshot, not a review.
+Publishing freezes the design. The workflow's name, its description, its effective prompt, and its full template list — dependency edges and tool bindings included — are captured as a new numbered published version; earlier versions stay in the [version history](../guides/workflows.md#version-history). No AI runs at this point; publishing is a snapshot, not a review.
 
 Editing afterwards moves the workflow to `modified` and changes nothing about what runs: runs keep using the published version until it is published again. A run already under way is unaffected either way, because it took its own copy the moment it started.
 
-The published version is also the only version most people ever see. While a workflow is `modified`, its unpublished name, description and task templates are shown to a **Developer** or **Super Admin** and to nobody else; every other role reads the published version throughout — including in the workflows list, where searching and sorting by name follow the published name too — and sees the status as `published`. A Developer can run either design: the published one as a real request, or the edits as a [test run](../guides/workflows.md#trying-the-edits-out) that may stub its tools and is left out of the operations metrics.
+The published version is also the only version most people ever see. While a workflow is `modified`, its unpublished name, description, prompt and task templates are shown
+ to a **Developer** or **Super Admin** and to nobody else; every other role reads the published version throughout — including in the workflows list, where searching and sorting by name follow the published name too — and sees the status as `published`. A Developer can run either design: the published one as a real request, or the edits as a [test run](../guides/workflows.md#trying-the-edits-out) that may stub its tools and is left out of the operations metrics.

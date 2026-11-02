@@ -2,7 +2,7 @@
  * @module Dialog — the shared modal shell every dialog in the app is built on.
  *
  * Collects what {@link ConfirmDialog}, {@link RegistrySearchDialog},
- * {@link GenerateWorkflowDialog}, and {@link DescriptionDiffDialog} each used
+ * {@link GenerateWorkflowDialog}, and {@link PromptDiffDialog} each used
  * to hand-write: a portal to `document.body`, a scrim that closes on click
  * without stealing focus, the fade/scale transition, the `useDialogA11y`
  * focus trap, and a labelled `role="dialog"` panel. Callers supply only their

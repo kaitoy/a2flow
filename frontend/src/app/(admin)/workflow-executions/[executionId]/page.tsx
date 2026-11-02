@@ -64,6 +64,8 @@ export default function WorkflowExecutionDetailPage() {
   const [audit, setAudit] = useState<AuditMetaProps | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const isAdmin = useHasRole(Role.ADMIN);
+  // The backend blanks a run's prompt for anyone else, so the row would be empty.
+  const canViewPrompt = useHasRole(Role.ADMIN, Role.DEVELOPER, Role.REVIEWER);
   const isAllTenantsView = useIsAllTenantsView();
   // Resolve the parent workflow's *current* name for the Workflow field, the
   // same way the workflow-executions list's Workflow column does.
@@ -201,7 +203,7 @@ export default function WorkflowExecutionDetailPage() {
               label="Version"
               value={session.workflowVersion != null ? `v${session.workflowVersion}` : EMPTY_VALUE}
             />
-            <DetailItem label="Description" value={session.description || EMPTY_VALUE} />
+            {canViewPrompt && <DetailItem label="Prompt" value={session.prompt || EMPTY_VALUE} />}
             <DetailItem
               label="Agent Skill"
               value={

@@ -54,7 +54,8 @@ function buildColumns(
   isAdmin: boolean,
   tenantNames: Map<string, string>,
   isAllTenantsView: boolean,
-  tagsById: Map<string, Tag>
+  tagsById: Map<string, Tag>,
+  canViewPrompt: boolean
 ): ColumnDef<WorkflowExecution>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<WorkflowExecution>(tenantNames)] : []),
@@ -155,11 +156,16 @@ function buildColumns(
       cell: (s) =>
         s.finishedAt ? <DateTime value={s.finishedAt} className="text-on-surface-variant" /> : "—",
     },
-    {
-      header: "Description",
-      visibility: "optional",
-      cell: (s) => s.description || "—",
-    },
+    // The backend blanks a run's prompt for anyone else, so the column would be empty.
+    ...(canViewPrompt
+      ? [
+          {
+            header: "Prompt",
+            visibility: "optional" as const,
+            cell: (s: WorkflowExecution) => s.prompt || "—",
+          },
+        ]
+      : []),
     {
       header: "Agent Skill",
       sortField: "agentSkillName",
@@ -233,6 +239,7 @@ export default function WorkflowExecutionsPage() {
   } = useTableQuery<WorkflowExecution>(listWorkflowExecutions, { limit: LIMIT });
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const isAdmin = useHasRole(Role.ADMIN);
+  const canViewPrompt = useHasRole(Role.ADMIN, Role.DEVELOPER, Role.REVIEWER);
 
   function handleDelete(id: string, name: string) {
     setConfirmTarget({ id, name });
@@ -270,7 +277,8 @@ export default function WorkflowExecutionsPage() {
       isAdmin,
       tenantNames,
       isAllTenantsView,
-      tagsById
+      tagsById,
+      canViewPrompt
     )
   );
 

@@ -181,6 +181,7 @@ async def _seed_tenant_rows(db: AsyncSession, tenant_id: str, *, suffix: str) ->
         workflow.id,
         name=workflow.name,
         description=None,
+        prompt=None,
         templates=dump_templates([snapshot_template(template)]),
         user_id="owner",
     )

@@ -122,6 +122,7 @@ async def _seed(engine: AsyncEngine) -> None:
                 workflow_id,
                 name="first published name",
                 description=None,
+                prompt=None,
                 templates=dump_templates([_template("t-old", "Old", 5)]),
                 user_id=SYSTEM_USER_ID,
             )
@@ -129,6 +130,7 @@ async def _seed(engine: AsyncEngine) -> None:
                 workflow_id,
                 name=f"published name for {tenant_id}",
                 description="published description",
+                prompt="published prompt",
                 templates=dump_templates(PUBLISHED),
                 user_id=SYSTEM_USER_ID,
             )

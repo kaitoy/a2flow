@@ -19,7 +19,7 @@ vi.mock("next/link", () => ({
 }));
 
 /** Accessible name of the action opening the description diff dialog. */
-const DIFF_BUTTON = "Show diff from the generated description";
+const DIFF_BUTTON = "Show diff from the generated prompt";
 
 /** Accessible name of the action re-summarizing the design conversation. */
 const GENERATE_BUTTON = "Generate from the design conversation";
@@ -41,10 +41,39 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(screen.getByLabelText(/^name/i)).toHaveValue("my-workflow"));
   });
 
-  it("has no prompt field (workflows carry task templates, not a prompt)", async () => {
+  it("offers Description and Prompt as separate fields to a developer", async () => {
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
     await waitFor(() => screen.getByLabelText(/^name/i));
-    expect(screen.queryByLabelText(/prompt/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^description/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^prompt/i)).toBeInTheDocument();
+  });
+
+  it("shows a requester the description but neither prompt field", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflows/:id", () =>
+        envelope({
+          id: "wf-1",
+          tenantId: "tenant-1",
+          name: "my-workflow",
+          description: "What it is for.",
+          prompt: null,
+          generatedPrompt: null,
+          agentSkillId: "skill-1",
+          sessionId: "design-session-id",
+          agentSkillCommitSha: "a".repeat(40),
+          status: "published",
+          generationError: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdBy: "user",
+          updatedBy: "",
+        })
+      )
+    );
+    render(<WorkflowDetailPage />, { preloadedState: REQUESTER });
+    expect(await screen.findByText("What it is for.")).toBeInTheDocument();
+    expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
+    expect(screen.queryByText("Generated prompt")).not.toBeInTheDocument();
   });
 
   it("shows the linked knowledge bases and saves a changed selection", async () => {
@@ -576,7 +605,7 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(body).toEqual({ toolMockIds: [], designSource: "live" }));
   });
 
-  it("saves name and description only", async () => {
+  it("saves name, description, and prompt but not the generated prompt", async () => {
     const user = userEvent.setup();
     let receivedBody: unknown;
     server.use(
@@ -606,7 +635,9 @@ describe("WorkflowDetailPage", () => {
     await user.type(nameInput, "Renamed");
     await user.click(screen.getByRole("button", { name: /save/i }));
 
-    await waitFor(() => expect(receivedBody).toEqual({ name: "Renamed", description: null }));
+    await waitFor(() =>
+      expect(receivedBody).toEqual({ name: "Renamed", description: null, prompt: null })
+    );
   });
 
   it("returns to the workflow list after a successful save", async () => {
@@ -632,7 +663,7 @@ describe("WorkflowDetailPage", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/workflows"));
   });
 
-  it("shows the generated description as read-only text for a non-super-admin", async () => {
+  it("shows the generated prompt as read-only text for a non-super-admin", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
         envelope({
@@ -640,7 +671,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "AI summary of the design",
+          generatedPrompt: "AI summary of the design",
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -654,14 +685,14 @@ describe("WorkflowDetailPage", () => {
       )
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
     await waitFor(() => expect(screen.getByText("AI summary of the design")).toBeInTheDocument());
     // Anchored so the diff button — whose accessible name mentions the
-    // generated description — isn't mistaken for the textarea.
-    expect(screen.queryByLabelText(/^generated description$/i)).not.toBeInTheDocument();
+    // generated prompt — isn't mistaken for the textarea.
+    expect(screen.queryByLabelText(/^generated prompt$/i)).not.toBeInTheDocument();
   });
 
-  it("lets a super admin edit the generated description", async () => {
+  it("lets a super admin edit the generated prompt", async () => {
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
         envelope({
@@ -669,7 +700,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "AI summary of the design",
+          generatedPrompt: "AI summary of the design",
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -684,11 +715,11 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
-    const field = await screen.findByLabelText(/^generated description$/i);
+    const field = await screen.findByLabelText(/^generated prompt$/i);
     await waitFor(() => expect(field).toHaveValue("AI summary of the design"));
   });
 
-  it("includes generatedDescription in the save payload for a super admin", async () => {
+  it("includes generatedPrompt in the save payload for a super admin", async () => {
     const user = userEvent.setup();
     let receivedBody: unknown;
     server.use(
@@ -698,7 +729,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "AI summary",
+          generatedPrompt: "AI summary",
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -716,7 +747,7 @@ describe("WorkflowDetailPage", () => {
           id: "wf-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "Edited by admin",
+          generatedPrompt: "Edited by admin",
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -731,7 +762,7 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: SUPER_ADMIN });
-    const field = await screen.findByLabelText(/^generated description$/i);
+    const field = await screen.findByLabelText(/^generated prompt$/i);
     await waitFor(() => expect(field).toHaveValue("AI summary"));
     await user.clear(field);
     await user.type(field, "Edited by admin");
@@ -741,12 +772,13 @@ describe("WorkflowDetailPage", () => {
       expect(receivedBody).toEqual({
         name: "my-workflow",
         description: null,
-        generatedDescription: "Edited by admin",
+        prompt: null,
+        generatedPrompt: "Edited by admin",
       })
     );
   });
 
-  it("generates the description from the design conversation", async () => {
+  it("generates the prompt from the design conversation", async () => {
     const user = userEvent.setup();
     const generateSpy = vi.fn(() =>
       envelope({
@@ -754,7 +786,7 @@ describe("WorkflowDetailPage", () => {
         tenantId: "tenant-1",
         name: "my-workflow",
         description: null,
-        generatedDescription: "A freshly generated summary",
+        generatedPrompt: "A freshly generated summary",
         agentSkillId: "skill-1",
         sessionId: "design-session-id",
         agentSkillCommitSha: "a".repeat(40),
@@ -767,7 +799,7 @@ describe("WorkflowDetailPage", () => {
       })
     );
     server.use(
-      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", generateSpy)
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-prompt", generateSpy)
     );
 
     // Success toasts go through the component's own dispatch, so they land in
@@ -783,14 +815,14 @@ describe("WorkflowDetailPage", () => {
     // text rather than in a textarea.
     expect(await screen.findByText("A freshly generated summary")).toBeInTheDocument();
     expect(renderStore.getState().toast.items.at(-1)).toMatchObject({
-      message: "Description generated",
+      message: "Prompt generated",
     });
   });
 
-  it("lights the generated-description field while a summary is generating, then unlights it", async () => {
+  it("lights the generated-prompt field while a summary is generating, then unlights it", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", async () => {
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-prompt", async () => {
         // Outlast useAsyncAction's 200ms pending gate so the light is reached.
         await delay(400);
         return envelope({
@@ -798,7 +830,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "A freshly generated summary",
+          generatedPrompt: "A freshly generated summary",
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -817,21 +849,19 @@ describe("WorkflowDetailPage", () => {
     await user.click(screen.getByRole("button", { name: GENERATE_BUTTON }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Generated description").parentElement).toHaveClass("live-edge")
+      expect(screen.getByLabelText("Generated prompt").parentElement).toHaveClass("live-edge")
     );
     await waitFor(() =>
-      expect(screen.getByLabelText("Generated description").parentElement).not.toHaveClass(
-        "live-edge"
-      )
+      expect(screen.getByLabelText("Generated prompt").parentElement).not.toHaveClass("live-edge")
     );
   });
 
   it("shows an error toast when there is no design conversation to summarize", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post("http://localhost:8000/api/v1/workflows/:id/generate-description", () =>
+      http.post("http://localhost:8000/api/v1/workflows/:id/generate-prompt", () =>
         envelopeErr(
-          "WORKFLOW_DESCRIPTION_NOT_GENERATABLE",
+          "WORKFLOW_PROMPT_NOT_GENERATABLE",
           "Workflow has no design conversation to summarize",
           409
         )
@@ -991,7 +1021,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: null,
+          generatedPrompt: null,
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -1019,7 +1049,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: null,
+          generatedPrompt: null,
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -1039,13 +1069,13 @@ describe("WorkflowDetailPage", () => {
     );
   });
 
-  it("disables the diff action while there is no generated description to compare against", async () => {
-    render(<WorkflowDetailPage />);
+  it("disables the diff action while there is no generated prompt to compare against", async () => {
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
     await screen.findByRole("heading", { name: "my-workflow" });
     expect(screen.getByRole("button", { name: DIFF_BUTTON })).toBeDisabled();
   });
 
-  it("diffs the description against the generated description", async () => {
+  it("diffs the prompt against the generated prompt", async () => {
     const user = userEvent.setup();
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
@@ -1053,8 +1083,8 @@ describe("WorkflowDetailPage", () => {
           id: "wf-1",
           tenantId: "tenant-1",
           name: "my-workflow",
-          description: "Collects the weekly sales report.",
-          generatedDescription: "Collects the monthly sales report.",
+          prompt: "Collects the weekly sales report.",
+          generatedPrompt: "Collects the monthly sales report.",
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -1068,7 +1098,7 @@ describe("WorkflowDetailPage", () => {
       )
     );
 
-    render(<WorkflowDetailPage />);
+    render(<WorkflowDetailPage />, { preloadedState: REVIEWER });
     await screen.findByRole("heading", { name: "my-workflow" });
     await user.click(screen.getByRole("button", { name: DIFF_BUTTON }));
 
@@ -1081,7 +1111,7 @@ describe("WorkflowDetailPage", () => {
     ]);
   });
 
-  it("diffs unsaved edits to the description", async () => {
+  it("diffs unsaved edits to the prompt", async () => {
     const user = userEvent.setup();
     server.use(
       http.get("http://localhost:8000/api/v1/workflows/:id", () =>
@@ -1090,7 +1120,7 @@ describe("WorkflowDetailPage", () => {
           tenantId: "tenant-1",
           name: "my-workflow",
           description: null,
-          generatedDescription: "Runs monthly.",
+          generatedPrompt: "Runs monthly.",
           agentSkillId: "skill-1",
           sessionId: "design-session-id",
           agentSkillCommitSha: "a".repeat(40),
@@ -1105,8 +1135,9 @@ describe("WorkflowDetailPage", () => {
     );
 
     render(<WorkflowDetailPage />, { preloadedState: DEVELOPER });
-    const description = await screen.findByLabelText(/^description/i);
-    await user.type(description, "Runs weekly.");
+    const prompt = await screen.findByLabelText(/^prompt/i);
+    await user.type(prompt, "Runs weekly.");
+
     await user.click(screen.getByRole("button", { name: DIFF_BUTTON }));
 
     const dialog = await screen.findByRole("dialog");
