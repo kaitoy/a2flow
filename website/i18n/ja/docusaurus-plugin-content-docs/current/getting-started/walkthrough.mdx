@@ -41,6 +41,39 @@ import TabItem from '@theme/TabItem';
 
   [シークレット](../guides/secrets.md) `demo-aws-credentials` に本物のアクセスキーが入っていること。初回起動前に `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` を設定しておくか、あとから **Secrets** でシークレットを編集します。実行すると**本物の EC2 インスタンスが起動し**、終了させるまで課金されます。
 
+  アクセスキーの IAM ユーザーには、AMI の解決、ネットワークとキーペアの確認、インスタンスの起動を許すポリシーが必要です。次のポリシーで足ります。
+
+  ```json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "ResolveAmi",
+        "Effect": "Allow",
+        "Action": "ssm:GetParameter",
+        "Resource": "arn:aws:ssm:*::parameter/aws/service/*"
+      },
+      {
+        "Sid": "LookupAndLaunch",
+        "Effect": "Allow",
+        "Action": [
+          "ec2:DescribeImages",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeKeyPairs",
+          "ec2:DescribeInstances",
+          "ec2:RunInstances",
+          "ec2:CreateTags"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }
+  ```
+
+  1 つ目のステートメントが読めるのは、AWS が最新の AMI ID を公開しているパブリックパラメータだけで、自分のアカウントのパラメータは読めません。このポリシーではインスタンスを終了できないので、終了は AWS コンソールから自分で行ってください。
+
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 

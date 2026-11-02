@@ -41,6 +41,39 @@ Pick a provider here. Every provider-specific block on this page follows the cho
 
   The `demo-aws-credentials` [secret](../guides/secrets.md) holds a real access key: either `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` were set before the first start, or you edit the secret under **Secrets**. The run **launches a real EC2 instance**, which costs money until you terminate it.
 
+  The key's IAM user needs a policy that lets it resolve the AMI, look up the network and key pair, and launch the instance. This is enough:
+
+  ```json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "ResolveAmi",
+        "Effect": "Allow",
+        "Action": "ssm:GetParameter",
+        "Resource": "arn:aws:ssm:*::parameter/aws/service/*"
+      },
+      {
+        "Sid": "LookupAndLaunch",
+        "Effect": "Allow",
+        "Action": [
+          "ec2:DescribeImages",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeKeyPairs",
+          "ec2:DescribeInstances",
+          "ec2:RunInstances",
+          "ec2:CreateTags"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }
+  ```
+
+  The first statement reads only the public parameters AWS publishes the latest AMI ids under, not your account's own parameters. The policy does not let the key terminate the instance — do that yourself in the AWS console.
+
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 
