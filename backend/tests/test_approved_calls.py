@@ -126,6 +126,13 @@ def test_matches_needs_a_valid_regular_expression() -> None:
 def test_an_over_long_pattern_is_rejected() -> None:
     problems = validate_declaration([_call(name={"matches": "a" * 600})])
     assert any("longer than" in problem for problem in problems)
+    # The refusal points the agent at the operator that fits an exact value.
+    assert any("'eq'" in problem for problem in problems)
+
+
+def test_eq_pins_a_long_value_without_a_length_limit() -> None:
+    script = "aws ec2 run-instances " + "--x y " * 200
+    assert validate_declaration([_call(code={"eq": script})]) == []
 
 
 def test_the_same_tool_may_not_be_declared_twice() -> None:

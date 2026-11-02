@@ -214,7 +214,9 @@ def _validate_constraint(
             problems.append(f"{at}: 'matches' needs a regular expression string")
         elif len(value) > _MAX_PATTERN_LENGTH:
             problems.append(
-                f"{at}: 'matches' is longer than {_MAX_PATTERN_LENGTH} characters"
+                f"{at}: 'matches' is longer than {_MAX_PATTERN_LENGTH} characters; "
+                "to pin an exact value such as a script, declare it with 'eq' "
+                "instead, which has no length limit"
             )
         else:
             try:

@@ -616,7 +616,10 @@ async def request_approval(
 
     Call ``list_mcp_tools`` first to read each tool's input schema, and declare
     the narrowest values that still let the work succeed: a wider declaration is
-    a wider grant, and a human is reading it.
+    a wider grant, and a human is reading it. Free-form text you will send
+    verbatim -- a script, a command, a query -- is declared with ``eq`` holding
+    the exact text, never approximated with a ``matches`` pattern: the approver
+    then reads exactly what will run.
 
     A bound tool whose ``requires_input_approval`` is false -- the workflow's
     design saying it only reads, so its arguments need nobody's agreement -- is
