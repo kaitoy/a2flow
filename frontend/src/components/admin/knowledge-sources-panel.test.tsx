@@ -136,7 +136,11 @@ describe("KnowledgeSourcesPanel", () => {
     render(<KnowledgeSourcesPanel knowledgeBaseId="kb-1" canEdit onSettled={onSettled} />);
 
     expect(await screen.findByText("Reading")).toBeInTheDocument();
+    // The LLM is reading the source, so the card plays the live-edge light.
+    const card = screen.getByRole("heading", { name: "Sources" }).closest("section");
+    expect(card).toHaveClass("live-edge");
     await waitFor(() => expect(onSettled).toHaveBeenCalledOnce(), { timeout: 5000 });
     expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(card).not.toHaveClass("live-edge");
   });
 });

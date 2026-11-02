@@ -26,6 +26,7 @@ import {
 import {
   formatKnowledgeSourceStatus,
   isKnowledgeSourceBusy,
+  isKnowledgeSourceLlmActive,
   KNOWLEDGE_SOURCE_STATUS_DOT_CLASS,
 } from "@/lib/knowledge-source-status";
 
@@ -79,7 +80,8 @@ function SourceCell({ source }: { source: KnowledgeSource }) {
  *
  * Reading and removing happen in the background on the server, so every action
  * answers at once with the source queued; the panel then polls until nothing
- * is in flight.
+ * is in flight. While the LLM agent is reading or removing a source, the card
+ * plays the "live-edge" light, like every other view where an LLM is at work.
  */
 export function KnowledgeSourcesPanel({
   knowledgeBaseId,
@@ -110,6 +112,7 @@ export function KnowledgeSourcesPanel({
   }, [load]);
 
   const busy = sources.some((s) => isKnowledgeSourceBusy(s.status));
+  const live = sources.some((s) => isKnowledgeSourceLlmActive(s.status));
 
   useEffect(() => {
     if (wasBusy.current && !busy) onSettled?.();
@@ -213,7 +216,7 @@ export function KnowledgeSourcesPanel({
   ];
 
   return (
-    <SectionCard icon={FileText} title="Sources" className="mt-4">
+    <SectionCard icon={FileText} title="Sources" className={live ? "mt-4 live-edge" : "mt-4"}>
       {canEdit && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <form onSubmit={handleAddUrl} className="flex min-w-0 flex-1 gap-2">

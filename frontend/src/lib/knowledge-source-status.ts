@@ -50,3 +50,14 @@ export function formatKnowledgeSourceStatus(status: KnowledgeSourceStatus): stri
 export function isKnowledgeSourceBusy(status: KnowledgeSourceStatus): boolean {
   return status === "pending" || status === "ingesting" || status === "removing";
 }
+
+/**
+ * Whether the LLM agent is working on a source right now — reading it into the
+ * pages or taking its claims back out — as opposed to merely queued.
+ *
+ * @param status - The source's state.
+ * @returns `true` while the source is being read or removed.
+ */
+export function isKnowledgeSourceLlmActive(status: KnowledgeSourceStatus): boolean {
+  return status === "ingesting" || status === "removing";
+}
