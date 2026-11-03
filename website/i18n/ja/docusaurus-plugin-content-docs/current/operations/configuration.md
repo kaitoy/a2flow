@@ -22,6 +22,7 @@ sidebar_position: 2
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | フロントエンドのサーバー側プロキシが `/api/*` を転送する先。プロセス起動時に一度だけ読まれます。Docker Compose の構成では、公開アドレスではなく内部ネットワーク上のバックエンドのアドレスです |
 | `FRONTEND_PORT` | `3000` | Docker Compose 専用。フロントエンドを公開するホスト側のポートです。コンテナ内部では 3000 で待ち受けたままで、バックエンドの `CORS_ORIGINS` は自動的にこれに追従します |
+| `OPENBAO_PORT` | `8200` | Docker Compose で `--profile openbao` を付けたときだけ使います。OpenBao の UI を公開するホスト側のポートです。[OpenBao で Vault 型シークレットを試す](../getting-started/docker-compose.md#openbao)を参照してください。A2Flow はこの値に関係なく内部ネットワーク経由でアクセスします |
 
 ## アプリケーションのデータベース {#application-database}
 

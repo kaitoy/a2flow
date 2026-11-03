@@ -22,6 +22,13 @@
 # FRONTEND_PORT in .env to publish the frontend on a different host port (the
 # container keeps listening on 3000 internally); CORS_ORIGINS below follows
 # it automatically.
+#
+# Optional OpenBao (a Vault-compatible secret store) to try the Vault
+# integration against, its data kept in the `db` service below:
+#   docker compose --profile openbao up --build
+# Its UI is then served at http://localhost:8200/ui (OPENBAO_PORT in .env to
+# change the host port). See the manual's "Run with Docker Compose" page for
+# initializing it and connecting A2Flow to it.
 services:
   db:
     image: postgres:17
@@ -236,6 +243,79 @@ services:
       backend:
         condition: service_healthy
 
+  # Creates the `openbao` database in `db` for the OpenBao service below, then
+  # exits. A job rather than an init script because postgres runs those only on
+  # an empty `pgdata` volume. A database of its own, not a table in `a2flow`, so
+  # Alembic autogenerate never sees OpenBao's table and proposes dropping it.
+  openbao-db-init:
+    profiles: ["openbao"]
+    image: postgres:17
+    environment:
+      PGHOST: db
+      PGUSER: a2flow
+      PGPASSWORD: a2flow
+      PGDATABASE: a2flow
+    command:
+      [
+        "sh",
+        "-c",
+        "psql -tAc \"SELECT 1 FROM pg_database WHERE datname = 'openbao'\" | grep -q 1 || psql -c 'CREATE DATABASE openbao'",
+      ]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # OpenBao, an API-compatible Vault fork, for trying `vault`-type secrets
+  # locally. Opt-in (`--profile openbao`). Its storage is the `openbao`
+  # database in `db`, so it is backed up with `pgdata`; it creates its
+  # `openbao_kv_store` table itself.
+  #
+  # It unseals itself on every start with the `static` seal, whose key is
+  # generated into the `openbao-unseal` volume on first start. Anyone holding
+  # that key and the database can read every secret, and losing the key makes
+  # the data unreadable -- fine for a local trial, not for production.
+  openbao:
+    profiles: ["openbao"]
+    image: openbao/openbao:2.7.2
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "[ -s /openbao/file/unseal.key ] || head -c 32 /dev/urandom > /openbao/file/unseal.key; exec docker-entrypoint.sh server",
+      ]
+    environment:
+      # For the `bao` CLI run through `docker compose exec openbao`.
+      BAO_ADDR: http://127.0.0.1:8200
+    configs:
+      - source: openbao
+        target: /openbao/config/config.hcl
+    volumes:
+      - openbao-unseal:/openbao/file
+    # Published so its UI can be opened from the host. The backend reaches it
+    # as http://openbao:8200 on `default`; it never joins `mcp`.
+    ports:
+      - "${OPENBAO_PORT:-8200}:8200"
+    depends_on:
+      openbao-db-init:
+        condition: service_completed_successfully
+
+configs:
+  openbao:
+    content: |
+      ui = true
+      api_addr = "http://openbao:8200"
+      storage "postgresql" {
+        connection_url = "postgres://a2flow:a2flow@db:5432/openbao?sslmode=disable"
+      }
+      listener "tcp" {
+        address     = "0.0.0.0:8200"
+        tls_disable = true
+      }
+      seal "static" {
+        current_key_id = "compose-1"
+        current_key    = "file:///openbao/file/unseal.key"
+      }
+
 networks:
   # The backend <-> mcp-proxy hop, kept apart from `default` so the third-party
   # MCP server code in `mcp-proxy` cannot reach `db`. Not `internal`: remote MCP
@@ -248,3 +328,4 @@ volumes:
   mcp-tls:
   mcp-home:
   secret-key:
+  openbao-unseal:
