@@ -98,6 +98,9 @@ class ExecutionSession(TenantScoped, BaseEntity, table=True):
     __tablename__ = "execution_sessions"
     __table_args__ = (
         Index("ix_execution_sessions_workflow_execution_id", "workflow_execution_id"),
+        # Every replica's session runner looks up the due sessions by status
+        # every couple of seconds (repositories/execution_session_queue.py).
+        Index("ix_execution_sessions_status", "status"),
         # At most one open consultation per session: two first questions
         # racing each other must land in the same one, not open two.
         Index(

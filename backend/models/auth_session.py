@@ -16,7 +16,7 @@ establish the identity that the audit foreign keys would reference.
 from datetime import UTC, datetime
 
 import uuid_utils
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from models.base import TZDateTime
@@ -28,7 +28,6 @@ class AuthSession(SQLModel, table=True):
     __tablename__ = "auth_sessions"
     __table_args__ = (
         UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),
-        Index("ix_auth_sessions_token_hash", "token_hash"),
     )
 
     id: str = Field(
