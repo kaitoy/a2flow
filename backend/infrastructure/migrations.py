@@ -6,10 +6,9 @@ event that triggers schema catch-up, and Alembic's ``alembic_version`` tracking
 makes repeated runs against an already-current database a no-op.
 
 Several replicas rolling out together all reach this hook at once, and
-concurrent runs of the same DDL fail or contend on table locks. So the upgrade
-runs under an advisory lock (:mod:`infrastructure.locks`): the first replica to
-take it applies the migrations, and the rest wait for it and then find nothing
-left to do.
+concurrent runs of the same DDL fail or contend on table locks. ``main.py``'s
+lifespan therefore calls this under its startup advisory lock, together with
+the seeding that follows, so one replica at a time migrates and seeds.
 """
 
 import asyncio
@@ -18,36 +17,22 @@ from pathlib import Path
 from alembic.config import Config
 
 from alembic import command
-from infrastructure.locks import advisory_lock
-
-#: The advisory lock key every replica's startup upgrade contends on.
-MIGRATION_LOCK_KEY = "alembic-migrations"
-
-#: How long a replica waits for another one's upgrade before failing startup.
-#: Generous, because a migration that rewrites a large table can take minutes;
-#: a replica that still times out exits and is restarted by its orchestrator.
-_LOCK_WAIT_SECONDS = 600.0
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 async def run_migrations() -> None:
-    """Apply any pending Alembic migrations, one replica at a time.
+    """Apply any pending Alembic migrations, run in a worker thread.
 
-    The upgrade runs under the :data:`MIGRATION_LOCK_KEY` advisory lock, so
-    replicas starting together never run the same DDL concurrently.
+    Not safe to run from two processes at once; callers serialize it (see the
+    module docstring).
 
     Alembic's async-template ``env.py`` calls ``asyncio.run(...)``
     internally, which raises if invoked directly from a running event loop
     (as FastAPI's lifespan is). Running the upgrade in a worker thread gives
     it a thread with no running loop, sidestepping that conflict.
-
-    Raises:
-        LockNotAcquiredError: Another replica's upgrade still held the lock
-            after the wait.
     """
-    async with advisory_lock(MIGRATION_LOCK_KEY, wait_seconds=_LOCK_WAIT_SECONDS):
-        await asyncio.to_thread(_upgrade_to_head)
+    await asyncio.to_thread(_upgrade_to_head)
 
 
 def _upgrade_to_head() -> None:

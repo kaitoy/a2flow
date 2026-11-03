@@ -26,6 +26,7 @@ from infrastructure.bootstrap import (
 )
 from infrastructure.database import engine
 from infrastructure.demo_data import sync_demo_data
+from infrastructure.locks import advisory_lock
 from infrastructure.logging_context import setup_logging
 from infrastructure.mcp_transport_tls import provision_transport_credentials
 from infrastructure.migrations import run_migrations
@@ -53,6 +54,53 @@ load_dotenv()
 setup_logging()
 
 settings = get_settings()
+
+#: The advisory lock key every replica's startup bootstrap contends on.
+BOOTSTRAP_LOCK_KEY = "startup-bootstrap"
+
+#: How long a replica waits for another one's bootstrap before failing startup.
+#: Generous, because a migration that rewrites a large table can take minutes;
+#: a replica that still times out exits and is restarted by its orchestrator.
+_BOOTSTRAP_WAIT_SECONDS = 600.0
+
+
+async def _bootstrap() -> list[str]:
+    """Migrate the schema and seed the baseline data, one replica at a time.
+
+    Both steps are check-then-write: a migration reads ``alembic_version`` and
+    every seed function looks for its row before inserting it. Replicas
+    starting together on a fresh database would all pass the checks and then
+    collide on DDL or primary keys, so the whole sequence runs under the
+    :data:`BOOTSTRAP_LOCK_KEY` advisory lock. The first replica does the work;
+    the rest wait for it and then find nothing left to do.
+
+    Returns:
+        Ids of demo agent skills this run registered, whose clones the caller
+        still has to start.
+
+    Raises:
+        LockNotAcquiredError: Another replica still held the lock after
+            :data:`_BOOTSTRAP_WAIT_SECONDS`.
+    """
+    async with advisory_lock(BOOTSTRAP_LOCK_KEY, wait_seconds=_BOOTSTRAP_WAIT_SECONDS):
+        await run_migrations()
+        async with AsyncSession(engine) as session:
+            await seed_system_user(session)
+            # Before anything that could take a while: the MCP proxy waits on
+            # this process reporting healthy to find its certificate on the
+            # shared volume, so the material has to be there by the time it
+            # does.
+            await provision_transport_credentials(session)
+            await seed_system_settings(session)
+            await apply_system_settings_env_overrides(session)
+            # seed_root_user's skip check ("any real user exists") must run
+            # before seed_default_tenant_and_admin_user creates its own real
+            # user, or root would never be seeded on a fresh database. The
+            # demo users are real users too, so sync_demo_data comes after
+            # both.
+            await seed_root_user(session)
+            await seed_default_tenant_and_admin_user(session)
+            return await sync_demo_data(session)
 
 
 @asynccontextmanager
@@ -84,25 +132,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     approval is decided (:mod:`services.session_runner`). Every replica runs
     one; each session's run lock keeps them from running the same turn twice.
     """
-    await run_migrations()
+    demo_skill_ids = await _bootstrap()
     # Holds a strong reference to the background tasks for as long as the
     # application runs, so they cannot be garbage-collected mid-flight.
     background: set[asyncio.Task[None]] = set()
-    async with AsyncSession(engine) as session:
-        await seed_system_user(session)
-        # Before anything that could take a while: the MCP proxy waits on this
-        # process reporting healthy to find its certificate on the shared
-        # volume, so the material has to be there by the time it does.
-        await provision_transport_credentials(session)
-        await seed_system_settings(session)
-        await apply_system_settings_env_overrides(session)
-        # seed_root_user's skip check ("any real user exists") must run
-        # before seed_default_tenant_and_admin_user creates its own real
-        # user, or root would never be seeded on a fresh database. The demo
-        # users are real users too, so sync_demo_data comes after both.
-        await seed_root_user(session)
-        await seed_default_tenant_and_admin_user(session)
-        demo_skill_ids = await sync_demo_data(session)
     for demo_skill_id in demo_skill_ids:
         clone = asyncio.create_task(
             sync_agent_skill(demo_skill_id, user_id=SYSTEM_USER_ID)

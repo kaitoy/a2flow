@@ -38,7 +38,7 @@ Every replica also runs a **session runner** that performs the turns no browser 
 
 ## Schema migrations during a rollout
 
-Every replica applies pending schema migrations when it starts, so several replicas rolling out together all try at once. They take turns: the first one to start applies the migrations, and the others wait for it to finish — up to ten minutes — before carrying on with nothing left to apply. A replica that is still waiting after that stops, and its orchestrator restarts it.
+Every replica applies pending schema migrations when it starts, and on a fresh database it also creates the initial accounts and settings. Several replicas rolling out together would all try at once, so they take turns: the first one to start does the work, and the others wait for it to finish — up to ten minutes — before carrying on with nothing left to do. A replica that is still waiting after that stops, and its orchestrator restarts it.
 
 ## Connection pooling {#connection-pooling}
 
