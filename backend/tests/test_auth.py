@@ -424,6 +424,60 @@ async def test_authenticate_expires_idle_session(
 
 
 @pytest.mark.asyncio
+async def test_authenticate_touches_the_session_only_once_it_is_stale(
+    auth_service_engine: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A recently refreshed session is not written again on every request.
+
+    Polling would otherwise turn every authenticated read into an UPDATE on
+    the primary. With a 60 s idle timeout the refresh interval is 30 s.
+    """
+    monkeypatch.setenv("SESSION_IDLE_TIMEOUT_SECONDS", "60")
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        session.add(
+            User(
+                username="poller",
+                first_name="Poller",
+                last_name="User",
+                password=hash_password(AUTH_PASSWORD),
+                email="poller@test.local",
+                enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+        service = AuthService(
+            SqlUserRepository(session),
+            SqlAuthSessionRepository(session),
+            SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
+        )
+        result = await service.login(
+            "poller", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
+        stmt = select(AuthSession).where(col(AuthSession.user_id) == result.user.id)
+
+        async def _slid_by(backdate_seconds: int) -> timedelta:
+            """Backdate the session, authenticate, and return how far it slid."""
+            auth_session = (await session.exec(stmt)).one()
+            backdated = datetime.now(UTC) - timedelta(seconds=backdate_seconds)
+            auth_session.last_active_at = backdated
+            session.add(auth_session)
+            await session.commit()
+            await service.authenticate(result.session_token)
+            session.expunge_all()
+            stored = (await session.exec(stmt)).one().last_active_at
+            return stored.replace(tzinfo=stored.tzinfo or UTC) - backdated
+
+        # Refreshed 10 s ago: left alone.
+        assert await _slid_by(10) == timedelta(0)
+        # Refreshed 40 s ago: past the interval, so it slides forward.
+        assert await _slid_by(40) > timedelta(seconds=30)
+
+
+@pytest.mark.asyncio
 async def test_password_reset_revokes_the_targets_sessions(
     auth_service_engine: Any,
 ) -> None:
