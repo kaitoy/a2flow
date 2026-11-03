@@ -1,8 +1,9 @@
 """MessageMeta repository: Protocol interface and SQLModel-backed implementation."""
 
+from datetime import datetime
 from typing import Protocol
 
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 from models.message_meta import MessageMeta, MessageScope
@@ -28,6 +29,10 @@ class MessageMetaRepository(Protocol):
     ) -> None: ...
 
     async def meta_for_session(self, scope: MessageScope) -> dict[str, MessageMeta]: ...
+
+    async def version_for_session(
+        self, scope: MessageScope
+    ) -> tuple[int, datetime | None]: ...
 
 
 class SqlMessageMetaRepository(TenantScopedRepository[MessageMeta]):
@@ -176,3 +181,24 @@ class SqlMessageMetaRepository(TenantScopedRepository[MessageMeta]):
         """
         result = await self._db.exec(self._for_scope(scope))
         return {row.adk_event_id: row for row in result.all()}
+
+    async def version_for_session(
+        self, scope: MessageScope
+    ) -> tuple[int, datetime | None]:
+        """Return a cheap fingerprint of a session chat's metadata rows.
+
+        Every write either adds a row or bumps an existing row's ``updated_at``,
+        so the pair changes whenever :meth:`meta_for_session` would return
+        something different -- without loading the rows themselves.
+
+        Args:
+            scope: The session chat whose metadata to fingerprint.
+
+        Returns:
+            The number of rows and their latest ``updated_at`` (``None`` when
+            the chat has no rows).
+        """
+        rows = self._for_scope(scope).subquery()
+        result = await self._db.exec(select(func.count(), func.max(rows.c.updated_at)))
+        count, latest = result.one()
+        return count, latest

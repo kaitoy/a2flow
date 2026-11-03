@@ -29,7 +29,7 @@ from typing import Any
 import anyio
 from ag_ui.core import RunAgentInput, SystemMessage
 from ag_ui.encoder import EventEncoder
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 
 from dependencies.auth import CurrentUserDep, CurrentUserIdDep, EffectiveRolesDep
@@ -181,7 +181,9 @@ async def get_design_session_messages(
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
     meta: ApiMetaDep,
-) -> ApiResponse[list[dict[str, Any]]]:
+    request: Request,
+    response: Response,
+) -> ApiResponse[list[dict[str, Any]]] | Response:
     """Return the chat history of a Workflow's design session.
 
     Restricted to the tenant's developers and reviewers (plus super admins and
@@ -200,10 +202,27 @@ async def get_design_session_messages(
     tenant, not just the one they've picked -- see ``WorkflowServiceDep``
     and ``dependencies.auth.get_current_tenant_scope``. The agent route stays
     on the strict, single-tenant dependency, since driving the chat is a write.
+
+    The chat is polled, so the history carries a weak ``ETag`` and
+    ``Cache-Control: private, no-cache``: the browser revalidates each poll with
+    ``If-None-Match`` on its own, and an unchanged history answers ``304`` without
+    loading a single ADK event (see ``WorkflowService.get_messages``). The header
+    is read from the request rather than declared as a parameter so the OpenAPI
+    spec, and the client generated from it, stay as they were -- the browser
+    never shows a ``304`` to the page.
     """
-    messages = await service.get_messages(
-        workflow_id, caller=caller, caller_roles=caller_roles
+    etag, messages = await service.get_messages(
+        workflow_id,
+        caller=caller,
+        caller_roles=caller_roles,
+        if_none_match=request.headers.get("if-none-match"),
     )
+    headers = (
+        {} if etag is None else {"ETag": etag, "Cache-Control": "private, no-cache"}
+    )
+    if messages is None:
+        return Response(status_code=304, headers=headers)
+    response.headers.update(headers)
     return ApiResponse(meta=meta, data=messages)
 
 

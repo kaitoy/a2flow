@@ -15,9 +15,13 @@ from google.adk.events.event import Event
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies.context import APP_NAME
 from infrastructure.agent import AgentKind, tenant_app_name
+from models.message_meta import MessageScope
+from repositories.message_meta import SqlMessageMetaRepository
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID
 from tests._workflow import create_skill, generate_workflow, seed_design_transcript
@@ -74,6 +78,78 @@ async def test_design_session_messages_empty_before_first_run(
     _skill, wf = await _design_session(workflow_client)
     response = await workflow_client.get(f"/api/v1/workflows/{wf['id']}/messages")
     assert assert_ok(response) == []
+    # No session, nothing to version: the empty answer is cheap anyway.
+    assert "etag" not in response.headers
+
+
+async def test_design_session_messages_answer_304_until_an_event_lands(
+    workflow_client: AsyncClient,
+    real_session_service: InMemorySessionService,
+) -> None:
+    """A poll holding the current ETag gets a 304; a new event makes it stale."""
+    _skill, wf = await _design_session(workflow_client)
+    await seed_design_transcript(workflow_client, real_session_service, wf["id"])
+    url = f"/api/v1/workflows/{wf['id']}/messages"
+
+    first = await workflow_client.get(url)
+    assert len(assert_ok(first)) == 1
+    etag = first.headers["etag"]
+    assert etag.startswith('W/"')
+    assert first.headers["cache-control"] == "private, no-cache"
+
+    unchanged = await workflow_client.get(url, headers={"If-None-Match": etag})
+    assert unchanged.status_code == 304
+    assert unchanged.content == b""
+    assert unchanged.headers["etag"] == etag
+
+    stale = await workflow_client.get(url, headers={"If-None-Match": 'W/"other"'})
+    assert len(assert_ok(stale)) == 1
+
+    session = await real_session_service.get_session(
+        app_name=tenant_app_name(APP_NAME, DEFAULT_TEST_TENANT_ID),
+        user_id=wf["createdBy"],
+        session_id=wf["sessionId"],
+    )
+    assert session is not None
+    await real_session_service.append_event(
+        session,
+        Event(
+            author="user",
+            content=types.Content(role="user", parts=[types.Part(text="one more")]),
+        ),
+    )
+
+    changed = await workflow_client.get(url, headers={"If-None-Match": etag})
+    assert [m["content"] for m in assert_ok(changed)] == [
+        "Build me a report",
+        "one more",
+    ]
+    assert changed.headers["etag"] != etag
+
+
+async def test_design_session_messages_etag_follows_attribution(
+    workflow_client_with_engine: tuple[AsyncClient, AsyncEngine],
+    real_session_service: InMemorySessionService,
+) -> None:
+    """Attribution lands after a run's last event, so it must move the ETag too."""
+    client, eng = workflow_client_with_engine
+    _skill, wf = await _design_session(client)
+    await seed_design_transcript(client, real_session_service, wf["id"])
+    url = f"/api/v1/workflows/{wf['id']}/messages"
+    first = await client.get(url)
+    etag = first.headers["etag"]
+    event_id = assert_ok(first)[0]["id"]
+
+    async with AsyncSession(eng) as db:
+        await SqlMessageMetaRepository(db, tenant_id=DEFAULT_TEST_TENANT_ID).set_sender(
+            scope=MessageScope.design_session(wf["id"]),
+            adk_event_id=event_id,
+            sender_user_id=wf["createdBy"],
+        )
+
+    attributed = await client.get(url, headers={"If-None-Match": etag})
+    assert assert_ok(attributed)[0]["senderUserId"] == wf["createdBy"]
+    assert attributed.headers["etag"] != etag
 
 
 async def test_design_session_messages_unknown_id_returns_404(

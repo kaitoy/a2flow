@@ -33,6 +33,7 @@ from typing import Any
 
 from ag_ui_adk import ADKAgent, adk_events_to_messages
 from google.adk.sessions import BaseSessionService, Session
+from google.adk.sessions.base_session_service import GetSessionConfig
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.skill_manager import SkillManager
@@ -497,9 +498,14 @@ class WorkflowService:
         )
 
     async def get_messages(
-        self, workflow_id: str, *, caller: User, caller_roles: Collection[str]
-    ) -> builtins.list[dict[str, Any]]:
-        """Return the chat history of a workflow's design session.
+        self,
+        workflow_id: str,
+        *,
+        caller: User,
+        caller_roles: Collection[str],
+        if_none_match: str | None = None,
+    ) -> tuple[str | None, builtins.list[dict[str, Any]] | None]:
+        """Return the chat history of a workflow's design session, with its ETag.
 
         The history is keyed by the session's owner (``created_by``), so every
         developer sees the one shared conversation. Each message carries the
@@ -509,17 +515,28 @@ class WorkflowService:
         here — a design session edits task *templates*, not the status-ful tasks
         a run works through — but is still emitted so the payload shape matches
         the workflow-execution messages endpoint and the frontend chat
-        components can be reused unchanged. Returns an empty list when the ADK
-        session does not exist yet.
+        components can be reused unchanged.
+
+        The chat is polled, and rebuilding it means loading every ADK event, so
+        the history comes with a weak ETag built from what it is made of: the
+        session's ``last_update_time`` (moved by every appended event) and the
+        fingerprint of its MessageMeta rows (sender attribution lands after the
+        run's last event). Both are read without loading any event, and before
+        the history itself, so a write landing in between can only leave the
+        ETag older than the body -- which the next poll re-reads -- never newer.
 
         Args:
             workflow_id: Identifier of the workflow whose messages to fetch.
             caller: The authenticated user requesting the history.
             caller_roles: The caller's effective roles, including any inherited
                 from their groups.
+            if_none_match: The ETag the caller already holds, if any.
 
         Returns:
-            The session's messages as plain JSON-serializable dicts.
+            ``(etag, messages)``, the messages as plain JSON-serializable dicts.
+            ``messages`` is ``None`` when ``if_none_match`` still matches, and
+            ``etag`` is ``None`` (with an empty list) when the ADK session does
+            not exist yet.
 
         Raises:
             NotFoundError: If no workflow exists with the given ID.
@@ -529,13 +546,24 @@ class WorkflowService:
         workflow = await self.get_for_design(
             workflow_id, caller=caller, caller_roles=caller_roles, write=False
         )
+        header = await self._session_service.get_session(
+            app_name=tenant_app_name(self._app_name, workflow.tenant_id),
+            user_id=workflow.created_by,
+            session_id=workflow.session_id,
+            config=GetSessionConfig(num_recent_events=0),
+        )
+        if header is None:
+            return None, []
+        scope = MessageScope.design_session(workflow_id)
+        count, latest = await self._meta.version_for_session(scope)
+        etag = f'W/"{header.last_update_time}:{count}:{latest}"'
+        if if_none_match == etag:
+            return etag, None
         session = await self._adk_session(workflow)
         if session is None:
-            return []
-        meta = await self._meta.meta_for_session(
-            MessageScope.design_session(workflow_id)
-        )
-        return session_attribution.merge_message_meta(
+            return None, []
+        meta = await self._meta.meta_for_session(scope)
+        return etag, session_attribution.merge_message_meta(
             adk_events_to_messages(session.events), meta
         )
 

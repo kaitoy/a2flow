@@ -111,7 +111,10 @@ function makeEventHandlers(
  *
  * The chat is shared by every developer in the tenant, plus the background
  * generation run, so the history is re-fetched every {@link POLL_INTERVAL_MS}
- * and messages from other participants appear without a reload. Polling pauses
+ * and messages from other participants appear without a reload. An idle poll
+ * stays cheap with no code here: the endpoint sends an `ETag`, so the browser
+ * revalidates on its own and the backend answers `304` while nothing has
+ * changed, handing this hook its cached copy of the history. Polling pauses
  * while the current viewer's own run is in flight and skips re-applying an
  * unchanged history -- see {@link historySignature} for what counts as
  * unchanged. The viewer's own run ends with the same re-read, which reconciles
