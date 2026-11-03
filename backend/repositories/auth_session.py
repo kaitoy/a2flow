@@ -13,7 +13,12 @@ class AuthSessionRepository(Protocol):
     """Interface for login-session persistence operations."""
 
     async def create(
-        self, *, user_id: str, token_hash: str, csrf_token: str
+        self,
+        *,
+        user_id: str,
+        token_hash: str,
+        csrf_token: str,
+        prune_before: datetime,
     ) -> AuthSession: ...
 
     async def get_by_token_hash(self, token_hash: str) -> AuthSession | None: ...
@@ -37,18 +42,34 @@ class SqlAuthSessionRepository:
         self._db = session
 
     async def create(
-        self, *, user_id: str, token_hash: str, csrf_token: str
+        self,
+        *,
+        user_id: str,
+        token_hash: str,
+        csrf_token: str,
+        prune_before: datetime,
     ) -> AuthSession:
-        """Insert a new login session for the given user.
+        """Insert a new login session for the given user and prune expired ones.
+
+        A session whose token is never presented again is otherwise never
+        deleted, and logins are the only thing that adds rows, so pruning here
+        keeps the table to roughly one idle window's worth of logins.
 
         Args:
             user_id: The authenticated user's id.
             token_hash: SHA-256 hash of the session cookie token.
             csrf_token: The double-submit CSRF token value.
+            prune_before: Sessions last active before this have passed the idle
+                timeout and are deleted in the same transaction.
 
         Returns:
             The persisted ``AuthSession``.
         """
+        # ponytail: no index on last_active_at, so this scans the table; that
+        # stays small while every login prunes it. Index it if the scan shows up.
+        await self._db.exec(
+            delete(AuthSession).where(col(AuthSession.last_active_at) < prune_before)
+        )
         auth_session = AuthSession(
             user_id=user_id, token_hash=token_hash, csrf_token=csrf_token
         )

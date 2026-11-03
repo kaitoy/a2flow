@@ -9,7 +9,9 @@ rejected. The refresh is written at most once per :data:`TOUCH_INTERVAL` (or
 half the idle timeout, if that is shorter) rather than on every request, so
 the frontend's polling does not turn every authenticated read into a write on
 the primary; a session can therefore expire up to that much earlier than its
-last request plus the idle timeout.
+last request plus the idle timeout. A session whose browser never comes back
+is not presented again, so every login also deletes the sessions already past
+the window.
 
 Failed logins are throttled per submitted account -- by the limit and lockout
 time its tenant sets (``Tenant.login_max_failures`` /
@@ -164,6 +166,7 @@ class AuthService:
             user_id=user.id,
             token_hash=hash_token(session_token),
             csrf_token=csrf_token,
+            prune_before=datetime.now(UTC) - self._idle_timeout(),
         )
         return LoginResult(
             user=user, session_token=session_token, csrf_token=csrf_token

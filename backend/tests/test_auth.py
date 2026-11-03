@@ -17,6 +17,7 @@ from dependencies.auth import (
     CSRF_HEADER_NAME,
     SESSION_COOKIE_NAME,
 )
+from infrastructure.auth_tokens import hash_token
 from infrastructure.password import hash_password
 from models.auth_session import AuthSession
 from models.login_failure import LoginFailure
@@ -421,6 +422,59 @@ async def test_authenticate_expires_idle_session(
             await service.authenticate(result.session_token)
         # The expired session is deleted on rejection.
         assert (await session.exec(stmt)).first() is None
+
+
+@pytest.mark.asyncio
+async def test_login_prunes_sessions_past_the_idle_timeout(
+    auth_service_engine: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An abandoned session is never presented again, so a later login deletes it."""
+    monkeypatch.setenv("SESSION_IDLE_TIMEOUT_SECONDS", "60")
+    async with AsyncSession(auth_service_engine) as session:
+        session.add(
+            User(
+                username="pruner",
+                first_name="Prune",
+                last_name="User",
+                password=hash_password(AUTH_PASSWORD),
+                email="pruner@test.local",
+                enabled=True,
+                tenant_id=DEFAULT_TEST_TENANT_ID,
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        service = AuthService(
+            SqlUserRepository(session),
+            SqlAuthSessionRepository(session),
+            SqlTenantRepository(session),
+            SqlLoginFailureRepository(session),
+        )
+        abandoned = await service.login(
+            "pruner", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
+        alive = await service.login(
+            "pruner", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
+        stmt = select(AuthSession).where(
+            col(AuthSession.token_hash) == hash_token(abandoned.session_token)
+        )
+        stale = (await session.exec(stmt)).one()
+        stale.last_active_at = datetime.now(UTC) - timedelta(seconds=120)
+        session.add(stale)
+        await session.commit()
+
+        latest = await service.login(
+            "pruner", AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+        )
+
+        rows = (await session.exec(select(AuthSession.token_hash))).all()
+        assert hash_token(abandoned.session_token) not in rows
+        assert hash_token(alive.session_token) in rows
+        assert hash_token(latest.session_token) in rows
 
 
 @pytest.mark.asyncio
