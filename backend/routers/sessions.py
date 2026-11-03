@@ -1,8 +1,15 @@
+"""Super-admin routes over the caller's general-agent ADK sessions.
+
+Lists them, reads one's messages, and deletes one. Every route is gated behind
+the ``super_admin`` role and scoped to the acting tenant's ADK app name.
+"""
+
 from datetime import UTC, datetime
 from typing import Any
 
 from ag_ui_adk import adk_events_to_messages
 from fastapi import APIRouter, Depends
+from google.adk.sessions.base_session_service import GetSessionConfig
 
 from dependencies.auth import CurrentTenantIdDep, CurrentUserIdDep
 from dependencies.authz import require_roles
@@ -120,12 +127,17 @@ async def delete_session(
     session_service: SessionServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[None]:
-    """Delete a session."""
+    """Delete a session, answering 404 when it does not exist.
+
+    The existence check reads the session without its events, which a long
+    conversation would otherwise load in full just to be thrown away.
+    """
     scoped_app_name = tenant_app_name(APP_NAME, tenant_id)
     session = await session_service.get_session(
         app_name=scoped_app_name,
         user_id=user_id,
         session_id=session_id,
+        config=GetSessionConfig(num_recent_events=0),
     )
     if session is None:
         raise NotFoundError("Session", session_id)
