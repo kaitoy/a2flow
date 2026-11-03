@@ -58,7 +58,7 @@ If either is unset (or empty), a random password is generated instead and logged
 
 | Variable | Default | What it does |
 |---|---|---|
-| `SESSION_IDLE_TIMEOUT_SECONDS` | `28800` (8 hours) | Sliding idle timeout. Each authenticated request refreshes the session's last-active time; a session left idle longer than this is rejected and deleted |
+| `SESSION_IDLE_TIMEOUT_SECONDS` | `28800` (8 hours) | Sliding idle timeout. Authenticated requests refresh the session's last-active time, at most once every 5 minutes (or half this value, if shorter), so a session may end up to that much early; a session left idle longer than this is rejected and deleted |
 | `SESSION_COOKIE_SECURE` | `false` | Marks the session and CSRF cookies `Secure` (HTTPS only). Set it to `true` for any deployment behind HTTPS |
 
 The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes. The frontend reaches the backend through a same-origin rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly.

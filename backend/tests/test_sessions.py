@@ -1,4 +1,8 @@
-from google.adk.sessions import InMemorySessionService
+from typing import Any
+
+import pytest
+from google.adk.sessions import InMemorySessionService, Session
+from google.adk.sessions.base_session_service import GetSessionConfig
 from httpx import AsyncClient
 
 from dependencies.context import APP_NAME
@@ -110,6 +114,28 @@ async def test_delete_session_removes_session_from_list(
         "/api/v1/sessions", headers={"X-User-Id": "grace"}
     )
     assert assert_ok(list_resp) == []
+
+
+async def test_delete_session_checks_existence_without_loading_events(
+    client_with_real_sessions: AsyncClient,
+    real_session_service: InMemorySessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A long conversation's events are not read just to confirm it exists."""
+    session_id = await _create_session(real_session_service, "ivan")
+    configs: list[GetSessionConfig | None] = []
+    original = real_session_service.get_session
+
+    async def _spy(**kwargs: Any) -> Session | None:
+        configs.append(kwargs.get("config"))
+        return await original(**kwargs)
+
+    monkeypatch.setattr(real_session_service, "get_session", _spy)
+    response = await client_with_real_sessions.delete(
+        f"/api/v1/sessions/{session_id}", headers={"X-User-Id": "ivan"}
+    )
+    assert_ok(response)
+    assert [c.num_recent_events if c else None for c in configs] == [0]
 
 
 async def test_delete_session_returns_404_for_unknown_session(

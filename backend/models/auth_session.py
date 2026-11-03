@@ -4,8 +4,9 @@ An :class:`AuthSession` row backs one logged-in browser. The session cookie
 carries a random opaque token whose SHA-256 hash is stored in ``token_hash``;
 the row is looked up by that hash. ``csrf_token`` holds the double-submit CSRF
 value handed to the client in a readable cookie. ``last_active_at`` drives the
-sliding idle-timeout: each authenticated request refreshes it, and a session
-whose idle window has elapsed is treated as expired.
+sliding idle-timeout: authenticated requests refresh it (throttled, see
+:data:`services.auth.TOUCH_INTERVAL`), and a session whose idle window has
+elapsed is treated as expired.
 
 This model deliberately does **not** inherit :class:`~models.base.BaseEntity`:
 auth sessions are not audited domain records and they exist precisely to
@@ -15,7 +16,7 @@ establish the identity that the audit foreign keys would reference.
 from datetime import UTC, datetime
 
 import uuid_utils
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from models.base import TZDateTime
@@ -27,7 +28,6 @@ class AuthSession(SQLModel, table=True):
     __tablename__ = "auth_sessions"
     __table_args__ = (
         UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),
-        Index("ix_auth_sessions_token_hash", "token_hash"),
     )
 
     id: str = Field(

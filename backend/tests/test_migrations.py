@@ -53,22 +53,38 @@ async def _run_on_server(base_url: str, statement: str) -> None:
         await engine.dispose()
 
 
-def _reflect(conn: Connection) -> tuple[set[str], dict[str, set[str]]]:
-    """Return the connected database's table names and each one's column names.
+#: What :func:`_reflect` reports: the table names, then per table its column
+#: names and its index names.
+_Schema = tuple[set[str], dict[str, set[str]], dict[str, set[str]]]
+
+
+def _reflect(conn: Connection) -> _Schema:
+    """Return the connected database's tables, columns, and indexes.
 
     Args:
         conn: A synchronous connection, as handed over by ``run_sync``.
 
     Returns:
-        The table names (excluding Alembic's own bookkeeping table) and a
-        mapping of table name to its set of column names.
+        The table names (excluding Alembic's own bookkeeping table), and
+        mappings of table name to its column names and to its index names.
+        Indexes a database creates behind a unique constraint are not listed,
+        just as they are not among a model's ``Table.indexes``.
     """
     inspector = inspect(conn)
     tables = set(inspector.get_table_names()) - {_ALEMBIC_TABLE}
-    return tables, {t: {c["name"] for c in inspector.get_columns(t)} for t in tables}
+    columns = {t: {c["name"] for c in inspector.get_columns(t)} for t in tables}
+    indexes = {
+        t: {
+            str(ix["name"])
+            for ix in inspector.get_indexes(t)
+            if not ix.get("duplicates_constraint")
+        }
+        for t in tables
+    }
+    return tables, columns, indexes
 
 
-async def _reflect_url(url: str) -> tuple[set[str], dict[str, set[str]]]:
+async def _reflect_url(url: str) -> _Schema:
     """Open ``url`` and reflect its schema through :func:`_reflect`.
 
     Args:
@@ -134,7 +150,9 @@ def test_upgrade_head_matches_model_metadata(migration_db: str) -> None:
     cfg = Config(str(BACKEND_DIR / "alembic.ini"))
     command.upgrade(cfg, "head")
 
-    actual_tables, actual_columns = asyncio.run(_reflect_url(migration_db))
+    actual_tables, actual_columns, actual_indexes = asyncio.run(
+        _reflect_url(migration_db)
+    )
     expected_tables = set(SQLModel.metadata.tables.keys())
     assert actual_tables == expected_tables
 
@@ -143,3 +161,12 @@ def test_upgrade_head_matches_model_metadata(migration_db: str) -> None:
     for table in sorted(expected_tables):
         expected_columns = set(SQLModel.metadata.tables[table].columns.keys())
         assert actual_columns[table] == expected_columns, table
+
+    # An index is invisible to the column check and to most tests, which run on
+    # create_all(), so a model index without a migration would only show up as
+    # a slow query in production.
+    for table in sorted(expected_tables):
+        expected_indexes = {
+            str(ix.name) for ix in SQLModel.metadata.tables[table].indexes
+        }
+        assert actual_indexes[table] == expected_indexes, table

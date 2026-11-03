@@ -37,6 +37,7 @@ from models.workflow_execution import WorkflowExecution
 from models.workflow_task import WorkflowTaskRead, WorkflowTaskStatus
 from repositories.mcp_server import SqlMCPServerRepository
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
+from repositories.query import FilterSpec
 from repositories.workflow_execution import SqlWorkflowExecutionRepository
 from repositories.workflow_task import SqlWorkflowTaskRepository
 
@@ -101,15 +102,15 @@ async def _in_progress_tasks(
         SqlMCPServerRepository(db, tenant_id=tenant_id),
         tenant_id=tenant_id,
     )
+    # The status is filtered in SQL: this runs on every MCP tool call, and only
+    # the few in-progress tasks need their bindings and dependencies resolved.
     tasks = await task_repo.list(
-        limit=_MAX_TASKS, offset=0, workflow_execution_id=execution_id
+        limit=_MAX_TASKS,
+        offset=0,
+        workflow_execution_id=execution_id,
+        filters=[FilterSpec("status", "eq", WorkflowTaskStatus.in_progress)],
     )
-    return [
-        t
-        for t in tasks
-        if t.status == WorkflowTaskStatus.in_progress
-        and (t.session_id or main_session_id) == session_id
-    ]
+    return [t for t in tasks if (t.session_id or main_session_id) == session_id]
 
 
 class InProgressToolBindingPolicy:

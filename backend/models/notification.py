@@ -84,7 +84,8 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
     __tablename__ = "notifications"
     link: str | None = None
     __table_args__ = (
-        Index("ix_notifications_user_id", "user_id"),
+        # The bell lists a recipient's notifications newest first.
+        Index("ix_notifications_user_id_created_at", "user_id", "created_at"),
         Index("ix_notifications_workflow_execution_id", "workflow_execution_id"),
         Index("ix_notifications_workflow_id", "workflow_id"),
         ForeignKeyConstraint(

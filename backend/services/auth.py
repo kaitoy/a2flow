@@ -3,9 +3,13 @@
 Sessions are server-side: a random opaque token is handed to the browser in a
 cookie and only its hash is stored. Validity is governed by a sliding idle
 timeout (``config.Settings.session_idle_timeout_seconds``, default 8 hours):
-every successful :meth:`AuthService.authenticate` refreshes the session's
+a successful :meth:`AuthService.authenticate` refreshes the session's
 last-active time, and a session left idle past the window is revoked and
-rejected.
+rejected. The refresh is written at most once per :data:`TOUCH_INTERVAL` (or
+half the idle timeout, if that is shorter) rather than on every request, so
+the frontend's polling does not turn every authenticated read into a write on
+the primary; a session can therefore expire up to that much earlier than its
+last request plus the idle timeout.
 
 Failed logins are throttled per submitted account -- by the limit and lockout
 time its tenant sets (``Tenant.login_max_failures`` /
@@ -37,6 +41,10 @@ from repositories.exceptions import TooManyLoginAttemptsError, UnauthorizedError
 from repositories.login_failure import LoginFailureRepository
 from repositories.tenant import TenantRepository
 from repositories.user import UserRepository
+
+#: The longest a session's stored ``last_active_at`` may lag behind its latest
+#: request before :meth:`AuthService.authenticate` writes it again.
+TOUCH_INTERVAL = timedelta(minutes=5)
 
 
 @dataclass
@@ -201,6 +209,9 @@ class AuthService:
     async def authenticate(self, session_token: str) -> User:
         """Resolve the user for a session token, sliding the idle timeout.
 
+        The session's last-active time is written only once it is older than
+        :data:`TOUCH_INTERVAL` (or half the idle timeout, if shorter).
+
         Args:
             session_token: The raw token from the session cookie.
 
@@ -239,7 +250,8 @@ class AuthService:
                 await self._sessions.delete_by_token_hash(token_hash)
                 raise UnauthorizedError()
 
-        await self._sessions.touch(session, now)
+        if now - last_active > min(TOUCH_INTERVAL, self._idle_timeout() / 2):
+            await self._sessions.touch(session, now)
         return user
 
     async def get_csrf_token(self, session_token: str) -> str | None:
