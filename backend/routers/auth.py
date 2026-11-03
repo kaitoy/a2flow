@@ -170,9 +170,16 @@ async def logout(
     Depends on :data:`~dependencies.RealUserDep`, not the possibly-
     impersonated ``CurrentUserDep`` -- logout must always end the real
     session regardless of any impersonation header on this request.
+
+    Also sends ``Clear-Site-Data: "cache"`` so API responses the browser kept
+    in its HTTP cache -- e.g. the design-chat history, which is sent with
+    ``Cache-Control: private, no-cache`` so its polls can revalidate -- do not
+    outlive the session on a shared machine. Browsers honor the header only in
+    a secure context (HTTPS or localhost).
     """
     await service.logout(request.cookies.get(SESSION_COOKIE_NAME, ""))
     _clear_auth_cookies(response)
+    response.headers["Clear-Site-Data"] = '"cache"'
     return ApiResponse(meta=meta, data=None)
 
 

@@ -336,9 +336,12 @@ async def test_logout_revokes_session(auth_client: AsyncClient) -> None:
     await _login(auth_client)
     csrf = auth_client.cookies.get(CSRF_COOKIE_NAME)
     assert csrf is not None
-    assert_ok(
-        await auth_client.post("/api/v1/auth/logout", headers={CSRF_HEADER_NAME: csrf})
+    response = await auth_client.post(
+        "/api/v1/auth/logout", headers={CSRF_HEADER_NAME: csrf}
     )
+    assert_ok(response)
+    # Cached API responses (e.g. the design-chat history) must not outlive it.
+    assert response.headers["clear-site-data"] == '"cache"'
     # The session is gone, so /auth/me is rejected even if a stale cookie lingers.
     assert_err(
         await auth_client.get("/api/v1/auth/me"),
