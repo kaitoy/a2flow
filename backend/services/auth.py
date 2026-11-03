@@ -12,8 +12,13 @@ time its tenant sets (``Tenant.login_max_failures`` /
 ``Tenant.login_lockout_minutes``, the ``models.tenant`` defaults for a
 platform-scoped account or an unknown tenant). The counts live in the
 ``login_failures`` table, so every replica enforces the same limit.
+
+Every bcrypt call runs in a worker thread: one costs hundreds of milliseconds
+of CPU, and on the event loop it would stall every other request and stream
+this process is serving.
 """
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -180,16 +185,16 @@ class AuthService:
         tenant_id: str | None = None
         if tenant_name:
             if tenant is None or not tenant.enabled:
-                burn_password_check(password)
+                await asyncio.to_thread(burn_password_check, password)
                 raise UnauthorizedError("Invalid username or password")
             tenant_id = tenant.id
         user = await self._users.get_by_username(username, tenant_id=tenant_id)
         if user is None or not user.enabled or user.deleted_at is not None:
             # Pay the same bcrypt cost as a wrong password, so timing does
             # not reveal which accounts exist.
-            burn_password_check(password)
+            await asyncio.to_thread(burn_password_check, password)
             raise UnauthorizedError("Invalid username or password")
-        if not verify_password(password, user.password):
+        if not await asyncio.to_thread(verify_password, password, user.password):
             raise UnauthorizedError("Invalid username or password")
         return user
 

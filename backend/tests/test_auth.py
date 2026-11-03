@@ -1,5 +1,6 @@
 """End-to-end tests for the cookie-based authentication and CSRF flow."""
 
+import threading
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -147,6 +148,26 @@ async def test_login_rejection_still_runs_bcrypt(
         status=401,
     )
     assert checks == [AUTH_PASSWORD.encode()]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("username", [AUTH_USERNAME, "nobody"])
+async def test_login_runs_bcrypt_off_the_event_loop(
+    auth_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, username: str
+) -> None:
+    """A bcrypt round on the loop would stall every other request and stream."""
+    loop_thread = threading.get_ident()
+    threads: list[int] = []
+    real_checkpw = bcrypt.checkpw
+
+    def _spy(plain: bytes, hashed: bytes) -> bool:
+        threads.append(threading.get_ident())
+        return bool(real_checkpw(plain, hashed))
+
+    monkeypatch.setattr("infrastructure.password.bcrypt.checkpw", _spy)
+    await _attempt(auth_client, username, AUTH_PASSWORD)
+    assert threads
+    assert loop_thread not in threads
 
 
 async def _attempt(client: AsyncClient, username: str, password: str) -> Any:

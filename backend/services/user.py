@@ -24,8 +24,11 @@ exempt, same as every other role check in this module — a platform-scoped
 no separate exemption, so a plain ``admin`` can never view, edit, or delete a
 ``super_admin``'s record; only the ``super_admin`` itself or another
 ``super_admin`` actor can.
+
+Hashing runs in a worker thread, so a bcrypt round never stalls the event loop.
 """
 
+import asyncio
 from collections.abc import Collection, Sequence
 
 from infrastructure.password import hash_password
@@ -438,7 +441,9 @@ class UserService:
         _reject_super_admin_tenant_conflict(data.roles, data.tenant_id)
         _require_tenant_for_non_super_admin(data.roles, data.tenant_id)
         _reject_super_admin_role_combination(data.roles)
-        hashed = data.model_copy(update={"password": hash_password(data.password)})
+        hashed = data.model_copy(
+            update={"password": await asyncio.to_thread(hash_password, data.password)}
+        )
         return await self._repo.create(hashed, user_id=acting_user.id)
 
     async def update(
@@ -526,7 +531,7 @@ class UserService:
             )
         password = update.get("password")
         if password:
-            update["password"] = hash_password(password)
+            update["password"] = await asyncio.to_thread(hash_password, password)
             # A reset is the usual answer to a stolen login, so it must also
             # cut off every browser already signed in as the target. Revoked
             # before the update so the user it returns is not expired by this
