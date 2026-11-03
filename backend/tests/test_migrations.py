@@ -12,9 +12,12 @@ a file under ``tmp_path``. PostgreSQL runs only when ``A2FLOW_TEST_PG_URL``
 names a reachable server, against a database created for the one test and
 dropped afterwards -- a whole database rather than a schema, so the reflection
 below sees exactly what the migrations built and nothing else.
+
+It also checks that the startup hook serializes the upgrade across processes.
 """
 
 import asyncio
+import time
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -26,6 +29,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
 from alembic import command
+from infrastructure import migrations
 from infrastructure.database import to_async_url
 from tests._engine import PG_URL_ENV, pg_url
 
@@ -170,3 +174,22 @@ def test_upgrade_head_matches_model_metadata(migration_db: str) -> None:
             str(ix.name) for ix in SQLModel.metadata.tables[table].indexes
         }
         assert actual_indexes[table] == expected_indexes, table
+
+
+async def test_concurrent_startups_run_the_upgrade_one_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Replicas starting together must not run ``alembic upgrade`` concurrently."""
+    running = 0
+    overlapped = False
+
+    def fake_upgrade() -> None:
+        nonlocal running, overlapped
+        running += 1
+        overlapped = overlapped or running > 1
+        time.sleep(0.05)
+        running -= 1
+
+    monkeypatch.setattr(migrations, "_upgrade_to_head", fake_upgrade)
+    await asyncio.gather(*(migrations.run_migrations() for _ in range(3)))
+    assert not overlapped

@@ -36,6 +36,10 @@ Human-in-the-loop is unaffected: a frontend tool call ends the run and closes th
 
 Every replica also runs a **session runner** that performs the turns no browser drives — a run's kickoff and its resumption after an approval. It takes the same lock without waiting, so a session already being run elsewhere is left to that replica, and it picks up a turn that a stopped replica left unfinished. How many such turns one replica runs at once is set by `SESSION_RUNNER_CONCURRENCY` (see the [configuration reference](./configuration.md#agent)).
 
+## Schema migrations during a rollout
+
+Every replica applies pending schema migrations when it starts, so several replicas rolling out together all try at once. They take turns: the first one to start applies the migrations, and the others wait for it to finish — up to ten minutes — before carrying on with nothing left to apply. A replica that is still waiting after that stops, and its orchestrator restarts it.
+
 ## Connection pooling {#connection-pooling}
 
 Because the lock is session-level rather than transaction-level, the deployment must not place a **transaction-pooling** proxy — PgBouncer in `transaction` mode, and most serverless PostgreSQL poolers — between the app and PostgreSQL. The lock would not survive between statements. Session-level pooling, or a direct connection, is required.
