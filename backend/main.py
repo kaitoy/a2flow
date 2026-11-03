@@ -44,6 +44,7 @@ from routers.exception_handlers import (
 from services.agent_skill_sync import sync_agent_skill
 from services.email_queue_worker import run_email_queue_worker
 from services.session_runner import SessionRunner, run_session_dispatcher
+from services.session_stream import run_stream_listener
 
 # Populates os.environ from backend/.env so vendor SDKs (litellm, google-genai)
 # that read GOOGLE_API_KEY/OPENAI_API_KEY/ANTHROPIC_API_KEY/AWS_BEARER_TOKEN_BEDROCK
@@ -131,11 +132,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     turns no browser drives -- a run's kickoff, and its resumption once an
     approval is decided (:mod:`services.session_runner`). Every replica runs
     one; each session's run lock keeps them from running the same turn twice.
+
+    On PostgreSQL the session stream's listener starts too, so a turn written
+    on any replica wakes the viewers watching it here at once
+    (:func:`services.session_stream.run_stream_listener`).
     """
     demo_skill_ids = await _bootstrap()
     # Holds a strong reference to the background tasks for as long as the
     # application runs, so they cannot be garbage-collected mid-flight.
     background: set[asyncio.Task[None]] = set()
+    stream_listener = asyncio.create_task(run_stream_listener())
+    background.add(stream_listener)
+    stream_listener.add_done_callback(background.discard)
     for demo_skill_id in demo_skill_ids:
         clone = asyncio.create_task(
             sync_agent_skill(demo_skill_id, user_id=SYSTEM_USER_ID)
@@ -163,6 +171,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         yield
     finally:
+        stream_listener.cancel()
+        await asyncio.gather(stream_listener, return_exceptions=True)
         session_dispatcher.cancel()
         # Cancelling it cancels the turns it started; this waits for them to
         # record where they stopped before the process goes.

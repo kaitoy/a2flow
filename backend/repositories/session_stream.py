@@ -17,6 +17,9 @@ from models.execution_session import SessionStreamEvent
 #: Most rows one read returns; a viewer further behind catches up over reads.
 _READ_LIMIT = 500
 
+#: The PostgreSQL ``NOTIFY`` channel an append announces its session id on.
+STREAM_CHANNEL = "session_stream"
+
 
 class SessionStreamRepository:
     """Appends and reads a session's streamed events."""
@@ -39,6 +42,10 @@ class SessionStreamRepository:
     ) -> None:
         """Append events of a turn, in order, in one commit.
 
+        On PostgreSQL the same transaction notifies :data:`STREAM_CHANNEL`
+        with the session id, so the notification reaches the listeners only
+        once the rows are visible to them (see ``services.session_stream``).
+
         Args:
             session_id: The session the turn runs in.
             run_id: The turn's AG-UI run id.
@@ -48,6 +55,16 @@ class SessionStreamRepository:
             SessionStreamEvent(session_id=session_id, run_id=run_id, payload=payload)
             for payload in payloads
         )
+        # ponytail: a NOTIFY takes one cluster-wide lock held through commit,
+        # so notifying commits run one at a time -- about 1,350/s measured on
+        # postgres:17, i.e. ~130 turns streaming at once at StreamWriter's
+        # 10 flushes/s. Past that, flushes wait and batch more (slower, not
+        # stuck); synchronous replication lowers the ceiling. Upgrade path:
+        # async-commit this transaction in the same round trip
+        # (``set_config('synchronous_commit', 'off', true)``, ~30% here), then
+        # coalesce each process's notifications into one NOTIFY per 100ms.
+        if self._db.get_bind().dialect.name == "postgresql":
+            await self._db.exec(select(func.pg_notify(STREAM_CHANNEL, session_id)))
         await self._db.commit()
 
     async def after(

@@ -159,11 +159,14 @@ def lock_id(key: str) -> int:
 
 
 @lru_cache(maxsize=1)
-def _lock_engine() -> AsyncEngine:
-    """Return the private NullPool/AUTOCOMMIT engine advisory locks are taken on.
+def dedicated_engine() -> AsyncEngine:
+    """Return the NullPool/AUTOCOMMIT engine for connections held indefinitely.
 
-    See the module docstring for why locks get their own engine rather than
-    borrowing a connection from the request-serving pool.
+    Advisory locks are taken on it, and the session stream's ``LISTEN``
+    connection (``services.session_stream.run_stream_listener``) is held on it.
+    See the module docstring for why these get their own engine rather than
+    borrowing a connection from the request-serving pool. Not for ordinary
+    queries.
     """
     return create_async_engine(
         ASYNC_DB_URL,
@@ -190,7 +193,7 @@ async def _try_acquire(conn: AsyncConnection, key_id: int, wait_seconds: float) 
 async def _postgres_advisory_lock(key: str, wait_seconds: float) -> AsyncIterator[None]:
     """Hold a PostgreSQL session-level advisory lock for the body's duration."""
     key_id = lock_id(key)
-    async with _lock_engine().connect() as conn:
+    async with dedicated_engine().connect() as conn:
         if not await _try_acquire(conn, key_id, wait_seconds):
             raise LockNotAcquiredError(key)
         try:

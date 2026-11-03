@@ -42,7 +42,7 @@ Every replica applies pending schema migrations when it starts, and on a fresh d
 
 ## Connection pooling {#connection-pooling}
 
-Because the lock is session-level rather than transaction-level, the deployment must not place a **transaction-pooling** proxy — PgBouncer in `transaction` mode, and most serverless PostgreSQL poolers — between the app and PostgreSQL. The lock would not survive between statements. Session-level pooling, or a direct connection, is required.
+Because the lock is session-level rather than transaction-level, the deployment must not place a **transaction-pooling** proxy — PgBouncer in `transaction` mode, and most serverless PostgreSQL poolers — between the app and PostgreSQL. The lock would not survive between statements. The same goes for live chat updates: each backend process keeps one connection open to hear about turns written on other replicas, so that a chat open on one replica shows a turn running on another as it happens. Session-level pooling, or a direct connection, is required.
 
 ### Connection budget
 
@@ -54,8 +54,9 @@ Each backend process opens database connections from these sources:
 | The pool for conversation history | Up to `DB_POOL_SIZE` + `DB_MAX_OVERFLOW` |
 | Each agent run in progress — a chat open in a browser, or a turn the server runs on its own (up to `SESSION_RUNNER_CONCURRENCY` at once) | 1 for the length of the run |
 | The notification email sender, and background jobs such as a skill pull or a knowledge-base ingest | 1 each while they run |
+| Live chat updates from other replicas | 1, always open |
 
-With the defaults that is up to 30 pooled connections per process, plus one per run in progress. PostgreSQL's own default `max_connections` is 100, so four or five busy replicas can reach it. Before adding replicas, either raise `max_connections` on the server, or lower `DB_POOL_SIZE` and `DB_MAX_OVERFLOW` (see the [configuration reference](./configuration.md#application-database)). If that is still not enough, put PgBouncer in **session** mode in front of PostgreSQL.
+With the defaults that is up to 30 pooled connections per process, plus one for live chat updates and one per run in progress. PostgreSQL's own default `max_connections` is 100, so four or five busy replicas can reach it. Before adding replicas, either raise `max_connections` on the server, or lower `DB_POOL_SIZE` and `DB_MAX_OVERFLOW` (see the [configuration reference](./configuration.md#application-database)). If that is still not enough, put PgBouncer in **session** mode in front of PostgreSQL.
 
 ## Notification email
 

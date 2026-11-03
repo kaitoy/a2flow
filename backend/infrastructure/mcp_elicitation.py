@@ -374,7 +374,7 @@ async def _show(
     await SessionStreamRepository(db).append(
         session_id, session.active_run_id, [serialize(event)]
     )
-    notify_viewers()
+    notify_viewers(session_id)
 
 
 @lru_cache(maxsize=1)

@@ -64,7 +64,9 @@ def pool_kwargs() -> dict[str, Any]:
     Both the request engine (:data:`engine`) and the ADK session service's own
     engine (``dependencies/singletons.py``) take these, so one process holds up
     to ``2 * (DB_POOL_SIZE + DB_MAX_OVERFLOW)`` pooled connections, plus one
-    unpooled connection per advisory lock held (``infrastructure/locks.py``).
+    unpooled connection per advisory lock held (``infrastructure/locks.py``)
+    and one more for the session stream's listener
+    (``services/session_stream.py``).
 
     Returns:
         ``pool_size`` and ``max_overflow`` for ``create_async_engine``.
