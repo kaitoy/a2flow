@@ -114,7 +114,7 @@ in the same change:
 |---|---|
 | `python` | `backend/.python-version`, `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
 | `node` | `backend/Dockerfile` (its `mcp-proxy` stage, the only one that needs Node.js) and `frontend/Dockerfile` base image tags |
-| `pnpm` | `packageManager` in `frontend/package.json` and `website/package.json` (corepack reads it during the Docker build, and pnpm self-switches to it) |
+| `pnpm` | `packageManager` in `frontend/package.json` and `website/package.json` (the frontend Docker build installs that version, and pnpm self-switches to it) |
 
 `backend/pyproject.toml` sets `[tool.uv] python-preference = "only-system"` so `uv sync`
 builds `backend/.venv` from the mise-pinned interpreter on `PATH` instead of downloading

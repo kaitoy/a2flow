@@ -19,11 +19,12 @@ RUN uv sync --frozen --no-install-project \
 # --- Stage 2: build the Next.js app -----------------------------------------
 FROM node:26-slim AS build
 
-RUN corepack enable
-
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml frontend/.pnpmfile.cjs ./
-RUN pnpm install --frozen-lockfile
+# Node.js 25+ no longer bundles corepack, so install the pnpm that
+# package.json's `packageManager` pins (e.g. "pnpm@12.15.0") with npm.
+RUN npm install -g "$(node -p "require('./package.json').packageManager")" \
+    && pnpm install --frozen-lockfile
 
 COPY frontend/ .
 COPY --from=openapi /backend/openapi.yaml /app/backend/openapi.yaml
