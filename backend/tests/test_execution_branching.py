@@ -328,6 +328,27 @@ async def test_mcp_policies_see_only_the_calling_sessions_tasks(
     assert sorted(t.id for t in main_view) == sorted([main_task, unassigned])
 
 
+async def test_mcp_policies_find_a_task_in_progress_past_the_scan_cap(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cap bounds the in-progress tasks, not the run's whole task list.
+
+    Filtering the status in SQL is what keeps the per-call query small, and it
+    also means finished tasks ahead of an in-progress one cannot push it out
+    of the window.
+    """
+    monkeypatch.setattr("infrastructure.mcp_policies._MAX_TASKS", 1)
+    execution_id = await _seed_run(engine)
+    await seed_workflow_task(engine, execution_id, status=completed, session_id=MAIN)
+    current = await seed_workflow_task(
+        engine, execution_id, status=WorkflowTaskStatus.in_progress, session_id=MAIN
+    )
+
+    async with AsyncSession(engine) as db:
+        view = await _in_progress_tasks(db, execution_id, DEFAULT_TEST_TENANT_ID, MAIN)
+    assert [t.id for t in view] == [current]
+
+
 async def test_a_branch_cannot_gate_another_branchs_task(engine: AsyncEngine) -> None:
     execution_id = await _seed_run(engine)
     main_task = await seed_workflow_task(engine, execution_id, session_id=MAIN)
