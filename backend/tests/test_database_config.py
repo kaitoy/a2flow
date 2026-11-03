@@ -8,8 +8,11 @@ import pytest
 from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.pool import QueuePool
 
+from config import Settings
 from dependencies import singletons
+from infrastructure import database
 from infrastructure.database import is_sqlite_url, to_async_url
 from repositories._integrity import is_foreign_key_error, is_unique_error
 
@@ -112,3 +115,15 @@ class TestSessionServiceFactory:
     ) -> None:
         service = self._build(monkeypatch, "postgresql://u:p@localhost:5432/a2flow")
         assert isinstance(service, DatabaseSessionService)
+
+    def test_postgresql_service_pool_follows_settings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        settings = Settings(_env_file=None, db_pool_size=7, db_max_overflow=3)  # type: ignore[call-arg]
+        monkeypatch.setattr(database, "get_settings", lambda: settings)
+        service = self._build(monkeypatch, "postgresql://u:p@localhost:5432/a2flow")
+        assert isinstance(service, DatabaseSessionService)
+        pool = service.db_engine.pool
+        assert isinstance(pool, QueuePool)
+        assert pool.size() == 7
+        assert pool._max_overflow == 3

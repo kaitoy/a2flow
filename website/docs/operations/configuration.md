@@ -29,6 +29,8 @@ Every setting below is an environment variable. The backend reads them from `bac
 | Variable | Default | What it does |
 |---|---|---|
 | `DB_URL` | `sqlite:///a2flow.db` | Database URL. SQLite (relative to the working directory) and PostgreSQL are supported |
+| `DB_POOL_SIZE` | `5` | PostgreSQL only. Connections each of a backend process's two connection pools keeps open. At least `1`. See [Connection pooling](./scaling.md#connection-pooling) for how this adds up across replicas |
+| `DB_MAX_OVERFLOW` | `10` | PostgreSQL only. Extra connections each pool may open on top of `DB_POOL_SIZE` under load, closed again once the load passes. At least `0` |
 
 The async driver suffix (`sqlite+aiosqlite` / `postgresql+asyncpg`) is added automatically, so the plain scheme is enough:
 

@@ -44,6 +44,19 @@ Every replica applies pending schema migrations when it starts, so several repli
 
 Because the lock is session-level rather than transaction-level, the deployment must not place a **transaction-pooling** proxy — PgBouncer in `transaction` mode, and most serverless PostgreSQL poolers — between the app and PostgreSQL. The lock would not survive between statements. Session-level pooling, or a direct connection, is required.
 
+### Connection budget
+
+Each backend process opens database connections from these sources:
+
+| Source | Connections |
+|---|---|
+| The pool serving API requests | Up to `DB_POOL_SIZE` + `DB_MAX_OVERFLOW` |
+| The pool for conversation history | Up to `DB_POOL_SIZE` + `DB_MAX_OVERFLOW` |
+| Each agent run in progress — a chat open in a browser, or a turn the server runs on its own (up to `SESSION_RUNNER_CONCURRENCY` at once) | 1 for the length of the run |
+| The notification email sender, and background jobs such as a skill pull or a knowledge-base ingest | 1 each while they run |
+
+With the defaults that is up to 30 pooled connections per process, plus one per run in progress. PostgreSQL's own default `max_connections` is 100, so four or five busy replicas can reach it. Before adding replicas, either raise `max_connections` on the server, or lower `DB_POOL_SIZE` and `DB_MAX_OVERFLOW` (see the [configuration reference](./configuration.md#application-database)). If that is still not enough, put PgBouncer in **session** mode in front of PostgreSQL.
+
 ## Notification email
 
 The outgoing-email worker needs no coordination from you: whether it runs in the API processes or as a dedicated one, the `email-queue` advisory lock elects exactly one sender across the whole deployment, so replicas never double-send and the configured rate limit stays exact. Adding worker replicas buys failover, not throughput — see [Process layout](./deployment.md#process-layout).

@@ -58,15 +58,33 @@ def is_sqlite_url(url: str) -> bool:
 ASYNC_DB_URL = to_async_url(DB_URL)
 
 
+def pool_kwargs() -> dict[str, Any]:
+    """Return the connection-pool sizing shared by every pooled PostgreSQL engine.
+
+    Both the request engine (:data:`engine`) and the ADK session service's own
+    engine (``dependencies/singletons.py``) take these, so one process holds up
+    to ``2 * (DB_POOL_SIZE + DB_MAX_OVERFLOW)`` pooled connections, plus one
+    unpooled connection per advisory lock held (``infrastructure/locks.py``).
+
+    Returns:
+        ``pool_size`` and ``max_overflow`` for ``create_async_engine``.
+    """
+    settings = get_settings()
+    return {
+        "pool_size": settings.db_pool_size,
+        "max_overflow": settings.db_max_overflow,
+    }
+
+
 def _engine() -> AsyncEngine:
     """Create the async SQLAlchemy engine from the configured DB_URL.
 
     Non-SQLite engines enable ``pool_pre_ping`` so stale pooled connections
     (e.g. dropped by a PostgreSQL server restart) are detected and replaced
-    transparently.
+    transparently, and are sized by :func:`pool_kwargs`.
     """
     kwargs: dict[str, Any] = (
-        {} if is_sqlite_url(ASYNC_DB_URL) else {"pool_pre_ping": True}
+        {} if is_sqlite_url(ASYNC_DB_URL) else {"pool_pre_ping": True, **pool_kwargs()}
     )
     return create_async_engine(ASYNC_DB_URL, echo=False, **kwargs)
 

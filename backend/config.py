@@ -175,6 +175,12 @@ class Settings(BaseSettings):
         reload: Whether that same ``__main__`` block enables uvicorn autoreload.
         cors_origins: Allowed CORS origins for the API.
         db_url: Database URL selecting SQLite (default) or PostgreSQL.
+        db_pool_size: Connections each PostgreSQL connection pool keeps open.
+            A process has two such pools -- the request engine's and the ADK
+            session service's -- so this counts twice toward its budget (see
+            :func:`infrastructure.database.pool_kwargs`). Ignored on SQLite.
+        db_max_overflow: Extra connections each of those pools may open on top
+            of ``db_pool_size`` under load, closed again once returned.
         skills_dir: Root of the Agent Skill store, laid out as
             ``<skill_id>/<commit_sha>/``. This is durable state, not a cache:
             a WorkflowExecution pins the revision it started with, so wiping the
@@ -344,6 +350,8 @@ class Settings(BaseSettings):
     )
 
     db_url: str = "sqlite:///a2flow.db"
+    db_pool_size: int = Field(default=5, ge=1)
+    db_max_overflow: int = Field(default=10, ge=0)
 
     skills_dir: Path = Field(
         default_factory=lambda: Path(__file__).resolve().parent / ".skills"

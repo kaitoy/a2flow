@@ -17,7 +17,7 @@ from google.adk.sessions.sqlite_session_service import SqliteSessionService
 from config import Settings
 from config import get_settings as get_settings
 from infrastructure.agent import AgentRegistry
-from infrastructure.database import ASYNC_DB_URL, DB_URL, is_sqlite_url
+from infrastructure.database import ASYNC_DB_URL, DB_URL, is_sqlite_url, pool_kwargs
 from infrastructure.email_sender import SmtpEmailSender
 from infrastructure.email_sender import get_email_sender as get_email_sender
 from infrastructure.secret_cipher import SecretCipher
@@ -35,11 +35,12 @@ def get_session_service() -> BaseSessionService:
     SQLite ``DB_URL``s keep the aiosqlite-based service; any other database
     (e.g. PostgreSQL) uses the SQLAlchemy-based service with the async-driver
     URL, so the ADK session store always lives in the same database as the
-    REST API data.
+    REST API data. Its engine is a second connection pool, sized like the
+    request engine's (:func:`infrastructure.database.pool_kwargs`).
     """
     if is_sqlite_url(DB_URL):
         return SqliteSessionService(DB_URL)
-    return DatabaseSessionService(ASYNC_DB_URL)
+    return DatabaseSessionService(ASYNC_DB_URL, **pool_kwargs())
 
 
 @lru_cache(maxsize=1)

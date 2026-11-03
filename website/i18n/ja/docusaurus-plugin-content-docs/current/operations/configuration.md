@@ -29,6 +29,8 @@ sidebar_position: 2
 | 変数 | 既定値 | 役割 |
 |---|---|---|
 | `DB_URL` | `sqlite:///a2flow.db` | データベース URL。SQLite(作業ディレクトリからの相対)と PostgreSQL に対応します |
+| `DB_POOL_SIZE` | `5` | PostgreSQL のときだけ使います。バックエンドの 1 プロセスが持つ 2 つのコネクションプールが、それぞれ開いたまま保つ接続の数です。`1` 以上。レプリカ全体での合計は[コネクションプーリング](./scaling.md#connection-pooling)を参照してください |
+| `DB_MAX_OVERFLOW` | `10` | PostgreSQL のときだけ使います。負荷が高いときに各プールが `DB_POOL_SIZE` を超えて追加で開ける接続の数です。負荷が下がると閉じます。`0` 以上 |
 
 非同期ドライバーのサフィックス(`sqlite+aiosqlite` / `postgresql+asyncpg`)は自動で付くので、素のスキームで足ります。
 
