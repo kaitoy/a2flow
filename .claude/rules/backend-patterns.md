@@ -424,6 +424,8 @@ Three kinds of endpoint intentionally skip the `ApiResponse` envelope by simply 
 - `GET /workflow-executions/{id}/sessions/{sid}/stream` — SSE stream of a server-run workflow session's turn, read from `session_stream_events` so any replica can serve it (`services/session_stream.py`)
 - `GET /api/v1/health` — returns `{"status":"ok"}` (200) or `{"status":"unavailable"}` (503), after checking database connectivity; used for both liveness and readiness gating. `routers/health.py` declares it as `/health`, but like every other router it is mounted under `api_router`'s `/api/v1` prefix, so that is the path to probe. Excluded from the uvicorn access log (`infrastructure/logging_context.py`, whose `HEALTH_CHECK_PATH` carries the full path) since it's polled frequently.
 
+A streaming route takes `db: DBSessionDep` and calls `await db.close()` right before returning its `StreamingResponse`: FastAPI closes the request session only after the response is fully sent, so otherwise the authorization reads keep a pooled connection checked out in an open transaction for the stream's whole lifetime (see `infrastructure/database.py::get_session`).
+
 `RequestContextMiddleware` still runs for all of them (it has no path exclusions), so they receive a `request_id`, log under it, and get the `X-Request-Id` header like any other request.
 
 ### Request ID logging

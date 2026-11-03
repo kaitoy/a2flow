@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from dependencies.auth import CurrentTenantIdDep, CurrentUserIdDep
 from dependencies.authz import require_roles
 from dependencies.context import APP_NAME
+from dependencies.repository import DBSessionDep
 from dependencies.singletons import AgentRegistryDep, SessionServiceDep
 from infrastructure.agent import (
     SESSION_TITLE_KEY,
@@ -38,6 +39,7 @@ async def agent_endpoint(
     session_service: SessionServiceDep,
     user_id: CurrentUserIdDep,
     tenant_id: CurrentTenantIdDep,
+    db: DBSessionDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the ADK agent for the given thread.
 
@@ -57,6 +59,9 @@ async def agent_endpoint(
     first has already moved past (see ``infrastructure/locks.py``). A run already
     in progress for this thread surfaces as HTTP 409, before any SSE headers go
     out.
+
+    The request's database session is closed before the stream starts, so the
+    run does not pin a pooled connection (see ``infrastructure.database.get_session``).
     """
     # Exclude SystemMessage to prevent prompt injection: ag_ui_adk appends its content directly to agent instructions
     filtered = [m for m in input_data.messages if not isinstance(m, SystemMessage)]
@@ -106,6 +111,7 @@ async def agent_endpoint(
             async for event in adk_agent.run(input_data):
                 yield encoder.encode(event)
 
+    await db.close()
     return StreamingResponse(
         event_generator(),
         media_type=encoder.get_content_type(),

@@ -38,6 +38,7 @@ from dependencies.context import (
     PaginationDep,
     SortDep,
 )
+from dependencies.repository import DBSessionDep
 from dependencies.service import (
     MCPElicitationServiceDep,
     MetricsServiceDep,
@@ -514,6 +515,7 @@ async def stream_workflow_session(
     service: WorkflowExecutionServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
+    db: DBSessionDep,
     after: Annotated[int, Query(ge=0)] = 0,
 ) -> StreamingResponse:
     """Stream a session's AG-UI events after ``after``, until its turn ends.
@@ -523,10 +525,15 @@ async def stream_workflow_session(
     comments. It ends after the turn's last event, and the client re-reads the
     history and subscribes again. Read access, like the history: a plain admin
     can watch a run without being able to drive it.
+
+    The request's database session is closed once the caller is authorized:
+    the stream reads through short sessions of its own, and an idle viewer must
+    not pin a pooled connection (see ``infrastructure.database.get_session``).
     """
     await service.authorize_stream(
         execution_id, session_id, caller=caller, caller_roles=caller_roles
     )
+    await db.close()
     return StreamingResponse(
         stream_events(
             session_id,

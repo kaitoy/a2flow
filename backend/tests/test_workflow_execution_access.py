@@ -600,6 +600,43 @@ async def test_admin_can_watch_the_stream(
     assert "RUN_FINISHED" in res.text
 
 
+async def test_stream_releases_the_request_connection_before_streaming(
+    access_env: tuple[AsyncClient, AsyncEngine],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An open stream must not pin the request session's pooled connection.
+
+    The authorization reads leave that session in a transaction, and FastAPI
+    closes it only after the response, so without an explicit close every idle
+    viewer would hold a connection for as long as it watched.
+    """
+    from infrastructure.database import get_session
+    from main import app
+
+    client, eng = access_env
+    execution_id = await _seed_session(eng)
+    inner = app.dependency_overrides[get_session]
+    opened: list[AsyncSession] = []
+
+    async def _capture() -> AsyncGenerator[AsyncSession, None]:
+        async for db in inner():
+            opened.append(db)
+            yield db
+
+    async def _stream(*_: object, **__: object) -> AsyncGenerator[str, None]:
+        assert not opened[0].in_transaction()
+        yield "data: {}\n\n"
+
+    app.dependency_overrides[get_session] = _capture
+    monkeypatch.setattr("routers.workflow_executions.stream_events", _stream)
+    res = await client.get(
+        f"/api/v1/workflow-executions/{execution_id}/sessions/sess-1/stream",
+        headers=ADMIN,
+    )
+    assert res.status_code == 200
+    assert opened
+
+
 async def test_unrelated_user_cannot_watch_the_stream(
     access_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:

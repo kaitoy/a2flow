@@ -94,6 +94,13 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     same request (e.g. the user whose login also inserts a session row) is
     expired, and reading its attributes during response serialization triggers
     lazy IO outside the async greenlet (``MissingGreenlet``).
+
+    FastAPI closes this session only after the response is fully sent, and a
+    read leaves it holding its pooled connection in an open transaction until
+    then. A streaming route must therefore ``await session.close()`` before
+    returning its ``StreamingResponse``, or every open stream pins one pool
+    connection for as long as it runs. A closed session stays usable: a later
+    query just checks out a fresh connection.
     """
     async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session

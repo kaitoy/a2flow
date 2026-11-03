@@ -42,6 +42,7 @@ from dependencies.context import (
     SortDep,
     TagFilterDep,
 )
+from dependencies.repository import DBSessionDep
 from dependencies.service import (
     KnowledgeBaseServiceDep,
     WorkflowDesignServiceDep,
@@ -214,6 +215,7 @@ async def design_session_agent(
     service: WorkflowServiceDep,
     caller: CurrentUserDep,
     caller_roles: EffectiveRolesDep,
+    db: DBSessionDep,
 ) -> StreamingResponse:
     """Stream AG-UI events from the agent driving a Workflow's design session.
 
@@ -244,6 +246,10 @@ async def design_session_agent(
     The lock also excludes the background generation run, so reopening the chat
     while generation is still in flight surfaces the same way instead of
     corrupting the session.
+
+    The request's database session is closed before the stream starts, so the
+    run does not pin a pooled connection (see ``infrastructure.database.get_session``);
+    the attribution at the end reopens one only for as long as it needs.
     """
     # Resolve (and authorize) before locking, so a caller with no business here
     # gets their 403/404 rather than queueing behind someone else's run.
@@ -307,6 +313,7 @@ async def design_session_agent(
                         workflow_id, prior_keys, current_user_id
                     )
 
+    await db.close()
     return StreamingResponse(
         event_generator(),
         media_type=encoder.get_content_type(),
