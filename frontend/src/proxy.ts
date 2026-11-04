@@ -6,7 +6,11 @@
  * `/api/*` and `/openapi.json` are rewritten to `BACKEND_BASE_URL`, read from
  * `process.env` when this module loads (container/process start), not baked
  * in at build time — this is what makes `BACKEND_BASE_URL` configurable via
- * `compose.yml`'s `frontend.environment` without rebuilding the image. Every
+ * `compose.yml`'s `frontend.environment` without rebuilding the image. In the
+ * Docker Compose stack the browser's `/api/*` requests never reach this
+ * rewrite: the `ingress` service (Envoy) routes them to the backend by path,
+ * keeping long-lived SSE streams off this server. The rewrite is for runs
+ * without such an ingress, e.g. `pnpm dev` against a local backend. Every
  * other path is gated on the HttpOnly session cookie's presence (not
  * validity); the `AuthProvider` then confirms the session with `/auth/me`
  * and the API client's 401 handling sends sessions that turn out to be

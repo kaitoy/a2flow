@@ -7,16 +7,18 @@ sidebar_position: 1
 
 A deployment is the frontend, the backend, and one relational database; [Run with Docker Compose](../getting-started/docker-compose.md) is the shortest path to all three. What follows is what changes once the stack sits behind a proxy and holds data worth keeping.
 
-![Architecture diagram showing the browser reaching the frontend through a reverse proxy, the frontend calling the backend API, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.](./img/deployment-topology.svg#gh-light-mode-only)
-![Architecture diagram showing the browser reaching the frontend through a reverse proxy, the frontend calling the backend API, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.](./img/deployment-topology-dark.svg#gh-dark-mode-only)
+![Architecture diagram showing the browser reaching a reverse proxy that routes API requests (/api/*) straight to the backend API and page requests to the frontend, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.](./img/deployment-topology.svg#gh-light-mode-only)
+![Architecture diagram showing the browser reaching a reverse proxy that routes API requests (/api/*) straight to the backend API and page requests to the frontend, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.](./img/deployment-topology-dark.svg#gh-dark-mode-only)
 
-The browser only ever talks to the frontend. Its server-side proxy forwards `/api/*` to the backend, which keeps the auth cookies first-party — so the backend needs no public route of its own. Every variable named here is described under [Configuration reference](./configuration.md).
+The browser talks to one origin, and the reverse proxy routes it by path: `/api/*` and `/openapi.json` to the backend, everything else to the frontend. Both sit on the same domain, so the auth cookies stay first-party — and the long-lived streams of every open chat go straight to the backend instead of through the frontend. The `ingress` service in `compose.yml` (Envoy) is a working example of this routing.
+
+Without that route the frontend forwards `/api/*` to the backend itself, which is how a run without containers works. It behaves the same, but every open chat then also holds a connection on the frontend, so the frontend has to be scaled with the number of concurrent chats as well. Every variable named here is described under [Configuration reference](./configuration.md).
 
 ## Reverse proxy and load balancer
 
 **Sticky sessions / session affinity are not required.** See [Horizontal scaling](./scaling.md) — a PostgreSQL advisory lock, not routing affinity, is what keeps one conversation pinned to one driver at a time, and only for the duration of a single SSE stream.
 
-The SSE agent routes (`POST /api/v1/workflow-executions/{id}/agent` and `POST /api/v1/workflows/{id}/agent`) need the following at the proxy layer:
+The SSE agent routes (`POST /api/v1/workflow-executions/{id}/agent` and `POST /api/v1/workflows/{id}/agent`) need the following at the reverse proxy that routes them to the backend:
 
 | Setting | Required value | Why |
 |---|---|---|

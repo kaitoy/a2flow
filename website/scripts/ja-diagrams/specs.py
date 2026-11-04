@@ -359,8 +359,8 @@ SPECS["concepts/authorization-session-matrix"] = head(
 # ---------------------------------------------------------------- operations/deployment-topology
 SPECS["operations/deployment-topology"] = head(
     "Deployment topology", "デプロイのトポロジー",
-    "Architecture diagram showing the browser reaching the frontend through a reverse proxy, the frontend calling the backend API, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.",
-    "ブラウザがリバースプロキシ経由でフロントエンドに届き、フロントエンドがバックエンド API を呼び、メールワーカーも動かすバックエンド API が、永続化が必要な状態(データベース、スキルストア、暗号化キー)、外部サービス(LLM プロバイダー、MCP サーバー)、SMTP リレーに届くことを示すアーキテクチャ図。",
+    "Architecture diagram showing the browser reaching a reverse proxy that routes API requests (/api/*) straight to the backend API and page requests to the frontend, and the backend API — which also runs the email worker — reaching durable state (database, skill store, secret key), external services (LLM provider, MCP servers), and an SMTP relay.",
+    "ブラウザがリバースプロキシに届き、リバースプロキシが API のリクエスト(/api/*)をバックエンド API へ直接、画面のリクエストをフロントエンドへ振り分け、メールワーカーも動かすバックエンド API が、永続化が必要な状態(データベース、スキルストア、暗号化キー)、外部サービス(LLM プロバイダー、MCP サーバー)、SMTP リレーに届くことを示すアーキテクチャ図。",
 ) + [
     ('<rect x="52" y="484" width="112" height="12"', '<rect x="52" y="483" width="116" height="14"'),
     ('<text x="108" y="493"', '<text x="110" y="493"'),
@@ -372,6 +372,8 @@ SPECS["operations/deployment-topology"] = head(
     label("Reverse proxy", "リバースプロキシ"),
     label("load balancer", "ロードバランサー"),
     label("Frontend", "フロントエンド"),
+    mask(690, 158, 52, 40, h=12),
+    label("pages", "画面"),
     label("Backend API", "バックエンド API"),
     label("uvicorn + email worker", "uvicorn + メールワーカー"),
     label("Database", "データベース"),

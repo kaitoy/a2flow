@@ -14,7 +14,7 @@ docker compose up --build
 
 Open [http://localhost:3000](http://localhost:3000). Database data persists in the `pgdata` volume across restarts.
 
-Set `FRONTEND_PORT` in `.env` to publish the frontend on a different host port (the container still listens on 3000 internally); the backend's `CORS_ORIGINS` follows it automatically.
+Set `APP_PORT` in `.env` to publish the app on a different host port; the backend's `CORS_ORIGINS` follows it automatically.
 
 ## What comes up
 
@@ -24,10 +24,11 @@ Set `FRONTEND_PORT` in `.env` to publish the frontend on a different host port (
 | **backend** | The agent and the API |
 | **worker** | Sends the [notification email](../guides/notifications.md#the-delivery-queue) the backend queues |
 | **mcp-proxy** | Runs the [MCP servers](../guides/mcp-servers.md) you register — see [why it is separate](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |
+| **ingress** | The entry point your browser talks to. Sends the screens' requests to the frontend and API requests straight to the backend |
 | **frontend** | The screens you use |
 | **openbao** | Only with `--profile openbao` — see [Try Vault secrets with OpenBao](#openbao) |
 
-Only the frontend (and, with the profile, OpenBao's UI) is reachable from outside; the rest talk to each other on Docker's internal network.
+Only the ingress (and, with the profile, OpenBao's UI) is reachable from outside; the rest talk to each other on Docker's internal network.
 
 The first start takes longer than later ones: the images are built, the database schema is created, and the MCP proxy waits for the backend to hand it the certificate it needs before it will accept anything.
 

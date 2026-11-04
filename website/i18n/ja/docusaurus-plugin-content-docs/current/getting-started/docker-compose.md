@@ -14,7 +14,7 @@ docker compose up --build
 
 [http://localhost:3000](http://localhost:3000) を開きます。データベースの中身は `pgdata` ボリュームに残るので、再起動しても消えません。
 
-フロントエンドをホスト側の別のポートで公開したい場合は、`.env` に `FRONTEND_PORT` を設定します(コンテナ内では 3000 のまま待ち受けます)。バックエンドの `CORS_ORIGINS` は自動的にそれに追従します。
+アプリをホスト側の別のポートで公開したい場合は、`.env` に `APP_PORT` を設定します。バックエンドの `CORS_ORIGINS` は自動的にそれに追従します。
 
 ## 起動するコンテナ
 
@@ -24,10 +24,11 @@ docker compose up --build
 | **backend** | エージェントと API |
 | **worker** | バックエンドが積んだ[通知メール](../guides/notifications.md#the-delivery-queue)を送ります |
 | **mcp-proxy** | 登録した [MCP サーバ](../guides/mcp-servers.md)を実行します。分けている理由は[登録したサーバーが動く場所](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を参照してください |
+| **ingress** | ブラウザが話す入口。画面のリクエストはフロントエンドへ、API のリクエストはバックエンドへ直接送ります |
 | **frontend** | 実際に操作する画面 |
 | **openbao** | `--profile openbao` を付けたときだけ起動します。[OpenBao で Vault 型シークレットを試す](#openbao)を参照してください |
 
-外から到達できるのはフロントエンド(プロファイル指定時は OpenBao の UI も)だけで、残りは Docker の内部ネットワークでやり取りします。
+外から到達できるのは ingress(プロファイル指定時は OpenBao の UI も)だけで、残りは Docker の内部ネットワークでやり取りします。
 
 初回の起動は 2 回目以降より時間がかかります。イメージのビルド、データベースのスキーマ作成に加えて、MCP プロキシがバックエンドから必要な証明書を受け取るまで待ってから受付を始めるためです。
 

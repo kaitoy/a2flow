@@ -17,11 +17,11 @@
 #   docker compose up --build
 #
 # The app is served at http://localhost:3000 by default. The browser talks
-# only to the frontend; its server-side proxy (frontend/src/proxy.ts) forwards
-# /api/* to the backend, keeping the auth cookies same-origin. Set
-# FRONTEND_PORT in .env to publish the frontend on a different host port (the
-# container keeps listening on 3000 internally); CORS_ORIGINS below follows
-# it automatically.
+# only to the `ingress` service (Envoy), which routes /api/* and
+# /openapi.json to the backend and everything else to the frontend -- one
+# origin, so the auth cookies stay same-origin, and the SSE streams never pass
+# through Node.js. Set APP_PORT in .env to publish the app on a different host
+# port; CORS_ORIGINS below follows it automatically.
 #
 # Optional OpenBao (a Vault-compatible secret store) to try the Vault
 # integration against, its data kept in the `db` service below:
@@ -82,7 +82,7 @@ services:
       DEMO_AZURE_TENANT_ID: ${DEMO_AZURE_TENANT_ID:-}
       DEMO_AZURE_CLIENT_ID: ${DEMO_AZURE_CLIENT_ID:-}
       DEMO_AZURE_CLIENT_SECRET: ${DEMO_AZURE_CLIENT_SECRET:-}
-      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
+      CORS_ORIGINS: http://localhost:${APP_PORT:-3000}
       # Store of cloned skill repositories, one directory per published
       # revision. Durable state, not a cache: a workflow execution pins the
       # revision it started with. Scaling the backend past one replica requires
@@ -233,15 +233,33 @@ services:
       dockerfile: frontend/Dockerfile
     environment:
       # Internal Docker network address of the backend service above, on its
-      # Dockerfile-hardcoded port 8000. Unlike FRONTEND_PORT this never varies
-      # by deployment, so it's a plain literal rather than a ${VAR:-default}
-      # host override -- same style as DB_URL.
+      # Dockerfile-hardcoded port 8000. Unlike APP_PORT this never varies by
+      # deployment, so it's a plain literal rather than a ${VAR:-default} host
+      # override -- same style as DB_URL. Browser /api/* requests never get
+      # here (`ingress` sends them to the backend); this is for the frontend's
+      # own server-side calls, such as the API doc page's session check.
       BACKEND_BASE_URL: http://backend:8000
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+    # No published port: the browser reaches it through `ingress`.
     depends_on:
       backend:
         condition: service_healthy
+
+  # The one published entry point. Routes by path on a single origin: /api/*
+  # and /openapi.json to the backend, everything else to the frontend. Keeping
+  # the long-lived SSE streams off the frontend is the point -- otherwise every
+  # open chat would hold a socket on the Node.js server. A production ingress
+  # or load balancer should route the same way; see the manual's Deployment
+  # page. No admin interface: nothing here needs it, and it must not be public.
+  ingress:
+    image: envoyproxy/envoy:distroless-v1.40.2
+    configs:
+      - source: envoy
+        target: /etc/envoy/envoy.yaml
+    ports:
+      - "${APP_PORT:-3000}:8080"
+    depends_on:
+      - backend
+      - frontend
 
   # Creates the `openbao` database in `db` for the OpenBao service below, then
   # exits. A job rather than an init script because postgres runs those only on
@@ -300,6 +318,59 @@ services:
         condition: service_completed_successfully
 
 configs:
+  # Routes are matched in order. The /api/ route disables both the route
+  # timeout (15 s by default) and the stream idle timeout (5 min by default):
+  # an agent run has no server-side time limit, and either default would cut
+  # an SSE stream off mid-turn. Envoy neither buffers nor compresses responses
+  # unless told to, so the streams need nothing else. /api-doc does not match
+  # the /api/ prefix and goes to the frontend, which serves that page.
+  envoy:
+    content: |
+      static_resources:
+        listeners:
+          - name: ingress
+            address:
+              socket_address: { address: 0.0.0.0, port_value: 8080 }
+            filter_chains:
+              - filters:
+                  - name: envoy.filters.network.http_connection_manager
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                      stat_prefix: ingress
+                      route_config:
+                        virtual_hosts:
+                          - name: a2flow
+                            domains: ["*"]
+                            routes:
+                              - match: { prefix: "/api/" }
+                                route: { cluster: backend, timeout: 0s, idle_timeout: 0s }
+                              - match: { path: "/openapi.json" }
+                                route: { cluster: backend }
+                              - match: { prefix: "/" }
+                                route: { cluster: frontend }
+                      http_filters:
+                        - name: envoy.filters.http.router
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        clusters:
+          - name: backend
+            type: STRICT_DNS
+            load_assignment:
+              cluster_name: backend
+              endpoints:
+                - lb_endpoints:
+                    - endpoint:
+                        address:
+                          socket_address: { address: backend, port_value: 8000 }
+          - name: frontend
+            type: STRICT_DNS
+            load_assignment:
+              cluster_name: frontend
+              endpoints:
+                - lb_endpoints:
+                    - endpoint:
+                        address:
+                          socket_address: { address: frontend, port_value: 3000 }
   openbao:
     content: |
       ui = true

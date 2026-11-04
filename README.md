@@ -53,8 +53,9 @@ the full picture.
 
 ## Quick start
 
-The whole stack — PostgreSQL, the backend, the outgoing-email worker, the MCP proxy, and
-the frontend — comes up with [compose.yml](compose.yml):
+The whole stack — PostgreSQL, the backend, the outgoing-email worker, the MCP proxy, the
+frontend, and an Envoy ingress that routes `/api` straight to the backend — comes up with
+[compose.yml](compose.yml):
 
 ```bash
 echo GOOGLE_API_KEY=your_google_api_key_here > .env

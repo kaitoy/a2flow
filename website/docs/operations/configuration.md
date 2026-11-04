@@ -20,8 +20,8 @@ Every setting below is an environment variable. The backend reads them from `bac
 
 | Variable | Default | What it does |
 |---|---|---|
-| `BACKEND_BASE_URL` | `http://localhost:8000` | Where the frontend's server-side proxy forwards `/api/*`. Read once at process start. In the Docker Compose stack this is the backend's address on the internal network, not a public one |
-| `FRONTEND_PORT` | `3000` | Docker Compose only: the host port the frontend is published on. The container keeps listening on 3000 internally, and the backend's `CORS_ORIGINS` follows this automatically |
+| `BACKEND_BASE_URL` | `http://localhost:8000` | Where the frontend forwards `/api/*` when no reverse proxy routes it to the backend first (a run without containers), and where the API documentation page checks the signed-in session. Read once at process start. In the Docker Compose stack this is the backend's address on the internal network, not a public one |
+| `APP_PORT` | `3000` | Docker Compose only: the host port the app is published on — the port of the `ingress` service, which serves both the screens and the API. The backend's `CORS_ORIGINS` follows this automatically |
 | `OPENBAO_PORT` | `8200` | Docker Compose only, with `--profile openbao`: the host port OpenBao's UI is published on — see [Try Vault secrets with OpenBao](../getting-started/docker-compose.md#openbao). A2Flow reaches it on the internal network regardless |
 
 ## Application database
@@ -63,7 +63,7 @@ If either is unset (or empty), a random password is generated instead and logged
 | `SESSION_IDLE_TIMEOUT_SECONDS` | `28800` (8 hours) | Sliding idle timeout. Authenticated requests refresh the session's last-active time, at most once every 5 minutes (or half this value, if shorter), so a session may end up to that much early; a session left idle longer than this is rejected and deleted |
 | `SESSION_COOKIE_SECURE` | `false` | Marks the session and CSRF cookies `Secure` (HTTPS only). Set it to `true` for any deployment behind HTTPS |
 
-The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes. The frontend reaches the backend through a same-origin rewrite (`/api/*`), so the cookies are first-party and `SameSite=Lax` applies cleanly.
+The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes. The browser reaches the backend on the same origin as the frontend — `/api/*` is routed to it by path, either at the reverse proxy or by the frontend itself — so the cookies are first-party and `SameSite=Lax` applies cleanly.
 
 ## CORS
 

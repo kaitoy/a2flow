@@ -5,7 +5,7 @@ sidebar_position: 3
 
 # Horizontal scaling
 
-The frontend holds no state of its own — it proxies `/api/*` and keeps nothing between requests — so it scales freely. Everything below is about the backend.
+The frontend holds no state of its own and keeps nothing between requests, so it scales freely — and when the reverse proxy routes `/api/*` straight to the backend, as [Deployment](./deployment.md) describes, the chat streams do not pass through it at all. Everything below is about the backend.
 
 ## What running more than one replica requires
 
