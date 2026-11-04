@@ -2,8 +2,8 @@
  * @module api-doc — Scalar API reference viewer.
  *
  * Renders an interactive OpenAPI reference at `/api-doc`. The spec is fetched
- * in-browser from `/openapi.json`, which `next.config.ts` rewrites to the
- * FastAPI backend's live spec. `proxy.ts` requires a session cookie to reach
+ * in-browser from `/openapi.json`, which reaches the FastAPI backend's live
+ * spec through the ingress or, without one, `proxy.ts`'s rewrite. `proxy.ts` requires a session cookie to reach
  * this route at all; the `GET` handler below additionally requires the
  * `admin` or `super_admin` role, since this route has no read/write split to
  * fall back to like the admin section's other pages.
@@ -27,7 +27,7 @@ const config = {
 /** Underlying handler that serves the Scalar API reference HTML page. */
 const serveReference = ApiReference(config);
 
-/** Backend origin for server-to-server calls, mirroring `next.config.ts`'s rewrite target. */
+/** Backend origin for server-to-server calls, the same one `proxy.ts` rewrites to. */
 const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL ?? "http://localhost:8000";
 
 /**
@@ -36,13 +36,18 @@ const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL ?? "http://localhost:8000"
  * `/auth/me` to resolve the caller's roles (no CSRF token is required since
  * this is a `GET`), redirecting to `/login` if the session is missing or
  * invalid, and responding `403` for any other authenticated role.
+ *
+ * The redirect is relative on purpose. `request.url` carries the origin the
+ * server listens on (`http://0.0.0.0:3000` in the standalone Docker image),
+ * not the one the browser used, so an absolute URL built from it sends the
+ * browser to an address it cannot reach.
  */
 export async function GET(request: NextRequest): Promise<Response> {
   const meResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/auth/me`, {
     headers: { cookie: request.headers.get("cookie") ?? "" },
   });
   if (!meResponse.ok) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return new NextResponse(null, { status: 307, headers: { location: "/login" } });
   }
   const { data } = await meResponse.json();
   if (!hasRole(data.user, Role.ADMIN)) {

@@ -70,13 +70,15 @@ describe("GET /api-doc", () => {
       )
     );
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const request = new NextRequest("http://localhost:3000/api-doc");
+    // The origin a standalone Next.js server sees behind Docker, not the one
+    // the browser used: the redirect must not carry it.
+    const request = new NextRequest("http://0.0.0.0:3000/api-doc");
 
     const res = await GET(request);
 
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.status).toBeLessThan(400);
-    expect(res.headers.get("location")).toContain("/login");
+    expect(res.headers.get("location")).toBe("/login");
 
     const meCall = fetchSpy.mock.calls.find(([input]) => input === `${BASE}/api/v1/auth/me`);
     const init = meCall?.[1] as RequestInit | undefined;
@@ -92,6 +94,6 @@ describe("GET /api-doc", () => {
     const res = await GET(makeRequest());
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.status).toBeLessThan(400);
-    expect(res.headers.get("location")).toContain("/login");
+    expect(res.headers.get("location")).toBe("/login");
   });
 });
