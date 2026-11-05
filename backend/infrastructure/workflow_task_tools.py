@@ -296,6 +296,7 @@ async def _notify(
     title: str,
     body: str | None = None,
     recipient: str | None = None,
+    params: dict[str, Any] | None = None,
 ) -> None:
     """Create a notification addressed to ``recipient`` (default: the execution initiator).
 
@@ -318,6 +319,8 @@ async def _notify(
         body: Optional longer description.
         recipient: User id to address the notification to; defaults to the
             execution initiator when ``None``.
+        params: Values the web UI fills into the translation of this type's
+            fixed wording; see :class:`models.notification.NotificationCreate`.
     """
     try:
         execution = await execution_repo.get(execution_id)
@@ -328,6 +331,7 @@ async def _notify(
             type=notification_type,
             title=title,
             body=body,
+            params=params,
             workflow_execution_id=execution_id,
         )
         await notifications.create(data, user_id=execution.created_by)
@@ -809,6 +813,7 @@ async def _hold_for_initiator(
         "It will ask you questions while it runs. Open the run's chat and "
         "resume it when you are ready to answer.",
         recipient=initiator_id,
+        params={"taskTitle": task.title},
     )
     return True
 

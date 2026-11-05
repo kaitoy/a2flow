@@ -778,6 +778,51 @@ async def test_roleless_user_can_update_own_avatar_config(
     assert body["avatarConfig"]["colors"] == ["#16BFA9"]
 
 
+async def test_user_can_set_and_clear_own_language(user_client: AsyncClient) -> None:
+    """A user without roles may set their GUI language, and clear it with null."""
+    created = await _create_user(user_client)
+    assert created["language"] is None
+    headers = {"X-User-Id": created["id"], "X-User-Roles": ""}
+    url = f"/api/v1/users/{created['id']}"
+
+    body = assert_ok(
+        await user_client.patch(url, json={"language": "zh-CN"}, headers=headers)
+    )
+    assert body["language"] == "zh-CN"
+
+    body = assert_ok(
+        await user_client.patch(url, json={"language": None}, headers=headers)
+    )
+    assert body["language"] is None
+
+
+async def test_unsupported_language_is_rejected(user_client: AsyncClient) -> None:
+    """A language the GUI is not translated into fails validation."""
+    created = await _create_user(user_client)
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"language": "de"},
+        headers={"X-User-Id": created["id"], "X-User-Roles": ""},
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_roleless_user_cannot_set_another_users_language(
+    user_client: AsyncClient,
+) -> None:
+    """Language is self-service only: another non-admin's PATCH is rejected."""
+    created = await _create_user(user_client)
+    other = await _create_user(
+        user_client, username="mallory", email="mallory@example.com"
+    )
+    response = await user_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"language": "ja"},
+        headers={"X-User-Id": other["id"], "X-User-Roles": ""},
+    )
+    assert_err(response, "FORBIDDEN", 403)
+
+
 async def test_roleless_user_cannot_update_own_profile_fields(
     user_client: AsyncClient,
 ) -> None:

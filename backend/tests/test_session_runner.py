@@ -1071,6 +1071,7 @@ async def test_a_task_whose_tool_asks_waits_for_its_initiator_to_resume_it(
     assert [(n.user_id, n.type) for n in notes] == [
         (execution["initiatorId"], NotificationType.elicitation_request)
     ]
+    assert set(notes[0].params or {}) == {"taskTitle"}
     assert await _run_status(engine, execution["id"]) is WorkflowExecutionStatus.running
 
     # The resume button: a message from the initiator.

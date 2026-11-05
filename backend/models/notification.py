@@ -13,16 +13,22 @@ the notification to the workflow execution or workflow it concerns; ``link`` is
 the relative in-app path resolved from those ids once, at creation time, by
 :func:`build_notification_link` — the single place that decides where each
 notification kind deep-links to, shared by the email dispatcher and the web UI.
+
+``title`` and ``body`` hold the English text, which is what email carries. The
+web UI translates the fixed wording of each ``type`` itself, filling it from
+``params``; agent-written text (an approval's title and description) and failure
+reasons have no fixed wording, so they are shown as stored.
 """
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic.alias_generators import to_camel
-from sqlalchemy import ForeignKeyConstraint, Index
-from sqlmodel import SQLModel
+from sqlalchemy import Column, ForeignKeyConstraint, Index
+from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
-from models.base import BaseEntity
+from models.base import BaseEntity, JSONColumn
 from models.constraints import BodyText, ShortText
 from models.tenant_scoped import TenantScoped
 
@@ -58,13 +64,16 @@ class NotificationCreate(NotificationUpdate):
     links, and defaults ``read`` to ``False`` so new notifications start
     unread. ``workflow_execution_id`` deep-links run-scoped notifications
     (approvals, completion) while ``workflow_id`` deep-links workflow-scoped
-    ones (``workflow_draft_ready``).
+    ones (``workflow_draft_ready``). ``params`` carries the values the web UI
+    needs to translate this ``type``'s fixed wording: ``count`` for
+    ``execution_completed``, ``taskTitle`` for ``elicitation_request``.
     """
 
     user_id: str
     type: NotificationType
     title: ShortText
     body: BodyText | None = None
+    params: dict[str, Any] | None = None
     workflow_execution_id: str | None = None
     workflow_id: str | None = None
     read: bool = False
@@ -83,6 +92,9 @@ class Notification(NotificationCreate, TenantScoped, BaseEntity, table=True):
 
     __tablename__ = "notifications"
     link: str | None = None
+    params: dict[str, Any] | None = Field(
+        default=None, sa_column=Column(JSONColumn, nullable=True)
+    )
     __table_args__ = (
         # The bell lists a recipient's notifications newest first.
         Index("ix_notifications_user_id_created_at", "user_id", "created_at"),

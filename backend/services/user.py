@@ -50,7 +50,7 @@ from repositories.user import UserRepository
 #: Fields a non-admin user may update on their own record via ``PATCH``.
 #: Matches what the self-service ``/profile`` page sends (avatar customization
 #: only); everything else requires the ``admin`` role.
-_SELF_SERVICE_FIELDS = frozenset({"avatar_config"})
+_SELF_SERVICE_FIELDS = frozenset({"avatar_config", "language"})
 
 
 def _reject_super_admin_tenant_conflict(

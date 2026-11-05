@@ -210,6 +210,7 @@ async def evaluate_completion(
                     f"All {count} task{'s' if count != 1 else ''} "
                     "in this workflow execution have finished."
                 ),
+                params={"count": count},
                 workflow_execution_id=execution_id,
             ),
             user_id=execution.created_by,

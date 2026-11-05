@@ -346,6 +346,7 @@ async def test_execution_completed_notification_emitted_once(
         if n.type is NotificationType.execution_completed
     ]
     assert len(completed) == 1
+    assert completed[0].params == {"count": 2}
 
     # A further terminal-state update must not create a duplicate.
     await update_workflow_task(a, _ctx(), status="skipped")

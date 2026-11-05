@@ -22,7 +22,7 @@ import re
 from collections.abc import Collection, Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import EmailStr, field_serializer, field_validator, model_validator
 from pydantic.alias_generators import to_camel
@@ -31,6 +31,7 @@ from sqlalchemy import (
     Column,
     ForeignKeyConstraint,
     Index,
+    String,
     UniqueConstraint,
     text,
 )
@@ -41,6 +42,11 @@ from models.base import BaseEntity, JSONColumn, TZDateTime, iso_z_or_none
 from models.constraints import Password, PersonName, Username
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
+
+#: Languages the GUI is translated into. A plain ``Literal`` over a string column
+#: rather than a :class:`~enum.StrEnum`, so adding a language needs no PostgreSQL
+#: ``ALTER TYPE`` migration. Keep in step with ``frontend/src/i18n/config.ts``.
+Language = Literal["en", "ja", "es", "zh-CN", "ko", "fr"]
 
 
 class Role(StrEnum):
@@ -211,6 +217,9 @@ class UserUpdate(SQLModel):
     #: see :func:`services.user._require_tenant_for_non_super_admin` and the
     #: matching guard against reassignment in :meth:`services.user.UserService.update`.
     tenant_id: str | None = None
+    #: Language the GUI is shown in. An explicit ``null`` from the client clears
+    #: it, which means "follow the browser's language".
+    language: Language | None = None
 
     @field_validator("roles")
     @classmethod
@@ -314,6 +323,11 @@ class User(UserCreate, BaseEntity, table=True):
     avatar_config: dict[str, Any] | None = Field(  # type: ignore[assignment]
         default=None, sa_column=Column(JSONColumn, nullable=True)
     )
+    #: GUI language, stored as plain text. Overrides the typed :data:`Language`
+    #: inherited from :class:`UserUpdate`, which validates what clients send.
+    language: str | None = Field(  # type: ignore[assignment]
+        default=None, sa_column=Column(String(16), nullable=True)
+    )
 
     @field_serializer("deleted_at", "avatar_updated_at", when_used="json")
     def _serialize_deleted_at(self, dt: datetime | None) -> str | None:
@@ -390,6 +404,8 @@ class UserRead(BaseEntity):
     avatar_config: AvatarConfig | None = None
     #: Tenant this user belongs to; ``None`` for a platform-scoped user.
     tenant_id: str | None = None
+    #: Language the GUI is shown in, or ``None`` to follow the browser's.
+    language: Language | None = None
 
     @classmethod
     def from_user(
