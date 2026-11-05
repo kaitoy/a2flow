@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CheckboxOption } from "@/components/ui/checkbox-group";
 import type { ColumnDef } from "@/components/ui/data-table";
+import { useT } from "@/i18n/provider";
 
 /** Prefix of the localStorage key holding one table's column choices. */
 const STORAGE_PREFIX = "a2flow.columns.";
@@ -103,6 +104,7 @@ export function useColumnVisibility<T>(
   storageKey: string,
   columns: ColumnDef<T>[]
 ): UseColumnVisibilityResult<T> {
+  const t = useT();
   const [overrides, setOverrides] = useState<Overrides>({});
 
   useEffect(() => {
@@ -126,8 +128,8 @@ export function useColumnVisibility<T>(
   const selected = toggleable.filter(isVisible).map((col) => col.header);
 
   const options = useMemo<CheckboxOption[]>(
-    () => toggleable.map((col) => ({ value: col.header, label: col.header })),
-    [toggleable]
+    () => toggleable.map((col) => ({ value: col.header, label: t.maybe(col.header) })),
+    [toggleable, t]
   );
 
   const setSelected = useCallback(

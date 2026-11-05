@@ -4,6 +4,7 @@
 import { Inbox, type LucideIcon } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useT } from "@/i18n/provider";
 import type { FilterSpec, SortSpec } from "@/lib/api";
 import type { CheckboxOption } from "./checkbox-group";
 import { EmptyState } from "./empty-state";
@@ -13,7 +14,11 @@ import { TruncatedCell } from "./truncated-cell";
 
 /** Definition of a single table column. */
 export interface ColumnDef<T> {
-  /** Column heading text; also used as the column's stable key. */
+  /**
+   * Catalog key of the column heading, translated when painted. Being the same
+   * in every language is what lets it double as the column's stable key: stored
+   * column preferences survive a language change.
+   */
   header: string;
   /** Render the cell content for a row. */
   cell: (row: T) => React.ReactNode;
@@ -376,6 +381,7 @@ export function DataTable<T>({
   highlightedRowKey = null,
   rowClassName,
 }: DataTableProps<T>) {
+  const t = useT();
   const colSpan = columns.length;
 
   // Column widths in px, keyed by header. `null` until measured, so the table
@@ -412,6 +418,17 @@ export function DataTable<T>({
   const columnsRef = useRef(columns);
   columnsRef.current = columns;
   const columnsKey = columns.map((c) => c.header).join(" ");
+
+  // Another language means other text in every cell, so what was measured no
+  // longer holds, cache included.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: t.locale is the trigger
+  useEffect(() => {
+    naturalCacheRef.current = {};
+    naturalRef.current = null;
+    headerMinRef.current = null;
+    manualRef.current = false;
+    setWidths(null);
+  }, [t.locale]);
 
   // Re-fit whenever the set of columns changes. The measurements themselves
   // survive in the caches — see `naturalCacheRef` — so only the layout derived
@@ -612,7 +629,7 @@ export function DataTable<T>({
                 >
                   {interactive ? (
                     <TableHeaderMenu
-                      label={col.header}
+                      label={t.maybe(col.header)}
                       sortDirection={sortable ? direction : undefined}
                       onSortChange={
                         sortable ? (dir) => setColumnSort(col.sortField as string, dir) : undefined
@@ -652,7 +669,7 @@ export function DataTable<T>({
                       }
                     />
                   ) : (
-                    <span className="block truncate">{col.header}</span>
+                    <span className="block truncate">{t.maybe(col.header)}</span>
                   )}
                   {/* The label is painted via ::before so it exists for width
                       measurement without duplicating the header text in the
@@ -660,7 +677,7 @@ export function DataTable<T>({
                   <span
                     aria-hidden="true"
                     data-header-sizer="true"
-                    data-label={col.header}
+                    data-label={t.maybe(col.header)}
                     ref={(el) => {
                       if (el) sizerRefs.current.set(col.header, el);
                       else sizerRefs.current.delete(col.header);

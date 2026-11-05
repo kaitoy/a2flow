@@ -1,0 +1,65 @@
+/** @module i18n/messages/fr — The fr catalog. */
+import type { Messages } from "./en";
+
+/** fr messages by key. */
+export const fr = {
+  "app.description": "Chat IA propulsé par Google ADK",
+  "errors.APPROVAL_ALREADY_RESOLVED": "Cette approbation a déjà été décidée.",
+  "errors.CONFLICT_REFERENCED":
+    "Cet élément est encore utilisé par d'autres et ne peut pas être supprimé.",
+  "errors.CONFLICT_UNIQUE": "Un élément avec la même valeur existe déjà.",
+  "errors.CSRF_FAILED": "Impossible de vérifier votre session. Rechargez la page et réessayez.",
+  "errors.DEPENDENCY_CYCLE": "Les dépendances des tâches forment un cycle.",
+  "errors.ELICITATION_ALREADY_ANSWERED": "Cette question a déjà reçu une réponse ou a expiré.",
+  "errors.EMAIL_SEND_FAILED": "Impossible d'envoyer l'e-mail.",
+  "errors.FORBIDDEN": "Vous n'avez pas l'autorisation d'effectuer cette action.",
+  "errors.FOREIGN_KEY_VIOLATION": "Un élément référencé est introuvable.",
+  "errors.HTTP": "La requête a échoué avec le statut {status}.",
+  "errors.INTERNAL_ERROR": "Une erreur inattendue est survenue sur le serveur.",
+  "errors.INVALID_AGENT_SKILL": "Les paramètres de la compétence ne sont pas valides.",
+  "errors.INVALID_AVATAR": "Cette image d'avatar ne peut pas être utilisée.",
+  "errors.INVALID_KNOWLEDGE_SOURCE": "Impossible d'enregistrer la source de connaissances.",
+  "errors.INVALID_MCP_SERVER": "Les paramètres du serveur MCP ne sont pas valides.",
+  "errors.INVALID_MCP_TOOL_MOCK": "Les paramètres du simulacre d'outil ne sont pas valides.",
+  "errors.INVALID_QUERY": "Impossible d'appliquer le filtre ou le tri.",
+  "errors.INVALID_SECRET": "Les paramètres du secret ne sont pas valides.",
+  "errors.INVALID_SESSION_FILE": "Ce fichier ne peut pas être joint à cette session.",
+  "errors.INVALID_SESSION_INPUT": "Cette saisie ne peut pas être envoyée à la session.",
+  "errors.INVALID_SYSTEM_SETTINGS": "Les paramètres système ne sont pas valides.",
+  "errors.INVALID_TENANT": "Les paramètres du tenant ne sont pas valides.",
+  "errors.INVALID_USER": "Les paramètres de l'utilisateur ne sont pas valides.",
+  "errors.MCP_UNREACHABLE": "Impossible de joindre le serveur MCP.",
+  "errors.NETWORK_ERROR":
+    "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+  "errors.NOT_FOUND": "L'élément est introuvable.",
+  "errors.OUTBOUND_EMAIL_NOT_DELETABLE": "Un e-mail en cours d'envoi ne peut pas être supprimé.",
+  "errors.REGISTRY_UNREACHABLE": "Impossible de joindre le registre MCP.",
+  "errors.SECRET_RESOLUTION_FAILED": "Impossible de résoudre une référence à un secret.",
+  "errors.SESSION_AWAITING_APPROVAL": "Cette session attend une approbation.",
+  "errors.SESSION_RUN_IN_PROGRESS": "Une exécution est déjà en cours dans cette session.",
+  "errors.SKILL_CLONE_FAILED": "Impossible de cloner le dépôt de la compétence.",
+  "errors.SKILL_NOT_READY": "La compétence n'a pas encore de révision publiée.",
+  "errors.SUMMARIZATION_FAILED": "Impossible de générer le résumé.",
+  "errors.TOO_MANY_LOGIN_ATTEMPTS":
+    "Trop de tentatives de connexion échouées. Patientez un moment, puis réessayez.",
+  "errors.UNAUTHENTICATED": "Nom d'utilisateur ou mot de passe incorrect.",
+  "errors.VALIDATION_ERROR": "La requête n'est pas valide. Vérifiez votre saisie.",
+  "errors.WORKFLOW_NOT_DEACTIVATABLE": "Le workflow n'est pas publié : il n'y a rien à désactiver.",
+  "errors.WORKFLOW_NOT_MODIFIED": "Le workflow n'a aucune modification non publiée à abandonner.",
+  "errors.WORKFLOW_NOT_RUNNABLE":
+    "Le workflow ne peut pas effectuer cette action dans son état actuel.",
+  "errors.WORKFLOW_PROMPT_NOT_GENERATABLE":
+    "Impossible de générer le prompt de ce workflow pour le moment.",
+  "errors.generic": "Une erreur est survenue. Veuillez réessayer.",
+  "profile.language.browser": "Utiliser la langue du navigateur",
+  "profile.language.impersonating":
+    "La langue ne peut pas être modifiée lorsque vous agissez en tant qu'un autre utilisateur.",
+  "profile.language.label": "Langue",
+  "profile.preferences": "Préférences",
+  "time.daysAgo": "il y a {count} j",
+  "time.hoursAgo": "il y a {count} h",
+  "time.justNow": "à l'instant",
+  "time.minutesAgo": "il y a {count} min",
+  "users.names.superAdmin": "Super administrateur",
+  "users.names.system": "Utilisateur système",
+} satisfies Messages;

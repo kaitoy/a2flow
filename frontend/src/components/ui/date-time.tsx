@@ -1,6 +1,8 @@
 /** @module DateTime — Shared timestamp display showing relative time with an absolute hover tooltip. */
 "use client";
 
+import { useT } from "@/i18n/provider";
+import { getActiveTranslator, type Translator } from "@/i18n/translate";
 import { Tooltip, type TooltipPlacement } from "./tooltip";
 
 /** Parts used to assemble the full timestamp as `YYYY/MM/DD HH:mm:ss TZ`. */
@@ -41,20 +43,21 @@ export function formatFullTimestamp(value: string): string {
  * ago" stops being easier to place than the date itself.
  *
  * @param value - ISO timestamp string.
+ * @param t - Translator to format with; a component passes its `useT()`.
  * @returns The relative time, or an empty string when `value` is not a valid date.
  */
-export function formatRelativeTime(value: string): string {
+export function formatRelativeTime(value: string, t: Translator = getActiveTranslator()): string {
   const then = new Date(value).getTime();
   if (Number.isNaN(then)) return "";
   const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return t("time.justNow");
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("time.hoursAgo", { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(value).toLocaleDateString();
+  if (days < 7) return t("time.daysAgo", { count: days });
+  return new Date(value).toLocaleDateString(t.locale);
 }
 
 /** Props for {@link DateTime}. */
@@ -75,12 +78,13 @@ export interface DateTimeProps {
  * the size is inherited from the caller.
  */
 export function DateTime({ value, placement = "top", className }: DateTimeProps) {
+  const t = useT();
   const cls = ["font-mono", className].filter(Boolean).join(" ");
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return <span className={cls}>—</span>;
   }
-  const display = formatRelativeTime(value);
+  const display = formatRelativeTime(value, t);
   const full = formatFullTimestamp(value);
   return (
     <Tooltip label={full} placement={placement}>

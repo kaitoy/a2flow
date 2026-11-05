@@ -40,9 +40,10 @@ export interface ProfileDetailsProps {
  * {@link import("./profile-hero").ProfileHero} above, so nothing is repeated
  * here.
  *
- * Nothing is editable — the backend only lets a non-admin user update their own
- * `avatarConfig` (see `_SELF_SERVICE_FIELDS` in `backend/services/user.py`), so
- * every attribute below is rendered as plain text rather than a disabled input.
+ * Nothing here is editable — the backend only lets a non-admin user update their
+ * own `avatarConfig` and `language` (see `_SELF_SERVICE_FIELDS` in
+ * `backend/services/user.py`), which have controls of their own, so every
+ * attribute below is rendered as plain text rather than a disabled input.
  */
 export function ProfileDetails({ user, groups }: ProfileDetailsProps) {
   const roles = user.roles ?? [];

@@ -99,6 +99,8 @@ import type {
   WorkflowUpdate,
   WorkflowVersionRead as WorkflowVersionModel,
 } from "@/generated/api/types.gen";
+import { DEFAULT_LOCALE } from "@/i18n/config";
+import { getActiveTranslator, type Translator } from "@/i18n/translate";
 import { store } from "@/store";
 import { showToast } from "@/store/toastSlice";
 import basicCatalogJson from "../generated/basic_catalog.json";
@@ -208,10 +210,31 @@ export class ApiClientError extends Error {
   }
 }
 
-/** Extract a user-facing message from a failed API call. */
+/**
+ * The translation of an API failure: the text for its code, plus the backend's
+ * reason where it gave one (English, but the only record of what to fix). A code
+ * with no translation falls back to the backend's own message.
+ */
+function translateApiError(error: ApiClientError, t: Translator): string {
+  const key = error.code.startsWith("HTTP_") ? "errors.HTTP" : `errors.${error.code}`;
+  const text = t.maybe(key, { status: error.status ?? "" });
+  if (text === key) return error.message;
+  const reason = (error.details as { reason?: unknown } | undefined)?.reason;
+  return typeof reason === "string" ? `${text} (${reason})` : text;
+}
+
+/**
+ * Extract a user-facing message from a failed API call, in the language on
+ * screen. English shows the backend's message as it is, which names the record
+ * involved; other languages get the translation of the error's code.
+ */
 export function getApiErrorMessage(error: unknown): string {
+  const t = getActiveTranslator();
+  if (error instanceof ApiClientError && t.locale !== DEFAULT_LOCALE) {
+    return translateApiError(error, t);
+  }
   if (error instanceof Error) return error.message;
-  return "Something went wrong. Please try again.";
+  return t("errors.generic");
 }
 
 /** Show a failed API call's message as a red toast. */

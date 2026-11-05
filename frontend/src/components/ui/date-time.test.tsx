@@ -52,7 +52,7 @@ describe("formatRelativeTime", () => {
   it("falls back to a locale date from a week out", () => {
     freeze();
     const iso = ago(7 * DAY);
-    expect(formatRelativeTime(iso)).toBe(new Date(iso).toLocaleDateString());
+    expect(formatRelativeTime(iso)).toBe(new Date(iso).toLocaleDateString("en"));
   });
 
   it("clamps future timestamps to 'just now' rather than reporting negative time", () => {

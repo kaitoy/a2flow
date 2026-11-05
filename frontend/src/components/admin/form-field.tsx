@@ -1,4 +1,5 @@
 import type React from "react";
+import { useT } from "@/i18n/provider";
 
 interface FormFieldProps {
   htmlFor: string;
@@ -21,6 +22,7 @@ interface FormFieldProps {
  * cannot target (e.g. a contenteditable code editor) to reference via `aria-labelledby`.
  */
 export function FormField({ htmlFor, label, required, error, action, children }: FormFieldProps) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex min-h-5 items-center justify-between gap-2">
@@ -30,7 +32,7 @@ export function FormField({ htmlFor, label, required, error, action, children }:
         {action}
       </div>
       {children}
-      {error && <p className="text-xs text-error">{error}</p>}
+      {error && <p className="text-xs text-error">{t.maybe(error)}</p>}
     </div>
   );
 }

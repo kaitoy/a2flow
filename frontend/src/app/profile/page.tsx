@@ -1,8 +1,9 @@
-/** @module ProfilePage — The signed-in user's own profile: identity hero, read-only attributes, and the avatar editor. */
+/** @module ProfilePage — The signed-in user's own profile: identity hero, read-only attributes, language, and the avatar editor. */
 "use client";
 
 import { useEffect, useState } from "react";
 import { AvatarDialog } from "@/components/profile/AvatarDialog";
+import { LanguagePreference } from "@/components/profile/LanguagePreference";
 import { ProfileDetails } from "@/components/profile/ProfileDetails";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { Spinner } from "@/components/ui/spinner";
@@ -10,12 +11,12 @@ import { getUserGroupsForUser, type UserGroup } from "@/lib/api";
 import { useAppSelector } from "@/store/hooks";
 
 /**
- * Profile page for the signed-in user: an identity hero naming them, then their
- * account and access attributes as two read-only cards.
+ * Profile page for the signed-in user: an identity hero naming them, their
+ * account and access attributes as two read-only cards, and their preferences.
  *
- * The backend only accepts self-service updates to `avatarConfig`, so everything
- * on the page proper is display-only — the one editable thing, the avatar, is
- * reached by clicking the hero's avatar, which opens {@link AvatarDialog}.
+ * The backend only accepts self-service updates to `avatarConfig` and `language`,
+ * so those are the two editable things: the language in {@link LanguagePreference},
+ * and the avatar by clicking the hero's avatar, which opens {@link AvatarDialog}.
  *
  * The surrounding `ProfileLayout` gates rendering on authentication, so the
  * user is normally present; a spinner covers the brief window before the auth
@@ -49,6 +50,7 @@ export default function ProfilePage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-8">
       <ProfileHero user={user} onEditAvatar={() => setAvatarOpen(true)} />
       <ProfileDetails user={user} groups={groups} />
+      <LanguagePreference user={user} />
       <AvatarDialog open={avatarOpen} onClose={() => setAvatarOpen(false)} user={user} />
     </div>
   );

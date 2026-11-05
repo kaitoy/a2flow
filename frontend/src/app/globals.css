@@ -896,3 +896,10 @@ body::after {
   background-repeat: no-repeat;
   animation: var(--animate-shimmer);
 }
+
+/* Han, Kana and Hangul have no case to differentiate, and glyphs tracked for
+   Latin capitals read as loose (or, with negative tracking, collide). Unlayered,
+   so this outranks the tracking utilities in Tailwind's layer. */
+:is(:lang(ja), :lang(zh), :lang(ko)) :is([class*="tracking-"], .text-label-caps) {
+  letter-spacing: normal;
+}
