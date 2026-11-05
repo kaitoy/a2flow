@@ -21,6 +21,8 @@ import {
   useWorkflowExecutionNames,
   useWorkflowTaskNames,
 } from "@/hooks/useNames";
+import { useT } from "@/i18n/provider";
+import { translateStatus } from "@/i18n/translate";
 import {
   getMcpToolInvocation,
   isForbiddenError,
@@ -42,6 +44,7 @@ const SERVER_LIMIT = 1000;
  * CA's public half re-check the record later without trusting this page.
  */
 export default function AuditToolInvocationDetailPage() {
+  const t = useT();
   const { invocationId } = useParams<{ invocationId: string }>();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -82,9 +85,9 @@ export default function AuditToolInvocationDetailPage() {
   }, [invocation]);
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Audit Logs", href: "/audit" },
-    { label: "Tool Invocations", href: "/audit/tool-invocations" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.auditLogs"), href: "/audit" },
+    { label: t("common.toolInvocations"), href: "/audit/tool-invocations" },
     { label: invocation?.toolName || "…" },
   ];
 
@@ -122,18 +125,21 @@ export default function AuditToolInvocationDetailPage() {
           />
         }
       >
-        <StatusCard ariaLabel="Proxy decision">
-          <Badge>{invocation.decision}</Badge>
+        <StatusCard ariaLabel={t("audit.proxyDecision")}>
+          <Badge>{translateStatus(invocation.decision, t)}</Badge>
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
             <DetailItem
-              label="Server"
+              label={t("common.server")}
               value={serverNameById.get(invocation.mcpServerId) ?? invocation.mcpServerId}
             />
-            <DetailItem label="Denial Reason" value={invocation.denialReason || EMPTY_VALUE} />
             <DetailItem
-              label="Workflow Execution"
+              label={t("common.denialReason")}
+              value={invocation.denialReason || EMPTY_VALUE}
+            />
+            <DetailItem
+              label={t("common.workflowExecution")}
               value={
                 invocation.workflowExecutionId ? (
                   <Link
@@ -149,7 +155,7 @@ export default function AuditToolInvocationDetailPage() {
               }
             />
             <DetailItem
-              label="Workflow Task"
+              label={t("audit.workflowTask")}
               value={
                 invocation.workflowTaskId ? (
                   invocation.workflowExecutionId ? (
@@ -168,7 +174,7 @@ export default function AuditToolInvocationDetailPage() {
               }
             />
             <DetailItem
-              label="Approval"
+              label={t("common.approval")}
               value={
                 invocation.approvalId ? (
                   <Link
@@ -183,7 +189,7 @@ export default function AuditToolInvocationDetailPage() {
               }
             />
             <DetailItem
-              label="Certificate Serial"
+              label={t("audit.certificateSerial")}
               value={
                 invocation.certificateSerial ? (
                   <span className="font-mono text-xs">{invocation.certificateSerial}</span>
@@ -193,11 +199,11 @@ export default function AuditToolInvocationDetailPage() {
               }
             />
             <DetailItem
-              label="Arguments Digest"
+              label={t("common.argumentsDigest")}
               value={<span className="font-mono text-xs">{invocation.argumentsDigest}</span>}
             />
             <DetailItem
-              label="Signature"
+              label={t("audit.signature")}
               value={
                 invocation.signature ? (
                   <span className="font-mono text-xs">{invocation.signature}</span>
@@ -207,7 +213,7 @@ export default function AuditToolInvocationDetailPage() {
               }
             />
             <DetailItem
-              label="Nonce"
+              label={t("audit.nonce")}
               value={
                 invocation.nonce ? (
                   <span className="font-mono text-xs">{invocation.nonce}</span>
@@ -217,11 +223,11 @@ export default function AuditToolInvocationDetailPage() {
               }
             />
             <DetailItem
-              label="Signed At"
+              label={t("common.signedAt")}
               value={invocation.signedAt ? <DateTime value={invocation.signedAt} /> : EMPTY_VALUE}
             />
             <DetailItem
-              label="Session"
+              label={t("common.session")}
               value={<span className="font-mono text-xs">{invocation.sessionId}</span>}
             />
           </DetailList>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type RefObject, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
+import { useT } from "@/i18n/provider";
 import { formatUserName, logout, type User, userDisplayName } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 import { clearUser } from "@/store/authSlice";
@@ -43,6 +44,7 @@ interface Coords {
  * the header, and animated in/out with the project's motion preset.
  */
 export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
+  const t = useT();
   const dispatch = useAppDispatch();
   const router = useRouter();
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -109,7 +111,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
             id="user-menu"
             role="menu"
             tabIndex={-1}
-            aria-label="Profile menu"
+            aria-label={t("app.profileMenu")}
             style={{
               position: "fixed",
               top: coords.top,
@@ -137,7 +139,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
                     )}
                   </>
                 ) : (
-                  <span className="text-sm text-on-surface-variant">Not signed in</span>
+                  <span className="text-sm text-on-surface-variant">{t("app.notSignedIn")}</span>
                 )}
               </div>
             </div>
@@ -152,7 +154,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
                 }}
                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
-                Profile
+                {t("common.profile")}
               </button>
             )}
             {user && (
@@ -165,7 +167,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
                 }}
                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
-                Notifications
+                {t("common.notifications")}
               </button>
             )}
             <button
@@ -175,7 +177,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
               disabled={pending}
               className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Log out
+              {t("app.logOut")}
             </button>
           </animated.div>
         )

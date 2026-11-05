@@ -2,11 +2,13 @@ import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { LOCKED_CHIP_LABEL } from "@/components/ui/chip";
 import { envelope } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import { TagPicker } from "./tag-picker";
+
+/** The lock glyph's accessible name in English. */
+const LOCKED = "Access control";
 
 const BASE = "http://localhost:8000";
 
@@ -47,7 +49,7 @@ describe("TagPicker", () => {
     // `production` is access-controlled, so its lock glyph joins the toggle's
     // accessible name.
     expect(
-      within(dialog).getByRole("button", { name: `${LOCKED_CHIP_LABEL} production` })
+      within(dialog).getByRole("button", { name: `${LOCKED} production` })
     ).toBeInTheDocument();
   });
 

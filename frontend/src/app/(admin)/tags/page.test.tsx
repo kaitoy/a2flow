@@ -1,13 +1,15 @@
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { LOCKED_CHIP_LABEL } from "@/components/ui/chip";
 import { store as appStore } from "@/store";
 import { ADMIN, DEVELOPER, REQUESTER } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor, within } from "@/test/test-utils";
 import TagsPage from "./page";
+
+/** The lock glyph's accessible name in English. */
+const LOCKED = "Access control";
 
 const BASE = "http://localhost:8000";
 
@@ -57,7 +59,7 @@ describe("TagsPage", () => {
     expect(screen.queryByText("Access control")).not.toBeInTheDocument();
     // The preview chip still carries the lock glyph for the access-controlled
     // tag even while the column itself is hidden.
-    expect(screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL })).toHaveLength(1);
+    expect(screen.getAllByRole("img", { name: LOCKED })).toHaveLength(1);
   });
 
   it("shows which tags restrict access, as a check or a dash, once the column is shown", async () => {

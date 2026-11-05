@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { UsersRound } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import type { ColumnDef } from "@/components/ui/data-table";
+import type { MessageKey } from "@/i18n/messages/en";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { RecordPickerField, type RecordPickerFieldProps } from "./record-picker-field";
 
@@ -10,7 +11,9 @@ interface Row {
   name: string;
 }
 
-const COLUMNS: ColumnDef<Row>[] = [{ header: "Name", visibility: "always", cell: (r) => r.name }];
+const COLUMNS: ColumnDef<Row>[] = [
+  { header: "Name" as MessageKey, visibility: "always", cell: (r) => r.name },
+];
 
 const ALL: Row[] = [
   { id: "a", name: "Alpha" },

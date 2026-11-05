@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useT } from "@/i18n/provider";
 import { userDisplayName } from "@/lib/api";
 import { useAppSelector } from "@/store/hooks";
 import { UserMenu } from "./UserMenu";
@@ -21,6 +22,7 @@ interface UserProfileButtonProps {
  * the header layout stays stable while the user is still loading.
  */
 export function UserProfileButton({ className }: UserProfileButtonProps) {
+  const t = useT();
   const user = useAppSelector((s) => s.auth.user);
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -41,13 +43,13 @@ export function UserProfileButton({ className }: UserProfileButtonProps) {
 
   return (
     <>
-      <Tooltip label={user ? userDisplayName(user) : "Profile"} placement="bottom">
+      <Tooltip label={user ? userDisplayName(user) : t("common.profile")} placement="bottom">
         <button
           ref={buttonRef}
           type="button"
           onClick={toggle}
           className={cls}
-          aria-label="Profile"
+          aria-label={t("common.profile")}
           aria-haspopup="menu"
           aria-expanded={open}
         >

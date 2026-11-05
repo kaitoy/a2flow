@@ -21,6 +21,7 @@ import { ChipRow, type ChipRowItem } from "@/components/ui/chip-row";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import {
   type ApprovalDetail,
   getApproval,
@@ -51,6 +52,7 @@ import { resolveTagColor } from "@/lib/tag-palette";
  * detail page.
  */
 export default function ApprovalDetailPage() {
+  const t = useT();
   const { approvalId } = useParams<{ approvalId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -145,8 +147,8 @@ export default function ApprovalDetailPage() {
   }, [approvalId, isAllTenantsView]);
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Approvals", href: "/approvals" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.approvals"), href: "/approvals" },
     { label: approval?.title || "…" },
   ];
 
@@ -182,7 +184,7 @@ export default function ApprovalDetailPage() {
             icon={CheckCircle2}
             secondaryAction={
               <HeaderIconButton
-                label="Open workflow session"
+                label={t("common.openWorkflowSession")}
                 onClick={() =>
                   router.push(`/workflow-executions/${approval.workflowExecutionId}/session`)
                 }
@@ -194,15 +196,18 @@ export default function ApprovalDetailPage() {
         }
         aside={audit && <AuditMeta {...audit} />}
       >
-        <StatusCard ariaLabel="Approval status">
+        <StatusCard ariaLabel={t("approvals.approvalStatus")}>
           <ApprovalStatusLabel status={status} />
         </StatusCard>
 
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem label="Description" value={approval.description || EMPTY_VALUE} />
             <DetailItem
-              label="Approver"
+              label={t("common.description")}
+              value={approval.description || EMPTY_VALUE}
+            />
+            <DetailItem
+              label={t("approvals.approver")}
               value={
                 approval.approver ? (
                   <Link
@@ -224,7 +229,7 @@ export default function ApprovalDetailPage() {
               }
             />
             <DetailItem
-              label="Decided By"
+              label={t("approvals.decidedBy")}
               value={
                 approval.decidedBy ? (
                   <Link
@@ -238,9 +243,9 @@ export default function ApprovalDetailPage() {
                 )
               }
             />
-            <DetailItem label="Comment" value={approval.response ?? EMPTY_VALUE} />
+            <DetailItem label={t("common.comment")} value={approval.response ?? EMPTY_VALUE} />
             <DetailItem
-              label="Workflow Execution"
+              label={t("common.workflowExecution")}
               value={
                 <Link
                   href={`/workflow-executions/${approval.workflowExecutionId}`}
@@ -251,7 +256,7 @@ export default function ApprovalDetailPage() {
               }
             />
             <DetailItem
-              label="Authorized Calls"
+              label={t("approvals.authorizedCalls")}
               value={
                 approval.approvedCalls && approval.approvedCalls.length > 0 ? (
                   <ApprovedCallList calls={approval.approvedCalls} />
@@ -261,7 +266,7 @@ export default function ApprovalDetailPage() {
               }
             />
             <DetailItem
-              label="Takes Effect From"
+              label={t("approvals.takesEffectFrom")}
               value={
                 approval.workflowTaskId ? (
                   <Link
@@ -276,7 +281,7 @@ export default function ApprovalDetailPage() {
               }
             />
             <DetailItem
-              label="Tags"
+              label={t("common.tags")}
               value={(() => {
                 const ids = approval.tagIds ?? [];
                 if (ids.length === 0) return EMPTY_VALUE;
@@ -287,14 +292,14 @@ export default function ApprovalDetailPage() {
                   description: tagsById.get(id)?.description ?? undefined,
                   locked: tagsById.get(id)?.accessControl,
                 }));
-                return <ChipRow items={items} title="Tags" />;
+                return <ChipRow items={items} title={t("common.tags")} />;
               })()}
             />
           </DetailList>
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" onClick={() => router.push("/approvals")}>
-              Back
+              {t("common.back")}
             </Button>
           </div>
         </div>
@@ -303,22 +308,20 @@ export default function ApprovalDetailPage() {
           <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
             <div className="flex items-center gap-2">
               <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" className="text-accent" />
-              <h2 className="font-semibold text-base">Authorized MCP tools</h2>
+              <h2 className="font-semibold text-base">{t("approvals.authorizedMcpTools")}</h2>
             </div>
             <p className="text-muted-foreground text-sm">
-              This approval covers the task it names and every task after it, up to the next
-              approval. Each of those tasks is issued its own certificate when it starts, over
-              exactly the tools it binds at that moment — changing them afterwards is refused.
+              {t("approvals.thisApprovalCoversTheTaskItNames")}
             </p>
             {certificates.length === 0 ? (
               <p className="text-muted-foreground text-sm">
-                No certificate has been issued under this approval yet.
+                {t("approvals.noCertificateHasBeenIssuedUnderThis")}
               </p>
             ) : (
               certificates.map((certificate) => (
                 <DetailList key={certificate.id} singleColumn>
                   <DetailItem
-                    label="Task"
+                    label={t("common.task")}
                     value={
                       <Link
                         href={`/workflow-executions/${approval.workflowExecutionId}/workflow-tasks/${certificate.workflowTaskId}`}
@@ -330,15 +333,19 @@ export default function ApprovalDetailPage() {
                     }
                   />
                   <DetailItem
-                    label="Certificate Status"
+                    label={t("approvals.certificateStatus")}
                     value={
                       certificate.revokedAt
-                        ? `Revoked${certificate.revocationReason ? ` (${certificate.revocationReason})` : ""}`
-                        : "Active"
+                        ? certificate.revocationReason
+                          ? t("certificate.revokedWithReason", {
+                              reason: certificate.revocationReason,
+                            })
+                          : t("certificate.revoked")
+                        : t("certificate.active")
                     }
                   />
                   <DetailItem
-                    label="Serial Number"
+                    label={t("common.serialNumber")}
                     value={
                       <span className="break-all font-mono text-xs">
                         {certificate.serialNumber}
@@ -346,11 +353,11 @@ export default function ApprovalDetailPage() {
                     }
                   />
                   <DetailItem
-                    label="Valid Until"
-                    value={new Date(certificate.notAfter).toLocaleString()}
+                    label={t("approvals.validUntil")}
+                    value={new Date(certificate.notAfter).toLocaleString(t.locale)}
                   />
                   <DetailItem
-                    label="Granted Tools"
+                    label={t("approvals.grantedTools")}
                     value={
                       certificate.allowedTools.length === 0 ? (
                         EMPTY_VALUE

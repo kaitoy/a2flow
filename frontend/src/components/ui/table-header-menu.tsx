@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, ChevronDown, Funnel } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
+import { useT } from "@/i18n/provider";
 import { useMotionConfig } from "@/lib/motion";
 import { CheckboxGroup, type CheckboxOption } from "./checkbox-group";
 import { Input } from "./input";
@@ -101,6 +102,7 @@ export function TableHeaderMenu({
   onFilterValuesChange,
   filterCheckboxOptions,
 }: TableHeaderMenuProps) {
+  const t = useT();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
@@ -253,7 +255,7 @@ export function TableHeaderMenu({
                   id={panelId}
                   role="dialog"
                   tabIndex={-1}
-                  aria-label={`${label} column menu`}
+                  aria-label={t("ui.labelColumnMenu", { label })}
                   style={{
                     position: "fixed",
                     top: coords.top,
@@ -275,7 +277,7 @@ export function TableHeaderMenu({
                         className={`${ITEM_CLASSES} ${sortDirection === "asc" ? "bg-accent-soft/40 text-accent" : ""}`}
                       >
                         <ArrowUp size={16} strokeWidth={1.8} aria-hidden="true" />
-                        Sort ascending
+                        {t("ui.sortAscending")}
                       </button>
                       <button
                         type="button"
@@ -284,7 +286,7 @@ export function TableHeaderMenu({
                         className={`${ITEM_CLASSES} ${sortDirection === "desc" ? "bg-accent-soft/40 text-accent" : ""}`}
                       >
                         <ArrowDown size={16} strokeWidth={1.8} aria-hidden="true" />
-                        Sort descending
+                        {t("ui.sortDescending")}
                       </button>
                     </>
                   ) : null}
@@ -295,7 +297,7 @@ export function TableHeaderMenu({
                         {/* The multi-select variant is conjunctive, which is
                             not the reading people default to — say so rather
                             than let a narrowing selection look broken. */}
-                        {multi ? "Filter (all of)" : "Filter"}
+                        {multi ? t("ui.filterAllOf") : t("ui.filter")}
                       </div>
                       {multi ? (
                         <div className="max-h-64 overflow-y-auto">
@@ -304,20 +306,20 @@ export function TableHeaderMenu({
                             options={filterCheckboxOptions ?? []}
                             value={filterValues ?? []}
                             onChange={(next) => onFilterValuesChange?.(next)}
-                            emptyMessage="Nothing to filter by yet."
+                            emptyMessage={t("ui.nothingToFilterByYet")}
                           />
                         </div>
                       ) : filterOptions ? (
                         <Select
-                          aria-label={`Filter ${label}`}
+                          aria-label={t("ui.filterLabel", { label })}
                           value={filterValue ?? ""}
                           onChange={(next) => onFilterChange?.(next)}
-                          options={[{ value: "", label: "All" }, ...filterOptions]}
+                          options={[{ value: "", label: t("ui.all") }, ...filterOptions]}
                         />
                       ) : (
                         <Input
                           type="text"
-                          placeholder={`Filter ${label}…`}
+                          placeholder={t("ui.filterLabel2", { label })}
                           value={draft}
                           onChange={(e) => onText(e.target.value)}
                         />

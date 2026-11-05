@@ -21,6 +21,7 @@ import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 import { JsonBlock } from "@/components/ui/json-block";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link ToolOutputFormatPanel}. */
 export interface ToolOutputFormatPanelProps {
@@ -40,12 +41,13 @@ export interface ToolOutputFormatPanelProps {
 
 /** The body shown while the tool's declaration is still in flight. */
 function OutputFormatSkeleton({ id }: { id: string }) {
+  const t = useT();
   return (
     <div
       id={id}
       role="status"
       aria-busy="true"
-      aria-label="Loading output format"
+      aria-label={t("admin.loadingOutputFormat")}
       className="flex flex-col gap-2 rounded-xl glass-panel px-4 py-3"
     >
       <Skeleton className="h-4 w-2/3" />
@@ -70,6 +72,7 @@ export function ToolOutputFormatPanel({
   outputSchema,
   loading = false,
 }: ToolOutputFormatPanelProps) {
+  const t = useT();
   const [expanded, setExpanded] = useState(true);
   const panelId = useId();
 
@@ -92,7 +95,7 @@ export function ToolOutputFormatPanel({
           aria-hidden="true"
           className={`transition-transform${expanded ? " rotate-180" : ""}`}
         />
-        Output format
+        {t("admin.outputFormat")}
         <span className="font-mono text-xs normal-case tracking-normal">{toolName}</span>
       </button>
       {expanded &&
@@ -107,8 +110,7 @@ export function ToolOutputFormatPanel({
               <JsonBlock value={outputSchema} />
             ) : (
               <p className="text-xs text-on-surface-variant">
-                This tool does not declare an output format, so there is no shape to follow. Write
-                whatever the workflow needs to read back.
+                {t("admin.thisToolDoesNotDeclareAnOutput")}
               </p>
             )}
           </div>

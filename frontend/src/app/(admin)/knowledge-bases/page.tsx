@@ -27,6 +27,7 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import { deleteKnowledgeBase, type KnowledgeBase, listKnowledgeBases } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
@@ -34,6 +35,7 @@ const LIMIT = 20;
 
 /** Admin page listing the tenant's knowledge bases. */
 export default function KnowledgeBasesPage() {
+  const t = useT();
   const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,
@@ -73,7 +75,7 @@ export default function KnowledgeBasesPage() {
     ...(isAllTenantsView ? [tenantColumn<KnowledgeBase>(tenantNames)] : []),
     idColumn<KnowledgeBase>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -87,7 +89,7 @@ export default function KnowledgeBasesPage() {
       ),
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       filterField: "description",
       cell: (kb) => kb.description || "—",
     },
@@ -96,7 +98,7 @@ export default function KnowledgeBasesPage() {
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (kb: KnowledgeBase) => (
@@ -116,12 +118,14 @@ export default function KnowledgeBasesPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Knowledge Bases" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.knowledgeBases") }]}
+      />
       <AdminPageHeader
-        title="Knowledge Bases"
+        title={t("common.knowledgeBases")}
         icon={BookOpen}
         addHref={canEdit ? "/knowledge-bases/new" : undefined}
-        addLabel="+ Add knowledge base"
+        addLabel={t("knowledgeBases.addKnowledgeBase")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -138,7 +142,7 @@ export default function KnowledgeBasesPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No knowledge bases created yet."
+        emptyMessage={t("knowledgeBases.noKnowledgeBasesCreatedYet")}
         emptyIcon={BookOpen}
         getRowKey={(kb) => kb.id}
         sort={sort}
@@ -157,10 +161,10 @@ export default function KnowledgeBasesPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Knowledge Base"
+        title={t("knowledgeBases.deleteKnowledgeBase")}
         description={
           confirmTarget
-            ? `Delete "${confirmTarget.name}" with all its sources and pages? Workflows linked to it lose access to it.`
+            ? t("knowledgeBases.deleteNameWithAllItsSourcesAnd", { name: confirmTarget.name })
             : ""
         }
         onConfirm={executeDelete}

@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link PromptDiffDialog}. */
 export interface PromptDiffDialogProps {
@@ -58,11 +59,12 @@ function DiffPart({ part }: DiffPartProps) {
  * `glass-panel`) so the dialog doesn't jump when the diff swaps in.
  */
 function DiffSkeleton() {
+  const t = useT();
   return (
     <div
       role="status"
       aria-busy="true"
-      aria-label="Generating"
+      aria-label={t("admin.generating2")}
       className="flex flex-1 flex-col gap-3"
     >
       <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -81,15 +83,16 @@ function DiffSkeleton() {
 
 /** Colour key shown above the diff body. */
 function DiffLegend() {
+  const t = useT();
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-on-surface-variant text-xs">
       <span className="flex items-center gap-1.5">
         <span className="inline-block size-2 rounded-full bg-error" aria-hidden="true" />
-        Only in the generated prompt
+        {t("admin.onlyInTheGeneratedPrompt")}
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block size-2 rounded-full bg-success" aria-hidden="true" />
-        Only in the prompt
+        {t("admin.onlyInThePrompt")}
       </span>
     </div>
   );
@@ -110,6 +113,7 @@ export function PromptDiffDialog({
   onClose,
   loading = false,
 }: PromptDiffDialogProps) {
+  const t = useT();
   const parts = useMemo(() => diffWords(generated, prompt), [generated, prompt]);
   const changed = parts.some((part) => part.added || part.removed);
 
@@ -122,8 +126,8 @@ export function PromptDiffDialog({
       open={open}
       onClose={onClose}
       panelId="prompt-diff-dialog"
-      title="Prompt diff"
-      description="Changes the prompt makes to the generated prompt."
+      title={t("admin.promptDiff")}
+      description={t("admin.changesThePromptMakesToTheGenerated")}
       size="lg"
       scrollable
       // Signature "live edge" — matches the streaming chat bubbles — while the
@@ -132,7 +136,7 @@ export function PromptDiffDialog({
       panelClassName={loading ? "live-edge" : undefined}
       footer={
         <Button variant="ghost" onClick={onClose}>
-          Close
+          {t("common.close")}
         </Button>
       }
     >
@@ -140,11 +144,11 @@ export function PromptDiffDialog({
         <DiffSkeleton />
       ) : emptyPrompt ? (
         <p className="text-sm text-on-surface-variant">
-          Prompt is empty, so the generated prompt is used as is.
+          {t("admin.promptIsEmptySoTheGeneratedPrompt")}
         </p>
       ) : !changed ? (
         <p className="text-sm text-on-surface-variant">
-          No differences — the prompt matches the generated prompt.
+          {t("admin.noDifferencesThePromptMatchesTheGenerated")}
         </p>
       ) : (
         <>

@@ -166,6 +166,10 @@ Three typefaces, three jobs — the pairing itself is part of the identity:
 
 Headings keep **tight letter-spacing** (`tracking-tight`) to lean into the futuristic feel. Label-caps use `0.08em` tracking and 11px size for a sharper, more compressed look. The `badge` scale (11px / 700 / 12px line-height, JetBrains Mono) is implemented as the `text-badge` utility — used for small numeric and fixed-label badges (`NotificationBell`'s unread count, `ToolActivityBubble`'s "MCP" tag). Badges are counts and constant labels — machine data — so they render in the mono data face, but keep their own scale without label-caps' forced uppercase/tracking/color, since badge color and case vary by call site. The `Tags` column's tag chips are a separate case: they take `Chip`'s compact `xs` size — the same 11px mono, but at normal weight and natural case, so two of them stack within one table row (see Shapes).
 
+### Japanese, Chinese and Korean
+
+The three faces cover Latin script only, and no CJK web font is loaded: those run to several megabytes. Han, Kana and Hangul come from the system, and the `lang` attribute on `<html>` makes the browser pick the regional glyphs. Under those languages all `tracking-*` utilities and `text-label-caps` drop their letter-spacing, since these scripts have no case to differentiate and read loosely when tracked.
+
 ## Layout & Spacing
 
 The app keeps the **Fixed Sidebar + Fluid Content** model. Sidebars are 256px wide and rendered as glass panels. Main content panels are centered with a max-width (`max-w-3xl` for chat, `max-w-6xl` for admin lists, `max-w-2xl` for forms) so glass panels feel like floating cards over the gradient canvas. The one form that grows past `max-w-2xl` is an admin detail page's form once it has earned a second column — see below.

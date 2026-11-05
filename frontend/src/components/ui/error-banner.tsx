@@ -1,4 +1,8 @@
+"use client";
+
 /** @module ErrorBanner — Shared inline error alert, optionally dismissible. */
+
+import { useT } from "@/i18n/provider";
 
 interface ErrorBannerProps {
   /** Error message to display; renders nothing when null/empty. */
@@ -13,6 +17,7 @@ interface ErrorBannerProps {
  * nothing when `error` is falsy, so callers can mount it unconditionally.
  */
 export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
+  const t = useT();
   if (!error) return null;
   return (
     <div
@@ -33,7 +38,7 @@ export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
           type="button"
           onClick={onDismiss}
           className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-[transform,translate,scale,background-color,color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] hover:bg-error/15 hover:text-on-error-container motion-safe:hover:scale-110"
-          aria-label="Dismiss error"
+          aria-label={t("ui.dismissError")}
         >
           ✕
         </button>

@@ -1,4 +1,7 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n/provider";
 
 /**
  * Placeholder for an admin edit/detail form while its record loads.
@@ -11,11 +14,12 @@ import { Skeleton } from "@/components/ui/skeleton";
  * @param fields - Number of label/input placeholder rows to render.
  */
 export function FormSkeleton({ fields }: { fields: number }) {
+  const t = useT();
   return (
     <div
       role="status"
       aria-busy="true"
-      aria-label="Loading"
+      aria-label={t("common.loading")}
       className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
     >
       {Array.from({ length: fields }, (_, i) => (

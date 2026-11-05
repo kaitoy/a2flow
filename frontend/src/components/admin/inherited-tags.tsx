@@ -12,6 +12,7 @@
 
 import { tagChipItems } from "@/components/admin/tag-columns";
 import { ChipRow } from "@/components/ui/chip-row";
+import { useT } from "@/i18n/provider";
 import type { Tag } from "@/lib/api";
 
 /** Props for {@link InheritedTags} and {@link InheritedTagsField}. */
@@ -24,8 +25,9 @@ export interface InheritedTagsProps {
 
 /** Render group-inherited tags as chips. */
 export function InheritedTags({ tagIds, byId }: InheritedTagsProps) {
+  const t = useT();
   if (tagIds.length === 0) return null;
-  return <ChipRow items={tagChipItems(tagIds, byId)} title="Tags" />;
+  return <ChipRow items={tagChipItems(tagIds, byId)} title={t("common.tags")} />;
 }
 
 /**
@@ -33,19 +35,19 @@ export function InheritedTags({ tagIds, byId }: InheritedTagsProps) {
  * alongside {@link InheritedRolesField}.
  */
 export function InheritedTagsField({ tagIds, byId }: InheritedTagsProps) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">Tags from groups</span>
+      <span className="text-label-caps">{t("admin.tagsFromGroups")}</span>
       {tagIds.length === 0 ? (
         <p className="text-xs text-on-surface-variant">
-          This user belongs to no group that carries a tag.
+          {t("admin.thisUserBelongsToNoGroupThat2")}
         </p>
       ) : (
         <>
           <InheritedTags tagIds={tagIds} byId={byId} />
           <p className="text-xs text-on-surface-variant">
-            Granted by group membership. Edit the groups below, or the group&apos;s tags, to change
-            these.
+            {t("admin.grantedByGroupMembershipEditTheGroups2")}
           </p>
         </>
       )}

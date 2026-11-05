@@ -1,6 +1,9 @@
 /** @module Breadcrumbs — Small breadcrumb trail shown above admin page headers. */
+"use client";
+
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { useT } from "@/i18n/provider";
 
 /** A single crumb in a breadcrumb trail. */
 export interface BreadcrumbItem {
@@ -28,8 +31,9 @@ interface BreadcrumbsProps {
  * hold a long, user-provided name; regardless of whether it has an `href`.
  */
 export function Breadcrumbs({ items, className = "mb-4" }: BreadcrumbsProps) {
+  const t = useT();
   return (
-    <nav aria-label="Breadcrumb" className={`min-w-0 ${className}`}>
+    <nav aria-label={t("admin.breadcrumb")} className={`min-w-0 ${className}`}>
       <ol className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
         {items.map((item, i) => {
           const isLast = i === items.length - 1;

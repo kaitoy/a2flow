@@ -4,6 +4,7 @@
 import { Inbox, type LucideIcon } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MessageKey } from "@/i18n/messages/en";
 import { useT } from "@/i18n/provider";
 import type { FilterSpec, SortSpec } from "@/lib/api";
 import type { CheckboxOption } from "./checkbox-group";
@@ -19,7 +20,7 @@ export interface ColumnDef<T> {
    * in every language is what lets it double as the column's stable key: stored
    * column preferences survive a language change.
    */
-  header: string;
+  header: MessageKey | "" | "#";
   /** Render the cell content for a row. */
   cell: (row: T) => React.ReactNode;
   /** Extra class names applied to each body `<td>`. */
@@ -91,8 +92,8 @@ export interface ColumnDef<T> {
  * the strings the list API expects for `field:eq:true` / `field:eq:false`.
  */
 export const BOOL_FILTER_OPTIONS: FilterOption[] = [
-  { label: "Yes", value: "true" },
-  { label: "No", value: "false" },
+  { label: "common.yes", value: "true" },
+  { label: "common.no", value: "false" },
 ];
 
 /**
@@ -367,7 +368,7 @@ export function DataTable<T>({
   rows,
   loading = false,
   skeletonRows = 5,
-  emptyMessage = "No data.",
+  emptyMessage = "ui.noData",
   emptyIcon = Inbox,
   getRowKey,
   sort = null,
@@ -595,7 +596,7 @@ export function DataTable<T>({
     <div
       ref={wrapperRef}
       className="overflow-x-auto rounded-2xl glass-panel"
-      {...(loading ? { role: "status", "aria-busy": true, "aria-label": "Loading" } : {})}
+      {...(loading ? { role: "status", "aria-busy": true, "aria-label": t("common.loading") } : {})}
     >
       <table className={`w-full border-collapse text-sm ${widths ? "table-fixed" : ""}`}>
         <colgroup>
@@ -718,7 +719,7 @@ export function DataTable<T>({
                 <EmptyState
                   icon={emptyIcon}
                   animation="spin-occasional"
-                  description={emptyMessage}
+                  description={t.maybe(emptyMessage)}
                 />
               </td>
             </tr>

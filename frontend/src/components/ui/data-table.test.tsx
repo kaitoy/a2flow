@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MessageKey } from "@/i18n/messages/en";
 import { type ColumnDef, DataTable, fitColumnWidths } from "./data-table";
 
 interface Row {
@@ -10,8 +11,8 @@ interface Row {
 }
 
 const COLUMNS: ColumnDef<Row>[] = [
-  { header: "Name", cell: (r) => r.name },
-  { header: "Value", cell: (r) => String(r.value) },
+  { header: "Name" as MessageKey, cell: (r) => r.name },
+  { header: "Value" as MessageKey, cell: (r) => String(r.value) },
 ];
 
 const ROWS: Row[] = [
@@ -40,7 +41,7 @@ describe("DataTable", () => {
 
   it("renders ReactNode cell content", () => {
     const cols: ColumnDef<Row>[] = [
-      { header: "Name", cell: (r) => <strong data-testid="bold">{r.name}</strong> },
+      { header: "Name" as MessageKey, cell: (r) => <strong data-testid="bold">{r.name}</strong> },
     ];
     render(<DataTable columns={cols} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
     expect(screen.getByTestId("bold")).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe("DataTable", () => {
 
   it("applies column className to td elements", () => {
     const cols: ColumnDef<Row>[] = [
-      { header: "Name", cell: (r) => r.name, className: "max-w-[200px] truncate" },
+      { header: "Name" as MessageKey, cell: (r) => r.name, className: "max-w-[200px] truncate" },
     ];
     render(<DataTable columns={cols} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
     const cell = screen.getByText("Alpha").closest("td");
@@ -131,7 +132,9 @@ describe("DataTable", () => {
   });
 
   it("renders noTruncate columns without a clipping span", () => {
-    const cols: ColumnDef<Row>[] = [{ header: "Name", noTruncate: true, cell: (r) => r.name }];
+    const cols: ColumnDef<Row>[] = [
+      { header: "Name" as MessageKey, noTruncate: true, cell: (r) => r.name },
+    ];
     render(<DataTable columns={cols} rows={[ROWS[0]]} getRowKey={(r) => r.id} />);
     expect(screen.getByText("Alpha").className).not.toContain("truncate");
   });
@@ -194,7 +197,9 @@ describe("DataTable", () => {
   it("sorts ascending, descending, and clears through the header menu", async () => {
     const user = userEvent.setup();
     const onSortChange = vi.fn();
-    const cols: ColumnDef<Row>[] = [{ header: "Name", sortField: "name", cell: (r) => r.name }];
+    const cols: ColumnDef<Row>[] = [
+      { header: "Name" as MessageKey, sortField: "name", cell: (r) => r.name },
+    ];
     /** Wait out the closing menu's exit animation so reopening never sees two panels. */
     const menuClosed = () =>
       waitFor(() =>
@@ -244,7 +249,9 @@ describe("DataTable", () => {
   });
 
   it("does not render a sort button without onSortChange", () => {
-    const cols: ColumnDef<Row>[] = [{ header: "Name", sortField: "name", cell: (r) => r.name }];
+    const cols: ColumnDef<Row>[] = [
+      { header: "Name" as MessageKey, sortField: "name", cell: (r) => r.name },
+    ];
     render(<DataTable columns={cols} rows={ROWS} getRowKey={(r) => r.id} />);
     expect(screen.queryByRole("button", { name: /Name/ })).not.toBeInTheDocument();
   });
@@ -254,7 +261,7 @@ describe("DataTable", () => {
     const onFilterChange = vi.fn();
     const cols: ColumnDef<Row>[] = [
       {
-        header: "Name",
+        header: "Name" as MessageKey,
         filterField: "name",
         filterOp: "eq",
         filterOptions: [{ label: "Alpha", value: "alpha" }],
@@ -278,7 +285,9 @@ describe("DataTable", () => {
   });
 
   it("renders one full-width menu trigger per interactive header", () => {
-    const cols: ColumnDef<Row>[] = [{ header: "Name", filterField: "name", cell: (r) => r.name }];
+    const cols: ColumnDef<Row>[] = [
+      { header: "Name" as MessageKey, filterField: "name", cell: (r) => r.name },
+    ];
     render(
       <DataTable
         columns={cols}
@@ -297,7 +306,9 @@ describe("DataTable", () => {
 
   it("offers no sort actions on a filter-only column", async () => {
     const user = userEvent.setup();
-    const cols: ColumnDef<Row>[] = [{ header: "Name", filterField: "name", cell: (r) => r.name }];
+    const cols: ColumnDef<Row>[] = [
+      { header: "Name" as MessageKey, filterField: "name", cell: (r) => r.name },
+    ];
     render(
       <DataTable
         columns={cols}
@@ -313,7 +324,9 @@ describe("DataTable", () => {
   });
 
   it("shows the active sort direction on the header trigger", () => {
-    const cols: ColumnDef<Row>[] = [{ header: "Name", sortField: "name", cell: (r) => r.name }];
+    const cols: ColumnDef<Row>[] = [
+      { header: "Name" as MessageKey, sortField: "name", cell: (r) => r.name },
+    ];
     const { container, rerender } = render(
       <DataTable
         columns={cols}
@@ -350,7 +363,9 @@ describe("DataTable", () => {
   });
 
   it("shows the filter indicator on the header trigger only while a filter is applied", () => {
-    const cols: ColumnDef<Row>[] = [{ header: "Name", filterField: "name", cell: (r) => r.name }];
+    const cols: ColumnDef<Row>[] = [
+      { header: "Name" as MessageKey, filterField: "name", cell: (r) => r.name },
+    ];
     const { container, rerender } = render(
       <DataTable
         columns={cols}
@@ -383,8 +398,8 @@ describe("DataTable", () => {
   it("clears the sort when its column stops being rendered", () => {
     const onSortChange = vi.fn();
     const withName: ColumnDef<Row>[] = [
-      { header: "Name", sortField: "name", cell: (r) => r.name },
-      { header: "Value", cell: (r) => String(r.value) },
+      { header: "Name" as MessageKey, sortField: "name", cell: (r) => r.name },
+      { header: "Value" as MessageKey, cell: (r) => String(r.value) },
     ];
     const { rerender } = render(
       <DataTable
@@ -412,8 +427,8 @@ describe("DataTable", () => {
   it("drops only the filters whose column stops being rendered", () => {
     const onFilterChange = vi.fn();
     const columns: ColumnDef<Row>[] = [
-      { header: "Name", filterField: "name", cell: (r) => r.name },
-      { header: "Value", filterField: "value", cell: (r) => String(r.value) },
+      { header: "Name" as MessageKey, filterField: "name", cell: (r) => r.name },
+      { header: "Value" as MessageKey, filterField: "value", cell: (r) => String(r.value) },
     ];
     const filters = [
       { field: "name", op: "like", value: "a" },
@@ -453,9 +468,9 @@ describe("fitColumnWidths", () => {
 
   const cell = (r: Row) => r.name;
   const FIT_COLUMNS: ColumnDef<Row>[] = [
-    { header: "Name", cell },
-    { header: "Prompt", cell },
-    { header: "Actions", noTruncate: true, cell },
+    { header: "Name" as MessageKey, cell },
+    { header: "Prompt" as MessageKey, cell },
+    { header: "Actions" as MessageKey, noTruncate: true, cell },
   ];
 
   const sum = (widths: Record<string, number>) =>
@@ -481,10 +496,10 @@ describe("fitColumnWidths", () => {
 
   it("shares one ceiling between the oversized columns", () => {
     const columns: ColumnDef<Row>[] = [
-      { header: "Name", cell },
-      { header: "Prompt", cell },
-      { header: "Description", cell },
-      { header: "Actions", noTruncate: true, cell },
+      { header: "Name" as MessageKey, cell },
+      { header: "Prompt" as MessageKey, cell },
+      { header: "Description" as MessageKey, cell },
+      { header: "Actions" as MessageKey, noTruncate: true, cell },
     ];
     const fitted = fitColumnWidths(
       columns,
@@ -502,9 +517,9 @@ describe("fitColumnWidths", () => {
 
   it("keeps explicitly sized columns at their natural width", () => {
     const columns: ColumnDef<Row>[] = [
-      { header: "Icon", width: 40, cell },
-      { header: "Name", cell },
-      { header: "Actions", noTruncate: true, cell },
+      { header: "Icon" as MessageKey, width: 40, cell },
+      { header: "Name" as MessageKey, cell },
+      { header: "Actions" as MessageKey, noTruncate: true, cell },
     ];
     const fitted = fitColumnWidths(columns, { Icon: 40, Name: 800, Actions: 100 }, 500);
     expect(fitted).toEqual({ Icon: 40, Name: 360, Actions: 100 });
@@ -563,9 +578,9 @@ describe("fitColumnWidths", () => {
 describe("DataTable column fitting", () => {
   const cell = (r: Row) => r.name;
   const COLS: ColumnDef<Row>[] = [
-    { header: "Name", cell },
-    { header: "Prompt", cell },
-    { header: "Actions", noTruncate: true, cell },
+    { header: "Name" as MessageKey, cell },
+    { header: "Prompt" as MessageKey, cell },
+    { header: "Actions" as MessageKey, noTruncate: true, cell },
   ];
 
   /** Natural width each column reports, keyed by its header text. */
@@ -698,7 +713,7 @@ describe("DataTable column fitting", () => {
     const { container } = render(
       <DataTable
         columns={[
-          { header: "Name", sortField: "name", filterField: "name", cell },
+          { header: "Name" as MessageKey, sortField: "name", filterField: "name", cell },
           ...COLS.slice(1),
         ]}
         rows={ROWS}
@@ -718,8 +733,8 @@ describe("DataTable column fitting", () => {
     const { container } = render(
       <DataTable
         columns={[
-          { header: "Name", cell },
-          { header: "Prompt", noTruncate: true, shrinkable: true, cell },
+          { header: "Name" as MessageKey, cell },
+          { header: "Prompt" as MessageKey, noTruncate: true, shrinkable: true, cell },
           COLS[2],
         ]}
         rows={ROWS}
@@ -753,7 +768,10 @@ describe("DataTable column fitting", () => {
   it("gives a tag-filter column the same trigger allowance", () => {
     const { container } = render(
       <DataTable
-        columns={[{ header: "Tags", filterKind: "tags", tagOptions: [], cell }, ...COLS.slice(1)]}
+        columns={[
+          { header: "Tags" as MessageKey, filterKind: "tags", tagOptions: [], cell },
+          ...COLS.slice(1),
+        ]}
         rows={ROWS}
         getRowKey={(r) => r.id}
         tagIds={[]}
@@ -769,7 +787,7 @@ describe("DataTable column fitting", () => {
   it("clears the tag filter when the tag column is hidden", () => {
     const onTagIdsChange = vi.fn();
     const tagCol: ColumnDef<Row> = {
-      header: "Tags",
+      header: "Tags" as MessageKey,
       filterKind: "tags",
       tagOptions: [{ value: "t1", label: "production" }],
       cell: () => null,

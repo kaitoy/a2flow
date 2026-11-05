@@ -6,6 +6,7 @@ import { Plus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
+import { useT } from "@/i18n/provider";
 import { useMotionConfig } from "@/lib/motion";
 
 /** Props for {@link ChatInputMenu}. */
@@ -44,6 +45,7 @@ export function ChatInputMenu({
   disabled = false,
   pending = false,
 }: ChatInputMenuProps) {
+  const t = useT();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -97,7 +99,7 @@ export function ChatInputMenu({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Chat actions"
+        aria-label={t("app.chatActions")}
         onClick={() => setOpen((o) => !o)}
         className="glass-panel flex size-9 shrink-0 self-end items-center justify-center rounded-xl cursor-pointer text-on-surface-variant transition-[background-color,border-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)] hover:border-accent/40 hover:bg-accent/10 hover:text-accent motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
@@ -113,7 +115,7 @@ export function ChatInputMenu({
                   id="chat-input-menu"
                   role="menu"
                   tabIndex={-1}
-                  aria-label="Chat actions menu"
+                  aria-label={t("app.chatActionsMenu")}
                   style={{
                     position: "fixed",
                     bottom: coords.bottom,
@@ -142,7 +144,7 @@ export function ChatInputMenu({
                       aria-hidden="true"
                       className={pending ? "motion-safe:animate-spin-y" : undefined}
                     />
-                    Generate prompt
+                    {t("app.generatePrompt")}
                   </button>
                 </animated.div>
               )

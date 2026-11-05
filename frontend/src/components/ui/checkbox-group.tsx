@@ -1,4 +1,5 @@
 import type React from "react";
+import { useT } from "@/i18n/provider";
 import type { TagColor } from "@/lib/api";
 import { TAG_COLOR_CLASS } from "@/lib/tag-palette";
 
@@ -83,11 +84,12 @@ export function CheckboxGroup({
   options,
   value,
   onChange,
-  emptyMessage = "No options available.",
+  emptyMessage = "ui.noOptionsAvailable",
   name,
   flush = false,
   columns = 1,
 }: CheckboxGroupProps) {
+  const t = useT();
   if (options.length === 0) {
     return (
       <p
@@ -97,7 +99,7 @@ export function CheckboxGroup({
             : "rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant"
         }
       >
-        {emptyMessage}
+        {t.maybe(emptyMessage)}
       </p>
     );
   }
@@ -143,8 +145,8 @@ export function CheckboxGroup({
           )}
           {/* A narrow cell (a two-column grid, a fixed-width popover) clips the
               label, so keep the full text reachable on hover. */}
-          <span className="min-w-0 truncate" title={option.label}>
-            {option.label}
+          <span className="min-w-0 truncate" title={t.maybe(option.label)}>
+            {t.maybe(option.label)}
           </span>
         </label>
       ))}

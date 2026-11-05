@@ -3,6 +3,7 @@
 import { Bell } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useT } from "@/i18n/provider";
 import { useAppSelector } from "@/store/hooks";
 import { NotificationPanel } from "./NotificationPanel";
 import { Tooltip } from "./ui/tooltip";
@@ -20,6 +21,7 @@ interface NotificationBellProps {
  * {@link NotificationPanel} dropdown anchored to the button.
  */
 export function NotificationBell({ className }: NotificationBellProps) {
+  const t = useT();
   useNotifications();
   const unreadCount = useAppSelector((s) => s.notifications.unreadCount);
   const [open, setOpen] = useState(false);
@@ -39,7 +41,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
     .filter(Boolean)
     .join(" ");
 
-  const label = unreadCount > 0 ? `Notifications (${unreadCount} unread)` : "Notifications";
+  const label =
+    unreadCount > 0
+      ? t("app.notificationsUnreadcountUnread", { unreadCount })
+      : t("common.notifications");
   const badge = unreadCount > 99 ? "99+" : String(unreadCount);
 
   return (

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { FormField } from "@/components/admin/form-field";
 import { Input } from "@/components/ui/input";
 import { zTenantSettingsUpdate } from "@/generated/api/zod.gen";
+import { useT } from "@/i18n/provider";
 
 /**
  * A whole number typed into a text input, checked against a generated field
@@ -93,11 +94,12 @@ export function SignInLockoutFields({
   lockoutMinutes,
   errors,
 }: SignInLockoutFieldsProps) {
+  const t = useT();
   return (
     <>
       <FormField
         htmlFor="loginMaxFailures"
-        label="Failed Sign-ins Before Lockout"
+        label={t("admin.failedSignInsBeforeLockout")}
         required
         error={errors.loginMaxFailures}
       >
@@ -105,14 +107,13 @@ export function SignInLockoutFields({
       </FormField>
       <FormField
         htmlFor="loginLockoutMinutes"
-        label="Lockout Minutes"
+        label={t("admin.lockoutMinutes")}
         required
         error={errors.loginLockoutMinutes}
       >
         <Input id="loginLockoutMinutes" inputMode="numeric" {...lockoutMinutes} />
         <p className="text-xs text-on-surface-variant">
-          Failures are counted over this many minutes, and a locked account can sign in again once
-          the oldest of them is this old.
+          {t("admin.failuresAreCountedOverThisManyMinutes")}
         </p>
       </FormField>
     </>

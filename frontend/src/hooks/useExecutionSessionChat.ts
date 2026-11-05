@@ -4,6 +4,7 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { AgentSubscriber, HttpAgent } from "@ag-ui/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "react-redux";
+import { useT } from "@/i18n/provider";
 import { formatActionContent, type PendingRenderCall } from "@/lib/a2uiAction";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
@@ -118,6 +119,7 @@ export function useExecutionSessionChat(
   sessionId: string,
   initiatorId: string
 ) {
+  const t = useT();
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
   const { messages, isRunning, isStreaming, error, pendingRenderCalls, suggestions } =
@@ -224,7 +226,7 @@ export function useExecutionSessionChat(
         }
       } catch (err) {
         console.error("failed to upload session files", err);
-        dispatch(setError("The files could not be attached. Nothing was sent."));
+        dispatch(setError(t("chat.theFilesCouldNotBeAttachedNothing")));
         return;
       }
       const id = crypto.randomUUID();
@@ -240,7 +242,7 @@ export function useExecutionSessionChat(
         dispatch(finishRun());
       }
     },
-    [executionId, sessionId, dispatch]
+    [executionId, sessionId, dispatch, t]
   );
 
   /**

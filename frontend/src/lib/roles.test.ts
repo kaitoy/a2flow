@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { User } from "@/lib/api";
-import { ALL_ROLES, effectiveRoles, hasRole, ROLE_LABELS, Role } from "@/lib/roles";
+import { ALL_ROLES, effectiveRoles, hasRole, Role, roleLabel } from "@/lib/roles";
 
 /** Build a minimal signed-in user holding the given roles. */
 function user(roles: Role[], groupRoles: Role[] = []): User {
@@ -34,7 +34,7 @@ describe("hasRole", () => {
 describe("role metadata", () => {
   it("labels every role", () => {
     for (const role of ALL_ROLES) {
-      expect(ROLE_LABELS[role]).toBeTruthy();
+      expect(roleLabel(role)).toBeTruthy();
     }
   });
 });

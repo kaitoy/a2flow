@@ -5,6 +5,7 @@ import { animated, useTransition } from "@react-spring/web";
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useT } from "@/i18n/provider";
 import { useMotionConfig } from "@/lib/motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { dismissToast, type Toast } from "@/store/toastSlice";
@@ -20,6 +21,7 @@ const AUTO_DISMISS_MS = 3500;
  * merge logic) is shown as a small round badge instead of stacking a new card.
  */
 function ToastCard({ toast }: { toast: Toast }) {
+  const t = useT();
   const dispatch = useAppDispatch();
   const isError = toast.variant === "error";
 
@@ -61,7 +63,7 @@ function ToastCard({ toast }: { toast: Toast }) {
           type="button"
           onClick={() => dispatch(dismissToast(toast.id))}
           className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-[transform,translate,scale,background-color,color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] hover:bg-error/15 hover:text-on-error-container motion-safe:hover:scale-110"
-          aria-label="Dismiss"
+          aria-label={t("ui.dismiss")}
         >
           ✕
         </button>

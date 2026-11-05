@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/i18n/provider";
 import type { ReasoningActivityContent } from "@/lib/agentActivity";
 
 /**
@@ -16,6 +17,7 @@ export function ReasoningBubble({
   content: ReasoningActivityContent;
   isThinking?: boolean;
 }) {
+  const t = useT();
   const text = content.text ?? "";
   if (!text) return null;
   return (
@@ -32,7 +34,7 @@ export function ReasoningBubble({
       >
         <div className="mb-1 flex items-center gap-1.5 text-[11px] not-italic tracking-wide uppercase">
           <span aria-hidden>💭</span>
-          <span>Thinking</span>
+          <span>{t("app.thinking")}</span>
         </div>
         {text}
       </div>

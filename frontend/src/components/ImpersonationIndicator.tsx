@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/provider";
 import { stopImpersonation } from "@/lib/api";
 import { persistImpersonatedUserId } from "@/lib/impersonation";
 import { clearImpersonation, setMe } from "@/store/authSlice";
@@ -17,6 +18,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
  * Renders nothing when no impersonation is active.
  */
 export function ImpersonationIndicator() {
+  const t = useT();
   const dispatch = useAppDispatch();
   const router = useRouter();
   const user = useAppSelector((s) => s.auth.user);
@@ -44,11 +46,11 @@ export function ImpersonationIndicator() {
 
   return (
     <div className="flex items-center gap-1.5">
-      <Badge>Acting as {user.username}</Badge>
-      <Tooltip label="Stop impersonating" placement="bottom">
+      <Badge>{t("app.actingAsUsername", { username: user.username })}</Badge>
+      <Tooltip label={t("app.stopImpersonating")} placement="bottom">
         <button
           type="button"
-          aria-label="Stop impersonating"
+          aria-label={t("app.stopImpersonating")}
           onClick={handleStop}
           disabled={pending}
           className="glass-panel flex size-8 shrink-0 items-center justify-center rounded-lg cursor-pointer text-on-surface-variant transition-[background-color,border-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)] hover:border-error/40 hover:bg-error/10 hover:text-error motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/50 disabled:cursor-not-allowed disabled:opacity-50"

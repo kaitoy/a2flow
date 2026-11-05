@@ -36,6 +36,7 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
 import { deleteTag, listTags, type Tag } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { resolveTagColor, tagColorLabel } from "@/lib/tag-palette";
@@ -51,7 +52,7 @@ function buildColumns(
     ...(isAllTenantsView ? [tenantColumn<Tag>(tenantNames)] : []),
     idColumn<Tag>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -65,11 +66,11 @@ function buildColumns(
       ),
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       cell: (tag) => tag.description || "—",
     },
     {
-      header: "Preview",
+      header: "tags.preview" as const,
       // The chip is what a tag looks like everywhere else, so the list shows the
       // real thing rather than naming a color the reader has to imagine.
       noTruncate: true,
@@ -78,7 +79,7 @@ function buildColumns(
       ),
     },
     {
-      header: "Access control",
+      header: "common.accessControl" as const,
       sortField: "accessControl",
       filterField: "accessControl",
       filterOp: "eq",
@@ -88,7 +89,7 @@ function buildColumns(
       cell: (tag) => boolCell(tag.accessControl ?? false),
     },
     {
-      header: "Color",
+      header: "common.color" as const,
       sortField: "color",
       visibility: "optional",
       cell: (tag) => (
@@ -96,7 +97,7 @@ function buildColumns(
       ),
     },
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       visibility: "optional",
       cell: (tag) => <DateTime value={tag.createdAt} className="text-on-surface-variant" />,
@@ -106,6 +107,7 @@ function buildColumns(
 }
 
 export default function TagsPage() {
+  const t = useT();
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
   const isAdmin = useHasRole(Role.ADMIN);
   const {
@@ -145,7 +147,7 @@ export default function TagsPage() {
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (tag: Tag) => (
@@ -169,12 +171,12 @@ export default function TagsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Tags" }]} />
+      <Breadcrumbs items={[{ label: t("common.home"), href: "/" }, { label: t("common.tags") }]} />
       <AdminPageHeader
-        title="Tags"
+        title={t("common.tags")}
         icon={Tags}
         addHref={canEdit ? "/tags/new" : undefined}
-        addLabel="+ Add tag"
+        addLabel={t("tags.addTag")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -191,7 +193,7 @@ export default function TagsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No tags created yet."
+        emptyMessage={t("tags.noTagsCreatedYet")}
         emptyIcon={Tags}
         getRowKey={(tag) => tag.id}
         sort={sort}
@@ -208,10 +210,10 @@ export default function TagsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Tag"
+        title={t("tags.deleteTag")}
         description={
           confirmTarget
-            ? `Delete "${confirmTarget.name}"? It is removed from every record currently carrying it.`
+            ? t("tags.deleteNameItIsRemovedFromEvery", { name: confirmTarget.name })
             : ""
         }
         onConfirm={executeDelete}

@@ -3,6 +3,7 @@
 import { ListTree } from "lucide-react";
 import { useParams } from "next/navigation";
 import { AdminLoading } from "@/components/admin/admin-loading";
+import { useT } from "@/i18n/provider";
 
 /**
  * Route loading fallback for the task templates list page. `loading.tsx`
@@ -10,19 +11,27 @@ import { AdminLoading } from "@/components/admin/admin-loading";
  * "add" link is read via `useParams`, matching the real page.
  */
 export default function Loading() {
+  const t = useT();
   const { workflowId } = useParams<{ workflowId: string }>();
   return (
     <AdminLoading
       crumbs={[
-        { label: "Workflows", href: "/workflows" },
+        { label: t("common.workflows"), href: "/workflows" },
         { label: "…", href: `/workflows/${workflowId}` },
-        { label: "Task Templates" },
+        { label: t("workflows.taskTemplates") },
       ]}
       icon={ListTree}
-      title="Task Templates"
+      title={t("workflows.taskTemplates")}
       addHref={`/workflows/${workflowId}/task-templates/new`}
-      addLabel="+ Add task"
-      columns={["#", "Title", "Description", "Depends on", "Tools", "Actions"]}
+      addLabel={t("workflows.addTask")}
+      columns={[
+        "#",
+        t("common.title"),
+        t("common.description"),
+        t("common.dependsOn"),
+        t("common.tools"),
+        t("common.actions"),
+      ]}
     />
   );
 }

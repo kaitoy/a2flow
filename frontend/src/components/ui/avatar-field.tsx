@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar, type AvatarUser } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { deleteUserAvatar, type User, uploadUserAvatar } from "@/lib/api";
+import { useT } from "@/i18n/provider";
+import { deleteUserAvatar, getApiErrorMessage, type User, uploadUserAvatar } from "@/lib/api";
 
 /** Props for {@link AvatarField}. */
 interface AvatarFieldProps {
@@ -40,7 +41,13 @@ const PREVIEW_SIZE = 96;
  * avatar to revert to the generated default. Used by the admin user form and by
  * the profile page's avatar dialog.
  */
-export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: AvatarFieldProps) {
+export function AvatarField({
+  user,
+  onChange,
+  label = "users.avatar",
+  onUploaded,
+}: AvatarFieldProps) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -102,7 +109,7 @@ export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: Av
         uploadedRef.current = true;
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload avatar");
+      setError(err instanceof Error ? getApiErrorMessage(err) : t("ui.failedToUploadAvatar"));
     }
   }
 
@@ -113,19 +120,19 @@ export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: Av
         onChange(await deleteUserAvatar(user.id));
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove avatar");
+      setError(err instanceof Error ? getApiErrorMessage(err) : t("ui.failedToRemoveAvatar"));
     }
   }
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{label}</span>
+      <span className="text-label-caps">{t.maybe(label)}</span>
       <div className="flex items-center gap-4">
         {previewUrl ? (
           // biome-ignore lint/performance/noImgElement: a local object-URL preview of the chosen file; next/image cannot optimize an in-memory blob.
           <img
             src={previewUrl}
-            alt="Avatar preview"
+            alt={t("ui.avatarPreview")}
             width={PREVIEW_SIZE}
             height={PREVIEW_SIZE}
             className="shrink-0 rounded-full object-cover"
@@ -150,13 +157,13 @@ export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: Av
                 onClick={handleUpload}
                 disabled={upload.inFlight}
                 status={upload.status}
-                pendingLabel="Uploading…"
+                pendingLabel={t("common.uploading")}
                 // Omitted when the caller takes over: the done stage never
                 // runs, and a label the button can't reach would still make it
                 // reserve width for "Uploaded!".
-                doneLabel={onUploaded ? undefined : "Uploaded!"}
+                doneLabel={onUploaded ? undefined : t("ui.uploaded")}
               >
-                Upload
+                {t("ui.upload")}
               </Button>
               <Button
                 type="button"
@@ -164,7 +171,7 @@ export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: Av
                 onClick={clearSelection}
                 disabled={upload.inFlight || upload.status !== "idle"}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             </>
           ) : (
@@ -175,7 +182,7 @@ export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: Av
                 onClick={() => inputRef.current?.click()}
                 disabled={remove.inFlight}
               >
-                Choose image
+                {t("ui.chooseImage")}
               </Button>
               {user.avatarUpdatedAt && (
                 <Button
@@ -184,9 +191,9 @@ export function AvatarField({ user, onChange, label = "Avatar", onUploaded }: Av
                   onClick={handleRemove}
                   disabled={remove.inFlight}
                   status={remove.status}
-                  pendingLabel="Removing…"
+                  pendingLabel={t("ui.removing")}
                 >
-                  Remove
+                  {t("common.remove")}
                 </Button>
               )}
             </>

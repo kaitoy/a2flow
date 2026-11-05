@@ -13,6 +13,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Radio } from "@/components/ui/radio";
 import { Spinner } from "@/components/ui/spinner";
+import { useT } from "@/i18n/provider";
 import {
   listMcpToolMocks,
   listWorkflowTaskTemplates,
@@ -99,6 +100,7 @@ export function RunWorkflowDialog({
   onConfirm,
   onCancel,
 }: RunWorkflowDialogProps) {
+  const t = useT();
   const [mocks, setMocks] = useState<McpToolMock[] | null>(null);
   const [applicable, setApplicable] = useState<McpToolMock[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -170,19 +172,19 @@ export function RunWorkflowDialog({
       open={open}
       onClose={onCancel}
       panelId="run-workflow-dialog"
-      title="Run Workflow"
-      description={`Run "${workflowName}"? This starts a new execution.`}
+      title={t("admin.runWorkflow")}
+      description={t("admin.runWorkflownameThisStartsANewExecution", { workflowName })}
       size={isDraftRun || canChooseDesign ? "md" : "sm"}
       footer={
         <>
           <Button variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="primary"
             onClick={() => onConfirm({ designSource, toolMockIds: isDraftRun ? selected : [] })}
           >
-            Run
+            {t("common.run")}
           </Button>
         </>
       }
@@ -193,21 +195,22 @@ export function RunWorkflowDialog({
         )}
         {canChooseDesign && (
           <section className="flex flex-col gap-2">
-            <h3 className="text-label-caps text-on-surface-variant">Which design to run</h3>
+            <h3 className="text-label-caps text-on-surface-variant">
+              {t("admin.whichDesignToRun")}
+            </h3>
             <p className="text-sm text-on-surface-variant">
-              This workflow has edits that have not been published. Everyone else still gets the
-              published version, so that is what a real request runs.
+              {t("admin.thisWorkflowHasEditsThatHaveNot")}
             </p>
             <div className="flex flex-col">
               <Radio
                 name="run-workflow-design"
-                label="Published version — a real request"
+                label={t("admin.publishedVersionARealRequest")}
                 checked={designSource === "published"}
                 onChange={() => setDesignSource("published")}
               />
               <Radio
                 name="run-workflow-design"
-                label="Unpublished edits — a test run"
+                label={t("admin.unpublishedEditsATestRun")}
                 checked={designSource === "live"}
                 onChange={() => setDesignSource("live")}
               />
@@ -216,11 +219,9 @@ export function RunWorkflowDialog({
         )}
         {isDraftRun && (
           <section className="flex flex-col gap-2">
-            <h3 className="text-label-caps text-on-surface-variant">Mock tools</h3>
+            <h3 className="text-label-caps text-on-surface-variant">{t("admin.mockTools")}</h3>
             <p className="text-sm text-on-surface-variant">
-              A stubbed tool is not called: it returns the mock&apos;s configured result and has no
-              effect. Leave a tool unchecked to exercise it for real. Only mocks for a tool this
-              workflow&apos;s tasks use, and mocks of a built-in tool, are listed.
+              {t("admin.aStubbedToolIsNotCalledIt")}
             </p>
             {applicable === null || mocks === null ? (
               <div className="flex justify-center py-4">
@@ -232,8 +233,8 @@ export function RunWorkflowDialog({
                 compact
                 description={
                   mocks.length === 0
-                    ? "No tool mocks are registered yet."
-                    : "No registered tool mock targets a tool this workflow uses."
+                    ? t("admin.noToolMocksAreRegisteredYet")
+                    : t("admin.noRegisteredToolMockTargetsATool")
                 }
               />
             ) : (

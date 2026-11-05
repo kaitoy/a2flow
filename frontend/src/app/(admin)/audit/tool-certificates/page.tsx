@@ -26,8 +26,9 @@ import {
   useWorkflowTaskNames,
 } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
 import { listMcpServers, listMcpToolCertificates, type McpToolCertificate } from "@/lib/api";
-import { CERTIFICATE_GRANT_DOT_CLASS, CERTIFICATE_GRANT_LABEL } from "@/lib/certificate-grant";
+import { CERTIFICATE_GRANT_DOT_CLASS, certificateGrantLabel } from "@/lib/certificate-grant";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /** Page size for the audit list. */
@@ -48,6 +49,7 @@ const SERVER_LIMIT = 1000;
  * response.
  */
 export default function AuditToolCertificatesPage() {
+  const t = useT();
   const {
     rows,
     loading,
@@ -86,7 +88,7 @@ export default function AuditToolCertificatesPage() {
       ...(isAllTenantsView ? [tenantColumn<McpToolCertificate>(tenantNames)] : []),
       idColumn<McpToolCertificate>(),
       {
-        header: "Serial",
+        header: "audit.serial",
         filterField: "serialNumber",
         visibility: "always",
         cell: (c) => (
@@ -99,25 +101,25 @@ export default function AuditToolCertificatesPage() {
         ),
       },
       {
-        header: "Authority",
+        header: "audit.authority",
         filterField: "grantKind",
         sortField: "grantKind",
         noTruncate: true,
         cell: (c) => (
           <StatusDot
             dotClass={CERTIFICATE_GRANT_DOT_CLASS[c.grantKind]}
-            label={CERTIFICATE_GRANT_LABEL[c.grantKind]}
+            label={certificateGrantLabel(c.grantKind)}
           />
         ),
       },
       {
-        header: "Granted By",
+        header: "audit.grantedBy",
         cell: (c) => names.get(c.grantedBy) ?? c.grantedBy,
       },
       {
         // Null for a grant the run's initiator gave itself: there is no
         // approval record to link to, which is the point of that grant kind.
-        header: "Approval",
+        header: "common.approval",
         visibility: "optional",
         cell: (c) =>
           c.approvalId ? (
@@ -135,17 +137,17 @@ export default function AuditToolCertificatesPage() {
         // Revocation is derived from `revokedAt` rather than shown as a stored
         // status: verification also re-reads the approval and the task, so a
         // grant can stop counting before anything stamps the column.
-        header: "State",
+        header: "audit.state",
         noTruncate: true,
         cell: (c) =>
           c.revokedAt ? (
-            <StatusDot dotClass="bg-on-surface-variant" label="Revoked" />
+            <StatusDot dotClass="bg-on-surface-variant" label={t("audit.revoked")} />
           ) : (
-            <StatusDot dotClass="bg-success/80" label="Live" />
+            <StatusDot dotClass="bg-success/80" label={t("audit.live")} />
           ),
       },
       {
-        header: "Allowed Tools",
+        header: "audit.allowedTools",
         cell: (c) =>
           c.allowedTools.length === 0 ? (
             EMPTY_VALUE
@@ -161,12 +163,12 @@ export default function AuditToolCertificatesPage() {
           ),
       },
       {
-        header: "Not After",
+        header: "audit.notAfter",
         sortField: "notAfter",
         cell: (c) => <DateTime value={c.notAfter} className="text-on-surface-variant" />,
       },
       {
-        header: "Revoked At",
+        header: "audit.revokedAt",
         sortField: "revokedAt",
         cell: (c) =>
           c.revokedAt ? (
@@ -176,7 +178,7 @@ export default function AuditToolCertificatesPage() {
           ),
       },
       {
-        header: "Revocation Reason",
+        header: "audit.revocationReason",
         visibility: "optional",
         cell: (c) =>
           c.revocationReason ? (
@@ -186,13 +188,13 @@ export default function AuditToolCertificatesPage() {
           ),
       },
       {
-        header: "Not Before",
+        header: "audit.notBefore",
         visibility: "optional",
         sortField: "notBefore",
         cell: (c) => <DateTime value={c.notBefore} className="text-on-surface-variant" />,
       },
       {
-        header: "Workflow Execution",
+        header: "common.workflowExecution",
         visibility: "optional",
         cell: (c) => (
           <Link
@@ -204,7 +206,7 @@ export default function AuditToolCertificatesPage() {
         ),
       },
       {
-        header: "Workflow Task",
+        header: "audit.workflowTask",
         visibility: "optional",
         cell: (c) => (
           <Link
@@ -217,7 +219,16 @@ export default function AuditToolCertificatesPage() {
       },
       ...auditColumns<McpToolCertificate>(names),
     ],
-    [serverNameById, names, executionNames, taskNames, approvalNames, tenantNames, isAllTenantsView]
+    [
+      serverNameById,
+      names,
+      executionNames,
+      taskNames,
+      approvalNames,
+      tenantNames,
+      isAllTenantsView,
+      t,
+    ]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -229,14 +240,14 @@ export default function AuditToolCertificatesPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Audit Logs", href: "/audit" },
-          { label: "Certificates" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.auditLogs"), href: "/audit" },
+          { label: t("common.certificates") },
         ]}
       />
       <AuditTabs active="tool-certificates" />
       <AdminPageHeader
-        title="Tool Certificates"
+        title={t("audit.toolCertificates")}
         icon={BadgeCheck}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -254,7 +265,7 @@ export default function AuditToolCertificatesPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No task has been granted tool authority yet."
+        emptyMessage={t("audit.noTaskHasBeenGrantedToolAuthority")}
         emptyIcon={BadgeCheck}
         getRowKey={(c) => c.id}
         sort={sort}

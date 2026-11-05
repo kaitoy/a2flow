@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createUser, setUserGroups } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -37,6 +38,7 @@ const schema = zUserCreate;
 type FormValues = z.infer<typeof schema>;
 
 export default function NewUserPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   // Roles live outside the form state: the picker is a controlled multi-select
@@ -96,7 +98,7 @@ export default function NewUserPage() {
         if (groupIds.length > 0) {
           await setUserGroups(created.id, groupIds);
         }
-        dispatch(showToast({ message: "User created" }));
+        dispatch(showToast({ message: t("users.userCreated") }));
         router.push("/users");
       });
     } catch {
@@ -105,9 +107,9 @@ export default function NewUserPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Users", href: "/users" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.users"), href: "/users" },
+    { label: t("common.new") },
   ];
 
   // The list page hides the Add button for this viewer, so reaching the form at
@@ -124,38 +126,58 @@ export default function NewUserPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New User" icon={UsersIcon} />
+      <AdminPageHeader title={t("users.newUser")} icon={UsersIcon} />
 
       <FormColumn>
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="username" label="Username" required error={errors.username?.message}>
-            <Input id="username" placeholder="e.g. alice" {...register("username")} />
+          <FormField
+            htmlFor="username"
+            label={t("common.username")}
+            required
+            error={errors.username?.message}
+          >
+            <Input id="username" placeholder={t("users.eGAlice")} {...register("username")} />
           </FormField>
 
           <FormField
             htmlFor="firstName"
-            label="First Name"
+            label={t("common.firstName")}
             required
             error={errors.firstName?.message}
           >
             <Input id="firstName" placeholder="Alice" {...register("firstName")} />
           </FormField>
 
-          <FormField htmlFor="lastName" label="Last Name" required error={errors.lastName?.message}>
+          <FormField
+            htmlFor="lastName"
+            label={t("common.lastName")}
+            required
+            error={errors.lastName?.message}
+          >
             <Input id="lastName" placeholder="Smith" {...register("lastName")} />
           </FormField>
 
-          <FormField htmlFor="email" label="Email" required error={errors.email?.message}>
+          <FormField
+            htmlFor="email"
+            label={t("common.email")}
+            required
+            error={errors.email?.message}
+          >
             <Input id="email" type="email" placeholder="alice@example.com" {...register("email")} />
           </FormField>
 
-          <FormField htmlFor="password" label="Password" required error={errors.password?.message}>
+          <FormField
+            htmlFor="password"
+            label={t("common.password")}
+            required
+            error={errors.password?.message}
+          >
             <PasswordInput
               id="password"
-              placeholder="At least 12 characters"
+              placeholder={t("users.atLeast12Characters")}
               {...register("password")}
             />
           </FormField>
@@ -164,13 +186,11 @@ export default function NewUserPage() {
 
           {!targetIsSuperAdmin && <GroupPicker value={groupIds} onChange={setGroupIds} />}
 
-          <Checkbox label="Enabled" {...register("enabled")} />
-          <Checkbox label="Email verified" {...register("emailVerified")} />
+          <Checkbox label={t("common.enabled")} {...register("enabled")} />
+          <Checkbox label={t("users.emailVerified")} {...register("emailVerified")} />
 
           {tenantMissing && (
-            <p className="text-xs text-error">
-              Select a tenant in the header before creating this user.
-            </p>
+            <p className="text-xs text-error">{t("users.selectATenantInTheHeaderBefore")}</p>
           )}
 
           <div className="flex gap-2">
@@ -179,12 +199,12 @@ export default function NewUserPage() {
               variant="primary"
               disabled={save.inFlight || tenantMissing}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/users")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

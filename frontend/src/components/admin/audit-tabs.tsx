@@ -13,13 +13,14 @@
 
 import { useRouter } from "next/navigation";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { useT } from "@/i18n/provider";
 
 /** The audit lists, in the order their tabs appear. */
 export const AUDIT_TABS = [
-  { value: "tool-invocations", label: "Tool Invocations" },
-  { value: "impersonations", label: "Impersonations" },
-  { value: "tool-certificates", label: "Certificates" },
-  { value: "outbound-emails", label: "Emails" },
+  { value: "tool-invocations", label: "common.toolInvocations" },
+  { value: "impersonations", label: "common.impersonations" },
+  { value: "tool-certificates", label: "common.certificates" },
+  { value: "outbound-emails", label: "common.emails" },
 ] as const;
 
 /** The route segment identifying one audit list. */
@@ -37,13 +38,14 @@ export interface AuditTabsProps {
  * @param props - The currently active list.
  */
 export function AuditTabs({ active }: AuditTabsProps) {
+  const t = useT();
   const router = useRouter();
   return (
     <SegmentedControl
       options={AUDIT_TABS}
       value={active}
       onChange={(tab) => router.push(`/audit/${tab}`)}
-      aria-label="Audit log"
+      aria-label={t("admin.auditLog")}
       className="mb-4"
     />
   );

@@ -1,30 +1,34 @@
 "use client";
 
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import type { MessageKey } from "@/i18n/messages/en";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import type { ExecutionSession } from "@/lib/api";
 
 /** How each session status reads in a tab. */
-const STATUS_LABEL: Record<string, string> = {
-  queued: "Queued",
-  running: "Running",
-  waiting_for_input: "Waiting for input",
-  waiting_for_approval: "Waiting for approval",
-  waiting_for_initiator: "Waiting for initiator",
-  scheduled: "Scheduled",
-  idle: "Idle",
-  done: "Done",
-  error: "Error",
+const STATUS_LABEL: Record<string, MessageKey> = {
+  queued: "session.status.queued",
+  running: "session.status.running",
+  waiting_for_input: "session.status.waiting_for_input",
+  waiting_for_approval: "session.status.waiting_for_approval",
+  waiting_for_initiator: "session.status.waiting_for_initiator",
+  scheduled: "session.status.scheduled",
+  idle: "session.status.idle",
+  done: "session.status.done",
+  error: "session.status.error",
 };
 
 /** A session's status as its tab reads it, with the resume time of a scheduled one. */
-function statusLabel(session: ExecutionSession): string {
-  const label = STATUS_LABEL[session.status ?? ""] ?? session.status ?? "";
+function statusLabel(session: ExecutionSession, t: Translator): string {
+  const key = STATUS_LABEL[session.status ?? ""];
+  const label = key ? t(key) : (session.status ?? "");
   if (session.status !== "scheduled" || !session.resumeAt) return label;
-  const at = new Date(session.resumeAt).toLocaleString(undefined, {
+  const at = new Date(session.resumeAt).toLocaleString(t.locale, {
     dateStyle: "short",
     timeStyle: "short",
   });
-  return `${label} until ${at}`;
+  return t("session.statusUntil", { status: label, at });
 }
 
 /** Props for {@link ExecutionSessionTabs}. */
@@ -55,22 +59,23 @@ export function ExecutionSessionTabs({
   value,
   onChange,
 }: ExecutionSessionTabsProps) {
+  const t = useT();
   if (sessions.length < 2) return null;
   let branch = 0;
   let consultation = 0;
   const options = sessions.map((session) => {
     const name =
       session.id === mainSessionId
-        ? "Main"
+        ? t("session.main")
         : session.kind === "consultation"
-          ? `Consultation ${++consultation}`
-          : `Branch ${++branch}`;
-    const status = statusLabel(session);
+          ? t("app.consultationValue", { value: ++consultation })
+          : t("app.branchValue", { value: ++branch });
+    const status = statusLabel(session, t);
     return { value: session.id ?? "", label: status ? `${name} · ${status}` : name };
   });
   return (
     <SegmentedControl
-      aria-label="Sessions of this run"
+      aria-label={t("app.sessionsOfThisRun")}
       options={options}
       value={value}
       onChange={onChange}

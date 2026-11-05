@@ -23,6 +23,7 @@ import {
   useWorkflowExecutionNames,
   useWorkflowTaskNames,
 } from "@/hooks/useNames";
+import { useT } from "@/i18n/provider";
 import {
   getMcpToolCertificateById,
   isForbiddenError,
@@ -30,7 +31,7 @@ import {
   type McpToolCertificate,
   SUPPRESS_FORBIDDEN_TOAST,
 } from "@/lib/api";
-import { CERTIFICATE_GRANT_DOT_CLASS, CERTIFICATE_GRANT_LABEL } from "@/lib/certificate-grant";
+import { CERTIFICATE_GRANT_DOT_CLASS, certificateGrantLabel } from "@/lib/certificate-grant";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /** Upper bound used to fetch the MCP server registry for tool-chip labels. */
@@ -45,6 +46,7 @@ const SERVER_LIMIT = 1000;
  * all.
  */
 export default function AuditToolCertificateDetailPage() {
+  const t = useT();
   const { certificateId } = useParams<{ certificateId: string }>();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -89,9 +91,9 @@ export default function AuditToolCertificateDetailPage() {
   }, [certificate]);
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Audit Logs", href: "/audit" },
-    { label: "Certificates", href: "/audit/tool-certificates" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.auditLogs"), href: "/audit" },
+    { label: t("common.certificates"), href: "/audit/tool-certificates" },
     { label: certificate?.serialNumber || "…" },
   ];
 
@@ -119,7 +121,7 @@ export default function AuditToolCertificateDetailPage() {
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
       <FormLayout
-        header={<AdminPageHeader title="Tool Certificate" icon={BadgeCheck} />}
+        header={<AdminPageHeader title={t("audit.toolCertificate")} icon={BadgeCheck} />}
         aside={
           <AuditMeta
             createdBy={certificate.createdBy}
@@ -129,21 +131,21 @@ export default function AuditToolCertificateDetailPage() {
           />
         }
       >
-        <StatusCard ariaLabel="Certificate state">
+        <StatusCard ariaLabel={t("audit.certificateState")}>
           {certificate.revokedAt ? (
-            <StatusDot dotClass="bg-on-surface-variant" label="Revoked" />
+            <StatusDot dotClass="bg-on-surface-variant" label={t("audit.revoked")} />
           ) : (
-            <StatusDot dotClass="bg-success/80" label="Live" />
+            <StatusDot dotClass="bg-success/80" label={t("audit.live")} />
           )}
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
             <DetailItem
-              label="Serial Number"
+              label={t("common.serialNumber")}
               value={<span className="font-mono text-xs">{certificate.serialNumber}</span>}
             />
             <DetailItem
-              label="Allowed Tools"
+              label={t("audit.allowedTools")}
               value={
                 certificate.allowedTools.length === 0 ? (
                   EMPTY_VALUE
@@ -160,17 +162,17 @@ export default function AuditToolCertificateDetailPage() {
               }
             />
             <DetailItem
-              label="Authority"
+              label={t("audit.authority")}
               value={
                 <StatusDot
                   dotClass={CERTIFICATE_GRANT_DOT_CLASS[certificate.grantKind]}
-                  label={CERTIFICATE_GRANT_LABEL[certificate.grantKind]}
+                  label={certificateGrantLabel(certificate.grantKind)}
                 />
               }
             />
-            <DetailItem label="Granted By" value={grantorName ?? certificate.grantedBy} />
+            <DetailItem label={t("audit.grantedBy")} value={grantorName ?? certificate.grantedBy} />
             <DetailItem
-              label="Approval"
+              label={t("common.approval")}
               value={
                 certificate.approvalId ? (
                   <Link
@@ -187,7 +189,7 @@ export default function AuditToolCertificateDetailPage() {
               }
             />
             <DetailItem
-              label="Workflow Execution"
+              label={t("common.workflowExecution")}
               value={
                 <Link
                   href={`/workflow-executions/${certificate.workflowExecutionId}`}
@@ -199,7 +201,7 @@ export default function AuditToolCertificateDetailPage() {
               }
             />
             <DetailItem
-              label="Workflow Task"
+              label={t("audit.workflowTask")}
               value={
                 <Link
                   href={`/workflow-executions/${certificate.workflowExecutionId}/workflow-tasks/${certificate.workflowTaskId}`}
@@ -209,16 +211,22 @@ export default function AuditToolCertificateDetailPage() {
                 </Link>
               }
             />
-            <DetailItem label="Not Before" value={<DateTime value={certificate.notBefore} />} />
-            <DetailItem label="Not After" value={<DateTime value={certificate.notAfter} />} />
             <DetailItem
-              label="Revoked At"
+              label={t("audit.notBefore")}
+              value={<DateTime value={certificate.notBefore} />}
+            />
+            <DetailItem
+              label={t("audit.notAfter")}
+              value={<DateTime value={certificate.notAfter} />}
+            />
+            <DetailItem
+              label={t("audit.revokedAt")}
               value={
                 certificate.revokedAt ? <DateTime value={certificate.revokedAt} /> : EMPTY_VALUE
               }
             />
             <DetailItem
-              label="Revocation Reason"
+              label={t("audit.revocationReason")}
               value={
                 certificate.revocationReason ? (
                   <span className="capitalize">

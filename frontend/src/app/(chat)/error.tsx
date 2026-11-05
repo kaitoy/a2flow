@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { RouteErrorFallback } from "@/components/ui/route-error-fallback";
+import { useT } from "@/i18n/provider";
 
 /**
  * Error boundary for `/sessions/new` and `/sessions/[sessionId]`. Renders
@@ -15,6 +16,7 @@ export default function RouteError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useT();
   useEffect(() => {
     console.error("uncaught render error", error);
   }, [error]);
@@ -24,7 +26,7 @@ export default function RouteError({
       reset={reset}
       fill="full"
       homeHref="/sessions/new"
-      homeLabel="Start a new chat"
+      homeLabel={t("chat.startANewChat")}
     />
   );
 }

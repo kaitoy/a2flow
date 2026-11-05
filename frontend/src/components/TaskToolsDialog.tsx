@@ -1,8 +1,11 @@
 /** @module TaskToolsDialog — modal listing a task's bound MCP tools and their servers. */
+"use client";
+
 import { animated, useTransition } from "@react-spring/web";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
+import { useT } from "@/i18n/provider";
 import type { ToolBinding } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 
@@ -34,6 +37,7 @@ export function TaskToolsDialog({
   serverNamesLoading,
   onClose,
 }: TaskToolsDialogProps) {
+  const t = useT();
   const open = task !== null;
   const config = useMotionConfig("gentle");
   const transitions = useTransition(open, {
@@ -84,7 +88,7 @@ export function TaskToolsDialog({
                   id="task-tools-dialog-title"
                   className="mb-1 font-display text-lg font-semibold tracking-tight text-on-surface"
                 >
-                  Bound tools
+                  {t("app.boundTools")}
                 </h2>
                 <p className="mb-4 truncate text-sm text-on-surface-variant">{task.title}</p>
                 <ul className="flex flex-col gap-2">
@@ -98,17 +102,17 @@ export function TaskToolsDialog({
                       </p>
                       <p className="mt-0.5 truncate text-xs text-on-surface-variant">
                         {serverNamesLoading
-                          ? "Loading server…"
-                          : (serverNames.get(binding.mcpServerId) ?? "Unknown server")}
+                          ? t("app.loadingServer")
+                          : (serverNames.get(binding.mcpServerId) ?? t("app.unknownServer"))}
                       </p>
                       {binding.requiresInputApproval === false && (
                         <p className="mt-0.5 text-xs text-on-surface-variant">
-                          Input needs no approval
+                          {t("app.inputNeedsNoApproval")}
                         </p>
                       )}
                       {binding.elicits && (
                         <p className="mt-0.5 text-xs text-on-surface-variant">
-                          Asks the initiator mid-call
+                          {t("app.asksTheInitiatorMidCall")}
                         </p>
                       )}
                     </li>
@@ -116,7 +120,7 @@ export function TaskToolsDialog({
                 </ul>
                 <div className="mt-4 flex justify-end">
                   <Button variant="ghost" onClick={onClose}>
-                    Close
+                    {t("common.close")}
                   </Button>
                 </div>
               </animated.div>

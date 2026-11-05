@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem } from "@/components/ui/detail-list";
 import { useTenantNames } from "@/hooks/useNames";
+import { useT } from "@/i18n/provider";
 import { getUserNames } from "@/lib/api";
 
 /** Props for {@link AuditMeta}: the audit fields shared by every persistent entity. */
@@ -44,6 +45,7 @@ export function AuditMeta({
   updatedAt,
   tenantId,
 }: AuditMetaProps) {
+  const t = useT();
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const tenantNames = useTenantNames(tenantId ? [tenantId] : []);
 
@@ -65,11 +67,17 @@ export function AuditMeta({
 
   return (
     <dl className="grid grid-cols-2 gap-4 rounded-xl glass-panel p-4 text-on-surface-variant">
-      {tenantId && <DetailItem label="Tenant" value={tenantNames.get(tenantId) ?? tenantId} />}
-      {createdAt && <DetailItem label="Created at" value={<DateTime value={createdAt} />} />}
-      <DetailItem label="Created by" value={nameOf(createdBy)} />
-      {updatedAt && <DetailItem label="Updated at" value={<DateTime value={updatedAt} />} />}
-      <DetailItem label="Updated by" value={nameOf(updatedBy)} />
+      {tenantId && (
+        <DetailItem label={t("common.tenant")} value={tenantNames.get(tenantId) ?? tenantId} />
+      )}
+      {createdAt && (
+        <DetailItem label={t("admin.createdAt")} value={<DateTime value={createdAt} />} />
+      )}
+      <DetailItem label={t("admin.createdBy2")} value={nameOf(createdBy)} />
+      {updatedAt && (
+        <DetailItem label={t("admin.updatedAt2")} value={<DateTime value={updatedAt} />} />
+      )}
+      <DetailItem label={t("admin.updatedBy2")} value={nameOf(updatedBy)} />
     </dl>
   );
 }

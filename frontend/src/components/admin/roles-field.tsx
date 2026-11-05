@@ -3,8 +3,9 @@
 
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { CheckboxGroup, type CheckboxOption } from "@/components/ui/checkbox-group";
+import { useT } from "@/i18n/provider";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
-import { ALL_ROLES, ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
+import { ALL_ROLES, Role, roleLabel, useHasRole } from "@/lib/roles";
 
 /** Props for {@link RolesField}. */
 export interface RolesFieldProps {
@@ -56,8 +57,9 @@ export function RolesField({
   onChange,
   readOnly = false,
   allowSuperAdmin = true,
-  label = "Roles",
+  label = "common.roles",
 }: RolesFieldProps) {
+  const t = useT();
   const viewerIsSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const showSuperAdmin = allowSuperAdmin && viewerIsSuperAdmin;
 
@@ -69,9 +71,9 @@ export function RolesField({
     const held = visibleRoles.filter((role) => value.includes(role));
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps">{label}</span>
+        <span className="text-label-caps">{t.maybe(label)}</span>
         <ReadOnlyField>
-          {held.length === 0 ? EMPTY_VALUE : held.map((role) => ROLE_LABELS[role]).join(", ")}
+          {held.length === 0 ? EMPTY_VALUE : held.map((role) => roleLabel(role)).join(", ")}
         </ReadOnlyField>
       </div>
     );
@@ -82,14 +84,14 @@ export function RolesField({
 
   const options: CheckboxOption[] = visibleRoles.map((role, i) => ({
     value: role,
-    label: ROLE_LABELS[role],
+    label: roleLabel(role),
     disabled: role === Role.SUPER_ADMIN ? holdsOtherRole : holdsSuperAdmin,
     dividerBefore: showSuperAdmin && i === 1,
   }));
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{label}</span>
+      <span className="text-label-caps">{t.maybe(label)}</span>
       <CheckboxGroup
         name="roles"
         options={options}
@@ -98,7 +100,7 @@ export function RolesField({
       />
       {showSuperAdmin && (
         <p className="text-xs text-on-surface-variant">
-          Super Admin can&apos;t be combined with other roles — uncheck it to change the others.
+          {t("admin.superAdminCantBeCombinedWithOther")}
         </p>
       )}
     </div>

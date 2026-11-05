@@ -13,12 +13,15 @@ import { formatFullTimestamp, formatRelativeTime } from "@/components/ui/date-ti
 import { Tooltip } from "@/components/ui/tooltip";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { DEFAULT_LOCALE } from "@/i18n/config";
+import { useT } from "@/i18n/provider";
 import {
   deleteNotification,
   listNotifications,
   type Notification,
   updateNotification,
 } from "@/lib/api";
+import { notificationText } from "@/lib/notification-text";
 import { useAppDispatch } from "@/store/hooks";
 import { markReadLocal, removeLocal } from "@/store/notificationsSlice";
 
@@ -27,17 +30,17 @@ const LIMIT = 20;
 
 /** Filter dropdown choices for the Type column, matching `NotificationType`. */
 const TYPE_OPTIONS = [
-  { value: "approval_request", label: "approval_request" },
-  { value: "execution_completed", label: "execution_completed" },
-  { value: "workflow_draft_ready", label: "workflow_draft_ready" },
-  { value: "workflow_generation_failed", label: "workflow_generation_failed" },
-  { value: "elicitation_request", label: "elicitation_request" },
+  { value: "approval_request", label: "notifications.type.approval_request" },
+  { value: "execution_completed", label: "notifications.type.execution_completed" },
+  { value: "workflow_draft_ready", label: "notifications.type.workflow_draft_ready" },
+  { value: "workflow_generation_failed", label: "notifications.type.workflow_generation_failed" },
+  { value: "elicitation_request", label: "notifications.type.elicitation_request" },
 ];
 
 /** Yes/No options for the Read column's boolean `eq` filter. */
 const READ_FILTER_OPTIONS = [
-  { label: "Yes", value: "true" },
-  { label: "No", value: "false" },
+  { label: "common.yes", value: "true" },
+  { label: "common.no", value: "false" },
 ];
 
 /** Render a boolean cell as a checkmark or an em dash. */
@@ -60,6 +63,7 @@ function boolCell(value: boolean): string {
  * into the slice so the bell stays in step.
  */
 export function NotificationList() {
+  const t = useT();
   const dispatch = useAppDispatch();
   const { rows, loading, offset, sort, filters, setOffset, setSort, setFilters, reload } =
     useTableQuery<Notification>((query) => listNotifications(query), { limit: LIMIT });
@@ -90,22 +94,24 @@ export function NotificationList() {
 
   const columns: ColumnDef<Notification>[] = [
     {
-      header: "Title",
-      sortField: "title",
-      filterField: "title",
+      header: "common.title",
+      // ponytail: the server sorts and filters the stored English, which would read
+      // as noise against translated titles, so both are English-only. Translating
+      // them would mean storing every title once per language.
+      ...(t.locale === DEFAULT_LOCALE ? { sortField: "title", filterField: "title" } : {}),
       visibility: "always",
-      cell: (n) => n.title,
+      cell: (n) => notificationText(n, t).title,
     },
     {
-      header: "Type",
+      header: "common.type",
       sortField: "type",
       filterField: "type",
       filterOp: "eq",
       filterOptions: TYPE_OPTIONS,
-      cell: (n) => n.type,
+      cell: (n) => t.maybe(`notifications.type.${n.type}`),
     },
     {
-      header: "Read",
+      header: "common.read",
       sortField: "read",
       filterField: "read",
       filterOp: "eq",
@@ -114,16 +120,16 @@ export function NotificationList() {
       cell: (n) => boolCell(n.read ?? false),
     },
     {
-      header: "Created",
+      header: "notifications.created",
       sortField: "createdAt",
       cell: (n) => (
         <Tooltip label={formatFullTimestamp(n.createdAt)}>
-          <span>{formatRelativeTime(n.createdAt)}</span>
+          <span>{formatRelativeTime(n.createdAt, t)}</span>
         </Tooltip>
       ),
     },
     {
-      header: "Actions",
+      header: "common.actions",
       noTruncate: true,
       visibility: "always",
       cell: (n) => (
@@ -131,7 +137,7 @@ export function NotificationList() {
           {!n.read && (
             <ActionIconButton
               icon={Check}
-              label="Mark as read"
+              label={t("common.markAsRead")}
               onClick={() => void handleMarkRead(n.id)}
             />
           )}
@@ -155,7 +161,7 @@ export function NotificationList() {
           section title doubles as the toolbar row. */}
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-lg font-semibold tracking-tight text-on-surface">
-          Notifications
+          {t("common.notifications")}
         </h2>
         <ColumnPicker
           options={options}
@@ -169,7 +175,7 @@ export function NotificationList() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No notifications yet."
+        emptyMessage={t("notifications.noNotificationsYet")}
         emptyIcon={Bell}
         getRowKey={(n) => n.id}
         sort={sort}
@@ -186,8 +192,14 @@ export function NotificationList() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete notification"
-        description={confirmTarget ? `Delete "${confirmTarget.title}"? This cannot be undone.` : ""}
+        title={t("notifications.deleteNotification")}
+        description={
+          confirmTarget
+            ? t("notifications.deleteTitleThisCannotBeUndone", {
+                title: notificationText(confirmTarget, t).title,
+              })
+            : ""
+        }
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

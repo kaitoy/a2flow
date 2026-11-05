@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ColumnDef } from "@/components/ui/data-table";
+import type { MessageKey } from "@/i18n/messages/en";
 import { useColumnVisibility } from "./useColumnVisibility";
 
 interface Row {
@@ -12,10 +13,10 @@ const cell = (r: Row) => r.id;
 /** A table with one column of each visibility, plus an unlabeled always-on column. */
 const COLUMNS: ColumnDef<Row>[] = [
   { header: "", visibility: "always", cell },
-  { header: "Name", visibility: "always", cell },
-  { header: "Type", cell },
-  { header: "Reference", visibility: "optional", cell },
-  { header: "Actions", visibility: "always", cell },
+  { header: "Name" as MessageKey, visibility: "always", cell },
+  { header: "Type" as MessageKey, cell },
+  { header: "Reference" as MessageKey, visibility: "optional", cell },
+  { header: "Actions" as MessageKey, visibility: "always", cell },
 ];
 
 /** Headers of the columns the hook says to render. */

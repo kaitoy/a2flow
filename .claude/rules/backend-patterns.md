@@ -440,6 +440,7 @@ Error codes are uppercase `SCREAMING_SNAKE_CASE` strings. The current set is doc
 
 1. Add it to `backend/repositories/exceptions.py` as an `HttpMappedError` (or `RepositoryError`) subclass with `code` and `http_status` class attributes; override `details()` for the envelope's `details` block, and `public_message()` + `log()` when the raw message must stay server-side.
 2. Append a row to the Error Mapping table above with the new HTTP status and `code`.
+3. Add `errors.<CODE>` to every catalog in `frontend/src/i18n/messages/`: outside English the UI shows that text rather than the backend's message, and a code it does not know falls back to the English message.
 
 ---
 

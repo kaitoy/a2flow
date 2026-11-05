@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { login } from "@/lib/api";
 import { persistImpersonatedUserId } from "@/lib/impersonation";
 import { clearImpersonation, setUser } from "@/store/authSlice";
@@ -22,6 +23,7 @@ import { useAppDispatch } from "@/store/hooks";
  * welcome page at `/`.
  */
 export default function LoginPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [username, setUsername] = useState("");
@@ -63,18 +65,18 @@ export default function LoginPage() {
         <div className="flex flex-col items-center gap-3">
           <Image
             src={logo}
-            alt="A2Flow logo"
+            alt={t("common.a2flowLogo")}
             width={logo.width}
             height={logo.height}
             className="h-12 w-auto"
             priority
           />
           <h1 className="font-display text-2xl font-semibold tracking-tight text-gradient-accent">
-            Sign in to A2Flow
+            {t("login.signInToA2flow")}
           </h1>
         </div>
 
-        <FormField htmlFor="username" label="Username" required>
+        <FormField htmlFor="username" label={t("common.username")} required>
           <Input
             id="username"
             name="username"
@@ -86,21 +88,21 @@ export default function LoginPage() {
           />
         </FormField>
 
-        <FormField htmlFor="tenantName" label="Tenant">
+        <FormField htmlFor="tenantName" label={t("common.tenant")}>
           <Input
             id="tenantName"
             name="tenantName"
             autoComplete="organization"
             value={tenantName}
             onChange={(e) => setTenantName(e.target.value)}
-            placeholder="e.g. acme-corp"
+            placeholder={t("login.eGAcmeCorp")}
           />
           <p className="mt-1 text-xs text-on-surface-variant">
-            Leave blank if you sign in as a platform administrator.
+            {t("login.leaveBlankIfYouSignInAs")}
           </p>
         </FormField>
 
-        <FormField htmlFor="password" label="Password" required>
+        <FormField htmlFor="password" label={t("common.password")} required>
           <PasswordInput
             id="password"
             name="password"
@@ -116,10 +118,10 @@ export default function LoginPage() {
           variant="primary"
           disabled={signIn.inFlight}
           status={signIn.status}
-          pendingLabel="Signing in…"
+          pendingLabel={t("login.signingIn")}
           className="w-full"
         >
-          Sign in
+          {t("login.signIn")}
         </Button>
       </form>
     </main>

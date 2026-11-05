@@ -1,6 +1,7 @@
 import { createComponentImplementation } from "@a2ui/react/v0_9";
 import { ChoicePickerApi } from "@a2ui/web_core/v0_9/basic_catalog";
 import { useState } from "react";
+import { useT } from "@/i18n/provider";
 import { Select } from "../ui/select";
 import { useSurfaceResolved } from "./surfaceResolvedContext";
 
@@ -13,7 +14,7 @@ import { useSurfaceResolved } from "./surfaceResolvedContext";
 const DROPDOWN_OPTION_THRESHOLD = 5;
 
 /** Trigger text shown by the dropdown while nothing is selected yet. */
-const DROPDOWN_PLACEHOLDER = "Select an option";
+const DROPDOWN_PLACEHOLDER = "ui.selectAnOption";
 
 /**
  * A2UI ChoicePicker implementation with dropdown, chips and radio/checkbox display styles
@@ -28,6 +29,7 @@ const DROPDOWN_PLACEHOLDER = "Select an option";
 export const customChoicePicker = createComponentImplementation(
   ChoicePickerApi,
   ({ props, context }) => {
+    const t = useT();
     const [filter, setFilter] = useState("");
     const resolved = useSurfaceResolved();
     const values = Array.isArray(props.value) ? props.value : [];
@@ -81,7 +83,7 @@ export const customChoicePicker = createComponentImplementation(
         {props.filterable && (
           <input
             type="text"
-            placeholder="Filter options..."
+            placeholder={t("a2ui.filterOptions")}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="rounded-xl glass-panel px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-accent/50"

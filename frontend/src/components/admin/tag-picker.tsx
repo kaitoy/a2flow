@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 import { resolveTagColor } from "@/lib/tag-palette";
 
@@ -52,7 +53,13 @@ export interface TagPickerProps {
  * record being loaded and this list being fetched, and quietly discarding it
  * would save the record with a tag the user never chose to remove.
  */
-export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }: TagPickerProps) {
+export function TagPicker({
+  value,
+  onChange,
+  readOnly = false,
+  label = "common.tags",
+}: TagPickerProps) {
+  const t = useT();
   const { tags, byId, loading } = useTags();
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
@@ -90,7 +97,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
   if (readOnly) {
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps">{label}</span>
+        <span className="text-label-caps">{t.maybe(label)}</span>
         {chips}
       </div>
     );
@@ -98,7 +105,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{label}</span>
+      <span className="text-label-caps">{t.maybe(label)}</span>
       {chips}
       {loading ? (
         <Skeleton className="h-9 w-40 rounded-xl" />
@@ -106,11 +113,13 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
         // Shown in place of the button rather than inside the dialog: there is
         // nothing to pick, so opening one would be a dead end.
         <p className="rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant">
-          No tags are registered yet.{" "}
-          <Link href="/tags" className="text-accent transition-colors hover:underline">
-            Create one
-          </Link>{" "}
-          to start classifying records.
+          {t.rich("admin.noTagsAreRegisteredYetLink1To", {
+            link1: (
+              <Link href="/tags" className="text-accent transition-colors hover:underline">
+                {t("admin.createOne")}
+              </Link>
+            ),
+          })}
         </p>
       ) : (
         <div>
@@ -122,7 +131,7 @@ export function TagPicker({ value, onChange, readOnly = false, label = "Tags" }:
               setOpen(true);
             }}
           >
-            Select tags…
+            {t("admin.selectTags2")}
           </Button>
         </div>
       )}

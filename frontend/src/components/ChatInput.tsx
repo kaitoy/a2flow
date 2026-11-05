@@ -5,6 +5,7 @@ import { Paperclip } from "lucide-react";
 import { type DragEvent, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useT } from "@/i18n/provider";
 import { useMotionConfig } from "@/lib/motion";
 import { formatFileSize, MAX_ATTACHMENT_BYTES } from "@/lib/sessionFileTool";
 import { Button } from "./ui/button";
@@ -73,6 +74,7 @@ export function ChatInput({
   allowAttachments = false,
   suggestions = [],
 }: Props) {
+  const t = useT();
   const coarsePointer = useMediaQuery("(pointer: coarse)");
   const [value, setValue] = useState("");
   const [files, setFiles] = useState<StagedFile[]>([]);
@@ -197,7 +199,7 @@ export function ChatInput({
       >
         {suggestions.length > 0 && !disabled && (
           <fieldset className="flex min-w-0 flex-wrap gap-1.5 px-1 pt-1">
-            <legend className="sr-only">Suggested replies</legend>
+            <legend className="sr-only">{t("app.suggestedReplies")}</legend>
             {suggestions.map((text) => (
               <Chip key={text} label={text} onClick={() => applySuggestion(text)} />
             ))}
@@ -237,7 +239,7 @@ export function ChatInput({
               />
               <button
                 type="button"
-                aria-label="Attach files"
+                aria-label={t("app.attachFiles")}
                 disabled={disabled}
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center self-end rounded-full text-on-surface-variant transition-colors duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)] hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -252,9 +254,7 @@ export function ChatInput({
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
-            placeholder={
-              coarsePointer ? "Message…" : "Message…  (Ctrl/⌘+Enter to send · Enter for newline)"
-            }
+            placeholder={coarsePointer ? t("app.message") : t("app.messageCtrlEnterToSendEnterFor")}
             disabled={disabled}
             rows={1}
             className="flex-1 resize-none max-h-40 overflow-y-auto !border-transparent !bg-transparent !shadow-none focus:!ring-0"
@@ -265,7 +265,7 @@ export function ChatInput({
             disabled={!canSend}
             className="shrink-0 self-end"
           >
-            Send
+            {t("app.send")}
           </Button>
         </div>
       </animated.div>

@@ -4,6 +4,7 @@ import { ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link AccessDeniedState}. */
 export interface AccessDeniedStateProps {
@@ -24,18 +25,24 @@ export interface AccessDeniedStateProps {
  * page it replaces is reachable from more than one place.
  */
 export function AccessDeniedState({
-  title = "Access denied",
-  description = "You don't have permission to view this page.",
+  title = "ui.accessDenied",
+  description = "ui.noPermissionToViewPage",
   fill,
 }: AccessDeniedStateProps) {
+  const t = useT();
   const router = useRouter();
   return (
     <div
       className={`flex ${fill === "screen" ? "h-dvh" : "h-full"} flex-col items-center justify-center gap-4`}
     >
-      <EmptyState icon={ShieldAlert} animation="none" title={title} description={description} />
+      <EmptyState
+        icon={ShieldAlert}
+        animation="none"
+        title={t.maybe(title)}
+        description={t.maybe(description)}
+      />
       <Button variant="secondary" onClick={() => router.back()}>
-        Go back
+        {t("ui.goBack")}
       </Button>
     </div>
   );

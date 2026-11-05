@@ -19,6 +19,7 @@ What each screen does, from the user's side, is in the manual at
 | HTTP | Fetch API (REST) / @ag-ui/client (SSE streaming) |
 | AG-UI | @ag-ui/client + @ag-ui/core + @ag-ui/a2ui-middleware |
 | A2UI | @a2ui/react + @a2ui/web_core |
+| i18n | Typed catalogs + React context + `Intl`, in `src/i18n/` (see [Translating the GUI](#translating-the-gui)) |
 | Package manager | pnpm |
 
 ## Requirements
@@ -94,6 +95,44 @@ The directory layout and where each kind of code lives is documented in [.claude
 7. A workflow execution's session works differently: the backend runs every turn itself, so `useExecutionSessionChat` never runs the agent. It reads the session's history (`getExecutionSessionHistory`, which also returns a `streamCursor`, and `running` while a turn is queued or under way — the hook then shows the agent working at once, and the turn's message is already appended to the history), then subscribes with `createSessionStreamAgent` — an `HttpAgent` that `GET`s the session's stream after that cursor, with the same `A2UIMiddleware` so streamed `render_a2ui` calls still become surfaces. The stream ends with each turn; the hook re-reads the history and subscribes again. Sending a message or answering a form posts it to the session's input endpoint (`sendSessionInput`) for the server to run. A question an MCP server asks mid-call arrives as an `mcp_elicitation` activity in the running turn's stream; `ElicitationControls` renders its form and answers it with `answerSessionElicitation`, which the still-running turn picks up by itself. Such a question only comes after the session was `waiting_for_initiator` and the initiator pressed **Resume** in `InitiatorResumeNotice` — which just sends a chat message, the turn the backend lets the held task start on. The design session still uses the browser-driven path above (`useDesignSessionChat`).
 
 For the full end-to-end A2UI flow (build-time schema download → tool injection → LLM call → event conversion → rendering → action feedback loop), see [docs/a2ui-flow.md](../docs/a2ui-flow.md).
+
+## Translating the GUI
+
+The screens come in `en`, `ja`, `es`, `zh-CN`, `ko` and `fr`, through a small layer in `src/i18n/` with no i18n library.
+
+| File | Holds |
+|---|---|
+| `messages/en.ts` | The English text, which also defines the keys |
+| `messages/<locale>.ts` | Each translation, typed so a missing or extra key fails the build |
+| `config.ts` | The language list, and matching a browser's preference onto it |
+| `translate.ts` | `{name}` placeholders, plurals via `Intl.PluralRules`, `t.rich` for embedded nodes |
+| `provider.tsx`, `locale-sync.tsx` | The language on screen, and following the signed-in user's setting |
+| `server.ts` | Resolving a request's language from the `a2flow.locale` cookie, then `Accept-Language` |
+
+Use `{ one, other }` for a message with a count; a language without plural forms gives `other` alone. A test checks that every language uses the same placeholders as English.
+
+**Adding a language** means a new value in the backend's `Language` literal (`backend/models/user.py`), a new entry in `LOCALE_NAMES`, a catalog, a loader line in `load.ts`, and the strings in `app/global-error.tsx`, which carries its own.
+
+### Glossary
+
+Keep these consistent when adding text. Japanese follows the manual under `website/i18n/ja/`.
+
+| English | ja | es | zh-CN | ko | fr |
+|---|---|---|---|---|---|
+| Workflow | ワークフロー | flujo de trabajo | 工作流 | 워크플로 | workflow |
+| Task | タスク | tarea | 任务 | 작업 | tâche |
+| Task template | タスクテンプレート | plantilla de tarea | 任务模板 | 작업 템플릿 | modèle de tâche |
+| Workflow execution | ワークフロー実行 | ejecución | 工作流执行 | 워크플로 실행 | exécution |
+| Approval | 承認 | aprobación | 审批 | 승인 | approbation |
+| Agent skill | エージェントスキル | skill de agente | 代理技能 | 에이전트 스킬 | compétence d'agent |
+| Tool mock | ツールモック | mock de herramienta | 工具模拟 | 도구 모의 | simulacre d'outil |
+| Secret | シークレット | secreto | 密钥 | 시크릿 | secret |
+| Knowledge base | ナレッジベース | base de conocimiento | 知识库 | 지식 베이스 | base de connaissances |
+| Tag | タグ | etiqueta | 标签 | 태그 | étiquette |
+| User group | ユーザーグループ | grupo de usuarios | 用户组 | 사용자 그룹 | groupe d'utilisateurs |
+| Tenant | テナント | tenant | 租户 | 테넌트 | tenant |
+| Role | ロール | rol | 角色 | 역할 | rôle |
+| Impersonate | 代理ログイン | suplantar | 代理登录 | 대리 로그인 | agir en tant que |
 
 ## Testing
 

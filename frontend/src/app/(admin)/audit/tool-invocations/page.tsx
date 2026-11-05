@@ -25,6 +25,8 @@ import {
   useWorkflowTaskNames,
 } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
+import { translateStatus } from "@/i18n/translate";
 import { listMcpServers, listMcpToolInvocations, type McpToolInvocation } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -36,8 +38,8 @@ const SERVER_LIMIT = 1000;
 
 /** Filter options for the proxy's verdict. */
 const DECISION_OPTIONS = [
-  { label: "Allowed", value: "allowed" },
-  { label: "Denied", value: "denied" },
+  { label: "common.allowed", value: "allowed" },
+  { label: "common.denied", value: "denied" },
 ];
 
 /**
@@ -54,6 +56,7 @@ const DECISION_OPTIONS = [
  * one spans every run in the tenant and is admin-only for that reason.
  */
 export default function AuditToolInvocationsPage() {
+  const t = useT();
   const {
     rows,
     loading,
@@ -92,7 +95,7 @@ export default function AuditToolInvocationsPage() {
       ...(isAllTenantsView ? [tenantColumn<McpToolInvocation>(tenantNames)] : []),
       idColumn<McpToolInvocation>(),
       {
-        header: "Tool",
+        header: "common.tool",
         sortField: "toolName",
         filterField: "toolName",
         visibility: "always",
@@ -106,27 +109,27 @@ export default function AuditToolInvocationsPage() {
         ),
       },
       {
-        header: "Server",
+        header: "common.server",
         cell: (r) =>
           r.mcpServerId
             ? (serverNameById.get(r.mcpServerId) ?? `${r.mcpServerId.slice(0, 8)}…`)
             : EMPTY_VALUE,
       },
       {
-        header: "Decision",
+        header: "common.decision",
         noTruncate: true,
         sortField: "decision",
         filterField: "decision",
         filterOp: "eq",
         filterOptions: DECISION_OPTIONS,
-        cell: (r) => <Badge>{r.decision}</Badge>,
+        cell: (r) => <Badge>{translateStatus(r.decision, t)}</Badge>,
       },
       {
-        header: "Denial Reason",
+        header: "common.denialReason",
         cell: (r) => r.denialReason || EMPTY_VALUE,
       },
       {
-        header: "Workflow Execution",
+        header: "common.workflowExecution",
         cell: (r) =>
           r.workflowExecutionId ? (
             <Link
@@ -140,19 +143,19 @@ export default function AuditToolInvocationsPage() {
           ),
       },
       {
-        header: "Created At",
+        header: "common.createdAt",
         sortField: "createdAt",
         cell: (r) => <DateTime value={r.createdAt} className="text-on-surface-variant" />,
       },
       {
         // The raw arguments are deliberately never stored: this is a SHA-256 of
         // their canonical JSON, which is what the presented signature covers.
-        header: "Arguments Digest",
+        header: "common.argumentsDigest",
         visibility: "optional",
         cell: (r) => <span className="font-mono text-xs">{r.argumentsDigest.slice(0, 16)}…</span>,
       },
       {
-        header: "Task",
+        header: "common.task",
         visibility: "optional",
         cell: (r) => {
           if (!r.workflowTaskId) return EMPTY_VALUE;
@@ -173,7 +176,7 @@ export default function AuditToolInvocationsPage() {
         },
       },
       {
-        header: "Approval",
+        header: "common.approval",
         visibility: "optional",
         cell: (r) =>
           r.approvalId ? (
@@ -188,25 +191,34 @@ export default function AuditToolInvocationsPage() {
           ),
       },
       {
-        header: "Certificate",
+        header: "common.certificate",
         visibility: "optional",
         filterField: "certificateSerial",
         cell: (r) => r.certificateSerial || EMPTY_VALUE,
       },
       {
-        header: "Signed At",
+        header: "common.signedAt",
         visibility: "optional",
         noTruncate: true,
         cell: (r) => (r.signedAt ? <DateTime value={r.signedAt} /> : EMPTY_VALUE),
       },
       {
-        header: "Session",
+        header: "common.session",
         visibility: "optional",
         cell: (r) => <span className="font-mono text-xs">{r.sessionId}</span>,
       },
       ...auditColumns<McpToolInvocation>(names),
     ],
-    [serverNameById, names, executionNames, taskNames, approvalNames, tenantNames, isAllTenantsView]
+    [
+      serverNameById,
+      names,
+      executionNames,
+      taskNames,
+      approvalNames,
+      tenantNames,
+      isAllTenantsView,
+      t,
+    ]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -218,14 +230,14 @@ export default function AuditToolInvocationsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Audit Logs", href: "/audit" },
-          { label: "Tool Invocations" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.auditLogs"), href: "/audit" },
+          { label: t("common.toolInvocations") },
         ]}
       />
       <AuditTabs active="tool-invocations" />
       <AdminPageHeader
-        title="Tool Invocations"
+        title={t("common.toolInvocations")}
         icon={ShieldCheck}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -243,7 +255,7 @@ export default function AuditToolInvocationsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No MCP tool calls have been recorded yet."
+        emptyMessage={t("audit.noMcpToolCallsHaveBeenRecorded")}
         emptyIcon={ShieldCheck}
         getRowKey={(r) => r.id}
         sort={sort}

@@ -1,4 +1,7 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n/provider";
 
 /** Per-column skeleton widths cycle through this list, matching {@link DataTable}'s own loading rows. */
 const SKELETON_WIDTHS = ["w-24", "w-32", "w-20", "w-28", "w-16"];
@@ -15,12 +18,13 @@ const SKELETON_WIDTHS = ["w-24", "w-32", "w-20", "w-28", "w-16"];
  * @param rows - Number of placeholder rows to render. Defaults to 5.
  */
 export function AdminListSkeleton({ columns, rows = 5 }: { columns: string[]; rows?: number }) {
+  const t = useT();
   return (
     <div
       className="overflow-hidden rounded-2xl glass-panel"
       role="status"
       aria-busy="true"
-      aria-label="Loading"
+      aria-label={t("common.loading")}
     >
       <table className="w-full border-collapse text-sm">
         <thead className="bg-glass-strong/70 backdrop-blur-md">

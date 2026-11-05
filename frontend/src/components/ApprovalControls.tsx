@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import {
   type ApprovalDetail,
   type ApprovalStatus,
@@ -23,9 +24,9 @@ type Decision = Extract<ApprovalStatus, "approved" | "rejected" | "returned">;
 
 /** How each decision is labelled and coloured once recorded. */
 const DECISION_DISPLAY: Record<Decision, { label: string; className: string }> = {
-  approved: { label: "Approved", className: "text-accent" },
-  rejected: { label: "Rejected", className: "text-error" },
-  returned: { label: "Returned for rework", className: "text-alert" },
+  approved: { label: "app.approved", className: "text-accent" },
+  rejected: { label: "app.rejected", className: "text-error" },
+  returned: { label: "app.returnedForRework", className: "text-alert" },
 };
 
 /**
@@ -71,6 +72,7 @@ export function ApprovalControls({
   toolCallId: string;
   onResolved?: (toolCallId: string, decision: Decision) => void;
 }) {
+  const t = useT();
   const user = useAppSelector((s) => s.auth.user);
   const currentUserId = user?.id ?? null;
   const [status, setStatus] = useState<ApprovalStatus>("pending");
@@ -155,47 +157,47 @@ export function ApprovalControls({
       <Textarea
         className="mt-3"
         rows={2}
-        placeholder="Comment (optional)"
+        placeholder={t("app.commentOptional")}
         value={comment}
         disabled={action.inFlight}
         onChange={(e) => setComment(e.target.value)}
-        aria-label="Comment"
+        aria-label={t("common.comment")}
       />
       <div className="mt-3 flex gap-2">
         <Button
           variant="primary"
           disabled={action.inFlight}
           status={pendingDecision === "approved" ? action.status : "idle"}
-          pendingLabel="Approving…"
+          pendingLabel={t("app.approving")}
           onClick={() => resolve("approved")}
         >
-          Approve
+          {t("app.approve")}
         </Button>
         <Button
           variant="secondary"
           disabled={action.inFlight}
           status={pendingDecision === "rejected" ? action.status : "idle"}
-          pendingLabel="Rejecting…"
+          pendingLabel={t("app.rejecting")}
           onClick={() => resolve("rejected")}
         >
-          Reject
+          {t("app.reject")}
         </Button>
         <Button
           variant="secondary"
           disabled={action.inFlight}
           status={pendingDecision === "returned" ? action.status : "idle"}
-          pendingLabel="Returning…"
+          pendingLabel={t("app.returning")}
           onClick={() => resolve("returned")}
         >
-          Return
+          {t("app.return")}
         </Button>
       </div>
     </>
   ) : (
     <p className="mt-3 text-sm text-on-surface-variant">
       {approverGroupId != null
-        ? "Waiting for a decision from the approver group."
-        : "Waiting for the approver's decision."}
+        ? t("app.waitingForADecisionFromTheApprover")
+        : t("app.waitingForTheApproversDecision")}
     </p>
   );
 
@@ -216,7 +218,7 @@ export function ApprovalControls({
         // Another member of the approver group got there first. Re-read the
         // approval so the bubble shows their decision instead of stale
         // controls, and do not resume the run -- their decision already did.
-        setError("Another approver already decided this request.");
+        setError(t("app.anotherApproverAlreadyDecidedThisRequest"));
         try {
           const latest = await getApproval(approvalId);
           if (latest.status) setStatus(latest.status);
@@ -228,14 +230,14 @@ export function ApprovalControls({
         return;
       }
       console.error("failed to resolve approval", err);
-      setError("Failed to record your decision. Please try again.");
+      setError(t("app.failedToRecordYourDecisionPleaseTry"));
     }
   };
 
   return (
     <div className="glass-panel rounded-2xl p-4">
       <h3 className="text-sm font-semibold tracking-tight text-on-surface">
-        {title ?? "Approval requested"}
+        {title ?? t("app.approvalRequested")}
       </h3>
       {description && <p className="mt-1 text-sm text-on-surface-variant">{description}</p>}
 
@@ -251,9 +253,13 @@ export function ApprovalControls({
               DECISION_DISPLAY[status as Decision]?.className ?? "text-on-surface-variant",
             ].join(" ")}
           >
-            {DECISION_DISPLAY[status as Decision]?.label ?? status}
+            {t.maybe(DECISION_DISPLAY[status as Decision]?.label ?? status)}
           </p>
-          {deciderName && <p className="mt-1 text-sm text-on-surface-variant">by {deciderName}</p>}
+          {deciderName && (
+            <p className="mt-1 text-sm text-on-surface-variant">
+              {t("app.byDecidername", { deciderName })}
+            </p>
+          )}
           {resolvedComment && (
             <p className="mt-1 text-sm text-on-surface-variant">{resolvedComment}</p>
           )}

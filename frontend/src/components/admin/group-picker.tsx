@@ -13,6 +13,7 @@ import { RecordPickerField } from "@/components/admin/record-picker-field";
 import { userGroupSharedColumns } from "@/components/admin/user-group-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import { listUserGroups, type UserGroup } from "@/lib/api";
 
 /**
@@ -21,7 +22,7 @@ import { listUserGroups, type UserGroup } from "@/lib/api";
  * via {@link userGroupSharedColumns}.
  */
 const NAME_COLUMN: ColumnDef<UserGroup> = {
-  header: "Name",
+  header: "common.name",
   sortField: "name",
   filterField: "name",
   visibility: "always",
@@ -47,6 +48,7 @@ export function GroupPicker({
   readOnly = false,
   initialOptions,
 }: GroupPickerProps) {
+  const t = useT();
   const { byId: tagsById } = useTags();
   // The dialog table has no `onTagIdsChange`, so the Tags column here shows
   // read-only chips — a group's tags are picked on its own detail page.
@@ -65,7 +67,7 @@ export function GroupPicker({
 
   return (
     <RecordPickerField<UserGroup>
-      label="Groups"
+      label={t("common.groups")}
       value={value}
       onChange={onChange}
       readOnly={readOnly}
@@ -76,9 +78,9 @@ export function GroupPicker({
       getId={(group) => group.id}
       getLabel={(group) => group.name}
       panelId="group-picker-dialog"
-      dialogTitle="Select groups"
-      selectLabel="Select groups…"
-      emptyMessage="This tenant has no user groups yet."
+      dialogTitle={t("admin.selectGroups")}
+      selectLabel={t("admin.selectGroups2")}
+      emptyMessage={t("admin.thisTenantHasNoUserGroupsYet")}
       emptyIcon={UsersRound}
     />
   );

@@ -1,4 +1,6 @@
 /** @module RegistrySearchDialog — modal to search the official MCP registry. */
+"use client";
+
 import { PackageSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { type McpRegistryServerEntry, searchMcpRegistry } from "@/lib/api";
 
 /** Props for {@link RegistrySearchDialog}. */
@@ -31,6 +34,7 @@ const DEBOUNCE_MS = 300;
  * result is selectable.
  */
 export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearchDialogProps) {
+  const t = useT();
   const [term, setTerm] = useState("");
   const [query, setQuery] = useState("");
   const [servers, setServers] = useState<McpRegistryServerEntry[]>([]);
@@ -96,31 +100,29 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
       open={open}
       onClose={onClose}
       panelId="registry-search-dialog"
-      title="Browse MCP Registry"
-      description="Search the official MCP registry by name. Only servers A2Flow can register are shown: those reachable over streamable HTTP, and those published as an npm or PyPI package it can launch over stdio."
+      title={t("admin.browseMcpRegistry")}
+      description={t("admin.searchTheOfficialMcpRegistryByName")}
       size="lg"
       scrollable
       footer={
         <Button variant="ghost" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
       }
     >
       <Input
         value={term}
         onChange={(e) => setTerm(e.target.value)}
-        placeholder="e.g. github, weather, search…"
-        aria-label="Search the MCP registry"
+        placeholder={t("admin.eGGithubWeatherSearch")}
+        aria-label={t("admin.searchTheMcpRegistry")}
       />
 
       <div className="mt-4 flex-1 overflow-y-auto">
         {servers.length === 0 ? (
           <EmptyState
             icon={PackageSearch}
-            title={loading ? "Searching…" : "No servers found"}
-            description={
-              loading ? undefined : "Try a different name, or check back as the registry grows."
-            }
+            title={loading ? t("admin.searching") : t("admin.noServersFound")}
+            description={loading ? undefined : t("admin.tryADifferentNameOrCheckBack")}
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -149,7 +151,7 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
                   </p>
                 </div>
                 <Button variant="primary" className="shrink-0" onClick={() => onSelect(server)}>
-                  Use this
+                  {t("admin.useThis")}
                 </Button>
               </li>
             ))}
@@ -163,9 +165,9 @@ export function RegistrySearchDialog({ open, onClose, onSelect }: RegistrySearch
               onClick={loadMore}
               disabled={loadMoreAction.inFlight}
               status={loadMoreAction.status}
-              pendingLabel="Loading…"
+              pendingLabel={t("admin.loading")}
             >
-              Load more
+              {t("admin.loadMore")}
             </Button>
           </div>
         )}

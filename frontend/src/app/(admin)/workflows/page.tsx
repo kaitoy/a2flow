@@ -26,6 +26,8 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   deleteWorkflow,
@@ -88,13 +90,14 @@ function buildColumns(
   tagsById: Map<string, Tag>,
   tenantNames: Map<string, string>,
   isAllTenantsView: boolean,
-  canViewPrompt: boolean
+  canViewPrompt: boolean,
+  t: Translator
 ): ColumnDef<Workflow>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<Workflow>(tenantNames)] : []),
     idColumn<Workflow>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -114,7 +117,7 @@ function buildColumns(
     },
     {
       // Resolved from agentSkillId to a display name; not a real column, so no sort/filter.
-      header: "Agent Skill",
+      header: "common.agentSkill",
       cell: (w) => (
         <Link
           href={`/agent-skills/${w.agentSkillId}`}
@@ -125,7 +128,7 @@ function buildColumns(
       ),
     },
     {
-      header: "Status",
+      header: "common.status" as const,
       sortField: "status",
       filterField: "status",
       filterOp: "eq",
@@ -137,7 +140,7 @@ function buildColumns(
       cell: (w) => <StatusCell workflow={w} />,
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       sortField: "description",
       filterField: "description",
       cell: (w) => w.description || "—",
@@ -146,7 +149,7 @@ function buildColumns(
     ...(canViewPrompt
       ? [
           {
-            header: "Prompt",
+            header: "common.prompt" as const,
             sortField: "prompt",
             filterField: "prompt",
             visibility: "optional" as const,
@@ -157,12 +160,12 @@ function buildColumns(
         ]
       : []),
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       cell: (w) => <DateTime value={w.createdAt} className="text-on-surface-variant" />,
     },
     {
-      header: "Agent Skill Commit SHA",
+      header: "workflows.agentSkillCommitSha" as const,
       visibility: "optional",
       className: "font-mono",
       cell: (w) => formatRevision(w.agentSkillCommitSha),
@@ -170,7 +173,7 @@ function buildColumns(
     ...auditColumns<Workflow>(names),
     tagsColumn<Workflow>((w) => w.tagIds, tagsById),
     {
-      header: "Actions",
+      header: "common.actions" as const,
       noTruncate: true,
       visibility: "always",
       cell: (w) => (
@@ -178,7 +181,7 @@ function buildColumns(
           {permissions.canEdit && (
             <ActionIconButton
               icon={MessageSquareText}
-              label="Open design session"
+              label={t("workflows.openDesignSession")}
               onClick={() => onOpenDesign(w.id)}
               disabled={w.status === "generating"}
             />
@@ -186,7 +189,7 @@ function buildColumns(
           {permissions.canRun && (
             <ActionIconButton
               icon={runningId === w.id ? Loader2 : Play}
-              label="Run"
+              label={t("common.run")}
               onClick={() => onRun(w)}
               // Published workflows are executable by anyone with Run access;
               // drafts are executable only by someone who can also edit
@@ -203,6 +206,7 @@ function buildColumns(
 }
 
 export default function WorkflowsPage() {
+  const t = useT();
   const router = useRouter();
   const canRun = useHasRole(Role.REQUESTER, Role.DEVELOPER);
   const canEdit = useHasRole(Role.DEVELOPER);
@@ -305,7 +309,8 @@ export default function WorkflowsPage() {
     tagsById,
     tenantNames,
     isAllTenantsView,
-    canViewPrompt
+    canViewPrompt,
+    t
   );
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflows",
@@ -314,9 +319,11 @@ export default function WorkflowsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Workflows" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.workflows") }]}
+      />
       <AdminPageHeader
-        title="Workflows"
+        title={t("common.workflows")}
         icon={WorkflowIcon}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -334,7 +341,7 @@ export default function WorkflowsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No workflows registered yet."
+        emptyMessage={t("workflows.noWorkflowsRegisteredYet")}
         emptyIcon={WorkflowIcon}
         getRowKey={(w) => w.id}
         sort={sort}
@@ -353,8 +360,8 @@ export default function WorkflowsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Workflow"
-        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        title={t("workflows.deleteWorkflow")}
+        description={confirmTarget ? t("common.deleteName", { name: confirmTarget.name }) : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

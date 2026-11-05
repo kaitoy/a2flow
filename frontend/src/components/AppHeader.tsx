@@ -11,6 +11,7 @@ import { ImpersonationIndicator } from "@/components/ImpersonationIndicator";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfileButton } from "@/components/UserProfileButton";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link AppHeader}. */
 export interface AppHeaderProps {
@@ -35,6 +36,7 @@ export interface AppHeaderProps {
  * sidebar pass `onMenuClick` to expose it as a drawer on mobile.
  */
 export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
+  const t = useT();
   return (
     <header className="shrink-0 flex h-16 items-center justify-between px-4 sm:px-6 border-b border-glass-border glass-chrome">
       <div className="flex min-w-0 items-center gap-3">
@@ -42,7 +44,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
           <button
             type="button"
             onClick={onMenuClick}
-            aria-label="Open menu"
+            aria-label={t("app.openMenu")}
             aria-haspopup="dialog"
             className="md:hidden -ml-1 shrink-0 cursor-pointer rounded-lg p-2 pointer-coarse:p-3 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
           >
@@ -51,7 +53,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
         )}
         <Link
           href="/"
-          aria-label="A2Flow home"
+          aria-label={t("app.a2flowHome")}
           className={[
             "flex items-center gap-3 rounded-xl",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
@@ -59,7 +61,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
         >
           <Image
             src={logo}
-            alt="A2Flow logo"
+            alt={t("common.a2flowLogo")}
             width={logo.width}
             height={logo.height}
             className="h-10 w-auto"

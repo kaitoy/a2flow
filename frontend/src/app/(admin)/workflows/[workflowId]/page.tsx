@@ -47,6 +47,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   type AgentSkill,
@@ -177,6 +178,7 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
  * individually the same way as elsewhere on the page.
  */
 export default function WorkflowDetailPage() {
+  const t = useT();
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -326,7 +328,7 @@ export default function WorkflowDetailPage() {
         if (notes !== savedNotes) {
           await setWorkflowInternalNotes(workflowId, notes);
         }
-        dispatch(showToast({ message: "Workflow updated" }));
+        dispatch(showToast({ message: t("workflows.workflowUpdated") }));
         // Return to the list on success, matching every other admin edit page.
         router.push("/workflows");
       });
@@ -340,7 +342,7 @@ export default function WorkflowDetailPage() {
       await saveNotes.run(async () => {
         const updated = await setWorkflowInternalNotes(workflowId, notes);
         setSavedNotes(updated.internalNotes ?? "");
-        dispatch(showToast({ message: "Internal notes saved" }));
+        dispatch(showToast({ message: t("workflows.internalNotesSaved") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -353,7 +355,7 @@ export default function WorkflowDetailPage() {
       await publish.run(async () => {
         const published = await publishWorkflow(workflowId);
         applyWorkflow(published);
-        dispatch(showToast({ message: "Workflow published" }));
+        dispatch(showToast({ message: t("workflows.workflowPublished") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -365,7 +367,7 @@ export default function WorkflowDetailPage() {
       await generatePrompt.run(async () => {
         const updated = await generateWorkflowPrompt(workflowId);
         applyWorkflow(updated);
-        dispatch(showToast({ message: "Prompt generated" }));
+        dispatch(showToast({ message: t("workflows.promptGenerated") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -378,7 +380,7 @@ export default function WorkflowDetailPage() {
       await discard.run(async () => {
         const restored = await discardWorkflowChanges(workflowId);
         applyWorkflow(restored);
-        dispatch(showToast({ message: "Changes discarded" }));
+        dispatch(showToast({ message: t("workflows.changesDiscarded") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -391,7 +393,7 @@ export default function WorkflowDetailPage() {
       await deactivate.run(async () => {
         const deactivated = await deactivateWorkflow(workflowId);
         applyWorkflow(deactivated);
-        dispatch(showToast({ message: "Workflow deactivated" }));
+        dispatch(showToast({ message: t("workflows.workflowDeactivated") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -429,8 +431,8 @@ export default function WorkflowDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Workflows", href: "/workflows" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.workflows"), href: "/workflows" },
     // The workflow itself is the current page; an ellipsis stands in until its
     // name has loaded.
     { label: workflow?.name || "…" },
@@ -482,7 +484,9 @@ export default function WorkflowDetailPage() {
               <>
                 {canViewDesign && (
                   <HeaderIconButton
-                    label={canEdit ? "Open design session" : "View design session"}
+                    label={
+                      canEdit ? t("workflows.openDesignSession") : t("workflows.viewDesignSession")
+                    }
                     onClick={handleOpenDesign}
                     disabled={generating}
                   >
@@ -491,7 +495,7 @@ export default function WorkflowDetailPage() {
                 )}
                 {canRun && (
                   <HeaderIconButton
-                    label="Run workflow"
+                    label={t("workflows.runWorkflow")}
                     onClick={() => setConfirmRunOpen(true)}
                     disabled={
                       generating ||
@@ -513,7 +517,11 @@ export default function WorkflowDetailPage() {
                 )}
                 {canViewTemplates && (
                   <HeaderIconButton
-                    label={canEdit ? "Manage task templates" : "View task templates"}
+                    label={
+                      canEdit
+                        ? t("workflows.manageTaskTemplates")
+                        : t("workflows.viewTaskTemplates")
+                    }
                     onClick={() => router.push(`/workflows/${workflowId}/task-templates`)}
                     disabled={generating}
                   >
@@ -522,7 +530,7 @@ export default function WorkflowDetailPage() {
                 )}
                 {canViewPrompt && (
                   <HeaderIconButton
-                    label="Version history"
+                    label={t("workflows.versionHistory")}
                     onClick={() => router.push(`/workflows/${workflowId}/versions`)}
                     disabled={generating}
                   >
@@ -536,7 +544,7 @@ export default function WorkflowDetailPage() {
         aside={audit && <AuditMeta {...audit} />}
       >
         <StatusCard
-          ariaLabel="Workflow status"
+          ariaLabel={t("workflows.workflowStatus")}
           // Signature "live edge": a lifecycle transition is being written
           // server-side, or `generating` means the background design run is
           // still going, so the card carries the same travelling light the
@@ -556,7 +564,7 @@ export default function WorkflowDetailPage() {
               {canEdit && workflow.status === "modified" && (
                 <ActionIconButton
                   icon={Undo2}
-                  label="Discard changes"
+                  label={t("workflows.discardChanges")}
                   onClick={() => setConfirmDiscardOpen(true)}
                   disabled={discard.inFlight}
                   spinning={discard.inFlight}
@@ -565,7 +573,7 @@ export default function WorkflowDetailPage() {
               {canPublish && canDeactivate && (
                 <ActionIconButton
                   icon={PowerOff}
-                  label="Deactivate"
+                  label={t("workflows.deactivate")}
                   onClick={() => setConfirmDeactivateOpen(true)}
                   disabled={deactivate.inFlight}
                   spinning={deactivate.inFlight}
@@ -574,7 +582,7 @@ export default function WorkflowDetailPage() {
               {canPublish && workflow.status !== "published" && (
                 <ActionIconButton
                   icon={Rocket}
-                  label="Publish"
+                  label={t("workflows.publish")}
                   onClick={() => setConfirmPublishOpen(true)}
                   disabled={generating || publish.inFlight}
                   spinning={publish.inFlight}
@@ -592,7 +600,7 @@ export default function WorkflowDetailPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+          <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
             {canEdit ? (
               <Input id="name" {...register("name")} />
             ) : (
@@ -600,7 +608,7 @@ export default function WorkflowDetailPage() {
             )}
           </FormField>
 
-          <FormField htmlFor="agentSkill" label="Agent Skill">
+          <FormField htmlFor="agentSkill" label={t("common.agentSkill")}>
             <div className="py-1.5">
               <Tooltip label={skillTooltip} disabled={!skill}>
                 <Link
@@ -613,12 +621,16 @@ export default function WorkflowDetailPage() {
             </div>
           </FormField>
 
-          <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+          <FormField
+            htmlFor="description"
+            label={t("common.description")}
+            error={errors.description?.message}
+          >
             {canEdit ? (
               <Textarea
                 id="description"
                 rows={3}
-                placeholder="What this workflow is for. Not used by the workflow execution."
+                placeholder={t("workflows.whatThisWorkflowIsForNotUsed")}
                 {...register("description")}
               />
             ) : (
@@ -631,11 +643,11 @@ export default function WorkflowDetailPage() {
           {canViewPrompt && (
             <FormField
               htmlFor="prompt"
-              label="Prompt"
+              label={t("common.prompt")}
               action={
                 <ActionIconButton
                   icon={GitCompare}
-                  label="Show diff from the generated prompt"
+                  label={t("workflows.showDiffFromTheGeneratedPrompt")}
                   onClick={() => setDiffOpen(true)}
                   // Without a generated prompt there is no baseline to diff
                   // against, so the dialog would have nothing to show.
@@ -647,7 +659,7 @@ export default function WorkflowDetailPage() {
                 <Textarea
                   id="prompt"
                   rows={4}
-                  placeholder="Overrides the generated prompt below for the workflow execution"
+                  placeholder={t("workflows.overridesTheGeneratedPromptBelowForThe")}
                   {...register("prompt")}
                 />
               ) : (
@@ -661,12 +673,12 @@ export default function WorkflowDetailPage() {
           {canViewPrompt && (
             <FormField
               htmlFor="generatedPrompt"
-              label="Generated prompt"
+              label={t("workflows.generatedPrompt")}
               action={
                 canEdit ? (
                   <ActionIconButton
                     icon={Sparkles}
-                    label="Generate from the design conversation"
+                    label={t("workflows.generateFromTheDesignConversation")}
                     onClick={handleGeneratePrompt}
                     // While the task templates are still generating the background job owns
                     // this field and there is no settled conversation to
@@ -687,7 +699,7 @@ export default function WorkflowDetailPage() {
                   <Textarea
                     id="generatedPrompt"
                     rows={4}
-                    placeholder="Summarized from the design conversation"
+                    placeholder={t("workflows.summarizedFromTheDesignConversation")}
                     {...register("generatedPrompt")}
                   />
                 ) : (
@@ -698,9 +710,9 @@ export default function WorkflowDetailPage() {
               </div>
               <p className="text-xs text-on-surface-variant">
                 {isSuperAdmin
-                  ? "AI-generated summary. Only a super admin can edit it directly."
-                  : "AI-generated summary, read-only."}{" "}
-                Used for the workflow execution whenever Prompt above is empty.
+                  ? t("workflows.aiGeneratedSummaryOnlyASuperAdmin")
+                  : t("workflows.aiGeneratedSummaryReadOnly")}{" "}
+                {t("workflows.usedForTheWorkflowExecutionWheneverPrompt")}
               </p>
             </FormField>
           )}
@@ -717,11 +729,11 @@ export default function WorkflowDetailPage() {
           {canViewPrompt && (
             <FormField
               htmlFor="internalNotes"
-              label="Internal notes"
+              label={t("workflows.internalNotes")}
               action={
                 <ActionIconButton
                   icon={Save}
-                  label="Save internal notes"
+                  label={t("workflows.saveInternalNotes")}
                   onClick={handleSaveNotes}
                   disabled={notes === savedNotes || saveNotes.inFlight}
                   spinning={saveNotes.inFlight}
@@ -732,14 +744,12 @@ export default function WorkflowDetailPage() {
                 id="internalNotes"
                 rows={3}
                 maxLength={10000}
-                placeholder="e.g. why a version was restored"
+                placeholder={t("workflows.eGWhyAVersionWasRestored")}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
               <p className="text-xs text-on-surface-variant">
-                Visible only to admins, developers, and reviewers. Not part of the design: saving
-                does not change the workflow status, and the notes are kept across publishing and
-                restoring versions.
+                {t("workflows.visibleOnlyToAdminsDevelopersAndReviewers")}
               </p>
             </FormField>
           )}
@@ -751,13 +761,13 @@ export default function WorkflowDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/workflows")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button
@@ -766,7 +776,7 @@ export default function WorkflowDetailPage() {
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -774,32 +784,32 @@ export default function WorkflowDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Workflow"
-        description={`Delete "${getValues("name")}"?`}
+        title={t("workflows.deleteWorkflow")}
+        description={t("common.deleteValue", { value: getValues("name") })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />
       <ConfirmDialog
         open={confirmDiscardOpen}
-        title="Discard Changes"
-        description="Restore this workflow and its task templates to the last published version? Unpublished edits are lost."
-        confirmLabel="Discard"
+        title={t("workflows.discardChanges2")}
+        description={t("workflows.restoreThisWorkflowAndItsTaskTemplates")}
+        confirmLabel={t("workflows.discard")}
         onConfirm={handleDiscard}
         onCancel={() => setConfirmDiscardOpen(false)}
       />
       <ConfirmDialog
         open={confirmDeactivateOpen}
-        title="Deactivate Workflow"
-        description="Return this workflow to draft? Only developers will be able to run it for testing until it's published again."
-        confirmLabel="Deactivate"
+        title={t("workflows.deactivateWorkflow")}
+        description={t("workflows.returnThisWorkflowToDraftOnlyDevelopers")}
+        confirmLabel={t("workflows.deactivate")}
         onConfirm={handleDeactivate}
         onCancel={() => setConfirmDeactivateOpen(false)}
       />
       <ConfirmDialog
         open={confirmPublishOpen}
-        title="Publish Workflow"
-        description="Publish this workflow? It becomes runnable by anyone with Run access."
-        confirmLabel="Publish"
+        title={t("workflows.publishWorkflow")}
+        description={t("workflows.publishThisWorkflowItBecomesRunnableBy")}
+        confirmLabel={t("workflows.publish")}
         confirmVariant="primary"
         onConfirm={handlePublish}
         onCancel={() => setConfirmPublishOpen(false)}

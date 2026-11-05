@@ -41,6 +41,8 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import {
   deleteUser,
   listUsers,
@@ -50,7 +52,7 @@ import {
   type UserGroup,
 } from "@/lib/api";
 import { canImpersonate, persistImpersonatedUserId } from "@/lib/impersonation";
-import { ROLE_LABELS, Role, useHasRole } from "@/lib/roles";
+import { Role, roleLabel, useHasRole } from "@/lib/roles";
 import { setMe } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -77,13 +79,14 @@ function buildColumns(
   tenantNames: Map<string, string>,
   groupsById: Map<string, UserGroup>,
   tagsById: Map<string, Tag>,
-  isAllTenantsView: boolean
+  isAllTenantsView: boolean,
+  t: Translator
 ): ColumnDef<User>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<User>(tenantNames)] : []),
     idColumn<User>(),
     {
-      header: "",
+      header: "" as const,
       noTruncate: true,
       visibility: "always",
       cell: (u) => (
@@ -91,18 +94,18 @@ function buildColumns(
           <Avatar user={u} size={28} />
           {!u.enabled && (
             <span
-              title="Disabled"
+              title={t("users.disabled")}
               className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-error text-on-error ring-2 ring-surface"
             >
               <Ban size={9} strokeWidth={2.5} aria-hidden="true" />
-              <span className="sr-only">Disabled</span>
+              <span className="sr-only">{t("users.disabled")}</span>
             </span>
           )}
         </span>
       ),
     },
     {
-      header: "Username",
+      header: "common.username" as const,
       sortField: "username",
       filterField: "username",
       visibility: "always",
@@ -123,7 +126,7 @@ function buildColumns(
       // are chips, not plain text, so the column opts out of single-line
       // truncation. Inherited roles render as muted chips so it stays obvious
       // which grants editing the user can actually change.
-      header: "Roles",
+      header: "common.roles",
       noTruncate: true,
       cell: (u) => {
         const isSuperAdmin = u.roles?.includes(Role.SUPER_ADMIN);
@@ -132,10 +135,8 @@ function buildColumns(
         const nothingHeld = !isSuperAdmin && otherRoles.length === 0 && groupRoles.length === 0;
         return (
           <div className="flex items-center gap-1.5">
-            {isSuperAdmin && <Badge>Super Admin</Badge>}
-            {otherRoles.length > 0 && (
-              <span>{otherRoles.map((r) => ROLE_LABELS[r]).join(", ")}</span>
-            )}
+            {isSuperAdmin && <Badge>{t("users.superAdmin")}</Badge>}
+            {otherRoles.length > 0 && <span>{otherRoles.map((r) => roleLabel(r)).join(", ")}</span>}
             <InheritedRoles roles={groupRoles} />
             {nothingHeld && "—"}
           </div>
@@ -145,7 +146,7 @@ function buildColumns(
     groupsColumn<User>((u) => u.groupIds, groupsById),
     inheritedTagsColumn<User>((u) => u.groupTagIds, tagsById),
     {
-      header: "Enabled",
+      header: "common.enabled" as const,
       sortField: "enabled",
       filterField: "enabled",
       filterOp: "eq",
@@ -155,7 +156,7 @@ function buildColumns(
       cell: (u) => boolCell(u.enabled),
     },
     {
-      header: "Verified",
+      header: "users.verified" as const,
       sortField: "emailVerified",
       filterField: "emailVerified",
       filterOp: "eq",
@@ -165,13 +166,13 @@ function buildColumns(
       cell: (u) => boolCell(u.emailVerified),
     },
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       visibility: "optional",
       cell: (u) => <DateTime value={u.createdAt} className="text-on-surface-variant" />,
     },
     {
-      header: "Deleted At",
+      header: "users.deletedAt" as const,
       visibility: "optional",
       cell: (u) =>
         u.deletedAt ? <DateTime value={u.deletedAt} className="text-on-surface-variant" /> : "—",
@@ -181,6 +182,7 @@ function buildColumns(
 }
 
 export default function UsersPage() {
+  const t = useT();
   const {
     rows,
     loading,
@@ -251,14 +253,14 @@ export default function UsersPage() {
   }
 
   const columns: ColumnDef<User>[] = [
-    ...buildColumns(names, tenantNames, groupsById, tagsById, isAllTenantsView),
+    ...buildColumns(names, tenantNames, groupsById, tagsById, isAllTenantsView, t),
     // Both actions in this column need the admin role — deleting a user
     // outright, and `canImpersonate`, which already answers false without it —
     // so the whole column goes for a viewer who only holds a read role.
     ...(isAdmin
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (user: User) => (
@@ -266,7 +268,7 @@ export default function UsersPage() {
                 {canImpersonate(viewer, isSuperAdmin, isAdmin, user) && (
                   <ActionIconButton
                     icon={UserCog}
-                    label="Impersonate"
+                    label={t("users.impersonate")}
                     onClick={() => handleImpersonate(user.id, user.username)}
                   />
                 )}
@@ -285,12 +287,12 @@ export default function UsersPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Users" }]} />
+      <Breadcrumbs items={[{ label: t("common.home"), href: "/" }, { label: t("common.users") }]} />
       <AdminPageHeader
-        title="Users"
+        title={t("common.users")}
         icon={UsersIcon}
         addHref={isAdmin ? "/users/new" : undefined}
-        addLabel="+ Add user"
+        addLabel={t("users.addUser")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -307,7 +309,7 @@ export default function UsersPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No users registered yet."
+        emptyMessage={t("users.noUsersRegisteredYet")}
         emptyIcon={UsersIcon}
         getRowKey={(user) => user.id}
         // A disabled account reads as inactive at a glance: the whole row is
@@ -329,18 +331,20 @@ export default function UsersPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete User"
-        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        title={t("users.deleteUser")}
+        description={confirmTarget ? t("common.deleteName", { name: confirmTarget.name }) : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />
       <ConfirmDialog
         open={impersonateTarget !== null}
-        title="Impersonate User"
+        title={t("users.impersonateUser")}
         description={
-          impersonateTarget ? `Act as "${impersonateTarget.name}"? You can stop at any time.` : ""
+          impersonateTarget
+            ? t("users.actAsNameYouCanStopAt", { name: impersonateTarget.name })
+            : ""
         }
-        confirmLabel="Impersonate"
+        confirmLabel={t("users.impersonate")}
         confirmVariant="primary"
         onConfirm={executeImpersonate}
         onCancel={() => setImpersonateTarget(null)}

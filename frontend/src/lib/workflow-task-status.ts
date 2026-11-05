@@ -4,6 +4,7 @@
  * sync.
  */
 
+import { getActiveTranslator, translateStatus } from "@/i18n/translate";
 import type { WorkflowTaskStatus } from "@/lib/api";
 
 /** All workflow-task statuses, in lifecycle order. */
@@ -41,8 +42,8 @@ export const STATUS_RAIL_CLASS: Record<WorkflowTaskStatus, string> = {
  * Human-readable label for a status (e.g. `in_progress` -> `in progress`).
  *
  * @param status - The status to format.
- * @returns The status with underscores replaced by spaces.
+ * @returns The status in the language on screen.
  */
 export function formatStatusLabel(status: WorkflowTaskStatus): string {
-  return status.replace("_", " ");
+  return translateStatus(status, getActiveTranslator());
 }

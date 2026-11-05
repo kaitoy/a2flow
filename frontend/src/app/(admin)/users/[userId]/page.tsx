@@ -41,6 +41,7 @@ import { zUserCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import {
   type AvatarConfig,
   deleteUser,
@@ -69,7 +70,7 @@ const schema = zUserCreate.omit({ username: true, password: true }).extend({
     .string()
     .refine(
       (v) => v === "" || (v.length >= 12 && v.length <= 72),
-      "Password must be 12–72 characters"
+      "users.passwordMustBe1272Characters"
     ),
 });
 
@@ -90,6 +91,7 @@ type FormValues = z.infer<typeof schema>;
  * rules ({@link canImpersonate}) and is unaffected.
  */
 export default function UserDetailPage() {
+  const t = useT();
   const { userId } = useParams<{ userId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -255,7 +257,7 @@ export default function UserDetailPage() {
         if (!sameIds(groupIds, savedGroupIds)) {
           await setUserGroups(userId, groupIds);
         }
-        dispatch(showToast({ message: "User updated" }));
+        dispatch(showToast({ message: t("users.userUpdated") }));
         router.push("/users");
       });
     } catch {
@@ -294,8 +296,8 @@ export default function UserDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Users", href: "/users" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.users"), href: "/users" },
     // The user itself is the current page; an ellipsis stands in until the
     // username has loaded.
     { label: username || "…" },
@@ -331,7 +333,7 @@ export default function UserDetailPage() {
             icon={UsersIcon}
             secondaryAction={
               canImpersonateTarget && (
-                <HeaderIconButton label="Impersonate" onClick={handleImpersonate}>
+                <HeaderIconButton label={t("users.impersonate")} onClick={handleImpersonate}>
                   <UserCog size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
               )
@@ -345,7 +347,7 @@ export default function UserDetailPage() {
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
           <div className="flex flex-col gap-1.5">
-            <span className="text-label-caps">Avatar</span>
+            <span className="text-label-caps">{t("users.avatar")}</span>
             <div className="flex items-center gap-3">
               <Avatar
                 // `originalTenantId`, not the derived `tenantId`: the avatar seed
@@ -361,17 +363,17 @@ export default function UserDetailPage() {
                 }}
                 size={96}
               />
-              {targetIsSuperAdmin && <Badge>Super Admin</Badge>}
+              {targetIsSuperAdmin && <Badge>{t("users.superAdmin")}</Badge>}
             </div>
           </div>
 
-          <FormField htmlFor="username" label="Username">
+          <FormField htmlFor="username" label={t("common.username")}>
             <ReadOnlyField>{username || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
 
           <FormField
             htmlFor="firstName"
-            label="First Name"
+            label={t("common.firstName")}
             required
             error={errors.firstName?.message}
           >
@@ -382,7 +384,12 @@ export default function UserDetailPage() {
             )}
           </FormField>
 
-          <FormField htmlFor="lastName" label="Last Name" required error={errors.lastName?.message}>
+          <FormField
+            htmlFor="lastName"
+            label={t("common.lastName")}
+            required
+            error={errors.lastName?.message}
+          >
             {canEdit ? (
               <Input id="lastName" {...register("lastName")} />
             ) : (
@@ -390,7 +397,12 @@ export default function UserDetailPage() {
             )}
           </FormField>
 
-          <FormField htmlFor="email" label="Email" required error={errors.email?.message}>
+          <FormField
+            htmlFor="email"
+            label={t("common.email")}
+            required
+            error={errors.email?.message}
+          >
             {canEdit ? (
               <Input id="email" type="email" {...register("email")} />
             ) : (
@@ -399,10 +411,14 @@ export default function UserDetailPage() {
           </FormField>
 
           {canEdit && (
-            <FormField htmlFor="password" label="Password" error={errors.password?.message}>
+            <FormField
+              htmlFor="password"
+              label={t("common.password")}
+              error={errors.password?.message}
+            >
               <PasswordInput
                 id="password"
-                placeholder="Leave blank to keep unchanged"
+                placeholder={t("users.leaveBlankToKeepUnchanged")}
                 {...register("password")}
               />
             </FormField>
@@ -425,24 +441,22 @@ export default function UserDetailPage() {
 
           {canEdit ? (
             <>
-              <Checkbox label="Enabled" {...register("enabled")} />
-              <Checkbox label="Email verified" {...register("emailVerified")} />
+              <Checkbox label={t("common.enabled")} {...register("enabled")} />
+              <Checkbox label={t("users.emailVerified")} {...register("emailVerified")} />
             </>
           ) : (
             <>
-              <FormField htmlFor="enabled" label="Enabled">
+              <FormField htmlFor="enabled" label={t("common.enabled")}>
                 <ReadOnlyField>{formatFlag(getValues("enabled") ?? false)}</ReadOnlyField>
               </FormField>
-              <FormField htmlFor="emailVerified" label="Email verified">
+              <FormField htmlFor="emailVerified" label={t("users.emailVerified")}>
                 <ReadOnlyField>{formatFlag(getValues("emailVerified") ?? false)}</ReadOnlyField>
               </FormField>
             </>
           )}
 
           {canEdit && tenantMissing && (
-            <p className="text-xs text-error">
-              Select a tenant in the header before removing this user's Super Admin role.
-            </p>
+            <p className="text-xs text-error">{t("users.selectATenantInTheHeaderBefore2")}</p>
           )}
 
           <div className="flex gap-2">
@@ -452,17 +466,17 @@ export default function UserDetailPage() {
                 variant="primary"
                 disabled={save.inFlight || tenantMissing}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/users")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -470,16 +484,16 @@ export default function UserDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete User"
-        description={`Delete "${username}"?`}
+        title={t("users.deleteUser")}
+        description={t("users.deleteUsername", { username })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />
       <ConfirmDialog
         open={impersonateConfirmOpen}
-        title="Impersonate User"
-        description={`Act as "${username}"? You can stop at any time.`}
-        confirmLabel="Impersonate"
+        title={t("users.impersonateUser")}
+        description={t("users.actAsUsernameYouCanStopAt", { username })}
+        confirmLabel={t("users.impersonate")}
         confirmVariant="primary"
         onConfirm={executeImpersonate}
         onCancel={() => setImpersonateConfirmOpen(false)}

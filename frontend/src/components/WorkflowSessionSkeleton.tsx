@@ -1,3 +1,5 @@
+"use client";
+
 import { AppHeader } from "@/components/AppHeader";
 import { ChatPanelSkeleton } from "@/components/ChatPanelSkeleton";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,6 +8,7 @@ import {
   TASK_TIMELINE_HEADER_CLASS,
   TASK_TIMELINE_LIST_CLASS,
 } from "@/components/WorkflowTaskTimeline";
+import { useT } from "@/i18n/provider";
 
 /**
  * Placeholder chat layout shown while a session page loads, so it presents the
@@ -17,8 +20,9 @@ import {
  * loading branch and from their routes' `loading.tsx`.
  */
 export function WorkflowSessionSkeleton() {
+  const t = useT();
   return (
-    <div role="status" aria-label="Loading" className="flex h-dvh overflow-hidden">
+    <div role="status" aria-label={t("common.loading")} className="flex h-dvh overflow-hidden">
       <div className={`${TASK_TIMELINE_ASIDE_CLASS} max-md:hidden`}>
         <div className={TASK_TIMELINE_HEADER_CLASS}>
           <Skeleton className="h-4 w-16" />

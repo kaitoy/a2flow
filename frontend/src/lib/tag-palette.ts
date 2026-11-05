@@ -13,6 +13,7 @@
  * colors.
  */
 
+import { getActiveTranslator } from "@/i18n/translate";
 import type { TagColor } from "./api";
 
 /**
@@ -57,8 +58,8 @@ export function resolveTagColor(color: TagColor | undefined): TagColor {
  * Human-readable name of a palette slot, for a color picker's option label.
  *
  * @param color - The palette slot.
- * @returns The slot name with its first letter capitalized.
+ * @returns The slot's name in the language on screen.
  */
 export function tagColorLabel(color: TagColor): string {
-  return color.charAt(0).toUpperCase() + color.slice(1);
+  return getActiveTranslator()(`tagColor.${color}`);
 }

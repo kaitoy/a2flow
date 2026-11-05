@@ -25,6 +25,7 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import {
   formatRevision,
   formatSyncStatusLabel,
@@ -75,7 +76,7 @@ function buildColumns(
     ...(isAllTenantsView ? [tenantColumn<AgentSkill>(tenantNames)] : []),
     idColumn<AgentSkill>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -89,18 +90,18 @@ function buildColumns(
       ),
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       cell: (s) => s.description || "—",
     },
     {
-      header: "Repo URL",
+      header: "common.repoUrl" as const,
       sortField: "repoUrl",
       filterField: "repoUrl",
       className: "font-mono",
       cell: (s) => s.repoUrl,
     },
     {
-      header: "Repo Path",
+      header: "common.repoPath" as const,
       sortField: "repoPath",
       filterField: "repoPath",
       className: "font-mono",
@@ -108,7 +109,7 @@ function buildColumns(
       cell: (s) => s.repoPath || "—",
     },
     {
-      header: "Ref",
+      header: "common.ref" as const,
       sortField: "repoRef",
       filterField: "repoRef",
       className: "font-mono",
@@ -116,39 +117,39 @@ function buildColumns(
       cell: (s) => s.repoRef || "—",
     },
     {
-      header: "Status",
+      header: "common.status" as const,
       sortField: "syncStatus",
       filterField: "syncStatus",
       noTruncate: true,
       cell: (s) => <SyncStatus skill={s} />,
     },
     {
-      header: "Revision",
+      header: "agentSkills.revision" as const,
       sortField: "commitSha",
       className: "font-mono",
       visibility: "optional",
       cell: (s) => formatRevision(s.commitSha),
     },
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
     {
-      header: "Auth Username",
+      header: "common.authUsername" as const,
       visibility: "optional",
       className: "font-mono",
       cell: (s) => s.repoAuthUsername || "—",
     },
     {
-      header: "Auth Password",
+      header: "common.authPassword" as const,
       visibility: "optional",
       className: "font-mono",
       cell: (s) => s.repoAuthPassword || "—",
     },
     {
-      header: "Synced At",
+      header: "agentSkills.syncedAt" as const,
       visibility: "optional",
       cell: (s) =>
         s.syncedAt ? <DateTime value={s.syncedAt} className="text-on-surface-variant" /> : "—",
@@ -158,6 +159,7 @@ function buildColumns(
 }
 
 export default function AgentSkillsPage() {
+  const t = useT();
   const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,
@@ -232,14 +234,14 @@ export default function AgentSkillsPage() {
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (skill: AgentSkill) => (
               <div className="flex justify-center gap-2">
                 <ActionIconButton
                   icon={Sparkles}
-                  label="Generate workflow"
+                  label={t("agentSkills.generateWorkflow")}
                   onClick={() => setGenerateTarget({ id: skill.id, name: skill.name })}
                   // A skill can only back a design run once its clone has
                   // published a revision.
@@ -247,7 +249,7 @@ export default function AgentSkillsPage() {
                 />
                 <ActionIconButton
                   icon={RefreshCw}
-                  label="Pull"
+                  label={t("agentSkills.pull")}
                   onClick={() => handlePull(skill.id)}
                   disabled={pullingId !== null || skill.syncStatus === "pending"}
                   spinning={pullingId === skill.id || skill.syncStatus === "pending"}
@@ -267,12 +269,14 @@ export default function AgentSkillsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Agent Skills" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.agentSkills") }]}
+      />
       <AdminPageHeader
-        title="Agent Skills"
+        title={t("common.agentSkills")}
         icon={Wand2}
         addHref={canEdit ? "/agent-skills/new" : undefined}
-        addLabel="+ Add skill"
+        addLabel={t("agentSkills.addSkill")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -289,7 +293,7 @@ export default function AgentSkillsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No agent skills registered yet."
+        emptyMessage={t("agentSkills.noAgentSkillsRegisteredYet")}
         emptyIcon={Wand2}
         getRowKey={(skill) => skill.id}
         sort={sort}
@@ -308,8 +312,8 @@ export default function AgentSkillsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Agent Skill"
-        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        title={t("agentSkills.deleteAgentSkill")}
+        description={confirmTarget ? t("common.deleteName", { name: confirmTarget.name }) : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

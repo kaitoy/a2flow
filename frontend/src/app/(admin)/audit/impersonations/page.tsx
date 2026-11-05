@@ -18,6 +18,7 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
 import { type ImpersonationEvent, listImpersonationEvents } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -38,6 +39,7 @@ const LIMIT = 50;
  * a record's own `tenantId`.
  */
 export default function AuditImpersonationsPage() {
+  const t = useT();
   const {
     rows,
     loading,
@@ -70,13 +72,13 @@ export default function AuditImpersonationsPage() {
     return [
       idColumn<ImpersonationEvent>(),
       {
-        header: "Impersonator",
+        header: "audit.impersonator",
         filterField: "impersonatorId",
         visibility: "always",
         cell: (e) => userLink(e.impersonatorId),
       },
       {
-        header: "Target User",
+        header: "audit.targetUser",
         filterField: "targetUserId",
         cell: (e) => userLink(e.targetUserId),
       },
@@ -85,22 +87,22 @@ export default function AuditImpersonationsPage() {
         // is closed, so there is no third state a status column could show.
         // Colours follow the task palette — accent for still-running, muted for
         // finished (see STATUS_DOT_CLASS in lib/workflow-task-status).
-        header: "State",
+        header: "audit.state",
         noTruncate: true,
         cell: (e) =>
           e.endedAt ? (
-            <StatusDot dotClass="bg-on-surface-variant" label="Ended" />
+            <StatusDot dotClass="bg-on-surface-variant" label={t("audit.ended")} />
           ) : (
-            <StatusDot dotClass="bg-accent" label="Active" />
+            <StatusDot dotClass="bg-accent" label={t("audit.active")} />
           ),
       },
       {
-        header: "Started At",
+        header: "audit.startedAt",
         sortField: "startedAt",
         cell: (e) => <DateTime value={e.startedAt} className="text-on-surface-variant" />,
       },
       {
-        header: "Ended At",
+        header: "audit.endedAt",
         sortField: "endedAt",
         cell: (e) =>
           e.endedAt ? (
@@ -112,7 +114,7 @@ export default function AuditImpersonationsPage() {
       ...(isAllTenantsView
         ? [
             {
-              header: "Target Tenant",
+              header: "audit.targetTenant",
               cell: (e: ImpersonationEvent) => {
                 const id = e.targetTenantId;
                 if (!id) return EMPTY_VALUE;
@@ -129,7 +131,7 @@ export default function AuditImpersonationsPage() {
           ]
         : []),
       {
-        header: "Actions",
+        header: "common.actions",
         noTruncate: true,
         visibility: "always",
         cell: (e) => (
@@ -138,13 +140,13 @@ export default function AuditImpersonationsPage() {
               href={`/audit/impersonations/${e.id}`}
               className="font-medium text-accent transition-colors hover:underline"
             >
-              Details
+              {t("audit.details")}
             </Link>
           </div>
         ),
       },
     ];
-  }, [names, tenantNames, isAllTenantsView]);
+  }, [names, tenantNames, isAllTenantsView, t]);
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "auditImpersonations",
@@ -155,14 +157,14 @@ export default function AuditImpersonationsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Audit Logs", href: "/audit" },
-          { label: "Impersonations" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.auditLogs"), href: "/audit" },
+          { label: t("common.impersonations") },
         ]}
       />
       <AuditTabs active="impersonations" />
       <AdminPageHeader
-        title="Impersonations"
+        title={t("common.impersonations")}
         icon={VenetianMask}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -180,7 +182,7 @@ export default function AuditImpersonationsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No one has acted as another user yet."
+        emptyMessage={t("audit.noOneHasActedAsAnotherUser")}
         emptyIcon={VenetianMask}
         getRowKey={(e) => e.id}
         sort={sort}

@@ -1,8 +1,11 @@
+"use client";
+
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n/provider";
 import { HeaderIconButton } from "./header-icon-button";
 
 interface AdminPageHeaderProps {
@@ -55,6 +58,7 @@ export function AdminPageHeader({
   onRefresh,
   refreshing = false,
 }: AdminPageHeaderProps) {
+  const t = useT();
   return (
     <div className="mb-6 flex items-center justify-between gap-3">
       {/* A detail page's title is a user-provided record name, so the heading
@@ -81,7 +85,7 @@ export function AdminPageHeader({
       <div className="flex shrink-0 items-center gap-2">
         {onRefresh && (
           <HeaderIconButton
-            label="Refresh"
+            label={t("admin.refresh")}
             // Called with no argument on purpose: `reload` takes options, and
             // the click event must not land in them.
             onClick={() => onRefresh()}

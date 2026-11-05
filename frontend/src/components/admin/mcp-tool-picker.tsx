@@ -45,6 +45,7 @@ import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { useMcpServerTools } from "@/hooks/useMcpServerTools";
+import { useT } from "@/i18n/provider";
 import { getApiErrorMessage, listMcpServers } from "@/lib/api";
 import { bindingLabel, bindingToValue, valueToBinding } from "@/lib/mcp-tool-options";
 
@@ -89,6 +90,7 @@ export interface McpToolPickerProps {
  * into an empty dropdown.
  */
 export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpToolPickerProps) {
+  const t = useT();
   const [registry, setRegistry] = useState<RegistryState>({ phase: "loading" });
   const [picked, setPicked] = useState<{ id: string; name: string } | null>(null);
   const [open, setOpen] = useState(false);
@@ -154,19 +156,19 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
 
   // The select's placeholder carries the state: an empty dropdown alone cannot
   // say whether the server is slow, silent, exhausted, or unreachable.
-  let placeholder = "Select a tool…";
+  let placeholder = t("admin.selectATool");
   let toolsDisabled = false;
   if (tools.phase === "idle" || tools.phase === "loading") {
-    placeholder = "Loading tools…";
+    placeholder = t("admin.loadingTools");
     toolsDisabled = true;
   } else if (tools.phase === "error") {
-    placeholder = "Could not load tools";
+    placeholder = t("admin.couldNotLoadTools");
     toolsDisabled = true;
   } else if (toolNames.length === 0) {
-    placeholder = "No tools advertised";
+    placeholder = t("admin.noToolsAdvertised");
     toolsDisabled = true;
   } else if (available.length === 0) {
-    placeholder = "All tools added";
+    placeholder = t("admin.allToolsAdded");
     toolsDisabled = true;
   }
 
@@ -209,18 +211,20 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
           <EmptyState
             icon={Server}
             compact
-            title="Loading MCP servers…"
-            description="Reading the registered servers."
+            title={t("admin.loadingMcpServers")}
+            description={t("admin.readingTheRegisteredServers")}
           />
         </div>
       )}
 
       {registry.phase === "error" && (
         <div className="flex flex-col items-start gap-2 rounded-xl glass-panel px-4 py-3">
-          <p className="text-sm text-on-surface-variant">Could not load the MCP server registry.</p>
+          <p className="text-sm text-on-surface-variant">
+            {t("admin.couldNotLoadTheMcpServerRegistry")}
+          </p>
           <p className="text-xs text-error">{registry.message}</p>
           <Button type="button" variant="secondary" onClick={() => void loadRegistry()}>
-            Retry
+            {t("common.retry")}
           </Button>
         </div>
       )}
@@ -228,11 +232,13 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
       {registry.phase === "ready" &&
         (registry.names.size === 0 ? (
           <p className="rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant">
-            No MCP servers are registered.{" "}
-            <Link href="/mcp-servers" className="text-accent transition-colors hover:underline">
-              Register one
-            </Link>{" "}
-            to bind its tools to this task.
+            {t.rich("admin.noMcpServersAreRegisteredLink1To2", {
+              link1: (
+                <Link href="/mcp-servers" className="text-accent transition-colors hover:underline">
+                  {t("admin.registerOne")}
+                </Link>
+              ),
+            })}
           </p>
         ) : picked === null ? (
           // Nothing is chosen yet, so there is nothing for the Tool select to
@@ -240,10 +246,10 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
           // just doubles the empty state. Collapse to the one control that
           // actually does something, exactly as `SecretRefField` does.
           <div className="flex flex-col gap-1.5">
-            <span className="text-label-caps">MCP Server</span>
+            <span className="text-label-caps">{t("admin.mcpServer")}</span>
             <div>
               <Button type="button" variant="secondary" onClick={openPicker}>
-                Select MCP server…
+                {t("admin.selectMcpServer2")}
               </Button>
             </div>
           </div>
@@ -253,17 +259,17 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
                 the accessible name of whatever it points at, renaming the
                 "Select MCP server…" button to the field's label. */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-label-caps">MCP Server</span>
+              <span className="text-label-caps">{t("admin.mcpServer")}</span>
               <div className="flex flex-wrap gap-1.5">
                 <Chip label={picked.name} onRemove={() => setPicked(null)} size="lg" />
               </div>
               <div>
                 <Button type="button" variant="secondary" onClick={openPicker}>
-                  Select MCP server…
+                  {t("admin.selectMcpServer2")}
                 </Button>
               </div>
             </div>
-            <FormField htmlFor={ID_PREFIX} label="Tool">
+            <FormField htmlFor={ID_PREFIX} label={t("common.tool")}>
               <Select
                 id={ID_PREFIX}
                 options={toolOptions}
@@ -275,7 +281,7 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
                 <div className="flex flex-col items-start gap-1.5">
                   <p className="text-xs text-error">{tools.message}</p>
                   <Button type="button" variant="secondary" onClick={reloadTools}>
-                    Retry
+                    {t("common.retry")}
                   </Button>
                 </div>
               )}
@@ -284,9 +290,9 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
         ))}
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps">Selected Tools</span>
+        <span className="text-label-caps">{t("admin.selectedTools")}</span>
         {chips.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">No tools are bound to this task yet.</p>
+          <p className="text-sm text-on-surface-variant">{t("admin.noToolsAreBoundToThisTask")}</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {chips.map((chip) => {
@@ -300,8 +306,8 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
                     icon: isExempt ? ShieldOff : ShieldCheck,
                     active: isExempt,
                     label: isExempt
-                      ? "Input needs no approval — click to require approval"
-                      : "Input needs approval — click to allow any input",
+                      ? t("admin.inputNeedsNoApprovalClickToRequire")
+                      : t("admin.inputNeedsApprovalClickToAllowAny"),
                     onClick: () => toggleExempt(chip.value),
                   }}
                   size="lg"

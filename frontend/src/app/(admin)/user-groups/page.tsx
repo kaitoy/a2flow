@@ -29,6 +29,7 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import { deleteUserGroup, listUserGroups, type Tag, type UserGroup } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
@@ -50,7 +51,7 @@ function buildColumns(
     ...(isAllTenantsView ? [tenantColumn<UserGroup>(tenantNames)] : []),
     idColumn<UserGroup>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -65,7 +66,7 @@ function buildColumns(
     },
     ...userGroupSharedColumns(tagsById),
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       visibility: "optional",
       cell: (g) => <DateTime value={g.createdAt} className="text-on-surface-variant" />,
@@ -75,6 +76,7 @@ function buildColumns(
 }
 
 export default function UserGroupsPage() {
+  const t = useT();
   const canEdit = useHasRole(Role.ADMIN);
   const {
     rows,
@@ -116,7 +118,7 @@ export default function UserGroupsPage() {
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (group: UserGroup) => (
@@ -138,12 +140,14 @@ export default function UserGroupsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "User Groups" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.userGroups") }]}
+      />
       <AdminPageHeader
-        title="User Groups"
+        title={t("common.userGroups")}
         icon={UsersRound}
         addHref={canEdit ? "/user-groups/new" : undefined}
-        addLabel="+ Add group"
+        addLabel={t("userGroups.addGroup")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -160,7 +164,7 @@ export default function UserGroupsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No user groups created yet."
+        emptyMessage={t("userGroups.noUserGroupsCreatedYet")}
         emptyIcon={UsersRound}
         getRowKey={(group) => group.id}
         sort={sort}
@@ -179,10 +183,10 @@ export default function UserGroupsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete User Group"
+        title={t("userGroups.deleteUserGroup")}
         description={
           confirmTarget
-            ? `Delete "${confirmTarget.name}"? Its members keep their accounts but lose the roles it grants.`
+            ? t("userGroups.deleteNameItsMembersKeepTheirAccounts", { name: confirmTarget.name })
             : ""
         }
         onConfirm={executeDelete}

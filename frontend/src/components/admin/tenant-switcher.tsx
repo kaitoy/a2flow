@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { Select } from "@/components/ui/select";
+import { useT } from "@/i18n/provider";
 import { listTenants, type Tenant } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import {
@@ -57,6 +58,7 @@ function persistSelection(tenantId: string | null): void {
  * explicitly chosen, it is never overwritten by the auto-select fallback.
  */
 export function TenantSwitcher() {
+  const t = useT();
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const dispatch = useAppDispatch();
   const selectedTenantId = useAppSelector((s) => s.auth.selectedTenantId);
@@ -84,7 +86,7 @@ export function TenantSwitcher() {
 
   return (
     <Select
-      aria-label="Acting tenant"
+      aria-label={t("admin.actingTenant")}
       value={selectedTenantId ?? ""}
       disabled={tenants.length === 0}
       onChange={(next) => {
@@ -94,9 +96,9 @@ export function TenantSwitcher() {
       }}
       options={
         tenants.length === 0
-          ? [{ value: "", label: "No tenants" }]
+          ? [{ value: "", label: t("admin.noTenants") }]
           : [
-              { value: ALL_TENANTS_SENTINEL, label: "All tenants" },
+              { value: ALL_TENANTS_SENTINEL, label: t("admin.allTenants") },
               ...tenants.map((tenant) => ({
                 value: tenant.id,
                 label: tenant.displayName,

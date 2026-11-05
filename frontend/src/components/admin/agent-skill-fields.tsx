@@ -22,6 +22,7 @@ import { SecretRefField } from "@/components/admin/secret-ref-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zAgentSkillCreate } from "@/generated/api/zod.gen";
+import { useT } from "@/i18n/provider";
 import type { AgentSkillCreate, AgentSkillUpdate } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -140,35 +141,36 @@ export type AgentSkillFieldsProps =
  * editing this record.
  */
 function AgentSkillFieldValues({ values }: { values: AgentSkillFormValues }) {
+  const t = useT();
   return (
     <>
-      <FormField htmlFor="name" label="Name" required>
+      <FormField htmlFor="name" label={t("common.name")} required>
         <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="repoUrl" label="Repo URL" required>
+      <FormField htmlFor="repoUrl" label={t("common.repoUrl")} required>
         <ReadOnlyField>{values.repoUrl || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="repoPath" label="Repo Path">
+      <FormField htmlFor="repoPath" label={t("common.repoPath")}>
         <ReadOnlyField>{values.repoPath || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="repoRef" label="Ref">
+      <FormField htmlFor="repoRef" label={t("common.ref")}>
         <ReadOnlyField>{values.repoRef || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="description" label="Description">
+      <FormField htmlFor="description" label={t("common.description")}>
         <ReadOnlyField className="whitespace-pre-wrap">
           {values.description || EMPTY_VALUE}
         </ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="repoAuthUsername" label="Auth Username">
+      <FormField htmlFor="repoAuthUsername" label={t("common.authUsername")}>
         <ReadOnlyField>{values.repoAuthUsername || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="repoAuthPassword" label="Auth Password">
+      <FormField htmlFor="repoAuthPassword" label={t("common.authPassword")}>
         <ReadOnlyField>{values.repoAuthPassword || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
     </>
@@ -184,6 +186,7 @@ function AgentSkillFieldValues({ values }: { values: AgentSkillFormValues }) {
  * values instead, for a viewer whose role cannot write agent skills.
  */
 export function AgentSkillFields(props: AgentSkillFieldsProps) {
+  const t = useT();
   if (props.readOnly) {
     return <AgentSkillFieldValues values={props.values} />;
   }
@@ -191,15 +194,20 @@ export function AgentSkillFields(props: AgentSkillFieldsProps) {
 
   return (
     <>
-      <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+      <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
         <Input
           id="name"
-          placeholder={showPlaceholders ? "e.g. code-review" : undefined}
+          placeholder={showPlaceholders ? t("admin.eGCodeReview") : undefined}
           {...register("name")}
         />
       </FormField>
 
-      <FormField htmlFor="repoUrl" label="Repo URL" required error={errors.repoUrl?.message}>
+      <FormField
+        htmlFor="repoUrl"
+        label={t("common.repoUrl")}
+        required
+        error={errors.repoUrl?.message}
+      >
         <Input
           id="repoUrl"
           placeholder={showPlaceholders ? "https://github.com/owner/repo" : undefined}
@@ -207,39 +215,43 @@ export function AgentSkillFields(props: AgentSkillFieldsProps) {
         />
       </FormField>
 
-      <FormField htmlFor="repoPath" label="Repo Path" error={errors.repoPath?.message}>
+      <FormField htmlFor="repoPath" label={t("common.repoPath")} error={errors.repoPath?.message}>
         <Input
           id="repoPath"
-          placeholder={showPlaceholders ? "path/within/repo (optional)" : undefined}
+          placeholder={showPlaceholders ? t("admin.pathWithinRepoOptional") : undefined}
           {...register("repoPath")}
         />
       </FormField>
 
-      <FormField htmlFor="repoRef" label="Ref" error={errors.repoRef?.message}>
+      <FormField htmlFor="repoRef" label={t("common.ref")} error={errors.repoRef?.message}>
         <Input
           id="repoRef"
-          placeholder={showPlaceholders ? "branch or tag (optional)" : undefined}
+          placeholder={showPlaceholders ? t("admin.branchOrTagOptional") : undefined}
           {...register("repoRef")}
         />
       </FormField>
 
-      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+      <FormField
+        htmlFor="description"
+        label={t("common.description")}
+        error={errors.description?.message}
+      >
         <Textarea
           id="description"
           rows={4}
-          placeholder={showPlaceholders ? "What this skill does (optional)" : undefined}
+          placeholder={showPlaceholders ? t("admin.whatThisSkillDoesOptional") : undefined}
           {...register("description")}
         />
       </FormField>
 
       <FormField
         htmlFor="repoAuthUsername"
-        label="Auth Username"
+        label={t("common.authUsername")}
         error={errors.repoAuthUsername?.message}
       >
         <Input
           id="repoAuthUsername"
-          placeholder={showPlaceholders ? "e.g. octocat (optional)" : undefined}
+          placeholder={showPlaceholders ? t("admin.eGOctocatOptional") : undefined}
           {...register("repoAuthUsername")}
         />
       </FormField>
@@ -251,10 +263,10 @@ export function AgentSkillFields(props: AgentSkillFieldsProps) {
           <SecretRefField
             value={field.value}
             onChange={field.onChange}
-            label="Auth Password"
+            label={t("common.authPassword")}
             idPrefix="repoAuthPassword"
             error={errors.repoAuthPassword?.message}
-            hint="One entry of a registered Secret, used as the password for a private repository."
+            hint={t("admin.oneEntryOfARegisteredSecretUsed")}
           />
         )}
       />

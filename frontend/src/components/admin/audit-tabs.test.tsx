@@ -1,5 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { defaultTranslator } from "@/i18n/translate";
 import { render, screen } from "@/test/test-utils";
 import { AUDIT_TABS, AuditTabs } from "./audit-tabs";
 
@@ -13,7 +14,9 @@ describe("AuditTabs", () => {
   it("renders one tab per audit list", () => {
     render(<AuditTabs active="tool-invocations" />);
     for (const tab of AUDIT_TABS) {
-      expect(screen.getByRole("tab", { name: tab.label })).toBeInTheDocument();
+      expect(
+        screen.getByRole("tab", { name: defaultTranslator.maybe(tab.label) })
+      ).toBeInTheDocument();
     }
   });
 

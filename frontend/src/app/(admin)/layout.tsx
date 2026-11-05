@@ -17,6 +17,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { SidebarDrawer } from "@/components/ui/sidebar-drawer";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/provider";
 import { useVisibleAdminNavItems } from "@/lib/admin-nav";
 import { Role, useHasRole } from "@/lib/roles";
 
@@ -34,6 +35,7 @@ function AdminNavList({
   /** Called after a link is activated (the drawer closes itself with this). */
   onNavigate?: () => void;
 }) {
+  const t = useT();
   const pathname = usePathname();
   const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
   const navItems = useVisibleAdminNavItems();
@@ -51,7 +53,7 @@ function AdminNavList({
               else itemMap.current.delete(item.href);
             }}
           >
-            <Tooltip label={item.label} placement="right" disabled={!collapsed}>
+            <Tooltip label={t.maybe(item.label)} placement="right" disabled={!collapsed}>
               <span className="block">
                 <Link
                   href={item.href}
@@ -75,7 +77,7 @@ function AdminNavList({
                       aria-hidden="true"
                       className="shrink-0"
                     />
-                    {!collapsed && item.label}
+                    {!collapsed && t.maybe(item.label)}
                   </span>
                 </Link>
               </span>
@@ -105,12 +107,13 @@ function AdminNavFooter({
   /** Called after the link is activated (the drawer closes itself with this). */
   onNavigate?: () => void;
 }) {
+  const t = useT();
   const canViewApiDocs = useHasRole(Role.ADMIN);
   if (!canViewApiDocs) return null;
 
   return (
     <div className="mt-auto px-3 py-3">
-      <Tooltip label="API Docs" placement="right" disabled={!collapsed}>
+      <Tooltip label={t("admin.apiDocs")} placement="right" disabled={!collapsed}>
         <span className="block">
           <a
             href="/api-doc"
@@ -123,7 +126,7 @@ function AdminNavFooter({
               className={["flex items-center gap-2.5", collapsed ? "justify-center" : ""].join(" ")}
             >
               <ExternalLink size={18} strokeWidth={1.8} aria-hidden="true" className="shrink-0" />
-              {!collapsed && "API Docs"}
+              {!collapsed && t("admin.apiDocs")}
             </span>
           </a>
         </span>
@@ -133,6 +136,7 @@ function AdminNavFooter({
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -156,7 +160,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <button
               type="button"
               onClick={() => setCollapsed((c) => !c)}
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={collapsed ? t("admin.expandSidebar") : t("admin.collapseSidebar")}
               aria-expanded={!collapsed}
               className="cursor-pointer rounded-lg p-1.5 pointer-coarse:p-2.5 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
             >
@@ -170,7 +174,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavList collapsed={collapsed} />
           <AdminNavFooter collapsed={collapsed} />
         </nav>
-        <SidebarDrawer open={drawerOpen} onClose={closeDrawer} label="Admin navigation">
+        <SidebarDrawer open={drawerOpen} onClose={closeDrawer} label={t("admin.adminNavigation")}>
           <nav className="flex w-64 flex-col border-r border-glass-border glass-chrome pt-3">
             <AdminNavList collapsed={false} onNavigate={closeDrawer} />
             <AdminNavFooter collapsed={false} onNavigate={closeDrawer} />

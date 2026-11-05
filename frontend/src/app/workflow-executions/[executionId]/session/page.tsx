@@ -28,6 +28,7 @@ import { WorkflowSessionSkeleton } from "@/components/WorkflowSessionSkeleton";
 import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useExecutionSessionChat } from "@/hooks/useExecutionSessionChat";
 import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
+import { useT } from "@/i18n/provider";
 import {
   type ExecutionSession,
   getWorkflowExecution,
@@ -87,6 +88,7 @@ function useSessionSelection(execution: WorkflowExecution) {
 
 /** Renders the chat UI for an already-loaded WorkflowExecution, including the task timeline and message list. */
 function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
+  const t = useT();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s) => s.auth.user);
   const { sessions, selected, select, add } = useSessionSelection(execution);
@@ -193,7 +195,7 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
       <SidebarDrawer
         open={timelineDrawerOpen}
         onClose={() => setTimelineDrawerOpen(false)}
-        label="Workflow tasks"
+        label={t("workflowExecutions.workflowTasks2")}
       >
         <WorkflowTaskTimeline
           tasks={tasks}
@@ -214,13 +216,13 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
         <div className="shrink-0 px-4 pt-3 sm:px-6">
           <Breadcrumbs
             items={[
-              { label: "Home", href: "/" },
-              { label: "Workflow Executions", href: "/workflow-executions" },
+              { label: t("common.home"), href: "/" },
+              { label: t("common.workflowExecutions"), href: "/workflow-executions" },
               // Links to this session's own execution record. Unlike the
               // (nullable) design-time workflow id, the execution id always
               // exists — even after its parent workflow design has been deleted.
               { label: execution.name, href: `/workflow-executions/${execution.id}` },
-              { label: "Session" },
+              { label: t("common.session") },
             ]}
           />
           <ExecutionSessionTabs
@@ -280,16 +282,17 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
 
 /** Full-screen error state shown when the WorkflowExecution record fails to load, with a retry action. */
 function WorkflowSessionLoadError({ onRetry }: { onRetry: () => void }) {
+  const t = useT();
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4">
       <EmptyState
         icon={AlertTriangle}
         animation="wiggle"
-        title="Couldn't load this workflow"
-        description="Something went wrong while loading this workflow execution."
+        title={t("workflowExecutions.couldntLoadThisWorkflow")}
+        description={t("workflowExecutions.somethingWentWrongWhileLoadingThisWorkflow")}
       />
       <Button variant="secondary" onClick={onRetry}>
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );

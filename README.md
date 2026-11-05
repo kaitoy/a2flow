@@ -25,6 +25,7 @@ the agent takes part in — it is what the agent does.
 | **[Tool mocks](https://kaitoy.github.io/a2flow/docs/guides/tool-mocks)** | Exercise a draft workflow end to end with no side effects: mocked tools return a configured result, so no request reaches the server and nobody is emailed. |
 | **[Secrets](https://kaitoy.github.io/a2flow/docs/guides/secrets)** | Named key/value bundles, referenced from server headers and environment as `${secret:name/key}` — never pasted into a form twice. |
 | **[Append-only audit logs](https://kaitoy.github.io/a2flow/docs/guides/audit-logs)** | Every tool call the gateway allowed or refused, every certificate issued, every impersonated session, every mail sent. Nothing in the screens edits or removes a record. |
+| **[Six languages](https://kaitoy.github.io/a2flow/docs/guides/users-and-groups#language)** | The screens come in English, Japanese, Spanish, Chinese, Korean and French. Each user picks theirs on their profile, or follows the browser. |
 | **[Admin UI](https://kaitoy.github.io/a2flow/docs/guides/admin-ui)** | Thirteen sections that all behave the same way, over [multiple tenants](https://kaitoy.github.io/a2flow/docs/concepts/tenants), [role-based authorization](https://kaitoy.github.io/a2flow/docs/concepts/authorization), and [notifications](https://kaitoy.github.io/a2flow/docs/guides/notifications). |
 
 ## Architecture

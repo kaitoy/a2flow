@@ -39,6 +39,8 @@ Nothing in the dropdown deletes a notification; marking it read only moves it ou
 
 The Notifications page lists every notification you have received as a sortable, filterable table of title, type and creation time. An **All / Unread** switch above it toggles the read-state filter. This is the only place a notification can be permanently deleted.
 
+A2Flow's own notifications appear in [your language](./users-and-groups.md#language), while an approval's title and description stay as the agent wrote them. Sorting and filtering by title work on the English text, so outside English the **Title** column offers neither; filter by **Type** instead.
+
 Notifications are per-user throughout: you see only your own, and one disappears with the account, run or workflow it belongs to.
 
 ## Email delivery {#email-delivery}

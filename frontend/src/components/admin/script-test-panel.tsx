@@ -21,6 +21,8 @@ import { JsonBlock } from "@/components/ui/json-block";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import {
   callScriptTool,
   getApiErrorMessage,
@@ -55,15 +57,18 @@ export function argumentsTemplate(tool: McpToolInfo | undefined): string {
  * @param text - The textarea's contents.
  * @returns The object, or an error message when it is not a JSON object.
  */
-function parseArguments(text: string): { value: Record<string, unknown> } | { error: string } {
+function parseArguments(
+  text: string,
+  t: Translator
+): { value: Record<string, unknown> } | { error: string } {
   let value: unknown;
   try {
     value = JSON.parse(text.trim() || "{}");
   } catch (err) {
-    return { error: `Invalid JSON: ${(err as Error).message}` };
+    return { error: t("admin.invalidJsonMessage", { message: (err as Error).message }) };
   }
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return { error: "Arguments must be a JSON object." };
+    return { error: t("admin.argumentsMustBeAJsonObject") };
   }
   return { value: value as Record<string, unknown> };
 }
@@ -74,6 +79,7 @@ function parseArguments(text: string): { value: Record<string, unknown> } | { er
  * arguments skeleton, and **Run** calls it and shows the result under **Output**.
  */
 export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
+  const t = useT();
   const [language, source, packages, env] = useWatch({
     control,
     name: ["language", "source", "packages", "env"],
@@ -117,7 +123,7 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
   }
 
   async function handleRun() {
-    const parsed = parseArguments(argsText);
+    const parsed = parseArguments(argsText, t);
     if ("error" in parsed) {
       setArgsError(parsed.error);
       return;
@@ -135,20 +141,20 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
   }
 
   return (
-    <FormField htmlFor="script-test" label="Test Run">
+    <FormField htmlFor="script-test" label={t("admin.testRun")}>
       <div className="flex flex-col gap-3 rounded-xl glass-panel p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-on-surface-variant">
-            Runs the source, packages, and environment variables above, without saving them.
+            {t("admin.runsTheSourcePackagesAndEnvironmentVariables")}
           </p>
           <Button
             variant="secondary"
             onClick={handleLoad}
             disabled={loadAction.inFlight || !source.trim()}
             status={loadAction.status}
-            pendingLabel="Loading…"
+            pendingLabel={t("admin.loading")}
           >
-            Load tools
+            {t("admin.loadTools")}
           </Button>
         </div>
 
@@ -156,10 +162,10 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
 
         {tools !== null &&
           (tools.length === 0 ? (
-            <p className="text-sm text-on-surface-variant">This script exposes no tools.</p>
+            <p className="text-sm text-on-surface-variant">{t("admin.thisScriptExposesNoTools")}</p>
           ) : (
             <>
-              <FormField htmlFor="script-test-tool" label="Tool">
+              <FormField htmlFor="script-test-tool" label={t("common.tool")}>
                 <Select
                   id="script-test-tool"
                   options={tools.map((tool) => ({ value: tool.name, label: tool.name }))}
@@ -169,7 +175,7 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
               </FormField>
               <FormField
                 htmlFor="script-test-args"
-                label="Arguments"
+                label={t("common.arguments")}
                 error={argsError ?? undefined}
               >
                 <Textarea
@@ -186,16 +192,16 @@ export function ScriptTestPanel({ control }: ScriptTestPanelProps) {
                   onClick={handleRun}
                   disabled={runAction.inFlight || !toolName}
                   status={runAction.status}
-                  pendingLabel="Running…"
+                  pendingLabel={t("admin.running")}
                 >
-                  Run
+                  {t("common.run")}
                 </Button>
               </div>
             </>
           ))}
 
         {result && (
-          <FormField htmlFor="script-test-output" label="Output">
+          <FormField htmlFor="script-test-output" label={t("admin.output")}>
             <JsonBlock
               value={result.structured ?? (result.content ?? []).join("\n")}
               tone={result.isError ? "error" : "default"}

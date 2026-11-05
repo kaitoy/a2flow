@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
 import { Textarea } from "@/components/ui/textarea";
 import { zSecretCreate } from "@/generated/api/zod.gen";
+import { useT } from "@/i18n/provider";
 import type { SecretCreate } from "@/lib/api";
 import { EMPTY_VALUE, formatChoice, formatLines } from "@/lib/read-only-display";
 
@@ -66,7 +67,7 @@ export function buildSecretFormSchema(requireEntryValues: boolean) {
           ctx.addIssue({
             code: "custom",
             path: [field],
-            message: "Required for a Vault secret",
+            message: "admin.requiredForAVaultSecret",
           });
         }
       }
@@ -90,20 +91,20 @@ function validateEntries(
     ctx.addIssue({
       code: "custom",
       path: ["entries"],
-      message: "At least one entry is required",
+      message: "admin.atLeastOneEntryIsRequired",
     });
     return;
   }
   const keys = named.map((entry) => entry.key.trim());
   if (new Set(keys).size !== keys.length) {
-    ctx.addIssue({ code: "custom", path: ["entries"], message: "Keys must be unique" });
+    ctx.addIssue({ code: "custom", path: ["entries"], message: "admin.keysMustBeUnique" });
     return;
   }
   if (keys.some((key) => !ENTRY_KEY_PATTERN.test(key))) {
     ctx.addIssue({
       code: "custom",
       path: ["entries"],
-      message: "Keys may use letters, digits, '.', '_' and '-' only",
+      message: "admin.keysMayUseLettersDigitsAndOnly",
     });
     return;
   }
@@ -111,7 +112,7 @@ function validateEntries(
     ctx.addIssue({
       code: "custom",
       path: ["entries"],
-      message: "Every entry requires a value",
+      message: "admin.everyEntryRequiresAValue",
     });
   }
 }
@@ -125,7 +126,7 @@ export type SecretFormValues = z.infer<ReturnType<typeof buildSecretFormSchema>>
  * handed a fresh array literal on every render.
  */
 const SECRET_TYPE_OPTIONS: ReadonlyArray<SegmentedOption<SecretFormValues["type"]>> = [
-  { value: "local", label: "Local (encrypted)" },
+  { value: "local", label: "admin.localEncrypted" },
   { value: "vault", label: "HashiCorp Vault" },
 ];
 
@@ -207,24 +208,25 @@ export type SecretFieldsProps =
  * *set* a new one, which is exactly what this viewer may not do.
  */
 function SecretFieldValues({ values }: { values: SecretFormValues }) {
+  const t = useT();
   return (
     <>
-      <FormField htmlFor="name" label="Name" required>
+      <FormField htmlFor="name" label={t("common.name")} required>
         <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="description" label="Description">
+      <FormField htmlFor="description" label={t("common.description")}>
         <ReadOnlyField className="whitespace-pre-wrap">
           {values.description || EMPTY_VALUE}
         </ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="type" label="Type" required>
+      <FormField htmlFor="type" label={t("common.type")} required>
         <ReadOnlyField>{formatChoice(SECRET_TYPE_OPTIONS, values.type)}</ReadOnlyField>
       </FormField>
 
       {values.type === "local" ? (
-        <FormField htmlFor="entries" label="Entries" required>
+        <FormField htmlFor="entries" label={t("admin.entries")} required>
           <ReadOnlyField className="whitespace-pre-wrap">
             {formatLines(
               values.entries.map((entry) => entry.key.trim()).filter((key) => key !== "")
@@ -233,10 +235,10 @@ function SecretFieldValues({ values }: { values: SecretFormValues }) {
         </FormField>
       ) : (
         <>
-          <FormField htmlFor="vaultMount" label="Vault Mount" required>
+          <FormField htmlFor="vaultMount" label={t("admin.vaultMount")} required>
             <ReadOnlyField>{values.vaultMount || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
-          <FormField htmlFor="vaultPath" label="Vault Path" required>
+          <FormField htmlFor="vaultPath" label={t("admin.vaultPath")} required>
             <ReadOnlyField>{values.vaultPath || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
         </>
@@ -254,6 +256,7 @@ function SecretFieldValues({ values }: { values: SecretFormValues }) {
  * values instead, for a viewer whose role cannot write secrets.
  */
 export function SecretFields(props: SecretFieldsProps) {
+  const t = useT();
   if (props.readOnly) {
     return <SecretFieldValues values={props.values} />;
   }
@@ -261,36 +264,37 @@ export function SecretFields(props: SecretFieldsProps) {
 
   return (
     <>
-      <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+      <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
         <Input
           id="name"
-          placeholder={showPlaceholders ? "e.g. aws-credentials" : undefined}
+          placeholder={showPlaceholders ? t("admin.eGAwsCredentials") : undefined}
           {...register("name")}
         />
         <p className="mt-1 text-xs text-on-surface-variant">
-          One entry is referenced as{" "}
-          {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
-          {"${secret:name/key}"} in MCP server headers and environment variables, and as{" "}
-          <code>name/key</code> in Agent Skill repo auth. The key is always required.
+          {t.rich("admin.oneEntryIsReferencedAsSecretName", { code1: <code>name/key</code> })}
         </p>
       </FormField>
 
-      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+      <FormField
+        htmlFor="description"
+        label={t("common.description")}
+        error={errors.description?.message}
+      >
         <Textarea
           id="description"
           rows={4}
-          placeholder={showPlaceholders ? "What this secret is for (optional)" : undefined}
+          placeholder={showPlaceholders ? t("admin.whatThisSecretIsForOptional") : undefined}
           {...register("description")}
         />
       </FormField>
 
-      <FormField htmlFor="type" label="Type" required>
+      <FormField htmlFor="type" label={t("common.type")} required>
         <Controller
           control={control}
           name="type"
           render={({ field }) => (
             <SegmentedControl
-              aria-label="Secret type"
+              aria-label={t("admin.secretType")}
               options={SECRET_TYPE_OPTIONS}
               value={field.value}
               onChange={field.onChange}
@@ -300,7 +304,12 @@ export function SecretFields(props: SecretFieldsProps) {
       </FormField>
 
       {type === "local" ? (
-        <FormField htmlFor="entries" label="Entries" required error={errors.entries?.message}>
+        <FormField
+          htmlFor="entries"
+          label={t("admin.entries")}
+          required
+          error={errors.entries?.message}
+        >
           <Controller
             control={control}
             name="entries"
@@ -312,22 +321,22 @@ export function SecretFields(props: SecretFieldsProps) {
                 valueType="password"
                 keyPlaceholder="AWS_ACCESS_KEY_ID"
                 valuePlaceholder={
-                  showPlaceholders ? "Value (stored encrypted)" : "Leave blank to keep"
+                  showPlaceholders ? t("admin.valueStoredEncrypted") : t("admin.leaveBlankToKeep")
                 }
               />
             )}
           />
           <p className="mt-1 text-xs text-on-surface-variant">
             {showPlaceholders
-              ? "Each value is encrypted before it is stored and is never returned by the API."
-              : "Values are never returned by the API. Leave one blank to keep the stored value; remove a row to delete that entry."}
+              ? t("admin.eachValueIsEncryptedBeforeItIs")
+              : t("admin.valuesAreNeverReturnedByTheApi")}
           </p>
         </FormField>
       ) : (
         <>
           <FormField
             htmlFor="vaultMount"
-            label="Vault Mount"
+            label={t("admin.vaultMount")}
             required
             error={errors.vaultMount?.message}
           >
@@ -339,7 +348,7 @@ export function SecretFields(props: SecretFieldsProps) {
           </FormField>
           <FormField
             htmlFor="vaultPath"
-            label="Vault Path"
+            label={t("admin.vaultPath")}
             required
             error={errors.vaultPath?.message}
           >
@@ -349,7 +358,7 @@ export function SecretFields(props: SecretFieldsProps) {
               {...register("vaultPath")}
             />
             <p className="mt-1 text-xs text-on-surface-variant">
-              Every key stored at this KV v2 path is available; pick one per reference.
+              {t("admin.everyKeyStoredAtThisKvV2")}
             </p>
           </FormField>
         </>

@@ -5,7 +5,7 @@ sidebar_position: 3
 
 # Roles and authorization
 
-Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy — with one exception: **Super Admin bypasses every role-based check** and, for that reason, is **mutually exclusive** with every other role — a user is either a Super Admin or holds some combination of the other five roles, never both. Two ownership-layer checks are a deliberate exception to the bypass, and both are visible in the [session access matrix](./authorization.md#workflow-execution-access) below. A user with **no roles at all** is valid: they can still manage their own [account](../guides/users-and-groups.md#users) (avatar), but nothing else.
+Every user holds a set of **roles** granting the operations they may perform. Roles are **independent** — there is no hierarchy — with one exception: **Super Admin bypasses every role-based check** and, for that reason, is **mutually exclusive** with every other role — a user is either a Super Admin or holds some combination of the other five roles, never both. Two ownership-layer checks are a deliberate exception to the bypass, and both are visible in the [session access matrix](./authorization.md#workflow-execution-access) below. A user with **no roles at all** is valid: they can still manage their own [account](../guides/users-and-groups.md#users) (avatar and language), but nothing else.
 
 ## Effective roles {#effective-roles}
 

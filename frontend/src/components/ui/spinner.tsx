@@ -1,5 +1,9 @@
+"use client";
+import { useT } from "@/i18n/provider";
+
 /** Animated circular loading indicator. Size sm=16 px, md=24 px, lg=40 px. */
 export function Spinner({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+  const t = useT();
   const dim = { sm: 16, md: 24, lg: 40 }[size];
   return (
     <svg
@@ -8,7 +12,7 @@ export function Spinner({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
       viewBox="0 0 24 24"
       fill="none"
       className="animate-spin text-accent"
-      aria-label="Loading"
+      aria-label={t("common.loading")}
       role="status"
     >
       <circle

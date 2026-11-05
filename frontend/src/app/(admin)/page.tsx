@@ -3,15 +3,16 @@
 
 import { type LucideIcon, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { useT } from "@/i18n/provider";
 import { type AdminNavItem, useVisibleAdminNavItems } from "@/lib/admin-nav";
 import { Role, useHasRole } from "@/lib/roles";
 
 /** The chat card, shown first and only to `super_admin`; the admin destinations follow it. */
 const CHAT_CARD: AdminNavItem = {
   href: "/sessions/new",
-  label: "Start chat",
+  label: "admin.startChat",
   icon: MessageSquare,
-  description: "Open a new agent conversation",
+  description: "admin.openANewAgentConversation",
 };
 
 /**
@@ -21,6 +22,7 @@ const CHAT_CARD: AdminNavItem = {
  * reached from `/`, after login, and by clicking the A2Flow logo.
  */
 export default function AdminPage() {
+  const t = useT();
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   const cards: AdminNavItem[] = [
     ...(isSuperAdmin ? [CHAT_CARD] : []),
@@ -31,10 +33,10 @@ export default function AdminPage() {
     <div className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8">
         <h1 className="font-display text-3xl font-semibold tracking-tight text-gradient-accent">
-          Welcome to A2Flow
+          {t("admin.welcomeToA2flow")}
         </h1>
         <p className="mt-2 text-sm text-on-surface-variant">
-          Chat with the agent or jump straight into managing your workspace.
+          {t("admin.chatWithTheAgentOrJumpStraight")}
         </p>
       </header>
 
@@ -59,6 +61,7 @@ function WelcomeCard({
   icon: LucideIcon;
   description: string;
 }) {
+  const t = useT();
   return (
     <Link
       href={href}
@@ -74,9 +77,9 @@ function WelcomeCard({
       </span>
       <span className="flex min-w-0 flex-col">
         <span className="text-base font-medium tracking-tight text-on-surface group-hover:text-accent">
-          {label}
+          {t.maybe(label)}
         </span>
-        <span className="mt-0.5 text-sm text-on-surface-variant">{description}</span>
+        <span className="mt-0.5 text-sm text-on-surface-variant">{t.maybe(description)}</span>
       </span>
     </Link>
   );

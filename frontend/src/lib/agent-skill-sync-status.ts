@@ -6,6 +6,7 @@
  * a status dot means the same thing wherever it appears in the admin UI.
  */
 
+import { getActiveTranslator, translateStatus } from "@/i18n/translate";
 import type { SkillSyncStatus } from "@/lib/api";
 
 /** Tailwind background-color class for the small status dot of each status. */
@@ -26,7 +27,8 @@ export const SYNC_STATUS_DOT_CLASS: Record<SkillSyncStatus, string> = {
  * @returns The label to render next to the status dot.
  */
 export function formatSyncStatusLabel(status: SkillSyncStatus): string {
-  return status === "pending" ? "Cloning" : status;
+  const t = getActiveTranslator();
+  return status === "pending" ? t("status.cloning") : translateStatus(status, t);
 }
 
 /**

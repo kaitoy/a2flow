@@ -2,6 +2,7 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link DeleteIconButton}. */
 interface DeleteIconButtonProps {
@@ -20,12 +21,17 @@ interface DeleteIconButtonProps {
  * reveals the label on hover/focus. The `aria-label` keeps the button's
  * accessible name intact for assistive tech and tests.
  */
-export function DeleteIconButton({ onClick, label = "Delete", disabled }: DeleteIconButtonProps) {
+export function DeleteIconButton({
+  onClick,
+  label = "common.delete",
+  disabled,
+}: DeleteIconButtonProps) {
+  const t = useT();
   return (
-    <Tooltip label={label}>
+    <Tooltip label={t.maybe(label)}>
       <button
         type="button"
-        aria-label={label}
+        aria-label={t.maybe(label)}
         onClick={onClick}
         disabled={disabled}
         className={[

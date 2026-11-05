@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n/provider";
 import { renderMarkdown } from "@/lib/markdown";
 
 /** Props for {@link MarkdownContentDialog}. */
@@ -50,6 +51,7 @@ export function MarkdownContentDialog({
   load,
   onClose,
 }: MarkdownContentDialogProps) {
+  const t = useT();
   const [html, setHtml] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function MarkdownContentDialog({
       scrollable
       footer={
         <Button variant="ghost" onClick={onClose}>
-          Close
+          {t("common.close")}
         </Button>
       }
     >

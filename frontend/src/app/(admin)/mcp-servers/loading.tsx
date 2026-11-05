@@ -1,16 +1,20 @@
+"use client";
+
 import { Server } from "lucide-react";
 import { AdminLoading } from "@/components/admin/admin-loading";
+import { useT } from "@/i18n/provider";
 
 /** Route loading fallback for the MCP servers list page. */
 export default function Loading() {
+  const t = useT();
   return (
     <AdminLoading
-      crumbs={[{ label: "MCP Servers" }]}
+      crumbs={[{ label: t("common.mcpServers") }]}
       icon={Server}
-      title="MCP Servers"
+      title={t("common.mcpServers")}
       addHref="/mcp-servers/new"
-      addLabel="+ Add server"
-      columns={["Name", "Endpoint", "Created At", "Actions"]}
+      addLabel={t("mcpServers.addServer")}
+      columns={[t("common.name"), t("common.endpoint"), t("common.createdAt"), t("common.actions")]}
     />
   );
 }

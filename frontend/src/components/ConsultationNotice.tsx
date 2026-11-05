@@ -1,5 +1,8 @@
 /** @module ConsultationNotice — the bar a workflow session shows while it waits on an approval. */
+"use client";
+
 import { MessageCircleQuestion } from "lucide-react";
+import { useT } from "@/i18n/provider";
 
 /**
  * Notice above the chat input of a session that is `waiting_for_approval`.
@@ -13,16 +16,14 @@ import { MessageCircleQuestion } from "lucide-react";
  * steer the run.
  */
 export function ConsultationNotice() {
+  const t = useT();
   return (
     <div
       className="flex items-start gap-2 rounded-xl glass-panel px-4 py-3 text-sm text-on-surface animate-message-in"
       role="status"
     >
       <MessageCircleQuestion className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
-      <span>
-        This session is waiting for an approval decision. A question you send now opens a
-        consultation, where the agent answers without changing the run. The decision closes it.
-      </span>
+      <span>{t("app.thisSessionIsWaitingForAnApproval")}</span>
     </div>
   );
 }

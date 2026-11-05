@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useT } from "@/i18n/provider";
 import type { WorkflowTask } from "@/lib/api";
 import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status";
 
@@ -47,6 +48,7 @@ export function WorkflowTaskGroup({
   onHover,
   children,
 }: WorkflowTaskGroupProps) {
+  const t = useT();
   const status = task?.status ?? "pending";
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover is a non-essential visual link to the timeline; the core linkage is click + scroll-spy
@@ -68,7 +70,7 @@ export function WorkflowTaskGroup({
           {index}
         </span>
         <span className="truncate text-sm font-medium text-on-surface">
-          {task?.title ?? "Task"}
+          {task?.title ?? t("common.task")}
         </span>
         <span className="shrink-0 text-xs text-on-surface-variant">
           {formatStatusLabel(status)}

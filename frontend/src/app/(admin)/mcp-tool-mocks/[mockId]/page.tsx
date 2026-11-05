@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import {
   deleteMcpToolMock,
   getMcpToolMock,
@@ -48,6 +49,7 @@ import { showToast } from "@/store/toastSlice";
  * and Save/Delete are hidden rather than left to fail with a 403 on click.
  */
 export default function McpToolMockDetailPage() {
+  const t = useT();
   const { mockId } = useParams<{ mockId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -124,7 +126,7 @@ export default function McpToolMockDetailPage() {
         if (!sameIds(tagIds, savedTagIds)) {
           await setMcpToolMockTags(mockId, tagIds);
         }
-        dispatch(showToast({ message: "Tool mock updated" }));
+        dispatch(showToast({ message: t("mcpToolMocks.toolMockUpdated") }));
         router.push("/mcp-tool-mocks");
       });
     } catch {
@@ -143,8 +145,8 @@ export default function McpToolMockDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Tool Mocks", href: "/mcp-tool-mocks" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.toolMocks"), href: "/mcp-tool-mocks" },
     // The mock itself is the current page; an ellipsis stands in until its name
     // has loaded.
     { label: name || "…" },
@@ -201,13 +203,13 @@ export default function McpToolMockDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/mcp-tool-mocks")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button
@@ -216,7 +218,7 @@ export default function McpToolMockDetailPage() {
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -224,8 +226,10 @@ export default function McpToolMockDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Tool Mock"
-        description={`Delete "${getValues("name")}"? Runs already started keep their own copy of it and are unaffected.`}
+        title={t("mcpToolMocks.deleteToolMock")}
+        description={t("mcpToolMocks.deleteValueRunsAlreadyStartedKeepTheir", {
+          value: getValues("name"),
+        })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

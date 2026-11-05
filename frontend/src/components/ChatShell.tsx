@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { useT } from "@/i18n/provider";
 import { clearError } from "@/store/chatSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { AppHeader } from "./AppHeader";
@@ -20,6 +21,7 @@ import { SidebarDrawer } from "./ui/sidebar-drawer";
  * and the logo image is loaded once per page load.
  */
 export function ChatShell({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const userId = useAppSelector((s) => s.auth.user?.id ?? "");
@@ -64,7 +66,7 @@ export function ChatShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden">
       <SessionList {...sessionListProps} className="max-md:hidden" />
-      <SidebarDrawer open={drawerOpen} onClose={closeDrawer} label="Chat sessions">
+      <SidebarDrawer open={drawerOpen} onClose={closeDrawer} label={t("app.chatSessions")}>
         <SessionList {...sessionListProps} />
       </SidebarDrawer>
 

@@ -33,6 +33,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import {
   deleteTenant,
   getTenant,
@@ -123,6 +124,7 @@ function toBody(values: FormValues): TenantUpdate {
  * tenant exists.
  */
 export default function TenantDetailPage() {
+  const t = useT();
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -177,7 +179,7 @@ export default function TenantDetailPage() {
     try {
       await save.run(async () => {
         await updateTenant(tenantId, toBody(values));
-        dispatch(showToast({ message: "Tenant updated" }));
+        dispatch(showToast({ message: t("tenants.tenantUpdated") }));
         dispatch(tenantsChanged());
         router.push("/tenants");
       });
@@ -202,8 +204,8 @@ export default function TenantDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Tenants", href: "/tenants" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.tenants"), href: "/tenants" },
     // The tenant itself is the current page; an ellipsis stands in until its
     // display name has loaded.
     { label: displayName || "…" },
@@ -233,18 +235,18 @@ export default function TenantDetailPage() {
         >
           <FormField
             htmlFor="displayName"
-            label="Display Name"
+            label={t("tenants.displayName")}
             required
             error={errors.displayName?.message}
           >
             <Input id="displayName" {...register("displayName")} />
           </FormField>
 
-          <FormField htmlFor="name" label="Name">
+          <FormField htmlFor="name" label={t("common.name")}>
             <ReadOnlyField>{name || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
 
-          <Checkbox label="Enabled" {...register("enabled")} />
+          <Checkbox label={t("common.enabled")} {...register("enabled")} />
 
           <hr className="border-outline-variant" />
 
@@ -260,11 +262,12 @@ export default function TenantDetailPage() {
           <hr className="border-outline-variant" />
 
           <div className="flex flex-col gap-1">
-            <Checkbox label="Log in to the global Vault" {...register("globalVaultEnabled")} />
+            <Checkbox
+              label={t("tenants.logInToTheGlobalVault")}
+              {...register("globalVaultEnabled")}
+            />
             <p className="text-xs text-on-surface-variant">
-              Used only while the tenant has no Vault of its own. Register a credential issued for
-              this tenant: the Vault policies attached to it decide which secrets the tenant can
-              read.
+              {t("tenants.usedOnlyWhileTheTenantHasNo")}
             </p>
           </div>
 
@@ -290,23 +293,23 @@ export default function TenantDetailPage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/tenants")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-              Delete
+              {t("common.delete")}
             </Button>
           </div>
         </form>
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Tenant"
-        description={`Delete "${displayName}"?`}
+        title={t("tenants.deleteTenant")}
+        description={t("tenants.deleteDisplayname", { displayName })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

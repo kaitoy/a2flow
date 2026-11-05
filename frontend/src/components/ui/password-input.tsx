@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link PasswordInput}; every native input attribute except `type`. */
 export interface PasswordInputProps
@@ -15,6 +16,7 @@ export interface PasswordInputProps
  * reveals the current value as plain text while active.
  */
 export function PasswordInput({ className, ...rest }: PasswordInputProps) {
+  const t = useT();
   const [visible, setVisible] = useState(false);
   const Icon = visible ? EyeOff : Eye;
   const cls = className ? `pr-10 ${className}` : "pr-10";
@@ -25,7 +27,7 @@ export function PasswordInput({ className, ...rest }: PasswordInputProps) {
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? "Hide value" : "Show value"}
+        aria-label={visible ? t("ui.hideValue") : t("ui.showValue")}
         className="absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant transition-colors hover:text-accent"
       >
         <Icon size={16} strokeWidth={1.8} aria-hidden />

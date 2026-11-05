@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { zUserGroupCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import {
   deleteUserGroup,
   getUserGroup,
@@ -60,6 +61,7 @@ type FormValues = z.input<typeof schema>;
  * a 403 on click.
  */
 export default function UserGroupDetailPage() {
+  const t = useT();
   const { groupId } = useParams<{ groupId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -133,7 +135,7 @@ export default function UserGroupDetailPage() {
         if (!sameIds(tagIds, savedTagIds)) {
           await setUserGroupTags(groupId, tagIds);
         }
-        dispatch(showToast({ message: "User group updated" }));
+        dispatch(showToast({ message: t("userGroups.userGroupUpdated") }));
         router.push("/user-groups");
       });
     } catch {
@@ -152,8 +154,8 @@ export default function UserGroupDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "User Groups", href: "/user-groups" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.userGroups"), href: "/user-groups" },
     // The group itself is the current page; an ellipsis stands in until its
     // name has loaded.
     { label: name || "…" },
@@ -190,7 +192,7 @@ export default function UserGroupDetailPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+          <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
             {canEdit ? (
               <Input id="name" {...register("name")} />
             ) : (
@@ -198,7 +200,11 @@ export default function UserGroupDetailPage() {
             )}
           </FormField>
 
-          <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+          <FormField
+            htmlFor="description"
+            label={t("common.description")}
+            error={errors.description?.message}
+          >
             {canEdit ? (
               <Textarea id="description" rows={2} {...register("description")} />
             ) : (
@@ -212,7 +218,7 @@ export default function UserGroupDetailPage() {
             onChange={setRoles}
             readOnly={!canEdit}
             allowSuperAdmin={false}
-            label="Roles granted"
+            label={t("userGroups.rolesGranted")}
           />
 
           <UserPicker value={memberIds} onChange={setMemberIds} readOnly={!canEdit} />
@@ -226,13 +232,13 @@ export default function UserGroupDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/user-groups")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button
@@ -241,7 +247,7 @@ export default function UserGroupDetailPage() {
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -249,8 +255,8 @@ export default function UserGroupDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete User Group"
-        description={`Delete "${name}"? Its members keep their accounts but lose the roles it grants.`}
+        title={t("userGroups.deleteUserGroup")}
+        description={t("userGroups.deleteNameItsMembersKeepTheirAccounts", { name })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

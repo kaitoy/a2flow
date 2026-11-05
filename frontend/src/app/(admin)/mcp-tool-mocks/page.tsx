@@ -28,6 +28,8 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import { deleteMcpToolMock, listMcpServers, listMcpToolMocks, type McpToolMock } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
@@ -39,13 +41,14 @@ function buildColumns(
   serverNameById: Map<string, string>,
   names: Map<string, string>,
   tenantNames: Map<string, string>,
-  isAllTenantsView: boolean
+  isAllTenantsView: boolean,
+  t: Translator
 ): ColumnDef<McpToolMock>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<McpToolMock>(tenantNames)] : []),
     idColumn<McpToolMock>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -59,13 +62,13 @@ function buildColumns(
       ),
     },
     {
-      header: "Tool",
+      header: "common.tool" as const,
       sortField: "toolName",
       filterField: "toolName",
       cell: (mock) => <span className="font-mono text-on-surface">{mock.toolName}</span>,
     },
     {
-      header: "Server",
+      header: "common.server" as const,
       cell: (mock) =>
         mock.mcpServerId ? (
           <Link
@@ -75,18 +78,18 @@ function buildColumns(
             {serverNameById.get(mock.mcpServerId) ?? `${mock.mcpServerId.slice(0, 8)}…`}
           </Link>
         ) : (
-          <Badge>Built-in</Badge>
+          <Badge>{t("mcpToolMocks.builtIn")}</Badge>
         ),
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       cell: (mock) => mock.description || "—",
     },
     {
       // How many successive calls the mock answers differently before its last
       // response starts repeating. Off by default: the count is a niche detail
       // most viewers do not need, so it is offered through the column picker.
-      header: "Responses",
+      header: "common.responses",
       visibility: "optional",
       className: "text-center",
       cell: (mock) => mock.responses.length,
@@ -96,6 +99,7 @@ function buildColumns(
 }
 
 export default function McpToolMocksPage() {
+  const t = useT();
   const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,
@@ -142,12 +146,12 @@ export default function McpToolMocksPage() {
   }
 
   const columns: ColumnDef<McpToolMock>[] = [
-    ...buildColumns(serverNameById, names, tenantNames, isAllTenantsView),
+    ...buildColumns(serverNameById, names, tenantNames, isAllTenantsView, t),
     tagsColumn<McpToolMock>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (mock: McpToolMock) => (
@@ -169,12 +173,14 @@ export default function McpToolMocksPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Tool Mocks" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.toolMocks") }]}
+      />
       <AdminPageHeader
-        title="Tool Mocks"
+        title={t("common.toolMocks")}
         icon={FlaskConical}
         addHref={canEdit ? "/mcp-tool-mocks/new" : undefined}
-        addLabel="+ Add tool mock"
+        addLabel={t("mcpToolMocks.addToolMock")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -191,7 +197,7 @@ export default function McpToolMocksPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No tool mocks created yet."
+        emptyMessage={t("mcpToolMocks.noToolMocksCreatedYet")}
         emptyIcon={FlaskConical}
         getRowKey={(mock) => mock.id}
         sort={sort}
@@ -210,10 +216,10 @@ export default function McpToolMocksPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Tool Mock"
+        title={t("mcpToolMocks.deleteToolMock")}
         description={
           confirmTarget
-            ? `Delete "${confirmTarget.name}"? Runs already started keep their own copy of it and are unaffected.`
+            ? t("mcpToolMocks.deleteNameRunsAlreadyStartedKeepTheir", { name: confirmTarget.name })
             : ""
         }
         onConfirm={executeDelete}

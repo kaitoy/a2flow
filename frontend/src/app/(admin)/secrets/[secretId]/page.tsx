@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import {
   deleteSecret,
   getSecret,
@@ -56,6 +57,7 @@ const schema = buildSecretFormSchema(false);
  * click.
  */
 export default function SecretDetailPage() {
+  const t = useT();
   const { secretId } = useParams<{ secretId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -134,7 +136,7 @@ export default function SecretDetailPage() {
         if (!sameIds(tagIds, savedTagIds)) {
           await setSecretTags(secretId, tagIds);
         }
-        dispatch(showToast({ message: "Secret updated" }));
+        dispatch(showToast({ message: t("secrets.secretUpdated") }));
         router.push("/secrets");
       });
     } catch {
@@ -157,8 +159,8 @@ export default function SecretDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Secrets", href: "/secrets" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.secrets"), href: "/secrets" },
     // The secret itself is the current page; an ellipsis stands in until its
     // name has loaded.
     { label: name || "…" },
@@ -210,17 +212,17 @@ export default function SecretDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/secrets")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -228,8 +230,10 @@ export default function SecretDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Secret"
-        description={`Delete "${getValues("name")}"? Anything still referencing it will fail at its next use.`}
+        title={t("secrets.deleteSecret")}
+        description={t("secrets.deleteValueAnythingStillReferencingItWill", {
+          value: getValues("name"),
+        })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

@@ -21,6 +21,7 @@ import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createMcpServer, setMcpServerTags } from "@/lib/api";
 import { parsePrefill } from "@/lib/mcp-registry-prefill";
 import { Role, useHasRole } from "@/lib/roles";
@@ -29,6 +30,7 @@ import { showToast } from "@/store/toastSlice";
 
 /** The create form itself; reads registry prefill from the URL search params. */
 function NewMcpServerForm() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
@@ -68,7 +70,7 @@ function NewMcpServerForm() {
         if (tagIds.length > 0) {
           await setMcpServerTags(created.id, tagIds);
         }
-        dispatch(showToast({ message: "MCP server created" }));
+        dispatch(showToast({ message: t("mcpServers.mcpServerCreated") }));
         router.push("/mcp-servers");
       });
     } catch {
@@ -77,9 +79,9 @@ function NewMcpServerForm() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "MCP Servers", href: "/mcp-servers" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.mcpServers"), href: "/mcp-servers" },
+    { label: t("common.new") },
   ];
 
   // The list page hides Add and Browse registry for this viewer, so reaching the
@@ -97,7 +99,7 @@ function NewMcpServerForm() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New MCP Server" icon={Server} />
+      <AdminPageHeader title={t("mcpServers.newMcpServer")} icon={Server} />
 
       <FormColumn>
         <form
@@ -120,12 +122,12 @@ function NewMcpServerForm() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/mcp-servers")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

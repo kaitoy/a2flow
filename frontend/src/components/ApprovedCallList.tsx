@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/i18n/provider";
 import { type ApprovedCall, listMcpServers } from "@/lib/api";
 import { Chip } from "./ui/chip";
 
@@ -71,6 +72,7 @@ interface ApprovedCallListProps {
  * failed lookup) falls back to its id.
  */
 export function ApprovedCallList({ calls }: ApprovedCallListProps) {
+  const t = useT();
   const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
   const hasCalls = calls.length > 0;
 
@@ -95,7 +97,7 @@ export function ApprovedCallList({ calls }: ApprovedCallListProps) {
 
   return (
     <section className="mt-3">
-      <h4 className="text-label-caps text-on-surface-variant">This authorizes</h4>
+      <h4 className="text-label-caps text-on-surface-variant">{t("app.thisAuthorizes")}</h4>
       <ul className="mt-2 flex flex-col gap-2">
         {calls.map((call) => {
           const args = Object.entries((call.arguments ?? {}) as Record<string, Constraint>);
@@ -106,7 +108,7 @@ export function ApprovedCallList({ calls }: ApprovedCallListProps) {
               />
               {call.unconstrainedArguments === true && (
                 <p className="mt-1 ml-1 text-xs text-on-surface-variant">
-                  Any input — this tool only reads, so its input is not bounded.
+                  {t("app.anyInputThisToolOnlyReadsSo")}
                 </p>
               )}
               {args.length > 0 && (

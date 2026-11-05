@@ -10,7 +10,8 @@
 "use client";
 
 import { Chip } from "@/components/ui/chip";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { useT } from "@/i18n/provider";
+import { type Role, roleLabel } from "@/lib/roles";
 
 /** Props for {@link InheritedRoles}. */
 export interface InheritedRolesProps {
@@ -28,7 +29,7 @@ export function InheritedRoles({ roles }: InheritedRolesProps) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       {roles.map((role) => (
-        <Chip key={role} label={ROLE_LABELS[role]} />
+        <Chip key={role} label={roleLabel(role)} />
       ))}
     </span>
   );
@@ -39,19 +40,17 @@ export function InheritedRoles({ roles }: InheritedRolesProps) {
  * {@link RolesField}.
  */
 export function InheritedRolesField({ roles }: InheritedRolesProps) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">Roles from groups</span>
+      <span className="text-label-caps">{t("admin.rolesFromGroups")}</span>
       {roles.length === 0 ? (
-        <p className="text-xs text-on-surface-variant">
-          This user belongs to no group that grants a role.
-        </p>
+        <p className="text-xs text-on-surface-variant">{t("admin.thisUserBelongsToNoGroupThat")}</p>
       ) : (
         <>
           <InheritedRoles roles={roles} />
           <p className="text-xs text-on-surface-variant">
-            Granted by group membership. Edit the groups below, or the group itself, to change
-            these.
+            {t("admin.grantedByGroupMembershipEditTheGroups")}
           </p>
         </>
       )}

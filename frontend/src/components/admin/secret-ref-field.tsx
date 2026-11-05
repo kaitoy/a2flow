@@ -40,11 +40,12 @@ import { Chip } from "@/components/ui/chip";
 import type { ColumnDef } from "@/components/ui/data-table";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import { listSecretKeys, listSecrets, type Secret } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
 /** Label of the entry select's "no entry chosen" option. */
-const NONE_LABEL = "None";
+const NONE_LABEL = "common.none";
 
 /** Props for {@link SecretPickerDialog}. */
 interface SecretPickerDialogProps {
@@ -72,17 +73,18 @@ interface SecretPickerDialogProps {
  * the picker has actually been opened, not on every mount of the field.
  */
 function SecretPickerDialog({ open, onClose, onAssign, panelId, value }: SecretPickerDialogProps) {
+  const t = useT();
   const { byId: tagsById } = useTags();
   const columns: ColumnDef<Secret>[] = [
     {
-      header: "Name",
+      header: "common.name",
       sortField: "name",
       filterField: "name",
       visibility: "always",
       cell: (secret) => secret.name,
     },
     {
-      header: "Description",
+      header: "common.description",
       cell: (secret) => secret.description || "—",
     },
     tagsColumn<Secret>((secret) => secret.tagIds, tagsById),
@@ -94,7 +96,7 @@ function SecretPickerDialog({ open, onClose, onAssign, panelId, value }: SecretP
       onClose={onClose}
       onAssign={(ids) => onAssign(ids[0] ?? "")}
       panelId={panelId}
-      title="Select secret"
+      title={t("admin.selectSecret")}
       // Keyed by name, not id: a reference stores the secret's name, and
       // resolving it is deferred to clone time.
       value={value === "" ? [] : [value]}
@@ -103,7 +105,7 @@ function SecretPickerDialog({ open, onClose, onAssign, panelId, value }: SecretP
       columns={columns}
       getId={(secret) => secret.name}
       getLabel={(secret) => secret.name}
-      emptyMessage="This tenant has no secrets yet."
+      emptyMessage={t("admin.thisTenantHasNoSecretsYet")}
       emptyIcon={KeyRound}
     />
   );
@@ -155,6 +157,7 @@ export function SecretRefField({
   error,
   disabled = false,
 }: SecretRefFieldProps) {
+  const t = useT();
   const [keys, setKeys] = useState<string[]>([]);
   const [keysFailed, setKeysFailed] = useState(false);
   // Id of the secret `name` resolves to, and whether the lookup has positively
@@ -242,18 +245,18 @@ export function SecretRefField({
   const keyOptions: SelectOption[] = [
     { value: "", label: NONE_LABEL },
     ...(keyUnlisted
-      ? [{ value: refKey, label: keyMissing ? `${refKey} (not found)` : refKey }]
+      ? [{ value: refKey, label: keyMissing ? t("ui.valueNotFound", { value: refKey }) : refKey }]
       : []),
     ...keys.map((key) => ({ value: key, label: key })),
   ];
 
   let warning: string | null = null;
   if (nameMissing) {
-    warning = `No secret named "${name}" is registered. This will fail when it is used.`;
+    warning = t("admin.noSecretNamedNameIsRegisteredThis", { name });
   } else if (keysFailed) {
-    warning = `Could not list the entries of "${name}". The stored key is kept as it is.`;
+    warning = t("admin.couldNotListTheEntriesOfName", { name });
   } else if (keyMissing) {
-    warning = `Secret "${name}" has no entry "${refKey}". This will fail when it is used.`;
+    warning = t("admin.secretNameHasNoEntryRefkeyThis", { name, refKey });
   }
 
   /** Apply a newly chosen secret, dropping the entry chosen under the old one. */
@@ -288,7 +291,7 @@ export function SecretRefField({
           ) : (
             <div>
               <Button type="button" variant="secondary" onClick={openPicker}>
-                Select secret…
+                {t("admin.selectSecret2")}
               </Button>
             </div>
           )}
@@ -304,7 +307,7 @@ export function SecretRefField({
             <span className="text-label-caps">{label}</span>
             <div className="flex flex-wrap gap-1.5">
               <Chip
-                label={nameMissing ? `${name} (not found)` : name}
+                label={nameMissing ? t("ui.valueNotFound", { value: name }) : name}
                 onRemove={disabled ? undefined : () => handleName("")}
                 size="lg"
               />
@@ -312,13 +315,13 @@ export function SecretRefField({
             {!disabled && (
               <div>
                 <Button type="button" variant="secondary" onClick={openPicker}>
-                  Select secret…
+                  {t("admin.selectSecret2")}
                 </Button>
               </div>
             )}
             {error && <p className="text-xs text-error">{error}</p>}
           </div>
-          <FormField htmlFor={`${idPrefix}Key`} label="Entry Key">
+          <FormField htmlFor={`${idPrefix}Key`} label={t("admin.entryKey")}>
             <Select
               id={`${idPrefix}Key`}
               options={keyOptions}

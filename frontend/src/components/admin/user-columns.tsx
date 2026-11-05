@@ -26,13 +26,13 @@ import { formatUserName, type User } from "@/lib/api";
  */
 export const USER_SHARED_COLUMNS: ColumnDef<User>[] = [
   {
-    header: "Name",
+    header: "common.name",
     sortField: "firstName",
     filterField: "firstName",
     cell: (u) => formatUserName(u),
   },
   {
-    header: "Email",
+    header: "common.email",
     sortField: "email",
     filterField: "email",
     visibility: "optional",

@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { UsersRound } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import type { ColumnDef } from "@/components/ui/data-table";
+import type { MessageKey } from "@/i18n/messages/en";
 import type { ListQuery } from "@/lib/api";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { RecordPickerDialog, type RecordPickerDialogProps } from "./record-picker-dialog";
@@ -11,11 +12,13 @@ interface Row {
   name: string;
 }
 
-const COLUMNS: ColumnDef<Row>[] = [{ header: "Name", visibility: "always", cell: (r) => r.name }];
+const COLUMNS: ColumnDef<Row>[] = [
+  { header: "Name" as MessageKey, visibility: "always", cell: (r) => r.name },
+];
 
 /** A `filterKind: "tags"` column, for the tag-filter-wiring test below. */
 const TAG_COLUMN: ColumnDef<Row> = {
-  header: "Tags",
+  header: "Tags" as MessageKey,
   filterKind: "tags",
   tagOptions: [{ value: "t1", label: "prod" }],
   cell: () => null,

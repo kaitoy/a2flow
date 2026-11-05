@@ -30,6 +30,8 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import { deleteSecret, listSecrets, type Secret } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 
@@ -38,13 +40,14 @@ const LIMIT = 20;
 function buildColumns(
   names: Map<string, string>,
   tenantNames: Map<string, string>,
-  isAllTenantsView: boolean
+  isAllTenantsView: boolean,
+  t: Translator
 ): ColumnDef<Secret>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<Secret>(tenantNames)] : []),
     idColumn<Secret>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -58,29 +61,29 @@ function buildColumns(
       ),
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       cell: (s) => s.description || "—",
     },
     {
-      header: "Type",
+      header: "common.type" as const,
       sortField: "type",
       filterField: "type",
-      cell: (s) => (s.type === "vault" ? "Vault" : "Local"),
+      cell: (s) => (s.type === "vault" ? "Vault" : t("secrets.typeLocal")),
     },
     {
-      header: "Reference",
+      header: "secrets.reference" as const,
       visibility: "optional",
       cell: (s) =>
         s.type === "vault" ? (
           `${s.vaultMount}/${s.vaultPath}`
         ) : (
           <span className="text-on-surface-variant">
-            {(s.keys ?? []).length === 1 ? "1 entry" : `${(s.keys ?? []).length} entries`}
+            {t("secrets.entries", { count: (s.keys ?? []).length })}
           </span>
         ),
     },
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
@@ -90,6 +93,7 @@ function buildColumns(
 }
 
 export default function SecretsPage() {
+  const t = useT();
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
   const {
     rows,
@@ -131,12 +135,12 @@ export default function SecretsPage() {
   }
 
   const columns: ColumnDef<Secret>[] = [
-    ...buildColumns(names, tenantNames, isAllTenantsView),
+    ...buildColumns(names, tenantNames, isAllTenantsView, t),
     tagsColumn<Secret>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (secret: Secret) => (
@@ -156,12 +160,14 @@ export default function SecretsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Secrets" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.secrets") }]}
+      />
       <AdminPageHeader
-        title="Secrets"
+        title={t("common.secrets")}
         icon={KeyRound}
         addHref={canEdit ? "/secrets/new" : undefined}
-        addLabel="+ Add secret"
+        addLabel={t("secrets.addSecret")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -178,7 +184,7 @@ export default function SecretsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No secrets registered yet."
+        emptyMessage={t("secrets.noSecretsRegisteredYet")}
         emptyIcon={KeyRound}
         getRowKey={(secret) => secret.id}
         sort={sort}
@@ -197,10 +203,10 @@ export default function SecretsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Secret"
+        title={t("secrets.deleteSecret")}
         description={
           confirmTarget
-            ? `Delete "${confirmTarget.name}"? Anything still referencing it will fail at its next use.`
+            ? t("secrets.deleteNameAnythingStillReferencingItWill", { name: confirmTarget.name })
             : ""
         }
         onConfirm={executeDelete}

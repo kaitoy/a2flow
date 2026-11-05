@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useMemo } from "react";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { Avatar } from "@/components/ui/avatar";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/provider";
 import { A2UI_SOURCE_TOOL_CALL_ID_KEY } from "@/lib/agentActivity";
 import { formatUserName, type User } from "@/lib/api";
 import { APPROVAL_ACTIVITY_TYPE } from "@/lib/approvalTool";
@@ -68,6 +69,7 @@ export function useSessionSenderRenderer({
   locallySentMessageIds,
   currentUser,
 }: SessionSenderRendererOptions): SessionSenderRenderer {
+  const t = useT();
   /**
    * The user id credited with a message, or `null` when nobody is — the agent's
    * own messages, and surfaces nobody has acted on yet.
@@ -101,7 +103,7 @@ export function useSessionSenderRenderer({
     (message: Message): ReactNode => {
       /** Render a tooltip-wrapped avatar for the given (possibly unresolved) user. */
       const userAvatar = (user: User | null): ReactNode => (
-        <Tooltip label={user ? formatUserName(user) : "Unknown sender"}>
+        <Tooltip label={user ? formatUserName(user) : t("chat.unknownSender")}>
           <span className="inline-flex">
             <Avatar user={user} size={28} />
           </span>
@@ -137,7 +139,7 @@ export function useSessionSenderRenderer({
       }
       return null;
     },
-    [agentLabel, senderUsers, currentUser, resolveSenderId]
+    [agentLabel, senderUsers, currentUser, resolveSenderId, t]
   );
 
   const isOwnMessage = useCallback(

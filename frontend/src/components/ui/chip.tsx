@@ -7,12 +7,13 @@
 
 import { Check, Lock, type LucideIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/i18n/provider";
 import type { TagColor } from "@/lib/api";
 import { TAG_COLOR_CLASS } from "@/lib/tag-palette";
 import { Tooltip } from "./tooltip";
 
 /** Accessible name of the lock glyph a {@link ChipProps.locked} chip carries. */
-export const LOCKED_CHIP_LABEL = "Access control";
+export const LOCKED_CHIP_LABEL = "common.accessControl";
 
 /** Props for {@link Chip}. */
 interface ChipProps {
@@ -278,6 +279,7 @@ export function Chip({
   selected = false,
   size = "sm",
 }: ChipProps) {
+  const t = useT();
   const ref = useRef<HTMLSpanElement>(null);
   const [overflowing, setOverflowing] = useState(false);
   // A colored chip swaps the neutral glass surface for the slot's tint rather
@@ -311,7 +313,7 @@ export function Chip({
           size={12}
           strokeWidth={2}
           role="img"
-          aria-label={LOCKED_CHIP_LABEL}
+          aria-label={t(LOCKED_CHIP_LABEL)}
           className="mr-1 shrink-0"
         />
       )}
@@ -338,7 +340,7 @@ export function Chip({
       {onRemove && (
         <button
           type="button"
-          aria-label={`Remove ${label}`}
+          aria-label={t("ui.removeLabel", { label })}
           onClick={onRemove}
           className={REMOVE_BUTTON_CLASS}
         >

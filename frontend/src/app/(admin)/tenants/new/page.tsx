@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { zTenantCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createTenant } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
@@ -30,6 +31,7 @@ const schema = zTenantCreate;
 type FormValues = z.infer<typeof schema>;
 
 export default function NewTenantPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
 
@@ -56,7 +58,7 @@ export default function NewTenantPage() {
           name: values.name,
           enabled: values.enabled,
         });
-        dispatch(showToast({ message: "Tenant created" }));
+        dispatch(showToast({ message: t("tenants.tenantCreated") }));
         dispatch(tenantsChanged());
         router.push("/tenants");
       });
@@ -66,15 +68,15 @@ export default function NewTenantPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Tenants", href: "/tenants" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.tenants"), href: "/tenants" },
+    { label: t("common.new") },
   ];
 
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New Tenant" icon={Building2} />
+      <AdminPageHeader title={t("tenants.newTenant")} icon={Building2} />
 
       <FormColumn>
         <form
@@ -83,22 +85,26 @@ export default function NewTenantPage() {
         >
           <FormField
             htmlFor="displayName"
-            label="Display Name"
+            label={t("tenants.displayName")}
             required
             error={errors.displayName?.message}
           >
-            <Input id="displayName" placeholder="e.g. Acme Corp" {...register("displayName")} />
+            <Input
+              id="displayName"
+              placeholder={t("tenants.eGAcmeCorp")}
+              {...register("displayName")}
+            />
           </FormField>
 
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+          <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
             <Input
               id="name"
-              placeholder="Lowercase kebab-case, e.g. acme-corp"
+              placeholder={t("tenants.lowercaseKebabCaseEGAcmeCorp")}
               {...register("name")}
             />
           </FormField>
 
-          <Checkbox label="Enabled" {...register("enabled")} />
+          <Checkbox label={t("common.enabled")} {...register("enabled")} />
 
           <div className="flex gap-2">
             <Button
@@ -106,12 +112,12 @@ export default function NewTenantPage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/tenants")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

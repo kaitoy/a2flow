@@ -3,6 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link ConfirmDialog}. */
 interface ConfirmDialogProps {
@@ -29,9 +30,10 @@ export function ConfirmDialog({
   description,
   onConfirm,
   onCancel,
-  confirmLabel = "Delete",
+  confirmLabel = "common.delete",
   confirmVariant = "danger",
 }: ConfirmDialogProps) {
+  const t = useT();
   return (
     <Dialog
       open={open}
@@ -43,10 +45,10 @@ export function ConfirmDialog({
       footer={
         <>
           <Button variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button variant={confirmVariant} onClick={onConfirm}>
-            {confirmLabel}
+            {t.maybe(confirmLabel)}
           </Button>
         </>
       }

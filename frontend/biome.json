@@ -24,6 +24,14 @@
   },
   "overrides": [
     {
+      "includes": ["src/i18n/messages/**"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noTemplateCurlyInString": "off" }
+        }
+      }
+    },
+    {
       "includes": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**"],
       "linter": {
         "rules": {

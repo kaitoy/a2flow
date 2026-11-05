@@ -86,7 +86,7 @@ describe("ExecutionSessionTabs", () => {
         onChange={() => {}}
       />
     );
-    const at = new Date(resumeAt).toLocaleString(undefined, {
+    const at = new Date(resumeAt).toLocaleString("en", {
       dateStyle: "short",
       timeStyle: "short",
     });

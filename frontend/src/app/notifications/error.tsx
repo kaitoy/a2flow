@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { RouteErrorFallback } from "@/components/ui/route-error-fallback";
+import { useT } from "@/i18n/provider";
 
 /**
  * Error boundary for `/notifications`. Renders inside `NotificationsLayout`
@@ -15,11 +16,17 @@ export default function RouteError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useT();
   useEffect(() => {
     console.error("uncaught render error", error);
   }, [error]);
 
   return (
-    <RouteErrorFallback reset={reset} fill="full" homeHref="/" homeLabel="Back to dashboard" />
+    <RouteErrorFallback
+      reset={reset}
+      fill="full"
+      homeHref="/"
+      homeLabel={t("common.backToDashboard")}
+    />
   );
 }

@@ -1,12 +1,16 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useT } from "@/i18n/provider";
 
 /** Number of quick-action cards on the welcome page: "Start chat" plus each `adminNavItems` entry. */
 const CARD_COUNT = 7;
 
 /** Route loading fallback for the `/` welcome page, mirroring its title/subtitle + quick-action card grid. */
 export default function Loading() {
+  const t = useT();
   return (
-    <div role="status" aria-label="Loading" className="mx-auto max-w-5xl px-6 py-10">
+    <div role="status" aria-label={t("common.loading")} className="mx-auto max-w-5xl px-6 py-10">
       <div className="mb-8">
         <Skeleton className="h-8 w-64 rounded" />
         <Skeleton className="mt-3 h-4 w-96 rounded" />

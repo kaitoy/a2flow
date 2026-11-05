@@ -10,14 +10,18 @@
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
+import { useT } from "@/i18n/provider";
 import { Role, useHasRole } from "@/lib/roles";
 
 export default function SystemSettingsLayout({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const isSuperAdmin = useHasRole(Role.SUPER_ADMIN);
   if (!isSuperAdmin) {
     return (
       <AdminPageContainer>
-        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "System Settings" }]} />
+        <Breadcrumbs
+          items={[{ label: t("common.home"), href: "/" }, { label: t("common.systemSettings") }]}
+        />
         <AccessDeniedState fill="full" />
       </AdminPageContainer>
     );

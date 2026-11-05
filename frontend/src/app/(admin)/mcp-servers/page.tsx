@@ -33,6 +33,8 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import {
   deleteMcpServer,
   listMcpServers,
@@ -47,13 +49,14 @@ const LIMIT = 20;
 function buildColumns(
   names: Map<string, string>,
   tenantNames: Map<string, string>,
-  isAllTenantsView: boolean
+  isAllTenantsView: boolean,
+  t: Translator
 ): ColumnDef<McpServer>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<McpServer>(tenantNames)] : []),
     idColumn<McpServer>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -67,11 +70,11 @@ function buildColumns(
       ),
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       cell: (s) => s.description || "—",
     },
     {
-      header: "Transport",
+      header: "common.transport" as const,
       sortField: "transport",
       filterField: "transport",
       className: "text-center",
@@ -79,25 +82,24 @@ function buildColumns(
       cell: (s) => <Badge>{mcpTransportLabel(s.transport)}</Badge>,
     },
     {
-      header: "Endpoint",
+      header: "common.endpoint" as const,
       sortField: "url",
       filterField: "url",
       className: "font-mono",
       cell: (s) => mcpServerEndpoint(s),
     },
     {
-      header: "Headers / Env",
+      header: "mcpServers.headersEnv" as const,
       visibility: "optional",
       cell: (s) => {
         const isHttp = s.transport === "streamable_http";
         const count = Object.keys((isHttp ? s.headers : s.env) ?? {}).length;
         if (count === 0) return <span className="text-on-surface-variant">—</span>;
-        const noun = isHttp ? "header" : "variable";
-        return `${count} ${noun}${count === 1 ? "" : "s"}`;
+        return t(isHttp ? "mcpServers.headersCount" : "mcpServers.variablesCount", { count });
       },
     },
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       visibility: "optional",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
@@ -107,6 +109,7 @@ function buildColumns(
 }
 
 export default function McpServersPage() {
+  const t = useT();
   const canEdit = useHasRole(Role.DEVELOPER);
   const {
     rows,
@@ -156,12 +159,12 @@ export default function McpServersPage() {
   }
 
   const columns: ColumnDef<McpServer>[] = [
-    ...buildColumns(names, tenantNames, isAllTenantsView),
+    ...buildColumns(names, tenantNames, isAllTenantsView, t),
     tagsColumn<McpServer>((row) => row.tagIds, tagsById),
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (server: McpServer) => (
@@ -181,12 +184,14 @@ export default function McpServersPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "MCP Servers" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.mcpServers") }]}
+      />
       <AdminPageHeader
-        title="MCP Servers"
+        title={t("common.mcpServers")}
         icon={Server}
         addHref={canEdit ? "/mcp-servers/new" : undefined}
-        addLabel="+ Add server"
+        addLabel={t("mcpServers.addServer")}
         secondaryAction={
           // Browsing the registry only leads to the create form, so it is a
           // write entry point like Add.
@@ -197,7 +202,7 @@ export default function McpServersPage() {
               onClick={() => setRegistryOpen(true)}
             >
               <PackageSearch size={16} />
-              Browse registry
+              {t("mcpServers.browseRegistry")}
             </Button>
           ) : undefined
         }
@@ -217,7 +222,7 @@ export default function McpServersPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No MCP servers registered yet."
+        emptyMessage={t("mcpServers.noMcpServersRegisteredYet")}
         emptyIcon={Server}
         getRowKey={(server) => server.id}
         sort={sort}
@@ -236,8 +241,8 @@ export default function McpServersPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete MCP Server"
-        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        title={t("mcpServers.deleteMcpServer")}
+        description={confirmTarget ? t("common.deleteName", { name: confirmTarget.name }) : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

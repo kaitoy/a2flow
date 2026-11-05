@@ -19,6 +19,8 @@ import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
+import { translateStatus } from "@/i18n/translate";
 import { listOutboundEmails, type OutboundEmail } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -27,10 +29,10 @@ const LIMIT = 50;
 
 /** Filter options for a queued message's delivery status. */
 const STATUS_OPTIONS = [
-  { label: "Pending", value: "pending" },
-  { label: "Sending", value: "sending" },
-  { label: "Sent", value: "sent" },
-  { label: "Failed", value: "failed" },
+  { label: "audit.pending", value: "pending" },
+  { label: "audit.sending", value: "sending" },
+  { label: "common.sent", value: "sent" },
+  { label: "common.failed", value: "failed" },
 ];
 
 /**
@@ -46,6 +48,7 @@ const STATUS_OPTIONS = [
  * is admin-only rather than open to any signed-in viewer.
  */
 export default function AuditOutboundEmailsPage() {
+  const t = useT();
   const {
     rows,
     loading,
@@ -71,7 +74,7 @@ export default function AuditOutboundEmailsPage() {
       ...(isAllTenantsView ? [tenantColumn<OutboundEmail>(tenantNames)] : []),
       idColumn<OutboundEmail>(),
       {
-        header: "To",
+        header: "audit.to",
         sortField: "toEmail",
         filterField: "toEmail",
         visibility: "always",
@@ -85,27 +88,27 @@ export default function AuditOutboundEmailsPage() {
         ),
       },
       {
-        header: "Subject",
+        header: "audit.subject",
         sortField: "subject",
         filterField: "subject",
         cell: (e) => e.subject,
       },
       {
-        header: "Status",
+        header: "common.status",
         noTruncate: true,
         sortField: "status",
         filterField: "status",
         filterOp: "eq",
         filterOptions: STATUS_OPTIONS,
-        cell: (e) => <Badge>{e.status}</Badge>,
+        cell: (e) => <Badge>{translateStatus(e.status, t)}</Badge>,
       },
       {
-        header: "Attempts",
+        header: "audit.attempts",
         sortField: "attempts",
         cell: (e) => e.attempts,
       },
       {
-        header: "Sent At",
+        header: "audit.sentAt",
         sortField: "sentAt",
         cell: (e) =>
           e.sentAt ? (
@@ -115,34 +118,34 @@ export default function AuditOutboundEmailsPage() {
           ),
       },
       {
-        header: "Last Error",
+        header: "audit.lastError",
         cell: (e) => e.lastError || EMPTY_VALUE,
       },
       {
-        header: "Next Attempt At",
+        header: "audit.nextAttemptAt",
         visibility: "optional",
         sortField: "nextAttemptAt",
         cell: (e) => <DateTime value={e.nextAttemptAt} className="text-on-surface-variant" />,
       },
       {
-        header: "Body",
+        header: "audit.body",
         visibility: "optional",
         cell: (e) => e.body,
       },
       {
-        header: "Notification",
+        header: "audit.notification",
         visibility: "optional",
         cell: (e) => (e.notificationId ? `${e.notificationId.slice(0, 8)}…` : EMPTY_VALUE),
       },
       {
-        header: "Created At",
+        header: "common.createdAt",
         visibility: "optional",
         sortField: "createdAt",
         cell: (e) => <DateTime value={e.createdAt} className="text-on-surface-variant" />,
       },
       ...auditColumns<OutboundEmail>(names),
     ],
-    [names, tenantNames, isAllTenantsView]
+    [names, tenantNames, isAllTenantsView, t]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -154,14 +157,14 @@ export default function AuditOutboundEmailsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Audit Logs", href: "/audit" },
-          { label: "Emails" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.auditLogs"), href: "/audit" },
+          { label: t("common.emails") },
         ]}
       />
       <AuditTabs active="outbound-emails" />
       <AdminPageHeader
-        title="Outbound Emails"
+        title={t("audit.outboundEmails")}
         icon={Mail}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -179,7 +182,7 @@ export default function AuditOutboundEmailsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No notification email has been queued yet."
+        emptyMessage={t("audit.noNotificationEmailHasBeenQueuedYet")}
         emptyIcon={Mail}
         getRowKey={(e) => e.id}
         sort={sort}

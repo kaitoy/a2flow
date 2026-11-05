@@ -29,6 +29,8 @@ import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useTenantNames, useUserNames, useWorkflowNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import { formatRevision } from "@/lib/agent-skill-sync-status";
 import {
   deleteWorkflowExecution,
@@ -55,13 +57,14 @@ function buildColumns(
   tenantNames: Map<string, string>,
   isAllTenantsView: boolean,
   tagsById: Map<string, Tag>,
-  canViewPrompt: boolean
+  canViewPrompt: boolean,
+  t: Translator
 ): ColumnDef<WorkflowExecution>[] {
   return [
     ...(isAllTenantsView ? [tenantColumn<WorkflowExecution>(tenantNames)] : []),
     idColumn<WorkflowExecution>(),
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
@@ -78,7 +81,7 @@ function buildColumns(
       // Resolved from workflowId to the workflow's current name via workflowMap;
       // not sorted/filtered by the raw id. Falls back to the id, then an em dash
       // once the run's workflow has been deleted (workflowId is null).
-      header: "Workflow",
+      header: "workflowExecutions.workflow",
       visibility: "optional",
       cell: (s) =>
         s.workflowId ? (
@@ -93,15 +96,15 @@ function buildColumns(
         ),
     },
     {
-      header: "Status",
+      header: "common.status" as const,
       sortField: "status",
       filterField: "status",
       filterOp: "eq",
       filterOptions: [
-        { label: "Running", value: "running" },
-        { label: "Scheduled", value: "scheduled" },
-        { label: "Completed", value: "completed" },
-        { label: "Failed", value: "failed" },
+        { label: t("workflowExecutions.running"), value: "running" },
+        { label: t("workflowExecutions.scheduled"), value: "scheduled" },
+        { label: t("workflowExecutions.completed"), value: "completed" },
+        { label: t("common.failed"), value: "failed" },
       ],
       noTruncate: true,
       cell: (s) => <WorkflowExecutionStatusLabel status={s.status} />,
@@ -111,7 +114,7 @@ function buildColumns(
       // excluded from the operations metrics; the filter lets an operator hide
       // these from the list too. Off by default: only the pre-publish test runs
       // of a few developers, not something most operators need on screen.
-      header: "Draft",
+      header: "workflowExecutions.draft",
       sortField: "isDraft",
       filterField: "isDraft",
       filterOp: "eq",
@@ -124,15 +127,16 @@ function buildColumns(
       // A draft run that stubbed some of its tools. Not sortable or filterable:
       // toolMocks is a JSON column, so there is no scalar for the list query to
       // order or compare against.
-      header: "Mocked",
+      header: "common.mocked",
       visibility: "optional",
       noTruncate: true,
       className: "text-center",
-      cell: (s) => (s.toolMocks && s.toolMocks.length > 0 ? <Badge>Mocked</Badge> : null),
+      cell: (s) =>
+        s.toolMocks && s.toolMocks.length > 0 ? <Badge>{t("common.mocked")}</Badge> : null,
     },
     {
       // Resolved from initiatorId to a display name; not sorted/filtered by raw id.
-      header: "Initiator",
+      header: "workflowExecutions.initiator",
       cell: (s) =>
         s.initiatorId ? (
           <Link
@@ -146,12 +150,12 @@ function buildColumns(
         ),
     },
     {
-      header: "Created At",
+      header: "common.createdAt" as const,
       sortField: "createdAt",
       cell: (s) => <DateTime value={s.createdAt} className="text-on-surface-variant" />,
     },
     {
-      header: "Finished At",
+      header: "workflowExecutions.finishedAt" as const,
       visibility: "optional",
       cell: (s) =>
         s.finishedAt ? <DateTime value={s.finishedAt} className="text-on-surface-variant" /> : "—",
@@ -160,14 +164,14 @@ function buildColumns(
     ...(canViewPrompt
       ? [
           {
-            header: "Prompt",
+            header: "common.prompt" as const,
             visibility: "optional" as const,
             cell: (s: WorkflowExecution) => s.prompt || "—",
           },
         ]
       : []),
     {
-      header: "Agent Skill",
+      header: "common.agentSkill" as const,
       sortField: "agentSkillName",
       filterField: "agentSkillName",
       visibility: "optional",
@@ -181,19 +185,19 @@ function buildColumns(
       ),
     },
     {
-      header: "Agent Skill Repo URL",
+      header: "workflowExecutions.agentSkillRepoUrl" as const,
       visibility: "optional",
       className: "font-mono",
       cell: (s) => s.agentSkillRepoUrl,
     },
     {
-      header: "Agent Skill Repo Path",
+      header: "workflowExecutions.agentSkillRepoPath" as const,
       visibility: "optional",
       className: "font-mono",
       cell: (s) => s.agentSkillRepoPath || "—",
     },
     {
-      header: "Agent Skill Commit",
+      header: "workflowExecutions.agentSkillCommit" as const,
       visibility: "optional",
       className: "font-mono",
       cell: (s) => formatRevision(s.agentSkillCommitSha),
@@ -201,19 +205,19 @@ function buildColumns(
     ...auditColumns<WorkflowExecution>(userMap),
     tagsColumn<WorkflowExecution>((s) => s.tagIds, tagsById),
     {
-      header: "Actions",
+      header: "common.actions" as const,
       noTruncate: true,
       visibility: "always",
       cell: (s) => (
         <div className="flex justify-center gap-2">
           <ActionIconButton
             icon={ClipboardList}
-            label="View tasks"
+            label={t("workflowExecutions.viewTasks")}
             href={`/workflow-executions/${s.id}/workflow-tasks`}
           />
           <ActionIconButton
             icon={MessageSquareText}
-            label="Open workflow session"
+            label={t("common.openWorkflowSession")}
             href={`/workflow-executions/${s.id}/session`}
           />
           {isAdmin && <DeleteIconButton onClick={() => onDelete(s.id, s.name)} />}
@@ -225,6 +229,7 @@ function buildColumns(
 
 /** Admin list of WorkflowExecutions ordered by most recent first. */
 export default function WorkflowExecutionsPage() {
+  const t = useT();
   const {
     rows,
     loading,
@@ -278,15 +283,18 @@ export default function WorkflowExecutionsPage() {
       tenantNames,
       isAllTenantsView,
       tagsById,
-      canViewPrompt
+      canViewPrompt,
+      t
     )
   );
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Workflow Executions" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.workflowExecutions") }]}
+      />
       <AdminPageHeader
-        title="Workflow Executions"
+        title={t("common.workflowExecutions")}
         icon={ListChecks}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -304,7 +312,7 @@ export default function WorkflowExecutionsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No workflow executions yet. Run a workflow to create one."
+        emptyMessage={t("workflowExecutions.noWorkflowExecutionsYetRunAWorkflow")}
         emptyIcon={ListChecks}
         getRowKey={(s) => s.id}
         sort={sort}
@@ -321,8 +329,8 @@ export default function WorkflowExecutionsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Workflow Execution"
-        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        title={t("workflowExecutions.deleteWorkflowExecution")}
+        description={confirmTarget ? t("common.deleteName", { name: confirmTarget.name }) : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

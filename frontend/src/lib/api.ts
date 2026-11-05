@@ -100,6 +100,7 @@ import type {
   WorkflowVersionRead as WorkflowVersionModel,
 } from "@/generated/api/types.gen";
 import { DEFAULT_LOCALE } from "@/i18n/config";
+import type { MessageKey } from "@/i18n/messages/en";
 import { getActiveTranslator, type Translator } from "@/i18n/translate";
 import { store } from "@/store";
 import { showToast } from "@/store/toastSlice";
@@ -1295,6 +1296,12 @@ export async function deleteUserAvatar(id: string): Promise<User> {
   ) as Promise<User>;
 }
 
+/** The backend's fixed names for an account the caller may not see individually. */
+const MASKED_NAMES: Record<string, MessageKey> = {
+  "System User": "users.names.system",
+  "Super Admin": "users.names.superAdmin",
+};
+
 /**
  * Resolve a set of user IDs to their display names, in a single request.
  *
@@ -1307,7 +1314,8 @@ export async function deleteUserAvatar(id: string): Promise<User> {
  * The server omits IDs the caller may not see, so those are simply missing
  * from the returned map and callers fall back to the raw ID. Users the caller
  * cannot see individually but whose *kind* of account is not a secret come
- * back under a fixed placeholder instead ("System User", "Super Admin").
+ * back under a fixed placeholder instead ("System User", "Super Admin"), which
+ * is returned in the language on screen.
  */
 export async function getUserNames(ids: Iterable<string>): Promise<Map<string, string>> {
   const unique = [...new Set([...ids].filter(Boolean))];
@@ -1315,7 +1323,13 @@ export async function getUserNames(ids: Iterable<string>): Promise<Map<string, s
   const resolved = await unwrap(
     sdk.resolveUserNamesApiV1UsersResolveNamesPost({ body: { ids: unique } })
   );
-  return new Map((resolved ?? []).map((entry) => [entry.id, entry.displayName]));
+  const t = getActiveTranslator();
+  return new Map(
+    (resolved ?? []).map((entry) => {
+      const masked = MASKED_NAMES[entry.displayName];
+      return [entry.id, masked ? t(masked) : entry.displayName];
+    })
+  );
 }
 
 /**

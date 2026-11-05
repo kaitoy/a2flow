@@ -21,6 +21,7 @@ import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createSecret, setSecretTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
@@ -30,6 +31,7 @@ import { showToast } from "@/store/toastSlice";
 const schema = buildSecretFormSchema(true);
 
 export default function NewSecretPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.ADMIN, Role.DEVELOPER);
@@ -61,7 +63,7 @@ export default function NewSecretPage() {
         if (tagIds.length > 0) {
           await setSecretTags(created.id, tagIds);
         }
-        dispatch(showToast({ message: "Secret created" }));
+        dispatch(showToast({ message: t("secrets.secretCreated") }));
         router.push("/secrets");
       });
     } catch {
@@ -70,9 +72,9 @@ export default function NewSecretPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Secrets", href: "/secrets" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.secrets"), href: "/secrets" },
+    { label: t("common.new") },
   ];
 
   // The list page hides the Add button for this viewer, so reaching the form at
@@ -89,7 +91,7 @@ export default function NewSecretPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New Secret" icon={KeyRound} />
+      <AdminPageHeader title={t("secrets.newSecret")} icon={KeyRound} />
 
       <FormColumn>
         <form
@@ -112,12 +114,12 @@ export default function NewSecretPage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/secrets")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

@@ -3,6 +3,7 @@
 import { A2UI_OPERATIONS_KEY, A2UIActivityType, type A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { ActivityMessage } from "@ag-ui/core";
 import { type ReactNode, useMemo } from "react";
+import { useT } from "@/i18n/provider";
 import {
   mergeRecoveredValuesIntoPayload,
   parseActionContent,
@@ -87,6 +88,7 @@ export function ActivityMessageBubble({
   /** Whether the signed-in viewer may submit the pending A2UI surfaces (the run's initiator). */
   canActOnSurfaces?: boolean;
 }) {
+  const t = useT();
   // A2UI branch data, computed unconditionally (hooks can't follow the early
   // returns below) but only meaningful when activityType === A2UIActivityType.
   const payload = message.content[A2UI_OPERATIONS_KEY];
@@ -146,7 +148,7 @@ export function ActivityMessageBubble({
           />
           {!isResolved && !canActOnSurfaces && (
             <p className="mt-3 text-sm text-on-surface-variant">
-              Waiting for the initiator to respond.
+              {t("app.waitingForTheInitiatorToRespond")}
             </p>
           )}
         </div>

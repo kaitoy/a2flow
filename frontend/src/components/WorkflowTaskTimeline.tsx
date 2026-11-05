@@ -4,6 +4,7 @@ import { ChevronLeft, ListTree, Wrench } from "lucide-react";
 import { useRef, useState } from "react";
 import { TaskToolsDialog } from "@/components/TaskToolsDialog";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/provider";
 import { listMcpServers, type ToolBinding, type WorkflowTaskStatus } from "@/lib/api";
 import { formatStatusLabel, STATUS_RAIL_CLASS } from "@/lib/workflow-task-status";
 
@@ -87,6 +88,7 @@ export function WorkflowTaskTimeline({
   onToggle,
   className,
 }: WorkflowTaskTimelineProps) {
+  const t = useT();
   const [openToolsTask, setOpenToolsTask] = useState<TimelineTask | null>(null);
   const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
   const [serverNamesLoading, setServerNamesLoading] = useState(false);
@@ -113,7 +115,7 @@ export function WorkflowTaskTimeline({
         <button
           type="button"
           onClick={onToggle}
-          aria-label="Show task timeline"
+          aria-label={t("app.showTaskTimeline")}
           aria-expanded={false}
           className="rounded-lg p-2 pointer-coarse:p-3 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
         >
@@ -126,11 +128,11 @@ export function WorkflowTaskTimeline({
   return (
     <aside className={`${TASK_TIMELINE_ASIDE_CLASS} ${className ?? ""}`}>
       <div className={TASK_TIMELINE_HEADER_CLASS}>
-        <h2 className="text-label-caps">Tasks</h2>
+        <h2 className="text-label-caps">{t("app.tasks")}</h2>
         <button
           type="button"
           onClick={onToggle}
-          aria-label="Hide task timeline"
+          aria-label={t("app.hideTaskTimeline")}
           aria-expanded={true}
           className="rounded-lg p-1.5 pointer-coarse:p-2.5 text-on-surface-variant transition-colors hover:bg-glass hover:text-on-surface"
         >
@@ -139,7 +141,7 @@ export function WorkflowTaskTimeline({
       </div>
       <ol className={TASK_TIMELINE_LIST_CLASS}>
         {tasks.length === 0 ? (
-          <li className="px-2 py-3 text-sm text-on-surface-variant">No tasks yet.</li>
+          <li className="px-2 py-3 text-sm text-on-surface-variant">{t("app.noTasksYet")}</li>
         ) : (
           tasks.map((task, i) => {
             const status = task.status ?? null;
@@ -198,7 +200,7 @@ export function WorkflowTaskTimeline({
                     <button
                       type="button"
                       onClick={() => openToolsDialog(task)}
-                      aria-label={`${toolBindings.length} bound tool${toolBindings.length === 1 ? "" : "s"}`}
+                      aria-label={t("app.boundToolsCount", { count: toolBindings.length })}
                       className="ml-[1.875rem] mt-0.5 inline-flex items-center gap-1 rounded-full glass-panel px-1.5 py-0.5 text-xs text-on-surface-variant transition-all hover:text-accent hover:shadow-glow motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       <Wrench size={11} strokeWidth={1.8} aria-hidden="true" />

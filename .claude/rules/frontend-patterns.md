@@ -36,6 +36,22 @@ src/
     └── api.ts            # listSessions(), createChatAgent() with A2UIMiddleware; generated fetch SDK (`@/generated/api/sdk.gen`) + `unwrap()`; credentials + X-CSRF-Token via request interceptor; 401 → /login
 ```
 
+## GUI text
+
+Every string a person reads comes from the catalogs in `src/i18n/messages/`:
+
+| Where the text is | Use |
+|---|---|
+| A component or hook | `const t = useT();` then `t("key", { name })` |
+| A sentence with a link or `<code>` in it | `t.rich("key", { link: <Link … /> })` |
+| A module-level constant | The key as the value, translated where it is painted. `Select`, `CheckboxGroup`, `SegmentedControl`, `ChipRow`, `FormField`'s `error` and `DataTable`'s `header` already do this with `t.maybe` |
+| A Zod schema | The key as the message |
+| Code outside React that runs in the browser | `getActiveTranslator()`, never on the server |
+| A backend status value | `translateStatus(value, t)`, with the value under `status.` in the catalog |
+| `Intl` and `toLocale*` calls | Pass `t.locale` |
+
+Without a provider `useT()` returns English, so tests need no setup and assert on English text. A schema's messages are keys, so a test reading them from the schema directly asserts the key.
+
 ## Testing
 
 Unit tests are implemented with [Vitest](https://vitest.dev/), [Testing Library](https://testing-library.com/), and [MSW](https://mswjs.io/).

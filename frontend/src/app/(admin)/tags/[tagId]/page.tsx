@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import {
   deleteTag,
   getTag,
@@ -53,6 +54,7 @@ import { showToast } from "@/store/toastSlice";
  * to fail with a 403 on click.
  */
 export default function TagDetailPage() {
+  const t = useT();
   const { tagId } = useParams<{ tagId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -121,7 +123,7 @@ export default function TagDetailPage() {
     try {
       await save.run(async () => {
         await updateTag(tagId, { ...toTagUpdateBody(values), color });
-        dispatch(showToast({ message: "Tag updated" }));
+        dispatch(showToast({ message: t("tags.tagUpdated") }));
         router.push("/tags");
       });
     } catch {
@@ -140,8 +142,8 @@ export default function TagDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Tags", href: "/tags" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.tags"), href: "/tags" },
     // The tag itself is the current page; an ellipsis stands in until its name
     // has loaded.
     { label: name || "…" },
@@ -202,13 +204,13 @@ export default function TagDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/tags")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button
@@ -217,7 +219,7 @@ export default function TagDetailPage() {
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -225,8 +227,8 @@ export default function TagDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Tag"
-        description={`Delete "${name}"? It is removed from every record currently carrying it.`}
+        title={t("tags.deleteTag")}
+        description={t("tags.deleteNameItIsRemovedFromEvery", { name })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

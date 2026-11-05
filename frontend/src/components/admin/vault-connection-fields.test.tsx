@@ -35,17 +35,17 @@ describe("refineVaultConnection", () => {
 
   it("requires a credential unless one is saved for the same method", () => {
     const addr = { vaultAddr: "https://vault.example.com" };
-    expect(issues(addr)).toEqual(["Token is required"]);
+    expect(issues(addr)).toEqual(["admin.tokenIsRequired"]);
     expect(issues(addr, "token")).toEqual([]);
     expect(issues({ ...addr, vaultAuthMethod: "approle" }, "token")).toEqual([
-      "Secret ID is required",
-      "Role ID is required",
+      "admin.secretIdIsRequired",
+      "admin.roleIdIsRequired",
     ]);
   });
 
   it("rejects an address without a scheme", () => {
     expect(issues({ vaultAddr: "vault.example.com", vaultCredential: "t" })).toEqual([
-      "Enter an http:// or https:// address",
+      "admin.enterHttpAddress",
     ]);
   });
 });

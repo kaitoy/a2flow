@@ -1,6 +1,7 @@
 "use client";
 
 import { Background, BackgroundVariant, Controls, type NodeTypes, ReactFlow } from "@xyflow/react";
+import { useT } from "@/i18n/provider";
 import "@xyflow/react/dist/style.css";
 import { useMemo } from "react";
 import { buildLayoutedWorkflowGraph, type GraphTask } from "@/lib/workflow-graph";
@@ -49,6 +50,7 @@ export function WorkflowTaskGraph({
   tasks,
   serverNameById = EMPTY_SERVER_NAMES,
 }: WorkflowTaskGraphProps) {
+  const t = useT();
   const { theme } = useTheme();
   const { nodes, edges } = useMemo(
     () => buildLayoutedWorkflowGraph(tasks, serverNameById),
@@ -58,7 +60,7 @@ export function WorkflowTaskGraph({
   if (tasks.length === 0) {
     return (
       <div className="flex h-[70vh] items-center justify-center rounded-xl glass-panel text-on-surface-variant text-sm">
-        No tasks to visualize yet.
+        {t("app.noTasksToVisualizeYet")}
       </div>
     );
   }
@@ -77,6 +79,12 @@ export function WorkflowTaskGraph({
         edgesFocusable={false}
         onlyRenderVisibleElements
         proOptions={{ hideAttribution: true }}
+        ariaLabelConfig={{
+          "controls.ariaLabel": t("graph.controls"),
+          "controls.zoomIn.ariaLabel": t("graph.zoomIn"),
+          "controls.zoomOut.ariaLabel": t("graph.zoomOut"),
+          "controls.fitView.ariaLabel": t("graph.fitView"),
+        }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} />
         <Controls showInteractive={false} />

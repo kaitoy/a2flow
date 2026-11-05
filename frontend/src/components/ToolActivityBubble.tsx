@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
+import { useT } from "@/i18n/provider";
 import type { ToolCallActivityContent } from "@/lib/agentActivity";
 import { Badge } from "./ui/badge";
 import { JsonBlock } from "./ui/json-block";
@@ -30,6 +31,7 @@ function DetailBlock({ label, value }: { label: string; value: unknown }) {
  * never reaches the MCP gateway, so it leaves no audit row behind.
  */
 export function ToolActivityBubble({ content }: { content: ToolCallActivityContent }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
   const running = content.status === "running";
@@ -46,8 +48,8 @@ export function ToolActivityBubble({ content }: { content: ToolCallActivityConte
       )}
       <span className="font-mono font-medium text-on-surface">{content.name}</span>
       {content.isMcp && <Badge>MCP</Badge>}
-      {content.mocked && <Badge>Mocked</Badge>}
-      <span>{running ? "running…" : "done"}</span>
+      {content.mocked && <Badge>{t("common.mocked")}</Badge>}
+      <span>{running ? t("app.running") : "done"}</span>
       {hasDetails && (
         <ChevronDown
           size={14}
@@ -92,8 +94,12 @@ export function ToolActivityBubble({ content }: { content: ToolCallActivityConte
           id={panelId}
           className="flex w-full max-w-[75%] flex-col gap-3 rounded-2xl glass-panel px-4 py-3"
         >
-          {content.args !== undefined && <DetailBlock label="Arguments" value={content.args} />}
-          {content.result !== undefined && <DetailBlock label="Result" value={content.result} />}
+          {content.args !== undefined && (
+            <DetailBlock label={t("common.arguments")} value={content.args} />
+          )}
+          {content.result !== undefined && (
+            <DetailBlock label={t("app.result")} value={content.result} />
+          )}
         </div>
       )}
     </div>

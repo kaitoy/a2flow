@@ -198,7 +198,7 @@ describe("mcpServerFormSchema", () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]).toMatchObject({
       path: ["url"],
-      message: "URL is required",
+      message: "admin.urlIsRequired",
     });
   });
 
@@ -231,7 +231,7 @@ describe("mcpServerFormSchema", () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]).toMatchObject({
       path: ["source"],
-      message: "Source is required",
+      message: "admin.sourceIsRequired",
     });
   });
 });

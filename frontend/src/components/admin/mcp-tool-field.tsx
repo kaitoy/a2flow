@@ -31,6 +31,7 @@ import { Chip } from "@/components/ui/chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { type UseMcpServerToolsResult, useMcpServerTools } from "@/hooks/useMcpServerTools";
+import { useT } from "@/i18n/provider";
 import { getApiErrorMessage, listMcpServers } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -96,6 +97,7 @@ export function McpToolField({
   readOnly = false,
   tools: providedTools,
 }: McpToolFieldProps) {
+  const t = useT();
   const [registry, setRegistry] = useState<RegistryState>({ phase: "loading" });
   // Holds the name the dialog last reported, so the chip has a label before the
   // registry read lands — and the only label when that read failed.
@@ -148,16 +150,16 @@ export function McpToolField({
 
   // The select's placeholder carries the state: an empty dropdown alone cannot
   // say whether the server is slow, silent, or unreachable.
-  let placeholder = "Select a tool…";
+  let placeholder = t("admin.selectATool");
   let toolsDisabled = false;
   if (tools.phase === "idle" || tools.phase === "loading") {
-    placeholder = "Loading tools…";
+    placeholder = t("admin.loadingTools");
     toolsDisabled = true;
   } else if (tools.phase === "error") {
-    placeholder = "Could not load tools";
+    placeholder = t("admin.couldNotLoadTools");
     toolsDisabled = true;
   } else if (toolNames.length === 0) {
-    placeholder = "No tools advertised";
+    placeholder = t("admin.noToolsAdvertised");
     toolsDisabled = true;
   }
   // A stored value that isn't in the listing must still be selectable — if only
@@ -165,9 +167,14 @@ export function McpToolField({
   if (toolUnlisted) toolsDisabled = false;
 
   const toolOptions: SelectOption[] = [
-    { value: "", label: toolName === "" ? placeholder : "None" },
+    { value: "", label: toolName === "" ? placeholder : t("common.none") },
     ...(toolUnlisted
-      ? [{ value: toolName, label: toolMissing ? `${toolName} (not found)` : toolName }]
+      ? [
+          {
+            value: toolName,
+            label: toolMissing ? t("ui.valueNotFound", { value: toolName }) : toolName,
+          },
+        ]
       : []),
     ...toolNames.map((name) => ({ value: name, label: name })),
   ];
@@ -188,11 +195,11 @@ export function McpToolField({
     return (
       <>
         <div className="flex flex-col gap-1.5">
-          <span className="text-label-caps">MCP Server</span>
+          <span className="text-label-caps">{t("admin.mcpServer")}</span>
           <ReadOnlyField>{serverLabel || EMPTY_VALUE}</ReadOnlyField>
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="text-label-caps">Tool Name</span>
+          <span className="text-label-caps">{t("admin.toolName")}</span>
           <ReadOnlyField>{toolName || EMPTY_VALUE}</ReadOnlyField>
         </div>
       </>
@@ -206,18 +213,20 @@ export function McpToolField({
           <EmptyState
             icon={Server}
             compact
-            title="Loading MCP servers…"
-            description="Reading the registered servers."
+            title={t("admin.loadingMcpServers")}
+            description={t("admin.readingTheRegisteredServers")}
           />
         </div>
       )}
 
       {registry.phase === "error" && (
         <div className="flex flex-col items-start gap-2 rounded-xl glass-panel px-4 py-3">
-          <p className="text-sm text-on-surface-variant">Could not load the MCP server registry.</p>
+          <p className="text-sm text-on-surface-variant">
+            {t("admin.couldNotLoadTheMcpServerRegistry")}
+          </p>
           <p className="text-xs text-error">{registry.message}</p>
           <Button type="button" variant="secondary" onClick={() => void loadRegistry()}>
-            Retry
+            {t("common.retry")}
           </Button>
         </div>
       )}
@@ -225,21 +234,23 @@ export function McpToolField({
       {registry.phase === "ready" &&
         (registry.names.size === 0 && mcpServerId === "" ? (
           <p className="rounded-xl glass-panel px-4 py-3 text-sm text-on-surface-variant">
-            No MCP servers are registered.{" "}
-            <Link href="/mcp-servers" className="text-accent transition-colors hover:underline">
-              Register one
-            </Link>{" "}
-            to point this mock at one of its tools.
+            {t.rich("admin.noMcpServersAreRegisteredLink1To", {
+              link1: (
+                <Link href="/mcp-servers" className="text-accent transition-colors hover:underline">
+                  {t("admin.registerOne")}
+                </Link>
+              ),
+            })}
           </p>
         ) : mcpServerId === "" ? (
           // Nothing is chosen yet, so there is nothing for the Tool select to
           // offer either. Collapse to the one control that does something,
           // exactly as `SecretRefField` and `McpToolPicker` do.
           <div className="flex flex-col gap-1.5">
-            <span className="text-label-caps">MCP Server</span>
+            <span className="text-label-caps">{t("admin.mcpServer")}</span>
             <div>
               <Button type="button" variant="secondary" onClick={openPicker}>
-                Select MCP server…
+                {t("admin.selectMcpServer2")}
               </Button>
             </div>
             {serverError && <p className="text-xs text-error">{serverError}</p>}
@@ -249,18 +260,18 @@ export function McpToolField({
             {/* Deliberately not a FormField: its `<label htmlFor>` would become
                 the accessible name of the "Select MCP server…" button. */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-label-caps">MCP Server</span>
+              <span className="text-label-caps">{t("admin.mcpServer")}</span>
               <div className="flex flex-wrap gap-1.5">
                 <Chip label={serverLabel} onRemove={() => handleServer("", "")} size="lg" />
               </div>
               <div>
                 <Button type="button" variant="secondary" onClick={openPicker}>
-                  Select MCP server…
+                  {t("admin.selectMcpServer2")}
                 </Button>
               </div>
               {serverError && <p className="text-xs text-error">{serverError}</p>}
             </div>
-            <FormField htmlFor={`${idPrefix}Tool`} label="Tool Name" error={toolError}>
+            <FormField htmlFor={`${idPrefix}Tool`} label={t("admin.toolName")} error={toolError}>
               <Select
                 id={`${idPrefix}Tool`}
                 options={toolOptions}
@@ -272,7 +283,7 @@ export function McpToolField({
                 <div className="flex flex-col items-start gap-1.5">
                   <p className="text-xs text-error">{tools.message}</p>
                   <Button type="button" variant="secondary" onClick={reloadTools}>
-                    Retry
+                    {t("common.retry")}
                   </Button>
                 </div>
               )}

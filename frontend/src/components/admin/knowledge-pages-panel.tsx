@@ -9,6 +9,7 @@ import { MarkdownContentDialog } from "@/components/admin/markdown-content-dialo
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { DateTime } from "@/components/ui/date-time";
 import { SectionCard } from "@/components/ui/section-card";
+import { useT } from "@/i18n/provider";
 import { getKnowledgePage, type KnowledgePageSummary, listKnowledgePages } from "@/lib/api";
 import { okfToDisplayMarkdown } from "@/lib/okf-display";
 
@@ -28,6 +29,7 @@ export interface KnowledgePagesPanelProps {
  * page is fixed by fixing or removing its source.
  */
 export function KnowledgePagesPanel({ knowledgeBaseId, refreshKey = 0 }: KnowledgePagesPanelProps) {
+  const t = useT();
   const [pages, setPages] = useState<KnowledgePageSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [openPath, setOpenPath] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export function KnowledgePagesPanel({ knowledgeBaseId, refreshKey = 0 }: Knowled
 
   const columns: ColumnDef<KnowledgePageSummary>[] = [
     {
-      header: "Page",
+      header: "admin.page",
       visibility: "always",
       noTruncate: true,
       cell: (page) => (
@@ -79,23 +81,23 @@ export function KnowledgePagesPanel({ knowledgeBaseId, refreshKey = 0 }: Knowled
         </div>
       ),
     },
-    { header: "Type", cell: (page) => page.type },
-    { header: "Updated At", cell: (page) => <DateTime value={page.updatedAt} /> },
+    { header: "common.type", cell: (page) => page.type },
+    { header: "admin.updatedAt", cell: (page) => <DateTime value={page.updatedAt} /> },
   ];
 
   return (
-    <SectionCard icon={BookOpen} title="Pages" className="mt-4">
+    <SectionCard icon={BookOpen} title={t("admin.pages")} className="mt-4">
       <DataTable
         columns={columns}
         rows={pages}
         loading={loading}
-        emptyMessage="No pages yet. They appear here once a source has been read."
+        emptyMessage={t("admin.noPagesYetTheyAppearHereOnce")}
         emptyIcon={BookOpen}
         getRowKey={(page) => page.path}
       />
       <MarkdownContentDialog
         open={openPath !== null}
-        title={pages.find((p) => p.path === openPath)?.title ?? "Page"}
+        title={pages.find((p) => p.path === openPath)?.title ?? t("admin.page")}
         panelId="knowledge-page-dialog"
         load={loadPage}
         onClose={() => setOpenPath(null)}

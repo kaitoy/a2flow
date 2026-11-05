@@ -89,6 +89,20 @@ export function createTranslator(locale: Locale, messages: Messages): Translator
   return t;
 }
 
+/**
+ * A backend status value as a reader sees it: its translation under `status.`, or
+ * the value itself with underscores as spaces if it has none.
+ *
+ * @param status - The value, e.g. `in_progress`.
+ * @param t - The translator to use.
+ * @returns The text to show.
+ */
+export function translateStatus(status: string, t: Translator): string {
+  const key = `status.${status}`;
+  const text = t.maybe(key);
+  return text === key ? status.replaceAll("_", " ") : text;
+}
+
 /** The translator for the default language. */
 export const defaultTranslator = createTranslator(DEFAULT_LOCALE, en);
 

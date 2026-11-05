@@ -1,6 +1,9 @@
 /** @module InitiatorResumeNotice — the bar a workflow session shows while it waits for its initiator. */
+"use client";
+
 import { Hand } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/provider";
 
 /** What the initiator's resume button sends; the turn it starts may begin the held task. */
 export const RESUME_MESSAGE = "I'm here — resume the workflow.";
@@ -30,7 +33,8 @@ export function InitiatorResumeNotice({
   canResume,
   onSend,
 }: InitiatorResumeNoticeProps) {
-  const task = taskTitle ? `“${taskTitle}”` : "The next task";
+  const t = useT();
+  const task = taskTitle ? `“${taskTitle}”` : t("app.theNextTask");
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-3 rounded-xl glass-panel px-4 py-3 text-sm text-on-surface animate-message-in"
@@ -40,11 +44,11 @@ export function InitiatorResumeNotice({
         <Hand className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
         <span>
           {canResume
-            ? `${task} will ask you questions while it runs. Resume when you are ready to answer them.`
-            : `${task} is waiting for the person who started this run to resume it.`}
+            ? t("app.taskWillAskYouQuestionsWhileIt", { task })
+            : t("app.taskIsWaitingForThePersonWho", { task })}
         </span>
       </span>
-      {canResume && <Button onClick={() => onSend(RESUME_MESSAGE)}>Resume</Button>}
+      {canResume && <Button onClick={() => onSend(RESUME_MESSAGE)}>{t("app.resume")}</Button>}
     </div>
   );
 }

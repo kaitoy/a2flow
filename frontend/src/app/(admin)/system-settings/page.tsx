@@ -26,6 +26,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
 import { zSystemSettingsUpdate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import {
   getSystemSettings,
   type SmtpSecurity,
@@ -42,7 +43,7 @@ import { showToast } from "@/store/toastSlice";
 const SECURITY_OPTIONS: ReadonlyArray<SegmentedOption<SmtpSecurity>> = [
   { value: "starttls", label: "STARTTLS" },
   { value: "ssl", label: "SSL/TLS" },
-  { value: "none", label: "None" },
+  { value: "none", label: "common.none" },
 ];
 
 /**
@@ -121,7 +122,7 @@ function buildSchema(passwordSet: boolean) {
         ctx.addIssue({
           code: "custom",
           path: ["smtpPort"],
-          message: "Port must be a whole number between 1 and 65535",
+          message: "systemSettings.portMustBeAWholeNumberBetween",
         });
       }
 
@@ -130,14 +131,14 @@ function buildSchema(passwordSet: boolean) {
           ctx.addIssue({
             code: "custom",
             path: ["smtpHost"],
-            message: "Host is required when email delivery is enabled",
+            message: "systemSettings.hostIsRequiredWhenEmailDeliveryIs",
           });
         }
         if (values.smtpFromEmail === "") {
           ctx.addIssue({
             code: "custom",
             path: ["smtpFromEmail"],
-            message: "From address is required when email delivery is enabled",
+            message: "systemSettings.fromAddressIsRequiredWhenEmailDelivery",
           });
         }
       }
@@ -146,7 +147,7 @@ function buildSchema(passwordSet: boolean) {
         ctx.addIssue({
           code: "custom",
           path: ["smtpPassword"],
-          message: "Password is required when a username is set",
+          message: "systemSettings.passwordIsRequiredWhenAUsernameIs",
         });
       }
 
@@ -241,6 +242,7 @@ const CLEARED_SMTP_BODY: SystemSettingsUpdate = {
  * mounts.
  */
 export default function SystemSettingsPage() {
+  const t = useT();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
@@ -294,7 +296,7 @@ export default function SystemSettingsPage() {
         // The password is write-only, so the field goes back to blank: what is
         // stored is reported by the placeholder, not by the input's value.
         reset(toFormValues(saved));
-        dispatch(showToast({ message: "System settings updated" }));
+        dispatch(showToast({ message: t("systemSettings.systemSettingsUpdated") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -305,7 +307,7 @@ export default function SystemSettingsPage() {
     try {
       await test.run(async () => {
         await sendSmtpTestEmail();
-        dispatch(showToast({ message: "Test email sent" }));
+        dispatch(showToast({ message: t("systemSettings.testEmailSent") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -319,15 +321,18 @@ export default function SystemSettingsPage() {
         const saved = await updateSystemSettings(CLEARED_SMTP_BODY);
         setPasswordSet(saved.smtpPasswordSet ?? false);
         reset({ ...getValues(), ...EMPTY_SMTP_VALUES });
-        dispatch(showToast({ message: "SMTP settings cleared" }));
+        dispatch(showToast({ message: t("systemSettings.smtpSettingsCleared") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
-  const breadcrumbItems = [{ label: "Home", href: "/" }, { label: "System Settings" }];
-  const header = <AdminPageHeader title="System Settings" icon={Settings2} />;
+  const breadcrumbItems = [
+    { label: t("common.home"), href: "/" },
+    { label: t("common.systemSettings") },
+  ];
+  const header = <AdminPageHeader title={t("common.systemSettings")} icon={Settings2} />;
 
   if (loading) {
     return (
@@ -346,7 +351,7 @@ export default function SystemSettingsPage() {
         <Breadcrumbs items={breadcrumbItems} />
         <FormLayout header={header}>
           <p className="rounded-2xl glass-panel-strong p-6 text-on-surface-variant">
-            The system settings could not be loaded.
+            {t("systemSettings.theSystemSettingsCouldNotBeLoaded")}
           </p>
         </FormLayout>
       </AdminPageContainer>
@@ -363,7 +368,7 @@ export default function SystemSettingsPage() {
         >
           <FormField
             htmlFor="appBaseUrl"
-            label="Application Base URL"
+            label={t("systemSettings.applicationBaseUrl")}
             error={errors.appBaseUrl?.message}
           >
             <Input
@@ -372,7 +377,7 @@ export default function SystemSettingsPage() {
               {...register("appBaseUrl")}
             />
             <p className="text-xs text-on-surface-variant">
-              Where notification email links back to. Leave empty to send messages without a link.
+              {t("systemSettings.whereNotificationEmailLinksBackToLeave")}
             </p>
           </FormField>
 
@@ -380,7 +385,7 @@ export default function SystemSettingsPage() {
 
           <FormField
             htmlFor="vaultAddr"
-            label="Global Vault Address"
+            label={t("systemSettings.globalVaultAddress")}
             error={errors.vaultAddr?.message}
           >
             <Input
@@ -389,25 +394,34 @@ export default function SystemSettingsPage() {
               {...register("vaultAddr")}
             />
             <p className="text-xs text-on-surface-variant">
-              The HashiCorp Vault every tenant without a Vault of its own reads from. Each tenant
-              logs in with its own credential, registered on the tenant&apos;s page, so its Vault
-              policies decide what it may read. Leave empty to disconnect it.
+              {t("systemSettings.theHashicorpVaultEveryTenantWithoutA")}
             </p>
           </FormField>
 
           <hr className="border-outline-variant" />
 
-          <Checkbox label="Send notifications by email" {...register("smtpEnabled")} />
+          <Checkbox
+            label={t("systemSettings.sendNotificationsByEmail")}
+            {...register("smtpEnabled")}
+          />
 
-          <FormField htmlFor="smtpHost" label="SMTP Host" error={errors.smtpHost?.message}>
+          <FormField
+            htmlFor="smtpHost"
+            label={t("systemSettings.smtpHost")}
+            error={errors.smtpHost?.message}
+          >
             <Input id="smtpHost" placeholder="smtp.example.com" {...register("smtpHost")} />
           </FormField>
 
-          <FormField htmlFor="smtpPort" label="SMTP Port" error={errors.smtpPort?.message}>
+          <FormField
+            htmlFor="smtpPort"
+            label={t("systemSettings.smtpPort")}
+            error={errors.smtpPort?.message}
+          >
             <Input id="smtpPort" inputMode="numeric" {...register("smtpPort")} />
           </FormField>
 
-          <FormField htmlFor="smtpSecurity" label="Security">
+          <FormField htmlFor="smtpSecurity" label={t("systemSettings.security")}>
             <Controller
               name="smtpSecurity"
               control={control}
@@ -416,7 +430,7 @@ export default function SystemSettingsPage() {
                   options={SECURITY_OPTIONS}
                   value={field.value}
                   onChange={field.onChange}
-                  aria-label="Connection security"
+                  aria-label={t("systemSettings.connectionSecurity")}
                 />
               )}
             />
@@ -424,31 +438,31 @@ export default function SystemSettingsPage() {
 
           <FormField
             htmlFor="smtpUsername"
-            label="SMTP Username"
+            label={t("systemSettings.smtpUsername")}
             error={errors.smtpUsername?.message}
           >
             <Input id="smtpUsername" {...register("smtpUsername")} />
             <p className="text-xs text-on-surface-variant">
-              Leave empty for a relay that does not require authentication.
+              {t("systemSettings.leaveEmptyForARelayThatDoes")}
             </p>
           </FormField>
 
           <FormField
             htmlFor="smtpPassword"
-            label="SMTP Password"
+            label={t("systemSettings.smtpPassword")}
             error={errors.smtpPassword?.message}
           >
             <PasswordInput
               id="smtpPassword"
               autoComplete="new-password"
-              placeholder={passwordSet ? "Saved — leave empty to keep it" : ""}
+              placeholder={passwordSet ? t("common.savedLeaveEmptyToKeepIt") : ""}
               {...register("smtpPassword")}
             />
           </FormField>
 
           <FormField
             htmlFor="smtpFromEmail"
-            label="From Address"
+            label={t("systemSettings.fromAddress")}
             error={errors.smtpFromEmail?.message}
           >
             <Input
@@ -458,7 +472,11 @@ export default function SystemSettingsPage() {
             />
           </FormField>
 
-          <FormField htmlFor="smtpFromName" label="From Name" error={errors.smtpFromName?.message}>
+          <FormField
+            htmlFor="smtpFromName"
+            label={t("systemSettings.fromName")}
+            error={errors.smtpFromName?.message}
+          >
             <Input id="smtpFromName" placeholder="A2Flow" {...register("smtpFromName")} />
           </FormField>
 
@@ -468,9 +486,9 @@ export default function SystemSettingsPage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button
               type="button"
@@ -478,10 +496,10 @@ export default function SystemSettingsPage() {
               onClick={onSendTest}
               disabled={test.inFlight}
               status={test.status}
-              pendingLabel="Sending…"
-              doneLabel="Sent"
+              pendingLabel={t("common.sending")}
+              doneLabel={t("common.sent")}
             >
-              Send test email
+              {t("systemSettings.sendTestEmail")}
             </Button>
             <Button
               type="button"
@@ -489,24 +507,23 @@ export default function SystemSettingsPage() {
               onClick={() => setConfirmClearOpen(true)}
               disabled={clear.inFlight}
               status={clear.status}
-              pendingLabel="Clearing…"
+              pendingLabel={t("systemSettings.clearing")}
             >
-              Clear SMTP settings
+              {t("systemSettings.clearSmtpSettings")}
             </Button>
           </div>
           <p className="text-xs text-on-surface-variant">
-            The test message uses the <em>saved</em> settings and goes to your own address. Save
-            first if you have just changed something.
+            {t.rich("systemSettings.theTestMessageUsesTheEm1Settings", { em1: <em>saved</em> })}
           </p>
         </form>
       </FormLayout>
       <ConfirmDialog
         open={confirmClearOpen}
-        title="Clear SMTP Settings"
-        description="This clears the SMTP host, credentials, and sender address, and disables email delivery. This cannot be undone."
+        title={t("systemSettings.clearSmtpSettings2")}
+        description={t("systemSettings.thisClearsTheSmtpHostCredentialsAnd")}
         onConfirm={executeClear}
         onCancel={() => setConfirmClearOpen(false)}
-        confirmLabel="Clear"
+        confirmLabel={t("systemSettings.clear")}
       />
     </AdminPageContainer>
   );

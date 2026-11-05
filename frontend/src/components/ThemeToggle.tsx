@@ -2,6 +2,7 @@
 
 import { animated, useTransition } from "@react-spring/web";
 import { useEffect, useState } from "react";
+import { useT } from "@/i18n/provider";
 import { useMotionConfig } from "@/lib/motion";
 import { useTheme } from "./ThemeProvider";
 import { Tooltip } from "./ui/tooltip";
@@ -12,6 +13,7 @@ interface ThemeToggleProps {
 
 /** Icon button that toggles between light and dark themes. */
 export function ThemeToggle({ className }: ThemeToggleProps) {
+  const t = useT();
   const { theme, toggleTheme } = useTheme();
   // Defer theme-dependent rendering until after hydration to avoid SSR mismatch.
   // The server always renders as "light"; the client corrects itself after mount.
@@ -38,7 +40,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     .filter(Boolean)
     .join(" ");
 
-  const label = isDark ? "Switch to light theme" : "Switch to dark theme";
+  const label = isDark ? t("app.switchToLightTheme") : t("app.switchToDarkTheme");
   return (
     <Tooltip label={label} placement="bottom">
       <button type="button" onClick={toggleTheme} className={cls} aria-label={label}>

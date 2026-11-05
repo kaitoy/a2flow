@@ -1,16 +1,26 @@
+"use client";
+
 import { FlaskConical } from "lucide-react";
 import { AdminLoading } from "@/components/admin/admin-loading";
+import { useT } from "@/i18n/provider";
 
 /** Route loading fallback for the tool mocks list page. */
 export default function Loading() {
+  const t = useT();
   return (
     <AdminLoading
-      crumbs={[{ label: "Tool Mocks" }]}
+      crumbs={[{ label: t("common.toolMocks") }]}
       icon={FlaskConical}
-      title="Tool Mocks"
+      title={t("common.toolMocks")}
       addHref="/mcp-tool-mocks/new"
-      addLabel="+ Add tool mock"
-      columns={["Name", "Tool", "Server", "Description", "Actions"]}
+      addLabel={t("mcpToolMocks.addToolMock")}
+      columns={[
+        t("common.name"),
+        t("common.tool"),
+        t("common.server"),
+        t("common.description"),
+        t("common.actions"),
+      ]}
     />
   );
 }

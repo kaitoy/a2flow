@@ -5,8 +5,9 @@ import { Camera, Check, TriangleAlert } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/provider";
 import { formatUserName, type User } from "@/lib/api";
-import { ROLE_LABELS } from "@/lib/roles";
+import { roleLabel } from "@/lib/roles";
 
 /** Diameter, in pixels, of the hero avatar inside its glass frame. */
 const AVATAR_SIZE = 120;
@@ -39,6 +40,7 @@ export interface ProfileHeroProps {
  * about their own account, and "Enabled: Yes" buries that under a label.
  */
 export function ProfileHero({ user, onEditAvatar }: ProfileHeroProps) {
+  const t = useT();
   const displayName = formatUserName(user) || user.username;
   const roles = user.roles ?? [];
 
@@ -55,11 +57,11 @@ export function ProfileHero({ user, onEditAvatar }: ProfileHeroProps) {
       />
 
       <div className="relative flex flex-col items-center gap-4 px-6 pt-14 pb-6 text-center sm:flex-row sm:items-end sm:gap-6 sm:text-left">
-        <Tooltip label="Edit avatar">
+        <Tooltip label={t("profile.editAvatar")}>
           <button
             type="button"
             onClick={onEditAvatar}
-            aria-label="Edit avatar"
+            aria-label={t("profile.editAvatar")}
             className={[
               "group relative shrink-0 rounded-full glass-panel-strong p-1",
               "transition-[box-shadow] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
@@ -96,7 +98,7 @@ export function ProfileHero({ user, onEditAvatar }: ProfileHeroProps) {
         </Tooltip>
 
         <div className="flex min-w-0 flex-col items-center gap-1.5 sm:items-start sm:pb-1">
-          <span className="text-label-caps">Profile</span>
+          <span className="text-label-caps">{t("common.profile")}</span>
           <h1 className="min-w-0 max-w-full truncate font-display text-3xl font-semibold tracking-tight text-gradient-accent">
             {displayName}
           </h1>
@@ -107,17 +109,21 @@ export function ProfileHero({ user, onEditAvatar }: ProfileHeroProps) {
           {roles.length > 0 && (
             <div className="mt-1 flex flex-wrap justify-center gap-1.5 sm:justify-start">
               {roles.map((role) => (
-                <Badge key={role}>{ROLE_LABELS[role]}</Badge>
+                <Badge key={role}>{roleLabel(role)}</Badge>
               ))}
             </div>
           )}
 
           <div className="mt-1 flex flex-wrap justify-center gap-2 sm:justify-start">
-            <StatusPill ok={user.enabled} okLabel="Enabled" ngLabel="Disabled" />
+            <StatusPill
+              ok={user.enabled}
+              okLabel={t("common.enabled")}
+              ngLabel={t("users.disabled")}
+            />
             <StatusPill
               ok={user.emailVerified}
-              okLabel="Email verified"
-              ngLabel="Email not verified"
+              okLabel={t("users.emailVerified")}
+              ngLabel={t("profile.emailNotVerified")}
             />
           </div>
         </div>

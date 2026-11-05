@@ -13,6 +13,7 @@
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { Chip } from "@/components/ui/chip";
 import { Select } from "@/components/ui/select";
+import { useT } from "@/i18n/provider";
 import type { TagColor } from "@/lib/api";
 import { TAG_COLORS, tagColorLabel } from "@/lib/tag-palette";
 
@@ -46,16 +47,17 @@ export function TagColorField({
   previewLabel,
   readOnly = false,
 }: TagColorFieldProps) {
+  const t = useT();
   const label = previewLabel?.trim() || PREVIEW_PLACEHOLDER;
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">Color</span>
+      <span className="text-label-caps">{t("common.color")}</span>
       {readOnly ? (
         <ReadOnlyField>{tagColorLabel(value)}</ReadOnlyField>
       ) : (
         <Select
-          aria-label="Color"
+          aria-label={t("common.color")}
           value={value}
           onChange={(next) => onChange(next as TagColor)}
           options={TAG_COLORS.map((color) => ({

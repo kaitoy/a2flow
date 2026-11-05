@@ -5,21 +5,33 @@
  * helpers let the UI hide actions the API would reject with HTTP 403. They are
  * a usability layer only — the backend remains the enforcement point.
  */
+
 import { Role } from "@/generated/api/types.gen";
+import type { MessageKey } from "@/i18n/messages/en";
+import { getActiveTranslator } from "@/i18n/translate";
 import type { User } from "@/lib/api";
 import { useAppSelector } from "@/store/hooks";
 
 export { Role };
 
-/** Human-readable labels for each role, used by the admin user forms. */
-export const ROLE_LABELS: Record<Role, string> = {
-  [Role.SUPER_ADMIN]: "Super Admin",
-  [Role.ADMIN]: "Admin",
-  [Role.DEVELOPER]: "Developer",
-  [Role.REVIEWER]: "Reviewer",
-  [Role.REQUESTER]: "Requester",
-  [Role.APPROVER]: "Approver",
+const ROLE_LABELS: Record<Role, MessageKey> = {
+  [Role.SUPER_ADMIN]: "roles.super_admin",
+  [Role.ADMIN]: "roles.admin",
+  [Role.DEVELOPER]: "roles.developer",
+  [Role.REVIEWER]: "roles.reviewer",
+  [Role.REQUESTER]: "roles.requester",
+  [Role.APPROVER]: "roles.approver",
 };
+
+/**
+ * A role's name in the language on screen.
+ *
+ * @param role - The role.
+ * @returns Its display name.
+ */
+export function roleLabel(role: Role): string {
+  return getActiveTranslator()(ROLE_LABELS[role]);
+}
 
 /** Every role, in descending order of privilege — the order shown in the UI. */
 export const ALL_ROLES: Role[] = [

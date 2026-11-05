@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { CheckboxGroup, type CheckboxOption } from "@/components/ui/checkbox-group";
 import { useAnchoredPanel } from "@/hooks/useAnchoredPanel";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
+import { useT } from "@/i18n/provider";
 import { useMotionConfig } from "@/lib/motion";
 import { HeaderIconButton } from "./header-icon-button";
 
@@ -75,6 +76,7 @@ const BULK_CLASSES = `${LABEL_CLASSES} cursor-pointer rounded-md px-2 py-1 text-
  * one visit.
  */
 export function ColumnPicker({ options, value, onChange, onReset, customized }: ColumnPickerProps) {
+  const t = useT();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const config = useMotionConfig("snappy");
@@ -117,7 +119,7 @@ export function ColumnPicker({ options, value, onChange, onReset, customized }: 
     <>
       <HeaderIconButton
         ref={buttonRef}
-        label="Columns"
+        label={t("admin.columns")}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -134,7 +136,7 @@ export function ColumnPicker({ options, value, onChange, onReset, customized }: 
                   id={panelId}
                   role="dialog"
                   tabIndex={-1}
-                  aria-label="Column visibility"
+                  aria-label={t("admin.columnVisibility")}
                   style={{
                     position: "fixed",
                     top: coords.top,
@@ -152,7 +154,9 @@ export function ColumnPicker({ options, value, onChange, onReset, customized }: 
                   className="glass-panel-overlay rounded-xl p-2 text-on-surface"
                 >
                   <div className="flex shrink-0 items-center justify-between gap-2 pt-1 pb-1 pl-3">
-                    <span className={`${LABEL_CLASSES} text-on-surface-variant`}>Columns</span>
+                    <span className={`${LABEL_CLASSES} text-on-surface-variant`}>
+                      {t("admin.columns")}
+                    </span>
                     <button
                       type="button"
                       disabled={options.length === 0}
@@ -161,7 +165,7 @@ export function ColumnPicker({ options, value, onChange, onReset, customized }: 
                       }
                       className={BULK_CLASSES}
                     >
-                      {allShown ? "Hide all" : "Show all"}
+                      {allShown ? t("admin.hideAll") : t("admin.showAll")}
                     </button>
                   </div>
                   {/* Only the list scrolls; the label row above and the reset
@@ -173,7 +177,7 @@ export function ColumnPicker({ options, value, onChange, onReset, customized }: 
                       options={options}
                       value={value}
                       onChange={onChange}
-                      emptyMessage="Every column is always shown."
+                      emptyMessage={t("admin.everyColumnIsAlwaysShown")}
                     />
                   </div>
                   <div className="my-1 h-px shrink-0 bg-glass-border" />
@@ -184,7 +188,7 @@ export function ColumnPicker({ options, value, onChange, onReset, customized }: 
                     className={`${ITEM_CLASSES} shrink-0`}
                   >
                     <RotateCcw size={16} strokeWidth={1.8} aria-hidden="true" />
-                    Reset to default
+                    {t("common.resetToDefault")}
                   </button>
                 </animated.div>
               )

@@ -7,12 +7,14 @@
  * is the question someone reading an audit trail is actually asking.
  */
 
+import type { MessageKey } from "@/i18n/messages/en";
+import { getActiveTranslator } from "@/i18n/translate";
 import type { CertificateGrant } from "@/lib/api";
 
 /** Human-readable label for where a certificate's authority came from. */
-export const CERTIFICATE_GRANT_LABEL: Record<CertificateGrant, string> = {
-  approval: "Approver",
-  initiator: "Run initiator",
+const CERTIFICATE_GRANT_LABEL: Record<CertificateGrant, MessageKey> = {
+  approval: "certificate.grant.approval",
+  initiator: "certificate.grant.initiator",
 };
 
 /**
@@ -21,6 +23,11 @@ export const CERTIFICATE_GRANT_LABEL: Record<CertificateGrant, string> = {
  * An approver's grant is accented because it is the one a human was asked to
  * weigh; an initiator's is neutral because it came with the run itself.
  */
+export function certificateGrantLabel(kind: CertificateGrant): string {
+  return getActiveTranslator()(CERTIFICATE_GRANT_LABEL[kind]);
+}
+
+/** Dot color for each grant kind. */
 export const CERTIFICATE_GRANT_DOT_CLASS: Record<CertificateGrant, string> = {
   approval: "bg-accent",
   initiator: "bg-on-surface-variant",

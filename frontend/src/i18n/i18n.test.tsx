@@ -1,11 +1,18 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { type ColumnDef, DataTable } from "@/components/ui/data-table";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { ApiClientError, getApiErrorMessage } from "@/lib/api";
 import { isLocale, LOCALES, matchLocale, parseAcceptLanguage } from "./config";
 import { loadMessages } from "./load";
 import { en, type Message, type MessageKey } from "./messages/en";
 import { I18nProvider, useSetLocale, useT } from "./provider";
-import { createTranslator, defaultTranslator, setActiveTranslator } from "./translate";
+import {
+  createTranslator,
+  defaultTranslator,
+  setActiveTranslator,
+  translateStatus,
+} from "./translate";
 
 afterEach(() => setActiveTranslator(defaultTranslator));
 
@@ -127,6 +134,60 @@ describe("catalogs", () => {
       }
     }
   );
+});
+
+describe("translateStatus", () => {
+  it("translates a known status and spells out an unknown one", async () => {
+    const ja = createTranslator("ja", await loadMessages("ja"));
+    expect(translateStatus("in_progress", ja)).toBe("進行中");
+    expect(translateStatus("brand_new_state", ja)).toBe("brand new state");
+  });
+});
+
+describe("translated tables", () => {
+  type Row = { id: string };
+  const COLUMNS: ColumnDef<Row>[] = [
+    { header: "common.name", cell: (r) => r.id },
+    { header: "common.description", visibility: "optional", cell: (r) => r.id },
+  ];
+
+  function Table() {
+    const { visibleColumns, options, setSelected } = useColumnVisibility("i18n-test", COLUMNS);
+    return (
+      <>
+        <button type="button" onClick={() => setSelected(options.map((o) => o.value))}>
+          {options.map((o) => o.label).join(",")}
+        </button>
+        <DataTable columns={visibleColumns} rows={[{ id: "x" }]} getRowKey={(r) => r.id} />
+      </>
+    );
+  }
+
+  afterEach(() => window.localStorage.clear());
+
+  it("paints headers and picker options in the language on screen", async () => {
+    render(
+      <I18nProvider locale="ja" messages={await loadMessages("ja")}>
+        <Table />
+      </I18nProvider>
+    );
+    expect(screen.getByRole("columnheader", { name: "名前" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /説明/ })).toBeInTheDocument();
+  });
+
+  it("keeps a stored column choice across a language change", async () => {
+    const english = render(<Table />);
+    await act(async () => screen.getByRole("button").click());
+    expect(screen.getByRole("columnheader", { name: "Description" })).toBeInTheDocument();
+    english.unmount();
+
+    render(
+      <I18nProvider locale="ja" messages={await loadMessages("ja")}>
+        <Table />
+      </I18nProvider>
+    );
+    expect(await screen.findByRole("columnheader", { name: "説明" })).toBeInTheDocument();
+  });
 });
 
 describe("I18nProvider", () => {

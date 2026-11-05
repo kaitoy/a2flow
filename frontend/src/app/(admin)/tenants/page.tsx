@@ -21,6 +21,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
 import { deleteTenant, listTenants, type Tenant } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { tenantsChanged } from "@/store/tenantsSlice";
@@ -29,15 +30,15 @@ const LIMIT = 20;
 
 /** Yes/No options for the boolean `eq` column filter. */
 const BOOL_FILTER_OPTIONS = [
-  { label: "Yes", value: "true" },
-  { label: "No", value: "false" },
+  { label: "common.yes", value: "true" },
+  { label: "common.no", value: "false" },
 ];
 
 function buildColumns(names: Map<string, string>): ColumnDef<Tenant>[] {
   return [
     idColumn<Tenant>(),
     {
-      header: "Display Name",
+      header: "tenants.displayName",
       sortField: "displayName",
       filterField: "displayName",
       visibility: "always",
@@ -51,13 +52,13 @@ function buildColumns(names: Map<string, string>): ColumnDef<Tenant>[] {
       ),
     },
     {
-      header: "Name",
+      header: "common.name",
       sortField: "name",
       filterField: "name",
       cell: (t) => t.name,
     },
     {
-      header: "Enabled",
+      header: "common.enabled",
       sortField: "enabled",
       filterField: "enabled",
       filterOp: "eq",
@@ -66,7 +67,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<Tenant>[] {
       cell: (t) => (t.enabled ? "✓" : "—"),
     },
     {
-      header: "Created At",
+      header: "common.createdAt",
       sortField: "createdAt",
       visibility: "optional",
       cell: (t) => <DateTime value={t.createdAt} className="text-on-surface-variant" />,
@@ -76,6 +77,7 @@ function buildColumns(names: Map<string, string>): ColumnDef<Tenant>[] {
 }
 
 export default function TenantsPage() {
+  const t = useT();
   const dispatch = useAppDispatch();
   const {
     rows,
@@ -112,7 +114,7 @@ export default function TenantsPage() {
   const columns: ColumnDef<Tenant>[] = [
     ...buildColumns(names),
     {
-      header: "Actions",
+      header: "common.actions",
       noTruncate: true,
       visibility: "always" as const,
       cell: (tenant: Tenant) => (
@@ -130,12 +132,14 @@ export default function TenantsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Tenants" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.tenants") }]}
+      />
       <AdminPageHeader
-        title="Tenants"
+        title={t("common.tenants")}
         icon={Building2}
         addHref="/tenants/new"
-        addLabel="+ Add tenant"
+        addLabel={t("tenants.addTenant")}
         onRefresh={reload}
         refreshing={loading || refreshing}
         columnPicker={
@@ -152,7 +156,7 @@ export default function TenantsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No tenants registered yet."
+        emptyMessage={t("tenants.noTenantsRegisteredYet")}
         emptyIcon={Building2}
         getRowKey={(tenant) => tenant.id}
         sort={sort}
@@ -169,8 +173,8 @@ export default function TenantsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Tenant"
-        description={confirmTarget ? `Delete "${confirmTarget.name}"?` : ""}
+        title={t("tenants.deleteTenant")}
+        description={confirmTarget ? t("common.deleteName", { name: confirmTarget.name }) : ""}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

@@ -33,6 +33,8 @@ import {
   zMcpTransport,
   zScriptLanguage,
 } from "@/generated/api/zod.gen";
+import { useT } from "@/i18n/provider";
+import { getActiveTranslator } from "@/i18n/translate";
 import type { McpServer, McpServerCreate } from "@/lib/api";
 import { EMPTY_VALUE, formatChoice, formatLines, formatPairs } from "@/lib/read-only-display";
 import { lintJavaScript, lintPython } from "@/lib/script-lint";
@@ -85,7 +87,7 @@ export const mcpServerFormSchema = z
   })
   .superRefine((values, ctx) => {
     if (values.transport === "streamable_http") {
-      validateRequired(values.url, zMcpServerCreate.shape.url, ctx, "url", "URL is required");
+      validateRequired(values.url, zMcpServerCreate.shape.url, ctx, "url", "admin.urlIsRequired");
     }
     if (values.transport === "script") {
       validateRequired(
@@ -93,7 +95,7 @@ export const mcpServerFormSchema = z
         zMcpServerCreate.shape.source,
         ctx,
         "source",
-        "Source is required"
+        "admin.sourceIsRequired"
       );
     }
   });
@@ -109,7 +111,7 @@ export type McpServerFormValues = z.infer<typeof mcpServerFormSchema>;
 const TRANSPORT_OPTIONS: ReadonlyArray<SegmentedOption<McpServerFormValues["transport"]>> = [
   { value: "streamable_http", label: "Streamable HTTP", icon: Globe },
   { value: "stdio", label: "stdio", icon: Terminal },
-  { value: "script", label: "Script", icon: FileCode },
+  { value: "script", label: "admin.script", icon: FileCode },
 ];
 
 /** The launchers a stdio server may be started with. See {@link TRANSPORT_OPTIONS}. */
@@ -146,7 +148,9 @@ export function mcpTransportLabel(transport: McpServer["transport"]): string {
 export function mcpServerEndpoint(server: McpServer): string {
   if (server.transport === "stdio") return [server.command, ...(server.args ?? [])].join(" ");
   if (server.transport === "script") {
-    return `${formatChoice(LANGUAGE_OPTIONS, server.language ?? "python")} script`;
+    return getActiveTranslator()("admin.valueScript", {
+      value: formatChoice(LANGUAGE_OPTIONS, server.language ?? "python"),
+    });
   }
   return server.url ?? "";
 }
@@ -244,26 +248,23 @@ export type McpServerFieldsProps =
  * including the Google-token variant a Google Cloud MCP server needs.
  */
 function SecretReferenceHint() {
+  const t = useT();
   return (
     <p className="mt-1 text-xs text-on-surface-variant">
-      Values may reference one entry of a registered secret as{" "}
-      {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
-      {"${secret:name/key}"}, resolved when connecting. For a Google Cloud MCP server, write{" "}
-      {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
-      {"${gcp-token:name/key}"} instead to send a Google access token minted from the credential
-      JSON that entry holds.
+      {t("admin.valuesMayReferenceOneEntryOfA")}
     </p>
   );
 }
 
 /** Note shown under the script editor about which functions become tools, per language. */
 function ScriptConventionHint({ language }: { language: McpServerFormValues["language"] }) {
+  const t = useT();
   return (
     <p className="mt-1 text-xs text-on-surface-variant">
       {language === "python"
-        ? "Every top-level function whose name does not start with _ becomes a tool: its type hints give the arguments and its docstring the description."
-        : "Every exported function whose name does not start with _ becomes a tool, called with one arguments object. Set fn.description and fn.inputSchema to describe it."}{" "}
-      Import from the standard library or the Packages below; print output goes to the server log.
+        ? t("admin.everyTopLevelFunctionWhoseNameDoes")
+        : t("admin.everyExportedFunctionWhoseNameDoesNot")}{" "}
+      {t("admin.importFromTheStandardLibraryOrThe")}
     </p>
   );
 }
@@ -312,11 +313,10 @@ function ScriptSourceEditor({
 
 /** Note shown under the arguments editor about referencing this server's own env vars. */
 function EnvArgReferenceHint() {
+  const t = useT();
   return (
     <p className="mt-1 text-xs text-on-surface-variant">
-      An argument may reuse this server's own Environment Variables by name as{" "}
-      {/* biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder syntax shown to the user */}
-      {"${env:NAME}"}, expanded when connecting.
+      {t("admin.anArgumentMayReuseThisServersOwn")}
     </p>
   );
 }
@@ -331,19 +331,20 @@ function EnvArgReferenceHint() {
  * they use.
  */
 function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
+  const t = useT();
   return (
     <>
-      <FormField htmlFor="name" label="Name" required>
+      <FormField htmlFor="name" label={t("common.name")} required>
         <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="description" label="Description">
+      <FormField htmlFor="description" label={t("common.description")}>
         <ReadOnlyField className="whitespace-pre-wrap">
           {values.description || EMPTY_VALUE}
         </ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="transport" label="Transport" required>
+      <FormField htmlFor="transport" label={t("common.transport")} required>
         <ReadOnlyField>{formatChoice(TRANSPORT_OPTIONS, values.transport)}</ReadOnlyField>
       </FormField>
 
@@ -353,7 +354,7 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
             <ReadOnlyField>{values.url || EMPTY_VALUE}</ReadOnlyField>
           </FormField>
 
-          <FormField htmlFor="headers" label="HTTP Headers">
+          <FormField htmlFor="headers" label={t("admin.httpHeaders")}>
             <ReadOnlyField className="whitespace-pre-wrap">
               {formatLines(formatPairs(values.headers))}
             </ReadOnlyField>
@@ -363,11 +364,11 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
         <>
           {values.transport === "stdio" ? (
             <>
-              <FormField htmlFor="command" label="Command" required>
+              <FormField htmlFor="command" label={t("admin.command")} required>
                 <ReadOnlyField>{formatChoice(COMMAND_OPTIONS, values.command)}</ReadOnlyField>
               </FormField>
 
-              <FormField htmlFor="args" label="Arguments">
+              <FormField htmlFor="args" label={t("common.arguments")}>
                 <ReadOnlyField className="whitespace-pre-wrap">
                   {formatLines(nonEmpty(values.args))}
                 </ReadOnlyField>
@@ -375,11 +376,11 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
             </>
           ) : (
             <>
-              <FormField htmlFor="language" label="Language" required>
+              <FormField htmlFor="language" label={t("admin.language")} required>
                 <ReadOnlyField>{formatChoice(LANGUAGE_OPTIONS, values.language)}</ReadOnlyField>
               </FormField>
 
-              <FormField htmlFor="source" label="Source" required>
+              <FormField htmlFor="source" label={t("admin.source")} required>
                 {values.source ? (
                   <ReadOnlyField as="div">
                     <CodeEditor
@@ -395,7 +396,7 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
                 )}
               </FormField>
 
-              <FormField htmlFor="packages" label="Packages">
+              <FormField htmlFor="packages" label={t("admin.packages")}>
                 <ReadOnlyField className="whitespace-pre-wrap">
                   {formatLines(nonEmpty(values.packages))}
                 </ReadOnlyField>
@@ -403,7 +404,7 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
             </>
           )}
 
-          <FormField htmlFor="env" label="Environment Variables">
+          <FormField htmlFor="env" label={t("admin.environmentVariables")}>
             <ReadOnlyField className="whitespace-pre-wrap">
               {formatLines(formatPairs(values.env))}
             </ReadOnlyField>
@@ -425,6 +426,7 @@ function McpServerFieldValues({ values }: { values: McpServerFormValues }) {
  * values instead, for a viewer whose role cannot write MCP servers.
  */
 export function McpServerFields(props: McpServerFieldsProps) {
+  const t = useT();
   if (props.readOnly) {
     return <McpServerFieldValues values={props.values} />;
   }
@@ -432,30 +434,34 @@ export function McpServerFields(props: McpServerFieldsProps) {
 
   return (
     <>
-      <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+      <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
         <Input
           id="name"
-          placeholder={showPlaceholders ? "e.g. web-search" : undefined}
+          placeholder={showPlaceholders ? t("admin.eGWebSearch") : undefined}
           {...register("name")}
         />
       </FormField>
 
-      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+      <FormField
+        htmlFor="description"
+        label={t("common.description")}
+        error={errors.description?.message}
+      >
         <Textarea
           id="description"
           rows={4}
-          placeholder={showPlaceholders ? "What this server is for (optional)" : undefined}
+          placeholder={showPlaceholders ? t("admin.whatThisServerIsForOptional") : undefined}
           {...register("description")}
         />
       </FormField>
 
-      <FormField htmlFor="transport" label="Transport" required>
+      <FormField htmlFor="transport" label={t("common.transport")} required>
         <Controller
           control={control}
           name="transport"
           render={({ field }) => (
             <SegmentedControl
-              aria-label="Transport"
+              aria-label={t("common.transport")}
               options={TRANSPORT_OPTIONS}
               value={field.value}
               onChange={field.onChange}
@@ -474,7 +480,7 @@ export function McpServerFields(props: McpServerFieldsProps) {
             />
           </FormField>
 
-          <FormField htmlFor="headers" label="HTTP Headers">
+          <FormField htmlFor="headers" label={t("admin.httpHeaders")}>
             <Controller
               control={control}
               name="headers"
@@ -495,13 +501,13 @@ export function McpServerFields(props: McpServerFieldsProps) {
         <>
           {transport === "stdio" ? (
             <>
-              <FormField htmlFor="command" label="Command" required>
+              <FormField htmlFor="command" label={t("admin.command")} required>
                 <Controller
                   control={control}
                   name="command"
                   render={({ field }) => (
                     <SegmentedControl
-                      aria-label="Command"
+                      aria-label={t("admin.command")}
                       options={COMMAND_OPTIONS}
                       value={field.value}
                       onChange={field.onChange}
@@ -509,11 +515,11 @@ export function McpServerFields(props: McpServerFieldsProps) {
                   )}
                 />
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  Launched as a child process of the backend.
+                  {t("admin.launchedAsAChildProcessOfThe")}
                 </p>
               </FormField>
 
-              <FormField htmlFor="args" label="Arguments">
+              <FormField htmlFor="args" label={t("common.arguments")}>
                 <Controller
                   control={control}
                   name="args"
@@ -523,27 +529,26 @@ export function McpServerFields(props: McpServerFieldsProps) {
                       values={field.value}
                       onChange={field.onChange}
                       placeholder="-y"
-                      addLabel="+ Add argument"
+                      addLabel={t("admin.addArgument")}
                     />
                   )}
                 />
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  One entry per argument, in order. Passed straight to the process — never through a
-                  shell, so quoting and globs are not interpreted.
+                  {t("admin.oneEntryPerArgumentInOrderPassed")}
                 </p>
                 <EnvArgReferenceHint />
               </FormField>
             </>
           ) : (
             <>
-              <FormField htmlFor="language" label="Language" required>
+              <FormField htmlFor="language" label={t("admin.language")} required>
                 <Controller
                   control={control}
                   name="language"
                   render={({ field }) => (
                     <>
                       <SegmentedControl
-                        aria-label="Language"
+                        aria-label={t("admin.language")}
                         options={LANGUAGE_OPTIONS}
                         value={field.value}
                         onChange={field.onChange}
@@ -554,11 +559,16 @@ export function McpServerFields(props: McpServerFieldsProps) {
                 />
               </FormField>
 
-              <FormField htmlFor="source" label="Source" required error={errors.source?.message}>
+              <FormField
+                htmlFor="source"
+                label={t("admin.source")}
+                required
+                error={errors.source?.message}
+              >
                 <ScriptSourceEditor control={control} invalid={Boolean(errors.source)} />
               </FormField>
 
-              <FormField htmlFor="packages" label="Packages">
+              <FormField htmlFor="packages" label={t("admin.packages")}>
                 <Controller
                   control={control}
                   name="packages"
@@ -568,20 +578,18 @@ export function McpServerFields(props: McpServerFieldsProps) {
                       values={field.value}
                       onChange={field.onChange}
                       placeholder="boto3==1.40.0"
-                      addLabel="+ Add package"
+                      addLabel={t("admin.addPackage")}
                     />
                   )}
                 />
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  Installed before the script runs: a pip requirement such as boto3==1.40.0 for
-                  Python, an npm package such as @aws-sdk/client-s3@3 for JavaScript. The first run
-                  after a change takes longer while they install.
+                  {t("admin.installedBeforeTheScriptRunsAPip")}
                 </p>
               </FormField>
             </>
           )}
 
-          <FormField htmlFor="env" label="Environment Variables">
+          <FormField htmlFor="env" label={t("admin.environmentVariables")}>
             <Controller
               control={control}
               name="env"

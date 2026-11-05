@@ -14,11 +14,12 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
 import { zTenantSettingsUpdate } from "@/generated/api/zod.gen";
+import { useT } from "@/i18n/provider";
 import type { VaultAuthMethod } from "@/lib/api";
 
 /** How A2Flow logs in to the Vault. */
 const AUTH_OPTIONS: ReadonlyArray<SegmentedOption<VaultAuthMethod>> = [
-  { value: "token", label: "Token" },
+  { value: "token", label: "admin.token" },
   { value: "approle", label: "AppRole" },
 ];
 
@@ -93,7 +94,7 @@ export function refineVaultConnection(
     ctx.addIssue({
       code: "custom",
       path: ["vaultAddr"],
-      message: "Enter an http:// or https:// address",
+      message: "admin.enterHttpAddress",
     });
   }
   refineVaultCredential(values, ctx, savedMethod);
@@ -117,11 +118,12 @@ export function refineVaultCredential(
     ctx.addIssue({
       code: "custom",
       path: ["vaultCredential"],
-      message: values.vaultAuthMethod === "approle" ? "Secret ID is required" : "Token is required",
+      message:
+        values.vaultAuthMethod === "approle" ? "admin.secretIdIsRequired" : "admin.tokenIsRequired",
     });
   }
   if (values.vaultAuthMethod === "approle" && values.vaultRoleId === "") {
-    ctx.addIssue({ code: "custom", path: ["vaultRoleId"], message: "Role ID is required" });
+    ctx.addIssue({ code: "custom", path: ["vaultRoleId"], message: "admin.roleIdIsRequired" });
   }
 }
 
@@ -228,28 +230,33 @@ export function VaultConnectionFields({
   addrHint,
   errors,
 }: VaultConnectionFieldsProps) {
+  const t = useT();
   const credentialSaved = savedMethod !== null && savedMethod === authMethod;
   return (
     <>
       {addr && (
-        <FormField htmlFor="vaultAddr" label="Vault Address" error={errors.vaultAddr}>
+        <FormField htmlFor="vaultAddr" label={t("admin.vaultAddress")} error={errors.vaultAddr}>
           <Input id="vaultAddr" placeholder="https://vault.example.com:8200" {...addr} />
           <p className="text-xs text-on-surface-variant">{addrHint}</p>
         </FormField>
       )}
 
-      <FormField htmlFor="vaultAuthMethod" label="Vault Auth Method">
+      <FormField htmlFor="vaultAuthMethod" label={t("admin.vaultAuthMethod")}>
         <SegmentedControl
           options={AUTH_OPTIONS}
           value={authMethod}
           onChange={onAuthMethodChange}
-          aria-label="Vault auth method"
+          aria-label={t("admin.vaultAuthMethod2")}
         />
       </FormField>
 
       {authMethod === "approle" && (
         <>
-          <FormField htmlFor="vaultRoleId" label="Vault Role ID" error={errors.vaultRoleId}>
+          <FormField
+            htmlFor="vaultRoleId"
+            label={t("admin.vaultRoleId")}
+            error={errors.vaultRoleId}
+          >
             <Input id="vaultRoleId" {...roleId} />
           </FormField>
           <FormField
@@ -264,13 +271,13 @@ export function VaultConnectionFields({
 
       <FormField
         htmlFor="vaultCredential"
-        label={authMethod === "approle" ? "Vault Secret ID" : "Vault Token"}
+        label={authMethod === "approle" ? t("admin.vaultSecretId") : t("admin.vaultToken")}
         error={errors.vaultCredential}
       >
         <PasswordInput
           id="vaultCredential"
           autoComplete="new-password"
-          placeholder={credentialSaved ? "Saved — leave empty to keep it" : ""}
+          placeholder={credentialSaved ? t("common.savedLeaveEmptyToKeepIt") : ""}
           {...credential}
         />
       </FormField>

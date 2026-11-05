@@ -6,6 +6,7 @@
  * so a status dot means the same thing wherever it appears in the admin UI.
  */
 
+import { getActiveTranslator, translateStatus } from "@/i18n/translate";
 import type { WorkflowStatus } from "@/lib/api";
 
 /** Every workflow lifecycle status, in lifecycle order (for filter options). */
@@ -56,7 +57,7 @@ export const WORKFLOW_STATUS_DOT_CLASS: Record<WorkflowStatus, string> = {
  * @returns The label to render next to the status dot.
  */
 export function formatWorkflowStatusLabel(status: WorkflowStatus): string {
-  return status;
+  return translateStatus(status, getActiveTranslator());
 }
 
 /** Permissions gating whether the current viewer may execute a given workflow. */

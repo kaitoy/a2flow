@@ -4,6 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { useT } from "@/i18n/provider";
 
 /** One editable key/value row. */
 export interface KeyValuePair {
@@ -52,10 +53,11 @@ export function KeyValueEditor({
   name,
   pairs,
   onChange,
-  keyPlaceholder = "Key",
-  valuePlaceholder = "Value",
+  keyPlaceholder = "form.key",
+  valuePlaceholder = "form.value",
   valueType = "text",
 }: KeyValueEditorProps) {
+  const t = useT();
   function updateRow(index: number, patch: Partial<KeyValuePair>) {
     onChange(pairs.map((pair, i) => (i === index ? { ...pair, ...patch } : pair)));
   }
@@ -73,23 +75,23 @@ export function KeyValueEditor({
           className="flex items-center gap-2"
         >
           <Input
-            aria-label={`${name} key ${index + 1}`}
-            placeholder={keyPlaceholder}
+            aria-label={t("admin.nameKeyValue", { name, value: index + 1 })}
+            placeholder={t.maybe(keyPlaceholder)}
             value={pair.key}
             onChange={(e) => updateRow(index, { key: e.target.value })}
           />
           {valueType === "password" ? (
             <PasswordInput
-              aria-label={`${name} value ${index + 1}`}
-              placeholder={valuePlaceholder}
+              aria-label={t("admin.nameValueValue", { name, value: index + 1 })}
+              placeholder={t.maybe(valuePlaceholder)}
               value={pair.value}
               onChange={(e) => updateRow(index, { value: e.target.value })}
             />
           ) : (
             <Input
-              aria-label={`${name} value ${index + 1}`}
+              aria-label={t("admin.nameValueValue", { name, value: index + 1 })}
               type="text"
-              placeholder={valuePlaceholder}
+              placeholder={t.maybe(valuePlaceholder)}
               value={pair.value}
               onChange={(e) => updateRow(index, { value: e.target.value })}
             />
@@ -97,7 +99,7 @@ export function KeyValueEditor({
           <Button
             type="button"
             variant="danger"
-            aria-label={`Remove ${name} row ${index + 1}`}
+            aria-label={t("admin.removeNameRowValue", { name, value: index + 1 })}
             onClick={() => removeRow(index)}
           >
             ✕
@@ -110,7 +112,7 @@ export function KeyValueEditor({
           variant="secondary"
           onClick={() => onChange([...pairs, { key: "", value: "" }])}
         >
-          + Add row
+          {t("admin.addRow")}
         </Button>
       </div>
     </div>

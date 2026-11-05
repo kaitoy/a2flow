@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowTaskTemplateCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import {
   deleteWorkflowTaskTemplate,
   getWorkflow,
@@ -79,6 +80,7 @@ type FormValues = z.infer<typeof schema>;
  * click — the same convention the parent `WorkflowDetailPage` follows.
  */
 export default function WorkflowTaskTemplateDetailPage() {
+  const t = useT();
   const { workflowId, templateId } = useParams<{ workflowId: string; templateId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -175,7 +177,7 @@ export default function WorkflowTaskTemplateDetailPage() {
             values.asksInitiator
           ),
         });
-        dispatch(showToast({ message: "Template updated" }));
+        dispatch(showToast({ message: t("workflows.templateUpdated") }));
         router.push(`/workflows/${workflowId}/task-templates`);
       });
     } catch {
@@ -199,12 +201,12 @@ export default function WorkflowTaskTemplateDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Workflows", href: "/workflows" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.workflows"), href: "/workflows" },
     // Links back to this template's parent workflow; an ellipsis stands in
     // until its name has loaded.
     { label: workflowName || "…", href: `/workflows/${workflowId}` },
-    { label: "Task Templates", href: `/workflows/${workflowId}/task-templates` },
+    { label: t("workflows.taskTemplates"), href: `/workflows/${workflowId}/task-templates` },
     // The template itself is the current page; an ellipsis stands in until its
     // title has loaded.
     { label: title || "…" },
@@ -240,7 +242,10 @@ export default function WorkflowTaskTemplateDetailPage() {
             icon={ListTree}
             secondaryAction={
               canEdit ? (
-                <HeaderIconButton label="Open design session" onClick={handleOpenDesign}>
+                <HeaderIconButton
+                  label={t("workflows.openDesignSession")}
+                  onClick={handleOpenDesign}
+                >
                   <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
               ) : undefined
@@ -254,10 +259,17 @@ export default function WorkflowTaskTemplateDetailPage() {
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
           <div className="text-xs text-on-surface-variant">
-            Workflow ID: <span className="font-mono">{workflowId}</span>
+            {t.rich("workflows.workflowIdSpan1", {
+              span1: <span className="font-mono">{workflowId}</span>,
+            })}
           </div>
 
-          <FormField htmlFor="title" label="Title" required error={errors.title?.message}>
+          <FormField
+            htmlFor="title"
+            label={t("common.title")}
+            required
+            error={errors.title?.message}
+          >
             {canEdit ? (
               <Input id="title" {...register("title")} />
             ) : (
@@ -265,7 +277,7 @@ export default function WorkflowTaskTemplateDetailPage() {
             )}
           </FormField>
 
-          <FormField htmlFor="description" label="Description">
+          <FormField htmlFor="description" label={t("common.description")}>
             {canEdit ? (
               <Textarea id="description" rows={4} {...register("description")} />
             ) : (
@@ -276,7 +288,7 @@ export default function WorkflowTaskTemplateDetailPage() {
           </FormField>
 
           <fieldset disabled={!canEdit} className="contents">
-            <FormField htmlFor="dependsOnIds" label="Depends on">
+            <FormField htmlFor="dependsOnIds" label={t("common.dependsOn")}>
               <Controller
                 control={control}
                 name="dependsOnIds"
@@ -288,7 +300,7 @@ export default function WorkflowTaskTemplateDetailPage() {
                       .map((t) => ({ value: t.id, label: t.title }))}
                     value={field.value}
                     onChange={field.onChange}
-                    emptyMessage="No other templates in this workflow to depend on."
+                    emptyMessage={t("workflows.noOtherTemplatesInThisWorkflowTo")}
                   />
                 )}
               />
@@ -296,7 +308,7 @@ export default function WorkflowTaskTemplateDetailPage() {
           </fieldset>
 
           {canEdit && (
-            <FormField htmlFor="toolBindings" label="MCP Tools">
+            <FormField htmlFor="toolBindings" label={t("workflows.mcpTools")}>
               <Controller
                 control={control}
                 name="toolBindings"
@@ -325,9 +337,9 @@ export default function WorkflowTaskTemplateDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button
@@ -335,7 +347,7 @@ export default function WorkflowTaskTemplateDetailPage() {
               variant="ghost"
               onClick={() => router.push(`/workflows/${workflowId}/task-templates`)}
             >
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button
@@ -344,7 +356,7 @@ export default function WorkflowTaskTemplateDetailPage() {
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -352,8 +364,8 @@ export default function WorkflowTaskTemplateDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Task Template"
-        description={`Delete "${getValues("title")}"?`}
+        title={t("workflows.deleteTaskTemplate")}
+        description={t("common.deleteValue", { value: getValues("title") })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

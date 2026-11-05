@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zTagCreate } from "@/generated/api/zod.gen";
+import { useT } from "@/i18n/provider";
 import type { TagCreate, TagUpdate } from "@/lib/api";
 import { EMPTY_VALUE, formatFlag } from "@/lib/read-only-display";
 
@@ -71,16 +72,13 @@ export function toTagUpdateBody(values: TagFormValues): Omit<TagUpdate, "color">
   };
 }
 
-/** Helper text under the access-control checkbox, stating what the flag does. */
-const ACCESS_CONTROL_HINT =
-  "Only members of user groups carrying this tag can see the records it is attached to.";
-
 /** The access-control flag as a plain value, for a viewer who cannot change it. */
 function AccessControlValue({ value }: { value: boolean }) {
+  const t = useT();
   return (
-    <FormField htmlFor="accessControl" label="Access control">
+    <FormField htmlFor="accessControl" label={t("common.accessControl")}>
       <ReadOnlyField>{formatFlag(value)}</ReadOnlyField>
-      <p className="text-xs text-on-surface-variant">{ACCESS_CONTROL_HINT}</p>
+      <p className="text-xs text-on-surface-variant">{t("admin.accessControlHint")}</p>
     </FormField>
   );
 }
@@ -126,14 +124,15 @@ export type TagFieldsProps =
  * a viewer whose role cannot write tags.
  */
 export function TagFields(props: TagFieldsProps) {
+  const t = useT();
   if (props.readOnly) {
     const { values } = props;
     return (
       <>
-        <FormField htmlFor="name" label="Name" required>
+        <FormField htmlFor="name" label={t("common.name")} required>
           <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
         </FormField>
-        <FormField htmlFor="description" label="Description">
+        <FormField htmlFor="description" label={t("common.description")}>
           <ReadOnlyField className="whitespace-pre-wrap">
             {values.description || EMPTY_VALUE}
           </ReadOnlyField>
@@ -147,27 +146,35 @@ export function TagFields(props: TagFieldsProps) {
 
   return (
     <>
-      <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+      <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
         <Input
           id="name"
-          placeholder={showPlaceholders ? "e.g. production" : undefined}
+          placeholder={showPlaceholders ? t("admin.eGProduction") : undefined}
           {...register("name")}
         />
       </FormField>
 
-      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+      <FormField
+        htmlFor="description"
+        label={t("common.description")}
+        error={errors.description?.message}
+      >
         <Textarea
           id="description"
           rows={4}
-          placeholder={showPlaceholders ? "What this tag means (optional)" : undefined}
+          placeholder={showPlaceholders ? t("admin.whatThisTagMeansOptional") : undefined}
           {...register("description")}
         />
       </FormField>
 
       {accessControlValue === undefined ? (
         <div>
-          <Checkbox id="accessControl" label="Access control" {...register("accessControl")} />
-          <p className="text-xs text-on-surface-variant">{ACCESS_CONTROL_HINT}</p>
+          <Checkbox
+            id="accessControl"
+            label={t("common.accessControl")}
+            {...register("accessControl")}
+          />
+          <p className="text-xs text-on-surface-variant">{t("admin.accessControlHint")}</p>
         </div>
       ) : (
         <AccessControlValue value={accessControlValue} />

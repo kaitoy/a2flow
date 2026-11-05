@@ -13,6 +13,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { useT } from "@/i18n/provider";
 import type { PendingRenderCall } from "@/lib/a2uiAction";
 import {
   REASONING_ACTIVITY_TYPE,
@@ -96,11 +97,12 @@ function shouldShowWorkingIndicator(
  * renders while genuinely live, it carries the signature live edge unconditionally.
  */
 function WorkingIndicator() {
+  const t = useT();
   return (
     <div className="mb-3 flex justify-start animate-message-in" aria-live="polite">
       <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs glass-panel text-on-surface-variant live-edge">
         <span className="inline-block h-2 w-2 rounded-full bg-accent shadow-glow animate-pulse" />
-        <span>Agent is thinking…</span>
+        <span>{t("app.agentIsThinking")}</span>
       </div>
     </div>
   );
@@ -184,6 +186,7 @@ export function MessageList({
    */
   canActOnSurfaces?: boolean;
 }) {
+  const t = useT();
   const scrollRef = useRef<HTMLDivElement>(null);
   // Wraps the message column itself (unlike scrollRef, which is clipped by
   // overflow-y-auto and never resizes) so the ResizeObserver below sees the
@@ -375,8 +378,8 @@ export function MessageList({
             <EmptyState
               icon={Sparkles}
               animation="breathe"
-              title="Start a conversation"
-              description="Ask anything, build an A2UI surface, or kick off a workflow."
+              title={t("app.startAConversation")}
+              description={t("app.askAnythingBuildAnA2uiSurfaceOr")}
             />
           </animated.div>
         )}

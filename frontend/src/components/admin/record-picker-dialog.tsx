@@ -19,6 +19,7 @@ import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { Dialog } from "@/components/ui/dialog";
 import { Radio } from "@/components/ui/radio";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
 import type { ListQuery } from "@/lib/api";
 
 /** One selectable entry: the id stored in the selection and its display label. */
@@ -99,6 +100,7 @@ export function RecordPickerDialog<T>({
   emptyMessage,
   emptyIcon,
 }: RecordPickerDialogProps<T>) {
+  const t = useT();
   const {
     rows,
     loading,
@@ -181,10 +183,10 @@ export function RecordPickerDialog<T>({
   // nothing an operator does not already see when only one row can ever win —
   // so name the pick instead. `labels` is consulted rather than the current
   // page, because the chosen row may have been paged away.
-  let summary = `${draft.length} selected`;
+  let summary = t("ui.selectedCount", { count: draft.length });
   if (!multiple) {
     const [only] = draft;
-    summary = only === undefined ? "None selected" : (labels.get(only) ?? only);
+    summary = only === undefined ? t("admin.noneSelected") : (labels.get(only) ?? only);
   }
 
   return (
@@ -199,7 +201,7 @@ export function RecordPickerDialog<T>({
         <>
           <span className="mr-auto text-sm text-on-surface-variant">{summary}</span>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -211,7 +213,7 @@ export function RecordPickerDialog<T>({
               )
             }
           >
-            Select
+            {t("admin.select")}
           </Button>
         </>
       }

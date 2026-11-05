@@ -4,6 +4,7 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect } from "react";
 import { useStore } from "react-redux";
+import { useT } from "@/i18n/provider";
 import { buildRenderAckMessages } from "@/lib/a2uiAction";
 import { type AgentSubscriberOptions, createAgentSubscriber } from "@/lib/agentSubscriber";
 import { createChatAgent, getSessionMessages } from "@/lib/api";
@@ -41,6 +42,7 @@ function makePendingRenderHandler(
  * messages, and forwarding A2UI user actions.
  */
 export function useChat(initialSessionId: string | null) {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
@@ -64,10 +66,10 @@ export function useChat(initialSessionId: string | null) {
       .then((messages) => dispatch(resumeSession({ sessionId: initialSessionId, messages })))
       .catch((err) => {
         console.error("failed to load session history", err);
-        dispatch(setError("Failed to load this session's message history."));
+        dispatch(setError(t("chat.failedToLoadThisSessionsMessageHistory")));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSessionId, dispatch]);
+  }, [initialSessionId, dispatch, t]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
   const sendMessage = useCallback(
@@ -103,13 +105,13 @@ export function useChat(initialSessionId: string | null) {
         );
       } catch (err) {
         console.error("stream error", err);
-        dispatch(setError("An error occurred while communicating with the agent."));
+        dispatch(setError(t("chat.anErrorOccurredWhileCommunicatingWithThe")));
         return;
       }
 
       dispatch(finishRun());
     },
-    [sessionId, isRunning, dispatch, router]
+    [sessionId, isRunning, dispatch, router, t]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -139,13 +141,13 @@ export function useChat(initialSessionId: string | null) {
         );
       } catch (err) {
         console.error("stream error", err);
-        dispatch(setError("An error occurred while communicating with the agent."));
+        dispatch(setError(t("chat.anErrorOccurredWhileCommunicatingWithThe")));
         return;
       }
 
       dispatch(finishRun());
     },
-    [sessionId, isRunning, dispatch]
+    [sessionId, isRunning, dispatch, t]
   );
 
   return {

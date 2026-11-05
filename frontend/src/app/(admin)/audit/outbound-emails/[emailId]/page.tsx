@@ -15,6 +15,8 @@ import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Badge } from "@/components/ui/badge";
 import { DateTime } from "@/components/ui/date-time";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
+import { useT } from "@/i18n/provider";
+import { translateStatus } from "@/i18n/translate";
 import {
   getOutboundEmail,
   isForbiddenError,
@@ -31,6 +33,7 @@ import { EMPTY_VALUE } from "@/lib/read-only-display";
  * so what this page shows is the message as it was (or will be) delivered.
  */
 export default function AuditOutboundEmailDetailPage() {
+  const t = useT();
   const { emailId } = useParams<{ emailId: string }>();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -56,9 +59,9 @@ export default function AuditOutboundEmailDetailPage() {
   }, [emailId]);
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Audit Logs", href: "/audit" },
-    { label: "Emails", href: "/audit/outbound-emails" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.auditLogs"), href: "/audit" },
+    { label: t("common.emails"), href: "/audit/outbound-emails" },
     { label: email?.subject || "…" },
   ];
 
@@ -96,28 +99,34 @@ export default function AuditOutboundEmailDetailPage() {
           />
         }
       >
-        <StatusCard ariaLabel="Delivery status">
-          <Badge>{email.status}</Badge>
+        <StatusCard ariaLabel={t("audit.deliveryStatus")}>
+          <Badge>{translateStatus(email.status, t)}</Badge>
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem label="To" value={email.toEmail} />
+            <DetailItem label={t("audit.to")} value={email.toEmail} />
             <DetailItem
-              label="Body"
+              label={t("audit.body")}
               value={<span className="whitespace-pre-wrap">{email.body}</span>}
             />
-            <DetailItem label="Attempts" value={email.attempts} />
-            <DetailItem label="Last Error" value={email.lastError || EMPTY_VALUE} />
-            <DetailItem label="Next Attempt At" value={<DateTime value={email.nextAttemptAt} />} />
+            <DetailItem label={t("audit.attempts")} value={email.attempts} />
+            <DetailItem label={t("audit.lastError")} value={email.lastError || EMPTY_VALUE} />
             <DetailItem
-              label="Sent At"
+              label={t("audit.nextAttemptAt")}
+              value={<DateTime value={email.nextAttemptAt} />}
+            />
+            <DetailItem
+              label={t("audit.sentAt")}
               value={email.sentAt ? <DateTime value={email.sentAt} /> : EMPTY_VALUE}
             />
             <DetailItem
-              label="Lease Expires At"
+              label={t("audit.leaseExpiresAt")}
               value={email.leaseExpiresAt ? <DateTime value={email.leaseExpiresAt} /> : EMPTY_VALUE}
             />
-            <DetailItem label="Notification" value={email.notificationId || EMPTY_VALUE} />
+            <DetailItem
+              label={t("audit.notification")}
+              value={email.notificationId || EMPTY_VALUE}
+            />
           </DetailList>
         </div>
       </FormLayout>

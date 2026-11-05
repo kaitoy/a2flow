@@ -34,7 +34,7 @@ interface Audited {
  */
 export function idColumn<T extends { id: string }>(): ColumnDef<T> {
   return {
-    header: "ID",
+    header: "common.id",
     visibility: "optional",
     className: "font-mono",
     cell: (row) => row.id,
@@ -77,18 +77,18 @@ export function auditColumns<T extends Audited>(
   );
   return [
     {
-      header: "Updated At",
+      header: "admin.updatedAt",
       visibility: "optional",
       sortField: "updatedAt",
       cell: (row) => <DateTime value={row.updatedAt} className="text-on-surface-variant" />,
     },
     {
-      header: "Created By",
+      header: "admin.createdBy",
       visibility: "optional",
       cell: (row) => userLink(row.createdBy),
     },
     {
-      header: "Updated By",
+      header: "admin.updatedBy",
       visibility: "optional",
       cell: (row) => userLink(row.updatedBy),
     },

@@ -8,6 +8,8 @@
  * a source nobody has asked to be read yet.
  */
 
+import type { MessageKey } from "@/i18n/messages/en";
+import { getActiveTranslator } from "@/i18n/translate";
 import type { KnowledgeSourceStatus } from "@/lib/api";
 
 /** Tailwind background-color class for the status dot of each state. */
@@ -21,13 +23,13 @@ export const KNOWLEDGE_SOURCE_STATUS_DOT_CLASS: Record<KnowledgeSourceStatus, st
 };
 
 /** Human-readable label for each state. */
-const LABELS: Record<KnowledgeSourceStatus, string> = {
-  unread: "Not read",
-  pending: "Queued",
-  ingesting: "Reading",
-  ready: "Ready",
-  failed: "Failed",
-  removing: "Removing",
+const LABELS: Record<KnowledgeSourceStatus, MessageKey> = {
+  unread: "knowledge.status.unread",
+  pending: "knowledge.status.pending",
+  ingesting: "knowledge.status.ingesting",
+  ready: "knowledge.status.ready",
+  failed: "knowledge.status.failed",
+  removing: "knowledge.status.removing",
 };
 
 /**
@@ -37,7 +39,7 @@ const LABELS: Record<KnowledgeSourceStatus, string> = {
  * @returns Its label.
  */
 export function formatKnowledgeSourceStatus(status: KnowledgeSourceStatus): string {
-  return LABELS[status];
+  return getActiveTranslator()(LABELS[status]);
 }
 
 /**

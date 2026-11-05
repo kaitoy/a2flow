@@ -1,5 +1,8 @@
 /** @module workflow-execution-status — the shared status readout for a WorkflowExecution. */
+
 import { StatusDot } from "@/components/ui/status-dot";
+import { useT } from "@/i18n/provider";
+import { translateStatus } from "@/i18n/translate";
 import type { WorkflowExecutionStatus as WorkflowExecutionStatusValue } from "@/lib/api";
 
 /**
@@ -33,6 +36,7 @@ export function WorkflowExecutionStatusLabel({
 }: {
   status?: WorkflowExecutionStatusValue | null;
 }) {
+  const t = useT();
   const value = status ?? "running";
-  return <StatusDot dotClass={STATUS_DOT_CLASS[value]} label={value} />;
+  return <StatusDot dotClass={STATUS_DOT_CLASS[value]} label={translateStatus(value, t)} />;
 }

@@ -29,6 +29,7 @@ import { WorkflowTaskTimeline } from "@/components/WorkflowTaskTimeline";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDesignSessionChat } from "@/hooks/useDesignSessionChat";
 import { useSessionSenderRenderer } from "@/hooks/useSessionSenderRenderer";
+import { useT } from "@/i18n/provider";
 import {
   generateWorkflowPrompt,
   getWorkflow,
@@ -73,6 +74,7 @@ function DesignSessionView({
   workflow: Workflow;
   onWorkflowUpdate: (wf: Workflow) => void;
 }) {
+  const t = useT();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
   const currentUser = useAppSelector((s) => s.auth.user);
@@ -173,7 +175,7 @@ function DesignSessionView({
       await generatePrompt.run(async () => {
         const updated = await generateWorkflowPrompt(workflow.id);
         onWorkflowUpdate(updated);
-        dispatch(showToast({ message: "Prompt generated" }));
+        dispatch(showToast({ message: t("workflows.promptGenerated") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; close the dialog rather
@@ -200,7 +202,7 @@ function DesignSessionView({
       <SidebarDrawer
         open={timelineDrawerOpen}
         onClose={() => setTimelineDrawerOpen(false)}
-        label="Design tasks"
+        label={t("workflows.designTasks")}
       >
         <WorkflowTaskTimeline
           tasks={templates}
@@ -217,10 +219,10 @@ function DesignSessionView({
         <div className="shrink-0 px-4 pt-3 sm:px-6">
           <Breadcrumbs
             items={[
-              { label: "Home", href: "/" },
-              { label: "Workflows", href: "/workflows" },
+              { label: t("common.home"), href: "/" },
+              { label: t("common.workflows"), href: "/workflows" },
               { label: workflow.name, href: `/workflows/${encodeURIComponent(workflow.id)}` },
-              { label: "Design Session" },
+              { label: t("workflows.designSession") },
             ]}
           />
         </div>
@@ -284,16 +286,17 @@ function DesignSessionView({
 
 /** Full-screen error state shown when the workflow fails to load, with a retry action. */
 function DesignSessionLoadError({ onRetry }: { onRetry: () => void }) {
+  const t = useT();
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4">
       <EmptyState
         icon={AlertTriangle}
         animation="wiggle"
-        title="Couldn't load this design session"
-        description="Something went wrong while loading this design session."
+        title={t("workflows.couldntLoadThisDesignSession")}
+        description={t("workflows.somethingWentWrongWhileLoadingThisDesign")}
       />
       <Button variant="secondary" onClick={onRetry}>
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );

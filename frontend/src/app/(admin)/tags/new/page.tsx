@@ -27,6 +27,7 @@ import {
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createTag, type TagColor } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { DEFAULT_TAG_COLOR } from "@/lib/tag-palette";
@@ -34,6 +35,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
 export default function NewTagPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [color, setColor] = useState<TagColor>(DEFAULT_TAG_COLOR);
@@ -63,7 +65,7 @@ export default function NewTagPage() {
     try {
       await save.run(async () => {
         await createTag({ ...toTagCreateBody(values), color });
-        dispatch(showToast({ message: "Tag created" }));
+        dispatch(showToast({ message: t("tags.tagCreated") }));
         router.push("/tags");
       });
     } catch {
@@ -72,9 +74,9 @@ export default function NewTagPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Tags", href: "/tags" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.tags"), href: "/tags" },
+    { label: t("common.new") },
   ];
 
   // The list page hides the Add button for this viewer, so reaching the form at
@@ -91,7 +93,7 @@ export default function NewTagPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New Tag" icon={Tags} />
+      <AdminPageHeader title={t("tags.newTag")} icon={Tags} />
 
       <FormColumn>
         <form
@@ -108,9 +110,7 @@ export default function NewTagPage() {
           <TagColorField value={color} onChange={setColor} previewLabel={watch("name")} />
 
           {tenantMissing && (
-            <p className="text-xs text-error">
-              Select a tenant in the header before creating this tag.
-            </p>
+            <p className="text-xs text-error">{t("tags.selectATenantInTheHeaderBefore")}</p>
           )}
 
           <div className="flex gap-2">
@@ -119,12 +119,12 @@ export default function NewTagPage() {
               variant="primary"
               disabled={save.inFlight || tenantMissing}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/tags")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

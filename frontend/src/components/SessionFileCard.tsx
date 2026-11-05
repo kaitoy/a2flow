@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, FileText } from "lucide-react";
+import { useT } from "@/i18n/provider";
 import { sessionFileDownloadUrl } from "@/lib/api";
 import { formatFileSize, type SessionFileActivityContent } from "@/lib/sessionFileTool";
 
@@ -18,6 +19,7 @@ import { formatFileSize, type SessionFileActivityContent } from "@/lib/sessionFi
  * the file with no JavaScript in the path.
  */
 export function SessionFileCard({ content }: { content: SessionFileActivityContent }) {
+  const t = useT();
   const href = sessionFileDownloadUrl(content.workflowExecutionId, content.fileId);
   return (
     <div className="glass-panel flex items-center gap-3 rounded-2xl p-4 animate-message-in">
@@ -36,11 +38,11 @@ export function SessionFileCard({ content }: { content: SessionFileActivityConte
       <a
         href={href}
         download={content.name}
-        aria-label={`Download ${content.name}`}
+        aria-label={t("app.downloadName", { name: content.name })}
         className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-on-surface-variant transition-colors duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)] hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         <Download size={14} strokeWidth={2} aria-hidden />
-        Download
+        {t("app.download")}
       </a>
     </div>
   );

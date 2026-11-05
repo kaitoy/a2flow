@@ -8,8 +8,11 @@
  * field count.
  */
 
+"use client";
+
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { useT } from "@/i18n/provider";
 import { AdminListSkeleton } from "./admin-list-skeleton";
 import { AdminPageContainer } from "./admin-page-container";
 import { AdminPageHeader } from "./admin-page-header";
@@ -59,6 +62,7 @@ export function AdminLoading({
   fields = 4,
   form = "layout",
 }: AdminLoadingProps) {
+  const t = useT();
   const header = (
     <AdminPageHeader title={title} icon={icon} addHref={addHref} addLabel={addLabel} />
   );
@@ -88,7 +92,7 @@ export function AdminLoading({
   }
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, ...crumbs]} />
+      <Breadcrumbs items={[{ label: t("common.home"), href: "/" }, ...crumbs]} />
       {body}
     </AdminPageContainer>
   );

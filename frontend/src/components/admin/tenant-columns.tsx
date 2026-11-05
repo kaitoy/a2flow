@@ -30,7 +30,7 @@ export function tenantColumn<T extends TenantScoped>(
   tenantNameById: Map<string, string>
 ): ColumnDef<T> {
   return {
-    header: "Tenant",
+    header: "common.tenant",
     visibility: "default",
     cell: (row) => {
       const id = row.tenantId;

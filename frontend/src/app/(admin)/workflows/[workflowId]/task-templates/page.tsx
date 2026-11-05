@@ -19,6 +19,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useUserNames } from "@/hooks/useNames";
+import { useT } from "@/i18n/provider";
 import {
   deleteWorkflowTaskTemplate,
   type FilterSpec,
@@ -45,8 +46,8 @@ const SERVER_LIMIT = 1000;
 type View = "table" | "graph";
 
 const VIEW_OPTIONS = [
-  { value: "table" as const, label: "Table" },
-  { value: "graph" as const, label: "Graph" },
+  { value: "table" as const, label: "common.table" },
+  { value: "graph" as const, label: "common.graph" },
 ];
 
 function buildColumns(
@@ -69,7 +70,7 @@ function buildColumns(
       cell: (t) => indexById.get(t.id) ?? 0,
     },
     {
-      header: "Title",
+      header: "common.title",
       sortField: "title",
       filterField: "title",
       visibility: "always",
@@ -83,14 +84,14 @@ function buildColumns(
       ),
     },
     {
-      header: "Description",
+      header: "common.description",
       sortField: "description",
       filterField: "description",
       cell: (t) => t.description || "—",
     },
     {
       // Resolved from the dependency join table; not a real column.
-      header: "Depends on",
+      header: "common.dependsOn",
       noTruncate: true,
       cell: (t) => {
         const deps = t.dependsOnIds ?? [];
@@ -111,7 +112,7 @@ function buildColumns(
     },
     {
       // Resolved from the tool-binding join table; not a real column.
-      header: "Tools",
+      header: "common.tools",
       noTruncate: true,
       cell: (t) => {
         const bindings = t.toolBindings ?? [];
@@ -134,7 +135,7 @@ function buildColumns(
   ];
   if (canEdit) {
     columns.push({
-      header: "Actions",
+      header: "common.actions",
       noTruncate: true,
       visibility: "always",
       cell: (t) => (
@@ -159,6 +160,7 @@ function buildColumns(
  * developer-only endpoints — render only for a `developer`.
  */
 export default function WorkflowTaskTemplatesPage() {
+  const t = useT();
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const canEdit = useHasRole(Role.DEVELOPER);
@@ -254,22 +256,22 @@ export default function WorkflowTaskTemplatesPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Workflows", href: "/workflows" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.workflows"), href: "/workflows" },
           { label: workflowName || "…", href: `/workflows/${workflowId}` },
-          { label: "Task Templates" },
+          { label: t("workflows.taskTemplates") },
         ]}
       />
       <AdminPageHeader
-        title="Task Templates"
+        title={t("workflows.taskTemplates")}
         icon={ListTree}
         addHref={canEdit ? `/workflows/${workflowId}/task-templates/new` : undefined}
-        addLabel="+ Add task"
+        addLabel={t("workflows.addTask")}
         onRefresh={load}
         refreshing={loading}
         secondaryAction={
           canEdit ? (
-            <HeaderIconButton label="Open design session" onClick={handleOpenDesign}>
+            <HeaderIconButton label={t("workflows.openDesignSession")} onClick={handleOpenDesign}>
               <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
             </HeaderIconButton>
           ) : undefined
@@ -292,7 +294,7 @@ export default function WorkflowTaskTemplatesPage() {
           options={VIEW_OPTIONS}
           value={view}
           onChange={setView}
-          aria-label="Template view"
+          aria-label={t("workflows.templateView")}
         />
       </div>
       {view === "graph" ? (
@@ -302,7 +304,7 @@ export default function WorkflowTaskTemplatesPage() {
           columns={visibleColumns}
           rows={templates}
           loading={loading}
-          emptyMessage="No task templates for this workflow yet."
+          emptyMessage={t("workflows.noTaskTemplatesForThisWorkflowYet")}
           emptyIcon={ListTree}
           getRowKey={(t) => t.id}
           sort={sort}
@@ -314,8 +316,10 @@ export default function WorkflowTaskTemplatesPage() {
       )}
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete Task Template"
-        description={confirmTarget ? `Delete "${confirmTarget.title}"?` : ""}
+        title={t("workflows.deleteTaskTemplate")}
+        description={
+          confirmTarget ? t("workflows.deleteTitle", { title: confirmTarget.title }) : ""
+        }
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

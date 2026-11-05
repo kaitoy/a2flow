@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { StatusDot } from "@/components/ui/status-dot";
+import { useT } from "@/i18n/provider";
+import { translateStatus } from "@/i18n/translate";
 import {
   getWorkflowExecution,
   getWorkflowTask,
@@ -46,6 +48,7 @@ const SERVER_LIMIT = 1000;
  * stays faithful to what actually ran.
  */
 export default function WorkflowTaskDetailPage() {
+  const t = useT();
   const { executionId, taskId } = useParams<{ executionId: string; taskId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -118,11 +121,11 @@ export default function WorkflowTaskDetailPage() {
   }, [task]);
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Workflow Executions", href: "/workflow-executions" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.workflowExecutions"), href: "/workflow-executions" },
     { label: workflowName || "…", href: `/workflow-executions/${executionId}` },
     {
-      label: "Workflow Tasks",
+      label: t("workflowExecutions.workflowTasks"),
       href: `/workflow-executions/${executionId}/workflow-tasks`,
     },
     { label: task?.title || "…" },
@@ -162,7 +165,7 @@ export default function WorkflowTaskDetailPage() {
             icon={ListTodo}
             secondaryAction={
               <HeaderIconButton
-                label="View all tasks"
+                label={t("workflowExecutions.viewAllTasks")}
                 onClick={() => router.push(`/workflow-executions/${executionId}/workflow-tasks`)}
               >
                 <ListTree size={18} strokeWidth={1.8} aria-hidden="true" />
@@ -172,14 +175,14 @@ export default function WorkflowTaskDetailPage() {
         }
         aside={audit && <AuditMeta {...audit} />}
       >
-        <StatusCard ariaLabel="Workflow task status">
+        <StatusCard ariaLabel={t("workflowExecutions.workflowTaskStatus")}>
           <StatusDot dotClass={STATUS_DOT_CLASS[status]} label={formatStatusLabel(status)} />
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem label="Description" value={task.description || EMPTY_VALUE} />
+            <DetailItem label={t("common.description")} value={task.description || EMPTY_VALUE} />
             <DetailItem
-              label="Depends on"
+              label={t("common.dependsOn")}
               value={
                 deps.length === 0 ? (
                   EMPTY_VALUE
@@ -193,7 +196,7 @@ export default function WorkflowTaskDetailPage() {
               }
             />
             <DetailItem
-              label="Tools"
+              label={t("common.tools")}
               value={
                 bindings.length === 0 ? (
                   EMPTY_VALUE
@@ -212,16 +215,19 @@ export default function WorkflowTaskDetailPage() {
               }
             />
             <DetailItem
-              label="Error Kind"
+              label={t("workflowExecutions.errorKind")}
               value={
                 task.errorKind ? (
-                  <span className="capitalize">{task.errorKind.replace("_", " ")}</span>
+                  <span className="capitalize">{translateStatus(task.errorKind, t)}</span>
                 ) : (
                   EMPTY_VALUE
                 )
               }
             />
-            <DetailItem label="Error Message" value={task.errorMessage || EMPTY_VALUE} />
+            <DetailItem
+              label={t("workflowExecutions.errorMessage")}
+              value={task.errorMessage || EMPTY_VALUE}
+            />
           </DetailList>
 
           <div className="flex flex-wrap gap-2">
@@ -230,7 +236,7 @@ export default function WorkflowTaskDetailPage() {
               variant="ghost"
               onClick={() => router.push(`/workflow-executions/${executionId}/workflow-tasks`)}
             >
-              Back
+              {t("common.back")}
             </Button>
           </div>
         </div>

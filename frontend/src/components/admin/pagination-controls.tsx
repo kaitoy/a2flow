@@ -1,4 +1,7 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/provider";
 
 interface PaginationControlsProps {
   offset: number;
@@ -16,13 +19,14 @@ export function PaginationControls({
   onPrev,
   onNext,
 }: PaginationControlsProps) {
+  const t = useT();
   return (
     <div className="mt-4 flex gap-2">
       <Button variant="secondary" disabled={offset === 0} onClick={onPrev}>
-        ← Previous
+        {t("admin.previous")}
       </Button>
       <Button variant="secondary" disabled={count < limit} onClick={onNext}>
-        Next →
+        {t("admin.next")}
       </Button>
     </div>
   );

@@ -4,6 +4,7 @@ import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import type { Message } from "@ag-ui/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "react-redux";
+import { useT } from "@/i18n/provider";
 import { buildRenderAckMessages, type PendingRenderCall } from "@/lib/a2uiAction";
 import { createAgentSubscriber } from "@/lib/agentSubscriber";
 import {
@@ -130,6 +131,7 @@ function makeEventHandlers(
  *   background generation run's) fall back to.
  */
 export function useDesignSessionChat(workflowId: string, sessionId: string, ownerUserId: string) {
+  const t = useT();
   const parentId = workflowId;
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
@@ -268,7 +270,7 @@ export function useDesignSessionChat(workflowId: string, sessionId: string, owne
         );
       } catch (err) {
         console.error("stream error", err);
-        dispatch(setError("An error occurred while communicating with the agent."));
+        dispatch(setError(t("chat.anErrorOccurredWhileCommunicatingWithThe")));
         return;
       }
 
@@ -278,7 +280,7 @@ export function useDesignSessionChat(workflowId: string, sessionId: string, owne
       // their keys, so reconciling their ids with the persisted ones is invisible.
       resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, dispatch, resyncAfterRun]
+    [parentId, sessionId, isRunning, dispatch, resyncAfterRun, t]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: store.getState is a stable reference; adding it would cause spurious re-runs
@@ -309,7 +311,7 @@ export function useDesignSessionChat(workflowId: string, sessionId: string, owne
         );
       } catch (err) {
         console.error("stream error", err);
-        dispatch(setError("An error occurred while communicating with the agent."));
+        dispatch(setError(t("chat.anErrorOccurredWhileCommunicatingWithThe")));
         return;
       }
 
@@ -321,7 +323,7 @@ export function useDesignSessionChat(workflowId: string, sessionId: string, owne
       // the same resumed-history path keeps it consistent with the sender map.
       resyncAfterRun();
     },
-    [parentId, sessionId, isRunning, dispatch, resyncAfterRun]
+    [parentId, sessionId, isRunning, dispatch, resyncAfterRun, t]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: initialization runs once per session; the guard below keeps it from repeating

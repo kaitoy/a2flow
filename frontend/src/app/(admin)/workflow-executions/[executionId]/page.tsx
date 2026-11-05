@@ -23,6 +23,7 @@ import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
 import { useWorkflowNames } from "@/hooks/useNames";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import {
   deleteWorkflowExecution,
   getUserNames,
@@ -55,6 +56,7 @@ import { resolveTagColor } from "@/lib/tag-palette";
  * the backend's `require_roles(Role.admin)` gate on the delete endpoint.
  */
 export default function WorkflowExecutionDetailPage() {
+  const t = useT();
   const { executionId } = useParams<{ executionId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -115,8 +117,8 @@ export default function WorkflowExecutionDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Workflow Executions", href: "/workflow-executions" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.workflowExecutions"), href: "/workflow-executions" },
     { label: session?.name || "…" },
   ];
 
@@ -151,13 +153,13 @@ export default function WorkflowExecutionDetailPage() {
             secondaryAction={
               <>
                 <HeaderIconButton
-                  label="View tasks"
+                  label={t("workflowExecutions.viewTasks")}
                   onClick={() => router.push(`/workflow-executions/${executionId}/workflow-tasks`)}
                 >
                   <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
                 <HeaderIconButton
-                  label="View tool invocations"
+                  label={t("workflowExecutions.viewToolInvocations")}
                   onClick={() =>
                     router.push(`/workflow-executions/${executionId}/tool-invocations`)
                   }
@@ -165,7 +167,7 @@ export default function WorkflowExecutionDetailPage() {
                   <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" />
                 </HeaderIconButton>
                 <HeaderIconButton
-                  label="Open workflow session"
+                  label={t("common.openWorkflowSession")}
                   onClick={() => router.push(`/workflow-executions/${executionId}/session`)}
                 >
                   <MessageSquareText size={18} strokeWidth={1.8} aria-hidden="true" />
@@ -176,16 +178,16 @@ export default function WorkflowExecutionDetailPage() {
         }
         aside={audit && <AuditMeta {...audit} />}
       >
-        <StatusCard ariaLabel="Workflow execution status">
+        <StatusCard ariaLabel={t("workflowExecutions.workflowExecutionStatus")}>
           <WorkflowExecutionStatusLabel status={session.status} />
-          {session.isDraft && <Badge>Draft</Badge>}
-          {session.toolMocks && session.toolMocks.length > 0 && <Badge>Mocked</Badge>}
+          {session.isDraft && <Badge>{t("workflowExecutions.draft")}</Badge>}
+          {session.toolMocks && session.toolMocks.length > 0 && <Badge>{t("common.mocked")}</Badge>}
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem label="Name" value={session.name} />
+            <DetailItem label={t("common.name")} value={session.name} />
             <DetailItem
-              label="Workflow"
+              label={t("workflowExecutions.workflow")}
               value={
                 session.workflowId ? (
                   <Link
@@ -200,12 +202,14 @@ export default function WorkflowExecutionDetailPage() {
               }
             />
             <DetailItem
-              label="Version"
+              label={t("common.version")}
               value={session.workflowVersion != null ? `v${session.workflowVersion}` : EMPTY_VALUE}
             />
-            {canViewPrompt && <DetailItem label="Prompt" value={session.prompt || EMPTY_VALUE} />}
+            {canViewPrompt && (
+              <DetailItem label={t("common.prompt")} value={session.prompt || EMPTY_VALUE} />
+            )}
             <DetailItem
-              label="Agent Skill"
+              label={t("common.agentSkill")}
               value={
                 <Link
                   href={`/agent-skills/${session.agentSkillId}`}
@@ -216,7 +220,7 @@ export default function WorkflowExecutionDetailPage() {
               }
             />
             <DetailItem
-              label="Agent Skill Repo URL"
+              label={t("workflowExecutions.agentSkillRepoUrl")}
               value={
                 <a
                   href={session.agentSkillRepoUrl}
@@ -229,11 +233,11 @@ export default function WorkflowExecutionDetailPage() {
               }
             />
             <DetailItem
-              label="Agent Skill Repo Path"
+              label={t("workflowExecutions.agentSkillRepoPath")}
               value={session.agentSkillRepoPath || EMPTY_VALUE}
             />
             <DetailItem
-              label="Agent Skill Commit"
+              label={t("workflowExecutions.agentSkillCommit")}
               value={
                 <span className="font-mono text-xs">
                   {session.agentSkillCommitSha ?? EMPTY_VALUE}
@@ -241,7 +245,7 @@ export default function WorkflowExecutionDetailPage() {
               }
             />
             <DetailItem
-              label="Initiator"
+              label={t("workflowExecutions.initiator")}
               value={
                 <Link
                   href={`/users/${session.initiatorId}`}
@@ -252,7 +256,7 @@ export default function WorkflowExecutionDetailPage() {
               }
             />
             <DetailItem
-              label="Tags"
+              label={t("common.tags")}
               value={(() => {
                 const ids = session.tagIds ?? [];
                 if (ids.length === 0) return EMPTY_VALUE;
@@ -263,7 +267,7 @@ export default function WorkflowExecutionDetailPage() {
                   description: tagsById.get(id)?.description ?? undefined,
                   locked: tagsById.get(id)?.accessControl,
                 }));
-                return <ChipRow items={items} title="Tags" />;
+                return <ChipRow items={items} title={t("common.tags")} />;
               })()}
             />
           </DetailList>
@@ -274,7 +278,7 @@ export default function WorkflowExecutionDetailPage() {
               variant="ghost"
               onClick={() => router.push("/workflow-executions")}
             >
-              Back
+              {t("common.back")}
             </Button>
             {isAdmin && (
               <Button
@@ -283,7 +287,7 @@ export default function WorkflowExecutionDetailPage() {
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -291,8 +295,8 @@ export default function WorkflowExecutionDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Workflow Execution"
-        description={`Delete "${session.name}"?`}
+        title={t("workflowExecutions.deleteWorkflowExecution")}
+        description={t("common.deleteName", { name: session.name })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

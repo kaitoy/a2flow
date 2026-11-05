@@ -3,6 +3,7 @@
 import { animated, useTransition } from "@react-spring/web";
 import { MessagesSquare, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/i18n/provider";
 import { deleteSession, getSession, listSessions, type Session } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
 import { useAppSelector } from "@/store/hooks";
@@ -35,6 +36,7 @@ export function SessionList({
   disabled,
   className,
 }: SessionListProps) {
+  const t = useT();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string } | null>(null);
@@ -113,12 +115,12 @@ export function SessionList({
             aria-hidden="true"
             className="transition-transform duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:rotate-[-8deg] group-disabled:!translate-y-0 group-disabled:!rotate-0"
           />
-          New session
+          {t("app.newSession")}
         </Button>
       </div>
       <div className="relative flex-1 overflow-y-auto py-2">
         {loading && sessions.length === 0 && (
-          <div role="status" aria-label="Loading" className="flex flex-col">
+          <div role="status" aria-label={t("common.loading")} className="flex flex-col">
             {Array.from({ length: 5 }, (_, i) => (
               <div
                 // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholder list with no identity
@@ -135,7 +137,7 @@ export function SessionList({
           <EmptyState
             icon={MessagesSquare}
             animation="bob"
-            description="No sessions"
+            description={t("app.noSessions")}
             compact
             className="px-3 py-8"
           />
@@ -143,7 +145,7 @@ export function SessionList({
         {transitions((style, s) => {
           const isActive = s.id === currentSessionId;
           const date = new Date(s.lastUpdateTime);
-          const label = date.toLocaleString(undefined, {
+          const label = date.toLocaleString(t.locale, {
             month: "short",
             day: "numeric",
             hour: "2-digit",
@@ -184,7 +186,7 @@ export function SessionList({
               </Tooltip>
               <button
                 type="button"
-                aria-label="Delete session"
+                aria-label={t("app.deleteSession")}
                 onClick={() => setConfirmTarget({ id: s.id })}
                 disabled={disabled}
                 className={[
@@ -211,8 +213,8 @@ export function SessionList({
       </div>
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Delete session?"
-        description="This session and its messages will be permanently deleted."
+        title={t("app.deleteSession2")}
+        description={t("app.thisSessionAndItsMessagesWillBe")}
         onConfirm={executeDelete}
         onCancel={() => setConfirmTarget(null)}
       />

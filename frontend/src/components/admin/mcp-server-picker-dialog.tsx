@@ -15,6 +15,7 @@ import { RecordPickerDialog } from "@/components/admin/record-picker-dialog";
 import { tagsColumn } from "@/components/admin/tag-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import { listMcpServers, type McpServer } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -49,21 +50,22 @@ export function McpServerPickerDialog({
   panelId,
   value,
 }: McpServerPickerDialogProps) {
+  const t = useT();
   const { byId: tagsById } = useTags();
   const columns: ColumnDef<McpServer>[] = [
     {
-      header: "Name",
+      header: "common.name",
       sortField: "name",
       filterField: "name",
       visibility: "always",
       cell: (server) => server.name,
     },
     {
-      header: "Description",
+      header: "common.description",
       cell: (server) => server.description || EMPTY_VALUE,
     },
     {
-      header: "Endpoint",
+      header: "common.endpoint",
       sortField: "url",
       filterField: "url",
       className: "font-mono",
@@ -78,14 +80,14 @@ export function McpServerPickerDialog({
       onClose={onClose}
       onAssign={(ids, options) => onAssign(ids[0] ?? "", options[0]?.label ?? "")}
       panelId={panelId}
-      title="Select MCP server"
+      title={t("admin.selectMcpServer")}
       value={value === "" ? [] : [value]}
       multiple={false}
       listRecords={listMcpServers}
       columns={columns}
       getId={(server) => server.id}
       getLabel={(server) => server.name}
-      emptyMessage="This tenant has no MCP servers yet."
+      emptyMessage={t("admin.thisTenantHasNoMcpServersYet")}
       emptyIcon={Server}
     />
   );

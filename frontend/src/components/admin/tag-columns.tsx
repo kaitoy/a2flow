@@ -67,7 +67,7 @@ export function tagsColumn<T>(
   byId: Map<string, Tag>
 ): ColumnDef<T> {
   return {
-    header: "Tags",
+    header: "common.tags",
     // A row of chips is not text, so the default single-line truncation would
     // clip it mid-pill; `ChipRow` does its own clipping instead, wrapping to at
     // most two lines and folding the rest into a `+N` chip.
@@ -85,7 +85,7 @@ export function tagsColumn<T>(
     cell: (row) => {
       const ids = getTagIds(row) ?? [];
       if (ids.length === 0) return EMPTY_VALUE;
-      return <ChipRow items={tagChipItems(ids, byId)} title="Tags" />;
+      return <ChipRow items={tagChipItems(ids, byId)} title="common.tags" />;
     },
   };
 }
@@ -109,14 +109,14 @@ export function inheritedTagsColumn<T>(
   byId: Map<string, Tag>
 ): ColumnDef<T> {
   return {
-    header: "Tags",
+    header: "common.tags",
     noTruncate: true,
     shrinkable: true,
     className: "py-1! align-middle",
     cell: (row) => {
       const ids = getTagIds(row) ?? [];
       if (ids.length === 0) return EMPTY_VALUE;
-      return <ChipRow items={tagChipItems(ids, byId)} title="Tags" />;
+      return <ChipRow items={tagChipItems(ids, byId)} title="common.tags" />;
     },
   };
 }

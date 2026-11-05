@@ -16,6 +16,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useUserNames } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
+import { useT } from "@/i18n/provider";
 import {
   getWorkflowExecution,
   listMcpServers,
@@ -30,8 +31,8 @@ const SERVER_LIMIT = 1000;
 
 /** Filter options for the proxy's verdict. */
 const DECISION_OPTIONS = [
-  { label: "Allowed", value: "allowed" },
-  { label: "Denied", value: "denied" },
+  { label: "common.allowed", value: "allowed" },
+  { label: "common.denied", value: "denied" },
 ];
 
 function buildColumns(
@@ -41,21 +42,21 @@ function buildColumns(
   return [
     idColumn<McpToolInvocation>(),
     {
-      header: "Tool",
+      header: "common.tool",
       sortField: "toolName",
       filterField: "toolName",
       visibility: "always",
       cell: (r) => <span className="font-mono text-on-surface">{r.toolName}</span>,
     },
     {
-      header: "Server",
+      header: "common.server",
       cell: (r) =>
         r.mcpServerId
           ? (serverNameById.get(r.mcpServerId) ?? `${r.mcpServerId.slice(0, 8)}…`)
           : "—",
     },
     {
-      header: "Decision",
+      header: "common.decision",
       noTruncate: true,
       sortField: "decision",
       filterField: "decision",
@@ -64,33 +65,33 @@ function buildColumns(
       cell: (r) => <Badge>{r.decision}</Badge>,
     },
     {
-      header: "Denial Reason",
+      header: "common.denialReason",
       cell: (r) => r.denialReason || "—",
     },
     {
       // The raw arguments are deliberately never stored: this is a SHA-256 of
       // their canonical JSON, which is what the presented signature covers.
-      header: "Arguments Digest",
+      header: "common.argumentsDigest",
       visibility: "optional",
       cell: (r) => <span className="font-mono text-xs">{r.argumentsDigest.slice(0, 16)}…</span>,
     },
     {
-      header: "Task",
+      header: "common.task",
       visibility: "optional",
       cell: (r) => (r.workflowTaskId ? `${r.workflowTaskId.slice(0, 8)}…` : "—"),
     },
     {
-      header: "Approval",
+      header: "common.approval",
       visibility: "optional",
       cell: (r) => (r.approvalId ? `${r.approvalId.slice(0, 8)}…` : "—"),
     },
     {
-      header: "Certificate",
+      header: "common.certificate",
       visibility: "optional",
       cell: (r) => r.certificateSerial || "—",
     },
     {
-      header: "Signed At",
+      header: "common.signedAt",
       visibility: "optional",
       noTruncate: true,
       cell: (r) => (r.signedAt ? <DateTime value={r.signedAt} /> : "—"),
@@ -112,6 +113,7 @@ function buildColumns(
  * carried.
  */
 export default function ToolInvocationsPage() {
+  const t = useT();
   const { executionId } = useParams<{ executionId: string }>();
   const {
     rows,
@@ -160,14 +162,14 @@ export default function ToolInvocationsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Workflow Executions", href: "/workflow-executions" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.workflowExecutions"), href: "/workflow-executions" },
           { label: workflowName || "…", href: `/workflow-executions/${executionId}` },
-          { label: "Tool Invocations" },
+          { label: t("common.toolInvocations") },
         ]}
       />
       <AdminPageHeader
-        title="Tool Invocations"
+        title={t("common.toolInvocations")}
         icon={ShieldCheck}
         onRefresh={reload}
         refreshing={refreshing}
@@ -185,7 +187,7 @@ export default function ToolInvocationsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No MCP tool calls were recorded for this run."
+        emptyMessage={t("workflowExecutions.noMcpToolCallsWereRecordedFor")}
         emptyIcon={ShieldCheck}
         getRowKey={(r) => r.id}
         sort={sort}

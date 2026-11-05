@@ -21,6 +21,7 @@ import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createKnowledgeBase, setKnowledgeBaseTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
@@ -31,6 +32,7 @@ import { showToast } from "@/store/toastSlice";
  * knowledge base's own page, which the form opens once it is saved.
  */
 export default function NewKnowledgeBasePage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
@@ -56,7 +58,7 @@ export default function NewKnowledgeBasePage() {
         if (tagIds.length > 0) {
           await setKnowledgeBaseTags(created.id, tagIds);
         }
-        dispatch(showToast({ message: "Knowledge base created" }));
+        dispatch(showToast({ message: t("knowledgeBases.knowledgeBaseCreated") }));
         router.push(`/knowledge-bases/${created.id}`);
       });
     } catch {
@@ -65,9 +67,9 @@ export default function NewKnowledgeBasePage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Knowledge Bases", href: "/knowledge-bases" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.knowledgeBases"), href: "/knowledge-bases" },
+    { label: t("common.new") },
   ];
 
   // The list page hides Add for this viewer, so reaching the form at all means a
@@ -84,7 +86,7 @@ export default function NewKnowledgeBasePage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New Knowledge Base" icon={BookOpen} />
+      <AdminPageHeader title={t("knowledgeBases.newKnowledgeBase")} icon={BookOpen} />
 
       <FormColumn>
         <form
@@ -101,12 +103,12 @@ export default function NewKnowledgeBasePage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/knowledge-bases")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zUserGroupCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createUserGroup, setUserGroupTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -37,6 +38,7 @@ const schema = zUserGroupCreate;
 type FormValues = z.input<typeof schema>;
 
 export default function NewUserGroupPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   // Roles, members, and tags live outside the form state: all are controlled
@@ -75,7 +77,7 @@ export default function NewUserGroupPage() {
         if (tagIds.length > 0) {
           await setUserGroupTags(created.id, tagIds);
         }
-        dispatch(showToast({ message: "User group created" }));
+        dispatch(showToast({ message: t("userGroups.userGroupCreated") }));
         router.push("/user-groups");
       });
     } catch {
@@ -84,9 +86,9 @@ export default function NewUserGroupPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "User Groups", href: "/user-groups" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.userGroups"), href: "/user-groups" },
+    { label: t("common.new") },
   ];
 
   // The list page hides the Add button for this viewer, so reaching the form at
@@ -103,22 +105,26 @@ export default function NewUserGroupPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New User Group" icon={UsersRound} />
+      <AdminPageHeader title={t("userGroups.newUserGroup")} icon={UsersRound} />
 
       <FormColumn>
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
-            <Input id="name" placeholder="e.g. Developers" {...register("name")} />
+          <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
+            <Input id="name" placeholder={t("userGroups.eGDevelopers")} {...register("name")} />
           </FormField>
 
-          <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+          <FormField
+            htmlFor="description"
+            label={t("common.description")}
+            error={errors.description?.message}
+          >
             <Textarea
               id="description"
               rows={2}
-              placeholder="What this group is for"
+              placeholder={t("userGroups.whatThisGroupIsFor")}
               {...register("description")}
             />
           </FormField>
@@ -128,7 +134,7 @@ export default function NewUserGroupPage() {
             value={roles}
             onChange={setRoles}
             allowSuperAdmin={false}
-            label="Roles granted"
+            label={t("userGroups.rolesGranted")}
           />
 
           <UserPicker value={memberIds} onChange={setMemberIds} />
@@ -136,9 +142,7 @@ export default function NewUserGroupPage() {
           <TagPicker value={tagIds} onChange={setTagIds} />
 
           {tenantMissing && (
-            <p className="text-xs text-error">
-              Select a tenant in the header before creating this group.
-            </p>
+            <p className="text-xs text-error">{t("userGroups.selectATenantInTheHeaderBefore")}</p>
           )}
 
           <div className="flex gap-2">
@@ -147,12 +151,12 @@ export default function NewUserGroupPage() {
               variant="primary"
               disabled={save.inFlight || tenantMissing}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/user-groups")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

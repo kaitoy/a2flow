@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/provider";
 import type { Tag, TagColor } from "@/lib/api";
 import { resolveTagColor, TAG_COLOR_CLASS, TAG_COLORS, tagColorLabel } from "@/lib/tag-palette";
 
@@ -113,6 +114,7 @@ export function TagPickerDialog({
   value,
   tags,
 }: TagPickerDialogProps) {
+  const t = useT();
   const [draft, setDraft] = useState<string[]>(value);
   const [query, setQuery] = useState("");
   const [colors, setColors] = useState<TagColor[]>([]);
@@ -148,17 +150,19 @@ export function TagPickerDialog({
       open={open}
       onClose={onClose}
       panelId={panelId}
-      title="Select tags"
+      title={t("admin.selectTags")}
       size="lg"
       scrollable
       footer={
         <>
-          <span className="mr-auto text-sm text-on-surface-variant">{draft.length} selected</span>
+          <span className="mr-auto text-sm text-on-surface-variant">
+            {t("admin.countSelected", { count: draft.length })}
+          </span>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="button" variant="primary" onClick={() => onAssign(draft)}>
-            Select
+            {t("admin.select")}
           </Button>
         </>
       }
@@ -167,8 +171,8 @@ export function TagPickerDialog({
           a row without squeezing the input to a few characters. */}
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input
-          aria-label="Filter tags"
-          placeholder="Filter tags…"
+          aria-label={t("admin.filterTags")}
+          placeholder={t("admin.filterTags2")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -179,7 +183,9 @@ export function TagPickerDialog({
           // No glass panel: this sits inside the dialog's own
           // `glass-panel-overlay`, and a second surface would stack two
           // elevation tiers — the same reason `CheckboxGroup` offers `flush`.
-          <p className="px-1 py-2 text-sm text-on-surface-variant">No tags match the filter.</p>
+          <p className="px-1 py-2 text-sm text-on-surface-variant">
+            {t("admin.noTagsMatchTheFilter")}
+          </p>
         ) : (
           // Wrapping flex rather than a fixed-column grid: tag names vary in
           // length, so equal columns would leave a ragged gap beside every

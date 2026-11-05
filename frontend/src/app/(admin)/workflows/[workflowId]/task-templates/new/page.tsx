@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zWorkflowTaskTemplateCreate } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import {
   createWorkflowTaskTemplate,
   listWorkflowTaskTemplates,
@@ -52,6 +53,7 @@ type FormValues = z.infer<typeof schema>;
 
 /** Form page that adds a new task template to the workflow in the URL. */
 export default function NewWorkflowTaskTemplatePage() {
+  const t = useT();
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -96,7 +98,7 @@ export default function NewWorkflowTaskTemplatePage() {
           dependsOnIds: values.dependsOnIds,
           toolBindings: toBindings(values.toolBindings, values.inputApprovalExempt),
         });
-        dispatch(showToast({ message: "Template created" }));
+        dispatch(showToast({ message: t("workflows.templateCreated") }));
         router.push(`/workflows/${workflowId}/task-templates`);
       });
     } catch {
@@ -105,10 +107,10 @@ export default function NewWorkflowTaskTemplatePage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Workflows", href: "/workflows" },
-    { label: "Task Templates", href: `/workflows/${workflowId}/task-templates` },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.workflows"), href: "/workflows" },
+    { label: t("workflows.taskTemplates"), href: `/workflows/${workflowId}/task-templates` },
+    { label: t("common.new") },
   ];
 
   // The template list hides its Add button for this viewer, so reaching the form
@@ -125,27 +127,36 @@ export default function NewWorkflowTaskTemplatePage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New Task Template" icon={ListTree} />
+      <AdminPageHeader title={t("workflows.newTaskTemplate")} icon={ListTree} />
 
       <FormColumn>
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField htmlFor="title" label="Title" required error={errors.title?.message}>
-            <Input id="title" placeholder="Short, actionable title" {...register("title")} />
+          <FormField
+            htmlFor="title"
+            label={t("common.title")}
+            required
+            error={errors.title?.message}
+          >
+            <Input
+              id="title"
+              placeholder={t("workflows.shortActionableTitle")}
+              {...register("title")}
+            />
           </FormField>
 
-          <FormField htmlFor="description" label="Description">
+          <FormField htmlFor="description" label={t("common.description")}>
             <Textarea
               id="description"
               rows={4}
-              placeholder="Longer-form details (optional)"
+              placeholder={t("workflows.longerFormDetailsOptional")}
               {...register("description")}
             />
           </FormField>
 
-          <FormField htmlFor="dependsOnIds" label="Depends on">
+          <FormField htmlFor="dependsOnIds" label={t("common.dependsOn")}>
             <Controller
               control={control}
               name="dependsOnIds"
@@ -155,13 +166,13 @@ export default function NewWorkflowTaskTemplatePage() {
                   options={candidates.map((t) => ({ value: t.id, label: t.title }))}
                   value={field.value}
                   onChange={field.onChange}
-                  emptyMessage="No other templates in this workflow yet."
+                  emptyMessage={t("workflows.noOtherTemplatesInThisWorkflowYet")}
                 />
               )}
             />
           </FormField>
 
-          <FormField htmlFor="toolBindings" label="MCP Tools">
+          <FormField htmlFor="toolBindings" label={t("workflows.mcpTools")}>
             <Controller
               control={control}
               name="toolBindings"
@@ -188,16 +199,16 @@ export default function NewWorkflowTaskTemplatePage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button
               type="button"
               variant="ghost"
               onClick={() => router.push(`/workflows/${workflowId}/task-templates`)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

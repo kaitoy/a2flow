@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import {
   deleteMcpServer,
   getMcpServer,
@@ -51,6 +52,7 @@ import { showToast } from "@/store/toastSlice";
  * 403 on click. The tools panel stays: listing a server's tools is a read.
  */
 export default function McpServerDetailPage() {
+  const t = useT();
   const { serverId } = useParams<{ serverId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -133,7 +135,7 @@ export default function McpServerDetailPage() {
         if (!sameIds(tagIds, savedTagIds)) {
           await setMcpServerTags(serverId, tagIds);
         }
-        dispatch(showToast({ message: "MCP server updated" }));
+        dispatch(showToast({ message: t("mcpServers.mcpServerUpdated") }));
         router.push("/mcp-servers");
       });
     } catch {
@@ -156,8 +158,8 @@ export default function McpServerDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "MCP Servers", href: "/mcp-servers" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.mcpServers"), href: "/mcp-servers" },
     // The server itself is the current page; an ellipsis stands in until its
     // name has loaded.
     { label: name || "…" },
@@ -214,17 +216,17 @@ export default function McpServerDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/mcp-servers")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -233,8 +235,8 @@ export default function McpServerDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete MCP Server"
-        description={`Delete "${getValues("name")}"?`}
+        title={t("mcpServers.deleteMcpServer")}
+        description={t("common.deleteValue", { value: getValues("name") })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

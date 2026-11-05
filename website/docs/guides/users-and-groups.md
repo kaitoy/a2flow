@@ -90,14 +90,37 @@ Saving an address without a credential, or AppRole without a role id, is rejecte
 
 ## Your own account {#your-own-account}
 
-Click the profile button in the app bar and choose **Profile** to review your own account. The page opens with an identity card — a banner, your avatar across its lower edge, your display name as the heading, and your `@username`, roles and status pills beside it — followed by two read-only cards:
+Click the profile button in the app bar and choose **Profile** to review your own account. The page opens with an identity card — a banner, your avatar across its lower edge, your display name as the heading, and your `@username`, roles and status pills beside it — followed by two read-only cards and a **Preferences** card:
 
 | Card | Shows |
 |---|---|
 | **Account** | Username, email, first and last name |
 | **Access** | Roles, Roles from Groups, and Groups |
+| **Preferences** | The [language](#language) the screens are shown in |
 
-Everything there is read-only: changing those attributes requires the `admin` role and the admin user detail page. The avatar is the one thing you can edit yourself, and clicking it is how you edit it.
+**Account** and **Access** are read-only: changing those attributes requires the `admin` role and the admin user detail page. The two things you can edit yourself are your language and your avatar, which you edit by clicking it.
+
+### Language {#language}
+
+A2Flow's screens come in English, 日本語, Español, 简体中文, 한국어 and Français. Each language is listed under its own name, so you can find yours whatever the screen is showing.
+
+1. Open **Profile** from the profile button in the app bar.
+2. In the **Preferences** card, choose a **Language**. The screen switches at once and stays in that language on every browser you sign in to.
+
+Choosing **Follow browser language**, the default, leaves the choice to your browser's language settings. A browser set to none of these languages gets English.
+
+| Situation | Language shown |
+|---|---|
+| Signed in, with a language chosen | That language |
+| Signed in, following the browser | The browser's, else English |
+| The sign-in page | The last language used in this browser, else the browser's |
+| Acting as another user ([impersonation](../concepts/impersonation.md)) | Your own, so you can read the screen. The **Language** control is disabled |
+
+The language covers what A2Flow itself says: screen text, messages and validation errors, and the wording of its own notifications. These stay as they were written:
+
+- Anything people or agents wrote: names, descriptions, approval titles, chat replies. The agent answers in the language of the conversation, not the language set here.
+- The technical reason attached to some errors, shown in English after the translated message.
+- [Notification emails](./notifications.md#email-delivery), which are in English.
 
 ### Avatars
 

@@ -14,6 +14,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { type ColumnDef, DataTable } from "@/components/ui/data-table";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useUserNames } from "@/hooks/useNames";
+import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import {
   type FilterSpec,
   getWorkflow,
@@ -33,26 +35,27 @@ function buildColumns(
   names: Map<string, string>,
   onRestore: (version: WorkflowVersion) => void,
   canRestore: boolean,
-  canViewPrompt: boolean
+  canViewPrompt: boolean,
+  t: Translator
 ): ColumnDef<WorkflowVersion>[] {
   const columns: ColumnDef<WorkflowVersion>[] = [
     idColumn<WorkflowVersion>(),
     {
-      header: "Version",
+      header: "common.version" as const,
       className: "w-24 font-mono",
       sortField: "version",
       visibility: "always",
       cell: (v) => `v${v.version}`,
     },
     {
-      header: "Name",
+      header: "common.name" as const,
       sortField: "name",
       filterField: "name",
       visibility: "always",
       cell: (v) => v.name,
     },
     {
-      header: "Description",
+      header: "common.description" as const,
       sortField: "description",
       filterField: "description",
       cell: (v) => v.description || "—",
@@ -61,7 +64,7 @@ function buildColumns(
     ...(canViewPrompt
       ? [
           {
-            header: "Prompt",
+            header: "common.prompt" as const,
             sortField: "prompt",
             filterField: "prompt",
             visibility: "optional" as const,
@@ -73,12 +76,16 @@ function buildColumns(
   ];
   if (canRestore) {
     columns.push({
-      header: "Actions",
+      header: "common.actions",
       noTruncate: true,
       visibility: "always",
       cell: (v) => (
         <div className="flex justify-center gap-2">
-          <ActionIconButton icon={RotateCcw} label="Restore" onClick={() => onRestore(v)} />
+          <ActionIconButton
+            icon={RotateCcw}
+            label={t("workflows.restore")}
+            onClick={() => onRestore(v)}
+          />
         </div>
       ),
     });
@@ -95,6 +102,7 @@ function buildColumns(
  * the workflow without publishing it, then returns to the workflow's page.
  */
 export default function WorkflowVersionsPage() {
+  const t = useT();
   const { workflowId } = useParams<{ workflowId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -137,7 +145,7 @@ export default function WorkflowVersionsPage() {
     setConfirmTarget(null);
     try {
       await restoreWorkflowVersion(workflowId, version);
-      dispatch(showToast({ message: `Version ${version} restored` }));
+      dispatch(showToast({ message: t("workflows.versionVersionRestored", { version }) }));
       router.push(`/workflows/${workflowId}`);
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -145,7 +153,7 @@ export default function WorkflowVersionsPage() {
   }
 
   const names = useUserNames(versions.flatMap((v) => [v.createdBy, v.updatedBy]));
-  const columns = buildColumns(names, setConfirmTarget, canRestore, canViewPrompt);
+  const columns = buildColumns(names, setConfirmTarget, canRestore, canViewPrompt, t);
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
     "workflowVersions",
@@ -156,14 +164,14 @@ export default function WorkflowVersionsPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Workflows", href: "/workflows" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.workflows"), href: "/workflows" },
           { label: workflowName || "…", href: `/workflows/${workflowId}` },
-          { label: "Versions" },
+          { label: t("workflows.versions") },
         ]}
       />
       <AdminPageHeader
-        title="Version History"
+        title={t("workflows.versionHistory2")}
         icon={History}
         onRefresh={load}
         refreshing={loading}
@@ -181,7 +189,7 @@ export default function WorkflowVersionsPage() {
         columns={visibleColumns}
         rows={versions}
         loading={loading}
-        emptyMessage="This workflow has not been published yet."
+        emptyMessage={t("workflows.thisWorkflowHasNotBeenPublishedYet")}
         emptyIcon={History}
         getRowKey={(v) => v.id}
         sort={sort}
@@ -191,13 +199,15 @@ export default function WorkflowVersionsPage() {
       />
       <ConfirmDialog
         open={confirmTarget !== null}
-        title="Restore Version"
+        title={t("workflows.restoreVersion")}
         description={
           confirmTarget
-            ? `Replace the workflow's current design with version ${confirmTarget.version}? It is not published until you publish it again.`
+            ? t("workflows.replaceTheWorkflowsCurrentDesignWithVersion", {
+                version: confirmTarget.version,
+              })
             : ""
         }
-        confirmLabel="Restore"
+        confirmLabel={t("workflows.restore")}
         onConfirm={executeRestore}
         onCancel={() => setConfirmTarget(null)}
       />

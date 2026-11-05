@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import {
   deleteKnowledgeBase,
   getKnowledgeBase,
@@ -52,6 +53,7 @@ import { showToast } from "@/store/toastSlice";
  * download the bundle.
  */
 export default function KnowledgeBaseDetailPage() {
+  const t = useT();
   const { knowledgeBaseId } = useParams<{ knowledgeBaseId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -118,7 +120,7 @@ export default function KnowledgeBaseDetailPage() {
         }
         setName(values.name);
         reset(values);
-        dispatch(showToast({ message: "Knowledge base updated" }));
+        dispatch(showToast({ message: t("knowledgeBases.knowledgeBaseUpdated") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -136,8 +138,8 @@ export default function KnowledgeBaseDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Knowledge Bases", href: "/knowledge-bases" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.knowledgeBases"), href: "/knowledge-bases" },
     { label: name || "…" },
   ];
 
@@ -171,7 +173,7 @@ export default function KnowledgeBaseDetailPage() {
             icon={BookOpen}
             secondaryAction={
               <HeaderIconButton
-                label="Download bundle"
+                label={t("knowledgeBases.downloadBundle")}
                 // Served as an attachment, so the browser downloads it in place.
                 onClick={() => window.location.assign(knowledgeBaseExportUrl(knowledgeBaseId))}
               >
@@ -201,13 +203,13 @@ export default function KnowledgeBaseDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/knowledge-bases")}>
-              Back
+              {t("common.back")}
             </Button>
             {canEdit && (
               <Button
@@ -216,7 +218,7 @@ export default function KnowledgeBaseDetailPage() {
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -230,8 +232,8 @@ export default function KnowledgeBaseDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Knowledge Base"
-        description={`Delete "${name}" with all its sources and pages? Workflows linked to it lose access to it.`}
+        title={t("knowledgeBases.deleteKnowledgeBase")}
+        description={t("knowledgeBases.deleteNameWithAllItsSourcesAnd", { name })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />

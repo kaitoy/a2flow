@@ -21,12 +21,14 @@ import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createAgentSkill, setAgentSkillTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
 export default function NewAgentSkillPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
@@ -56,7 +58,7 @@ export default function NewAgentSkillPage() {
         if (tagIds.length > 0) {
           await setAgentSkillTags(created.id, tagIds);
         }
-        dispatch(showToast({ message: "Agent skill created" }));
+        dispatch(showToast({ message: t("agentSkills.agentSkillCreated") }));
         router.push("/agent-skills");
       });
     } catch {
@@ -65,9 +67,9 @@ export default function NewAgentSkillPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Agent Skills", href: "/agent-skills" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.agentSkills"), href: "/agent-skills" },
+    { label: t("common.new") },
   ];
 
   // The list page hides the Add button for this viewer, so reaching the form at
@@ -84,7 +86,7 @@ export default function NewAgentSkillPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New Agent Skill" icon={Wand2} />
+      <AdminPageHeader title={t("agentSkills.newAgentSkill")} icon={Wand2} />
 
       <FormColumn>
         <form
@@ -106,12 +108,12 @@ export default function NewAgentSkillPage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/agent-skills")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

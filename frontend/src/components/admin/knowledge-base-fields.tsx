@@ -11,6 +11,7 @@ import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zKnowledgeBaseCreate } from "@/generated/api/zod.gen";
+import { useT } from "@/i18n/provider";
 import type { KnowledgeBaseCreate } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
 
@@ -60,13 +61,14 @@ export type KnowledgeBaseFieldsProps =
  * is worth saying what the knowledge base covers.
  */
 export function KnowledgeBaseFields(props: KnowledgeBaseFieldsProps) {
+  const t = useT();
   if (props.readOnly) {
     return (
       <>
-        <FormField htmlFor="name" label="Name" required>
+        <FormField htmlFor="name" label={t("common.name")} required>
           <ReadOnlyField>{props.values.name || EMPTY_VALUE}</ReadOnlyField>
         </FormField>
-        <FormField htmlFor="description" label="Description">
+        <FormField htmlFor="description" label={t("common.description")}>
           <ReadOnlyField className="whitespace-pre-wrap">
             {props.values.description || EMPTY_VALUE}
           </ReadOnlyField>
@@ -77,22 +79,22 @@ export function KnowledgeBaseFields(props: KnowledgeBaseFieldsProps) {
   const { register, errors, showPlaceholders = false } = props;
   return (
     <>
-      <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+      <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
         <Input
           id="name"
-          placeholder={showPlaceholders ? "e.g. IT operations" : undefined}
+          placeholder={showPlaceholders ? t("admin.eGItOperations") : undefined}
           {...register("name")}
         />
       </FormField>
-      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+      <FormField
+        htmlFor="description"
+        label={t("common.description")}
+        error={errors.description?.message}
+      >
         <Textarea
           id="description"
           rows={3}
-          placeholder={
-            showPlaceholders
-              ? "What it covers — workflow agents read this to decide when to look here"
-              : undefined
-          }
+          placeholder={showPlaceholders ? t("admin.whatItCoversWorkflowAgentsReadThis") : undefined}
           {...register("description")}
         />
       </FormField>

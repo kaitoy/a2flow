@@ -18,6 +18,8 @@ import { EditorView, keymap, tooltips } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { basicSetup } from "codemirror";
 import { useEffect, useRef } from "react";
+import type { MessageKey } from "@/i18n/messages/en";
+import { getActiveTranslator } from "@/i18n/translate";
 
 /** A language the editor can highlight. */
 export type CodeLanguage = "python" | "javascript";
@@ -119,6 +121,41 @@ const editorTheme = EditorView.theme({
 /** Room for about sixteen lines while editing, the old textarea's height. */
 const editableHeight = EditorView.theme({ ".cm-content, .cm-gutter": { minHeight: "24rem" } });
 
+/** CodeMirror's own English text, keyed by the phrase it looks up. */
+const EDITOR_PHRASES: Record<string, MessageKey> = {
+  Find: "editor.find",
+  Replace: "editor.replace",
+  next: "editor.next",
+  previous: "editor.previous",
+  all: "editor.all",
+  "match case": "editor.matchCase",
+  regexp: "editor.regexp",
+  "by word": "editor.byWord",
+  replace: "editor.replaceAction",
+  "replace all": "editor.replaceAll",
+  close: "editor.close",
+  "Go to line": "editor.goToLine",
+  go: "editor.go",
+  "current match": "editor.currentMatch",
+  "on line": "editor.onLine",
+  "Fold line": "editor.foldLine",
+  "Unfold line": "editor.unfoldLine",
+  "folded code": "editor.foldedCode",
+  unfold: "editor.unfold",
+  Diagnostics: "editor.diagnostics",
+  "No diagnostics": "editor.noDiagnostics",
+};
+
+/** CodeMirror's text in the language on screen when the editor is built. */
+function editorPhrases(): Extension {
+  const translate = getActiveTranslator();
+  return EditorState.phrases.of(
+    Object.fromEntries(
+      Object.entries(EDITOR_PHRASES).map(([phrase, key]) => [phrase, translate(key)])
+    )
+  );
+}
+
 const languageSlot = new Compartment();
 const lintSlot = new Compartment();
 const modeSlot = new Compartment();
@@ -134,7 +171,7 @@ function slots({
   invalid,
 }: CodeEditorProps): [Compartment, Extension][] {
   return [
-    [languageSlot, language === "python" ? python() : javascript()],
+    [languageSlot, [language === "python" ? python() : javascript(), editorPhrases()]],
     [lintSlot, lint && !readOnly ? [linter(lint, { delay: 500 }), lintGutter()] : []],
     [
       modeSlot,

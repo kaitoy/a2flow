@@ -3,6 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/provider";
 
 /**
  * Drop the blank rows a {@link StringListEditor} leaves behind.
@@ -39,9 +40,10 @@ export function StringListEditor({
   name,
   values,
   onChange,
-  placeholder = "Value",
+  placeholder = "form.value",
   addLabel = "+ Add row",
 }: StringListEditorProps) {
+  const t = useT();
   function updateRow(index: number, value: string) {
     onChange(values.map((current, i) => (i === index ? value : current)));
   }
@@ -59,15 +61,15 @@ export function StringListEditor({
           className="flex items-center gap-2"
         >
           <Input
-            aria-label={`${name} value ${index + 1}`}
-            placeholder={placeholder}
+            aria-label={t("admin.nameValueValue", { name, value: index + 1 })}
+            placeholder={t.maybe(placeholder)}
             value={value}
             onChange={(e) => updateRow(index, e.target.value)}
           />
           <Button
             type="button"
             variant="danger"
-            aria-label={`Remove ${name} row ${index + 1}`}
+            aria-label={t("admin.removeNameRowValue", { name, value: index + 1 })}
             onClick={() => removeRow(index)}
           >
             ✕

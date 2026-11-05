@@ -21,6 +21,7 @@ import { TagPicker } from "@/components/admin/tag-picker";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { createMcpToolMock, setMcpToolMockTags } from "@/lib/api";
 import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch } from "@/store/hooks";
@@ -28,6 +29,7 @@ import { showToast } from "@/store/toastSlice";
 
 /** Admin page for registering a new tool mock. */
 export default function NewMcpToolMockPage() {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const canEdit = useHasRole(Role.DEVELOPER);
@@ -58,7 +60,7 @@ export default function NewMcpToolMockPage() {
         if (tagIds.length > 0) {
           await setMcpToolMockTags(created.id, tagIds);
         }
-        dispatch(showToast({ message: "Tool mock created" }));
+        dispatch(showToast({ message: t("mcpToolMocks.toolMockCreated") }));
         router.push("/mcp-tool-mocks");
       });
     } catch {
@@ -67,9 +69,9 @@ export default function NewMcpToolMockPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Tool Mocks", href: "/mcp-tool-mocks" },
-    { label: "New" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.toolMocks"), href: "/mcp-tool-mocks" },
+    { label: t("common.new") },
   ];
 
   // The list page hides Add for this viewer, so reaching the form at all means a
@@ -86,7 +88,7 @@ export default function NewMcpToolMockPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <AdminPageHeader title="New Tool Mock" icon={FlaskConical} />
+      <AdminPageHeader title={t("mcpToolMocks.newToolMock")} icon={FlaskConical} />
 
       <FormColumn>
         <form
@@ -109,12 +111,12 @@ export default function NewMcpToolMockPage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
             <Button type="button" variant="ghost" onClick={() => router.push("/mcp-tool-mocks")}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>

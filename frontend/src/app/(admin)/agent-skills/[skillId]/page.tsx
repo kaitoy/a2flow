@@ -31,6 +31,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StatusDot } from "@/components/ui/status-dot";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useIsAllTenantsView } from "@/hooks/useIsAllTenantsView";
+import { useT } from "@/i18n/provider";
 import {
   formatRevision,
   formatSyncStatusLabel,
@@ -76,6 +77,7 @@ interface SyncState {
  * convention `WorkflowDetailPage` follows.
  */
 export default function AgentSkillDetailPage() {
+  const t = useT();
   const { skillId } = useParams<{ skillId: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -193,7 +195,7 @@ export default function AgentSkillDetailPage() {
         await setAgentSkillTags(skillId, tagIds);
       }
       setName(values.name);
-      dispatch(showToast({ message: "Agent skill updated" }));
+      dispatch(showToast({ message: t("agentSkills.agentSkillUpdated") }));
       // Re-seed the form with what was just saved so `isDirty` goes back to
       // false — the generation flow reads it to decide whether to ask.
       reset(values);
@@ -248,8 +250,8 @@ export default function AgentSkillDetailPage() {
   }
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Agent Skills", href: "/agent-skills" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.agentSkills"), href: "/agent-skills" },
     // The skill itself is the current page; an ellipsis stands in until its
     // name has loaded.
     { label: name || "…" },
@@ -286,7 +288,7 @@ export default function AgentSkillDetailPage() {
             secondaryAction={
               <>
                 <HeaderIconButton
-                  label="View SKILL.md"
+                  label={t("agentSkills.viewSkillMd")}
                   onClick={() => setSkillMdOpen(true)}
                   // The file only exists once a revision has been published.
                   disabled={sync?.status !== "ready"}
@@ -295,7 +297,7 @@ export default function AgentSkillDetailPage() {
                 </HeaderIconButton>
                 {canEdit && (
                   <HeaderIconButton
-                    label="Generate Workflow"
+                    label={t("common.generateWorkflow")}
                     onClick={handleGenerateClick}
                     // A skill can only back a design run once its clone has
                     // published a revision.
@@ -312,12 +314,12 @@ export default function AgentSkillDetailPage() {
       >
         {sync && (
           <StatusCard
-            ariaLabel="Repository sync"
+            ariaLabel={t("agentSkills.repositorySync")}
             actions={
               canEdit ? (
                 <ActionIconButton
                   icon={RefreshCw}
-                  label="Pull"
+                  label={t("agentSkills.pull")}
                   onClick={handlePull}
                   disabled={pull.inFlight || sync.status === "pending"}
                   spinning={pull.inFlight || sync.status === "pending"}
@@ -331,7 +333,7 @@ export default function AgentSkillDetailPage() {
               label={formatSyncStatusLabel(sync.status)}
             />
             <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-              <span>Revision</span>
+              <span>{t("agentSkills.revision")}</span>
               <span className="font-mono">{formatRevision(sync.commitSha)}</span>
             </div>
           </StatusCard>
@@ -356,17 +358,17 @@ export default function AgentSkillDetailPage() {
                 variant="primary"
                 disabled={save.inFlight}
                 status={save.status}
-                pendingLabel="Saving…"
+                pendingLabel={t("common.saving")}
               >
-                Save
+                {t("common.save")}
               </Button>
             )}
             <Button type="button" variant="ghost" onClick={() => router.push("/agent-skills")}>
-              {canEdit ? "Cancel" : "Back"}
+              {canEdit ? t("common.cancel") : t("common.back")}
             </Button>
             {canEdit && (
               <Button type="button" variant="danger" onClick={handleDelete} className="ml-auto">
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -374,16 +376,16 @@ export default function AgentSkillDetailPage() {
       </FormLayout>
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Agent Skill"
-        description={`Delete "${getValues("name")}"?`}
+        title={t("agentSkills.deleteAgentSkill")}
+        description={t("common.deleteValue", { value: getValues("name") })}
         onConfirm={executeDelete}
         onCancel={() => setConfirmOpen(false)}
       />
       <ConfirmDialog
         open={saveBeforeGenerateOpen}
-        title="Save changes?"
-        description="Generating opens the new workflow, leaving this page. Save your changes to this skill first?"
-        confirmLabel="Save and continue"
+        title={t("agentSkills.saveChanges")}
+        description={t("agentSkills.generatingOpensTheNewWorkflowLeavingThis")}
+        confirmLabel={t("agentSkills.saveAndContinue")}
         confirmVariant="primary"
         onConfirm={confirmSaveBeforeGenerate}
         onCancel={() => setSaveBeforeGenerateOpen(false)}

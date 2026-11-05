@@ -7,7 +7,8 @@ import { AvatarField } from "@/components/ui/avatar-field";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { type AvatarConfig, updateUser } from "@/lib/api";
+import { useT } from "@/i18n/provider";
+import { type AvatarConfig, getApiErrorMessage, updateUser } from "@/lib/api";
 import { avatarPalette, DEFAULT_AVATAR_PALETTE } from "@/lib/avatar-palette";
 import { setUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
@@ -45,6 +46,7 @@ export interface AvatarDialogProps {
  * config every time the dialog opens.
  */
 export function AvatarDialog({ open, onClose, user }: AvatarDialogProps) {
+  const t = useT();
   const dispatch = useAppDispatch();
 
   const [colors, setColors] = useState<string[]>(() => avatarPalette(user.avatarConfig));
@@ -90,7 +92,7 @@ export function AvatarDialog({ open, onClose, user }: AvatarDialogProps) {
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save avatar");
+      setError(err instanceof Error ? getApiErrorMessage(err) : t("profile.failedToSaveAvatar"));
     }
   }
 
@@ -104,30 +106,30 @@ export function AvatarDialog({ open, onClose, user }: AvatarDialogProps) {
       open={open}
       onClose={onClose}
       panelId="avatar-dialog"
-      title="Edit avatar"
-      description="Upload an image, or tune the colors your generated avatar is drawn from."
+      title={t("profile.editAvatar")}
+      description={t("profile.uploadAnImageOrTuneTheColors")}
       size="md"
       scrollable
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={action.inFlight}>
-            Close
+            {t("common.close")}
           </Button>
           <Button
             variant="primary"
             onClick={handleSave}
             disabled={action.inFlight}
             status={action.status}
-            pendingLabel="Saving…"
+            pendingLabel={t("common.saving")}
           >
-            Save
+            {t("common.save")}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-6 overflow-y-auto">
         <AvatarField
-          label="Uploaded image"
+          label={t("profile.uploadedImage")}
           user={user}
           onChange={(updated) => dispatch(setUser(updated))}
           onUploaded={onClose}
@@ -135,8 +137,12 @@ export function AvatarDialog({ open, onClose, user }: AvatarDialogProps) {
 
         <div className="flex flex-col gap-4 border-t border-glass-border pt-6">
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-on-surface">Generated avatar</h3>
-            <p className="text-xs text-on-surface-variant">Used when no image is uploaded.</p>
+            <h3 className="text-sm font-semibold text-on-surface">
+              {t("profile.generatedAvatar")}
+            </h3>
+            <p className="text-xs text-on-surface-variant">
+              {t("profile.usedWhenNoImageIsUploaded")}
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-6">
@@ -149,7 +155,7 @@ export function AvatarDialog({ open, onClose, user }: AvatarDialogProps) {
             {/* Purely local — it rewinds the swatches and leaves the commit to
                 Save, so it carries no submitting-button lifecycle at all. */}
             <Button variant="ghost" onClick={handleReset} disabled={action.inFlight}>
-              Reset to default
+              {t("common.resetToDefault")}
             </Button>
           </div>
         </div>
@@ -190,9 +196,10 @@ interface PalettePickerProps {
  * than by the feature they end up tinting.
  */
 function PalettePicker({ colors, onChange }: PalettePickerProps) {
+  const t = useT();
   return (
     <fieldset className="flex min-w-0 flex-col gap-2">
-      <legend className="text-label-caps">Palette</legend>
+      <legend className="text-label-caps">{t("profile.palette")}</legend>
       <div className="flex flex-wrap gap-4">
         {colors.map((color, index) => (
           <label
@@ -204,7 +211,7 @@ function PalettePicker({ colors, onChange }: PalettePickerProps) {
               type="color"
               value={color}
               onChange={(e) => onChange(index, e.target.value)}
-              aria-label={`Palette color ${index + 1}`}
+              aria-label={t("profile.paletteColorValue", { value: index + 1 })}
               className="h-8 w-8 cursor-pointer rounded-md border border-glass-border bg-transparent"
             />
             {index + 1}

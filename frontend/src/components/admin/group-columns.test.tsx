@@ -1,6 +1,7 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DataTable } from "@/components/ui/data-table";
+import type { MessageKey } from "@/i18n/messages/en";
 import type { UserGroup } from "@/lib/api";
 import { render, screen, within } from "@/test/test-utils";
 import { groupFilterOptions, groupsColumn } from "./group-columns";
@@ -51,7 +52,7 @@ function renderTable(rows: Row[], onGroupIdsChange = vi.fn(), groupIds: string[]
   render(
     <DataTable<Row>
       columns={[
-        { header: "Id", cell: (row) => row.id },
+        { header: "Id" as MessageKey, cell: (row) => row.id },
         groupsColumn<Row>((row) => row.groupIds, BY_ID),
       ]}
       rows={rows}

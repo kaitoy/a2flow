@@ -1,5 +1,8 @@
 /** @module approval-status — the shared status readout for an Approval request. */
+
 import { StatusDot } from "@/components/ui/status-dot";
+import { useT } from "@/i18n/provider";
+import { translateStatus } from "@/i18n/translate";
 import type { ApprovalStatus as ApprovalStatusValue } from "@/lib/api";
 
 /**
@@ -30,6 +33,7 @@ const STATUS_DOT_CLASS: Record<ApprovalStatusValue, string> = {
  *   state an approval starts in.
  */
 export function ApprovalStatusLabel({ status }: { status?: ApprovalStatusValue | null }) {
+  const t = useT();
   const value = status ?? "pending";
-  return <StatusDot dotClass={STATUS_DOT_CLASS[value]} label={value} />;
+  return <StatusDot dotClass={STATUS_DOT_CLASS[value]} label={translateStatus(value, t)} />;
 }

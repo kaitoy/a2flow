@@ -8,19 +8,20 @@ import { useCallback } from "react";
 import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RecordPickerField } from "@/components/admin/record-picker-field";
 import type { ColumnDef } from "@/components/ui/data-table";
+import { useT } from "@/i18n/provider";
 import { type KnowledgeBase, listKnowledgeBases } from "@/lib/api";
 
 /** Columns describing a knowledge base in the picker dialog. */
 const COLUMNS: ColumnDef<KnowledgeBase>[] = [
   {
-    header: "Name",
+    header: "common.name",
     sortField: "name",
     filterField: "name",
     visibility: "always",
     cell: (kb) => kb.name,
   },
   {
-    header: "Description",
+    header: "common.description",
     cell: (kb) => kb.description || "—",
   },
 ];
@@ -44,6 +45,7 @@ export function KnowledgeBasePicker({
   readOnly = false,
   initialOptions,
 }: KnowledgeBasePickerProps) {
+  const t = useT();
   const resolveLabels = useCallback(async (ids: string[]): Promise<PickerOption[]> => {
     const kbs = await listKnowledgeBases({
       limit: ids.length,
@@ -54,7 +56,7 @@ export function KnowledgeBasePicker({
 
   return (
     <RecordPickerField<KnowledgeBase>
-      label="Knowledge Bases"
+      label={t("common.knowledgeBases")}
       value={value}
       onChange={onChange}
       readOnly={readOnly}
@@ -65,9 +67,9 @@ export function KnowledgeBasePicker({
       getId={(kb) => kb.id}
       getLabel={(kb) => kb.name}
       panelId="knowledge-base-picker-dialog"
-      dialogTitle="Select knowledge bases"
-      selectLabel="Select knowledge bases…"
-      emptyMessage="This tenant has no knowledge bases yet."
+      dialogTitle={t("admin.selectKnowledgeBases")}
+      selectLabel={t("admin.selectKnowledgeBases2")}
+      emptyMessage={t("admin.thisTenantHasNoKnowledgeBasesYet")}
       emptyIcon={BookOpen}
     />
   );

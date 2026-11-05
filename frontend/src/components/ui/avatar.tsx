@@ -3,6 +3,7 @@
 
 import BoringAvatar from "boring-avatars";
 import { useState } from "react";
+import { useT } from "@/i18n/provider";
 import { avatarUrl, type User } from "@/lib/api";
 import { avatarPalette } from "@/lib/avatar-palette";
 
@@ -49,6 +50,7 @@ interface AvatarProps {
  * loading (`null`), a neutral placeholder keeps the layout stable.
  */
 export function Avatar({ user, size = 36, className }: AvatarProps) {
+  const t = useT();
   const url = user ? avatarUrl(user) : null;
   // Track the specific URL whose image failed to load; comparing against the
   // current URL means a newly uploaded avatar (different URL) is retried without
@@ -77,7 +79,7 @@ export function Avatar({ user, size = 36, className }: AvatarProps) {
         {/* biome-ignore lint/performance/noImgElement: the avatar is served from a dynamic API endpoint and needs an onError fallback to the generated default, which next/image cannot express. */}
         <img
           src={url}
-          alt={`${user.username} avatar`}
+          alt={t("ui.usernameAvatar", { username: user.username })}
           width={size}
           height={size}
           className="h-full w-full object-cover"

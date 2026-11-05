@@ -14,7 +14,7 @@ import { tagsColumn } from "@/components/admin/tag-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
 import type { Tag, UserGroup } from "@/lib/api";
 import { EMPTY_VALUE } from "@/lib/read-only-display";
-import { ROLE_LABELS } from "@/lib/roles";
+import { roleLabel } from "@/lib/roles";
 
 /**
  * Build the Description, Roles, Members, and Tags columns of a `UserGroup`
@@ -30,24 +30,24 @@ import { ROLE_LABELS } from "@/lib/roles";
 export function userGroupSharedColumns(byId: Map<string, Tag>): ColumnDef<UserGroup>[] {
   return [
     {
-      header: "Description",
+      header: "common.description",
       filterField: "description",
       cell: (g) => g.description || EMPTY_VALUE,
     },
     {
       // Roles are a JSON column, so this column is display-only: the list API can
       // neither sort nor filter on it.
-      header: "Roles",
+      header: "common.roles",
       noTruncate: true,
       cell: (g) =>
         g.roles && g.roles.length > 0
-          ? g.roles.map((role) => ROLE_LABELS[role]).join(", ")
+          ? g.roles.map((role) => roleLabel(role)).join(", ")
           : EMPTY_VALUE,
     },
     {
       // Membership lives in a join table rather than on the group row, so this is
       // display-only too.
-      header: "Members",
+      header: "common.members",
       className: "text-center",
       cell: (g) => g.memberIds?.length ?? 0,
     },

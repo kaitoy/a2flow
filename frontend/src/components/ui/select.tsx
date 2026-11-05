@@ -15,6 +15,7 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPanel } from "@/hooks/useAnchoredPanel";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
+import { useT } from "@/i18n/provider";
 import { useMotionConfig } from "@/lib/motion";
 
 /** A choice offered by {@link Select}. */
@@ -102,6 +103,7 @@ export function Select({
   placeholder,
   className,
 }: SelectProps) {
+  const t = useT();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
@@ -109,7 +111,9 @@ export function Select({
   const panelId = `select-listbox-${useId()}`;
 
   const selectedIndex = options.findIndex((o) => o.value === value);
-  const selectedLabel = selectedIndex >= 0 ? options[selectedIndex].label : (placeholder ?? "");
+  const selectedLabel = t.maybe(
+    selectedIndex >= 0 ? options[selectedIndex].label : (placeholder ?? "")
+  );
 
   const coords = useAnchoredPanel({
     open,
@@ -278,7 +282,7 @@ export function Select({
                             : ""
                       }`}
                     >
-                      {opt.label}
+                      {t.maybe(opt.label)}
                     </div>
                   ))}
                 </animated.div>

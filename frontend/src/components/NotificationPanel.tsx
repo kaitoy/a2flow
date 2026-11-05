@@ -7,8 +7,10 @@ import { type RefObject, useCallback, useEffect, useMemo, useState } from "react
 import { createPortal } from "react-dom";
 import { ActionIconButton } from "@/components/admin/action-icon-button";
 import { useDialogA11y } from "@/hooks/useDialogA11y";
+import { useT } from "@/i18n/provider";
 import { markAllNotificationsRead, updateNotification } from "@/lib/api";
 import { useMotionConfig } from "@/lib/motion";
+import { notificationText } from "@/lib/notification-text";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { markAllReadLocal, markReadLocal } from "@/store/notificationsSlice";
 import { Button } from "./ui/button";
@@ -48,6 +50,7 @@ interface Coords {
  * header, and animated in/out with the project's motion preset.
  */
 export function NotificationPanel({ anchorRef, open, onClose }: NotificationPanelProps) {
+  const t = useT();
   const dispatch = useAppDispatch();
   const router = useRouter();
   const items = useAppSelector((s) => s.notifications.items);
@@ -142,7 +145,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
             id="notification-panel"
             role="dialog"
             tabIndex={-1}
-            aria-label="Notifications"
+            aria-label={t("common.notifications")}
             style={{
               position: "fixed",
               top: coords.top,
@@ -157,17 +160,17 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
           >
             <div className="flex items-center justify-between gap-2 px-2 py-1.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                Notifications
+                {t("common.notifications")}
               </span>
               {unreadCount > 0 && (
                 <Button variant="ghost" onClick={onMarkAllRead}>
-                  Mark all read
+                  {t("app.markAllRead")}
                 </Button>
               )}
             </div>
             {unread.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-on-surface-variant">
-                No unread notifications
+                {t("app.noUnreadNotifications")}
               </div>
             ) : (
               <ul className="flex flex-col gap-1">
@@ -184,16 +187,16 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                       />
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-sm font-medium text-on-surface">
-                          {n.title}
+                          {notificationText(n, t).title}
                         </span>
-                        {n.body && (
+                        {notificationText(n, t).body && (
                           <span className="line-clamp-2 text-xs text-on-surface-variant">
-                            {n.body}
+                            {notificationText(n, t).body}
                           </span>
                         )}
                         <Tooltip label={formatFullTimestamp(n.createdAt)} placement="bottom">
                           <span className="w-fit text-[11px] text-on-surface-variant">
-                            {formatRelativeTime(n.createdAt)}
+                            {formatRelativeTime(n.createdAt, t)}
                           </span>
                         </Tooltip>
                       </span>
@@ -201,7 +204,7 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
                     <span className="shrink-0 pt-2">
                       <ActionIconButton
                         icon={Check}
-                        label="Mark as read"
+                        label={t("common.markAsRead")}
                         onClick={() => onMarkRead(n.id)}
                       />
                     </span>

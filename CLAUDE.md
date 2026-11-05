@@ -62,6 +62,10 @@ Colors, typography, spacing, and component styles are defined in [DESIGN.md](DES
 
 Pages that share the same structural element (header, footer, form layout, etc.) must use the same shared component — never duplicate markup with hand-written classes. If no suitable shared component exists yet, extract one before writing the new page. Inline styles or one-off class combinations that duplicate an existing component are not acceptable; extend the existing component instead.
 
+## GUI text
+
+No UI text is hardcoded: it goes through the catalogs in `frontend/src/i18n/messages/`. Add a key to `en.ts` and to the five other languages in the same change; a missing or extra key fails the build. [frontend/README.md](frontend/README.md#translating-the-gui) has the how-to and the glossary.
+
 ## Keeping tests in sync
 
 When modifying CSS class names or markup structure of a UI component, update every

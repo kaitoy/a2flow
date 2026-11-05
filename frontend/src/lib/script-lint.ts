@@ -6,10 +6,12 @@
  * report a syntax error first and, for a script that parses, the slips against
  * the runner conventions that would leave a tool missing or vaguely described.
  */
+
 import type { Diagnostic } from "@codemirror/lint";
 import type { Text } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { type ModuleDeclaration, type Node, parse, type Statement } from "acorn";
+import { getActiveTranslator } from "@/i18n/translate";
 import { lintPythonScript } from "@/lib/api";
 
 /** A public exported function: the tool name, the local binding, and where to mark it. */
@@ -112,7 +114,7 @@ export function javaScriptDiagnostics(doc: Text): Diagnostic[] {
 
   const publicTools = tools.filter((tool) => !tool.exported.startsWith("_"));
   if (publicTools.length === 0) {
-    return [wholeScriptWarning(doc, "No exported function: this server exposes no tools.")];
+    return [wholeScriptWarning(doc, getActiveTranslator()("lib.scriptNoExports"))];
   }
   const diagnostics: Diagnostic[] = [];
   for (const { exported, local, node } of publicTools) {
@@ -121,14 +123,14 @@ export function javaScriptDiagnostics(doc: Text): Diagnostic[] {
       diagnostics.push({
         ...at,
         severity: "warning",
-        message: `'${exported}' has no description: set ${local}.description to tell the agent what the tool does.`,
+        message: getActiveTranslator()("lib.scriptNoDescription", { exported, local }),
       });
     }
     if (!assigned.has(`${local}.inputSchema`)) {
       diagnostics.push({
         ...at,
         severity: "info",
-        message: `'${exported}' has no inputSchema: the tool will accept any arguments object.`,
+        message: getActiveTranslator()("lib.scriptNoInputSchema", { exported }),
       });
     }
   }

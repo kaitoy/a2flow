@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { zGenerateWorkflowRequest } from "@/generated/api/zod.gen";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import { generateWorkflow } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -51,6 +52,7 @@ export function GenerateWorkflowDialog({
   defaultName,
   onClose,
 }: GenerateWorkflowDialogProps) {
+  const t = useT();
   const router = useRouter();
   const dispatch = useAppDispatch();
 
@@ -82,7 +84,7 @@ export function GenerateWorkflowDialog({
           prompt: values.prompt,
           knowledgeBaseIds: values.knowledgeBaseIds,
         });
-        dispatch(showToast({ message: "Workflow generation started" }));
+        dispatch(showToast({ message: t("admin.workflowGenerationStarted") }));
         router.push(`/workflows/${workflow.id}`);
       });
     } catch {
@@ -95,8 +97,8 @@ export function GenerateWorkflowDialog({
       open={open}
       onClose={onClose}
       panelId="generate-workflow-dialog"
-      title="Generate Workflow"
-      description="A design agent follows this skill to break the prompt into the workflow's task list. The draft is registered right away and generation continues in the background."
+      title={t("common.generateWorkflow")}
+      description={t("admin.aDesignAgentFollowsThisSkillTo")}
       // Signature "live edge" while the design run is being handed to the agent.
       // Gated on the 200ms `pending` stage so a fast registration never flashes
       // the light.
@@ -105,27 +107,27 @@ export function GenerateWorkflowDialog({
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
         <FormField
           htmlFor="generate-workflow-name"
-          label="Workflow Name"
+          label={t("admin.workflowName")}
           required
           error={errors.name?.message}
         >
           <Input
             id="generate-workflow-name"
-            placeholder="Defaults to the skill name"
+            placeholder={t("admin.defaultsToTheSkillName")}
             {...register("name")}
           />
         </FormField>
 
         <FormField
           htmlFor="generate-workflow-prompt"
-          label="Prompt"
+          label={t("common.prompt")}
           required
           error={errors.prompt?.message}
         >
           <Textarea
             id="generate-workflow-prompt"
             rows={6}
-            placeholder="Describe the work; the design agent breaks it into the workflow's task list"
+            placeholder={t("admin.describeTheWorkTheDesignAgentBreaks")}
             {...register("prompt")}
           />
         </FormField>
@@ -140,16 +142,16 @@ export function GenerateWorkflowDialog({
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
             variant="primary"
             disabled={save.inFlight}
             status={save.status}
-            pendingLabel="Generating…"
+            pendingLabel={t("admin.generating")}
           >
-            Generate
+            {t("admin.generate")}
           </Button>
         </div>
       </form>

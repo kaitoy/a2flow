@@ -41,6 +41,7 @@ import { Select, type SelectOption } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { zMcpToolMockCreate, zMockResponseKind } from "@/generated/api/zod.gen";
 import { type UseMcpServerToolsResult, useMcpServerTools } from "@/hooks/useMcpServerTools";
+import { useT } from "@/i18n/provider";
 import type { McpToolInfo, McpToolMockCreate, MockResponse, MockResponseKind } from "@/lib/api";
 import { sampleObjectTextFromJsonSchema } from "@/lib/json-schema-sample";
 import { EMPTY_VALUE, formatChoice } from "@/lib/read-only-display";
@@ -69,7 +70,7 @@ const REQUEST_APPROVAL_TOOL_INFO: McpToolInfo = {
   outputSchema: {
     oneOf: [
       {
-        title: "Recorded",
+        title: "admin.recorded",
         type: "object",
         required: ["approval_id", "status"],
         properties: {
@@ -78,7 +79,7 @@ const REQUEST_APPROVAL_TOOL_INFO: McpToolInfo = {
         },
       },
       {
-        title: "Refused",
+        title: "admin.refused",
         type: "object",
         required: ["error"],
         properties: { error: { type: "string" } },
@@ -100,15 +101,15 @@ export const mcpToolMockFormSchema = z
     toolName: z.string(),
     responses: z
       .array(z.object({ kind: zMockResponseKind, value: z.string() }))
-      .min(1, "At least one response is required"),
+      .min(1, "admin.atLeastOneResponseIsRequired"),
   })
   .superRefine((values, ctx) => {
     if (values.target === "mcp") {
       if (values.mcpServerId === "") {
-        ctx.addIssue({ code: "custom", path: ["mcpServerId"], message: "Server is required" });
+        ctx.addIssue({ code: "custom", path: ["mcpServerId"], message: "admin.serverIsRequired" });
       }
       if (values.toolName === "") {
-        ctx.addIssue({ code: "custom", path: ["toolName"], message: "Tool name is required" });
+        ctx.addIssue({ code: "custom", path: ["toolName"], message: "admin.toolNameIsRequired" });
       }
     }
     values.responses.forEach((response, index) => {
@@ -117,7 +118,7 @@ export const mcpToolMockFormSchema = z
           ctx.addIssue({
             code: "custom",
             path: ["responses", index, "value"],
-            message: "A value is required",
+            message: "admin.aValueIsRequired",
           });
         }
         return;
@@ -129,7 +130,7 @@ export const mcpToolMockFormSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["responses", index, "value"],
-          message: "Must be valid JSON",
+          message: "admin.mustBeValidJson",
         });
         return;
       }
@@ -137,7 +138,7 @@ export const mcpToolMockFormSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["responses", index, "value"],
-          message: "Must be a JSON object",
+          message: "admin.mustBeAJsonObject",
         });
       }
     });
@@ -148,15 +149,15 @@ export type McpToolMockFormValues = z.infer<typeof mcpToolMockFormSchema>;
 
 /** The selectable targets. Module-level so the control is not re-created per render. */
 const TARGET_OPTIONS: ReadonlyArray<SegmentedOption<MockTarget>> = [
-  { value: "mcp", label: "MCP tool", icon: Server },
-  { value: "builtin", label: "Built-in tool", icon: Wrench },
+  { value: "mcp", label: "admin.mcpTool", icon: Server },
+  { value: "builtin", label: "admin.builtInTool", icon: Wrench },
 ];
 
 /** The response kinds, in the order the select offers them. */
 const KIND_OPTIONS: SelectOption[] = [
-  { value: "structured", label: "Structured (JSON object)" },
-  { value: "text", label: "Text" },
-  { value: "error", label: "Error" },
+  { value: "structured", label: "admin.structuredJsonObject" },
+  { value: "text", label: "admin.text" },
+  { value: "error", label: "common.error" },
 ];
 
 /** The built-in tools a mock may target. */
@@ -252,11 +253,10 @@ export type McpToolMockFieldsProps =
 
 /** Explains what the ordered response list means, shown above the editor. */
 function ResponseOrderHint() {
+  const t = useT();
   return (
     <p className="mt-1 text-xs text-on-surface-variant">
-      Responses are returned in order: the first for the run&apos;s first call, the second for its
-      second, and so on. Once the list runs out the last response repeats, so a single response
-      behaves as a constant.
+      {t("admin.responsesAreReturnedInOrderTheFirst")}
     </p>
   );
 }
@@ -327,6 +327,7 @@ function ResponseCard({
   onRemove,
   outputSchema,
 }: ResponseCardProps) {
+  const t = useT();
   const kind = useController({ control, name: `responses.${index}.kind` });
   const value = useController({ control, name: `responses.${index}.value` });
   const [confirmingInsert, setConfirmingInsert] = useState(false);
@@ -347,10 +348,13 @@ function ResponseCard({
   return (
     <div className="flex flex-col gap-2 rounded-xl glass-panel p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-label-caps text-on-surface-variant">Call #{index + 1}</span>
+        <span className="text-label-caps text-on-surface-variant">
+          {t("admin.call")}
+          {index + 1}
+        </span>
         <button
           type="button"
-          aria-label={`Remove response ${index + 1}`}
+          aria-label={t("admin.removeResponseValue", { value: index + 1 })}
           disabled={!canRemove}
           onClick={onRemove}
           className="inline-flex size-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -362,30 +366,32 @@ function ResponseCard({
         options={KIND_OPTIONS}
         value={kind.field.value}
         onChange={(next) => kind.field.onChange(next as MockResponseKind)}
-        aria-label={`Response ${index + 1} kind`}
+        aria-label={t("admin.responseValueKind", { value: index + 1 })}
       />
       <Textarea
         {...value.field}
         rows={4}
         className="font-mono text-xs"
-        aria-label={`Response ${index + 1} value`}
+        aria-label={t("admin.responseValueValue", { value: index + 1 })}
       />
       {errors.responses?.[index]?.value && (
-        <p className="text-xs text-error">{errors.responses[index]?.value?.message}</p>
+        <p className="text-xs text-error">
+          {t.maybe(errors.responses[index]?.value?.message ?? "")}
+        </p>
       )}
       {canInsert && (
         <TextActionButton
           icon={FileJson}
-          label="Insert from schema"
+          label={t("admin.insertFromSchema")}
           className="self-end"
           onClick={() => (isDisposable ? insertSkeleton() : setConfirmingInsert(true))}
         />
       )}
       <ConfirmDialog
         open={confirmingInsert}
-        title="Replace this response?"
-        description={`Response ${index + 1} already has a value. Inserting the skeleton from the tool's output format discards what is there.`}
-        confirmLabel="Replace"
+        title={t("admin.replaceThisResponse")}
+        description={t("admin.responseValueAlreadyHasAValueInserting", { value: index + 1 })}
+        confirmLabel={t("admin.replace")}
         confirmVariant="primary"
         onConfirm={insertSkeleton}
         onCancel={() => setConfirmingInsert(false)}
@@ -404,6 +410,7 @@ function ResponseListEditor({
   errors: FieldErrors<McpToolMockFormValues>;
   outputSchema?: Record<string, unknown> | null;
 }) {
+  const t = useT();
   const { fields, append, remove } = useFieldArray({ control, name: "responses" });
   return (
     <div className="flex flex-col gap-3">
@@ -419,11 +426,11 @@ function ResponseListEditor({
         />
       ))}
       {errors.responses?.root && (
-        <p className="text-xs text-error">{errors.responses.root.message}</p>
+        <p className="text-xs text-error">{t.maybe(errors.responses.root.message ?? "")}</p>
       )}
       <TextActionButton
         icon={Plus}
-        label="Add response"
+        label={t("admin.addResponse")}
         onClick={() => append({ kind: "structured", value: EMPTY_STRUCTURED_VALUE })}
       />
     </div>
@@ -432,19 +439,20 @@ function ResponseListEditor({
 
 /** The same fields as values, for a viewer who may see the mock but not edit it. */
 function McpToolMockFieldValues({ values }: { values: McpToolMockFormValues }) {
+  const t = useT();
   return (
     <>
-      <FormField htmlFor="name" label="Name" required>
+      <FormField htmlFor="name" label={t("common.name")} required>
         <ReadOnlyField>{values.name || EMPTY_VALUE}</ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="description" label="Description">
+      <FormField htmlFor="description" label={t("common.description")}>
         <ReadOnlyField className="whitespace-pre-wrap">
           {values.description || EMPTY_VALUE}
         </ReadOnlyField>
       </FormField>
 
-      <FormField htmlFor="target" label="Target" required>
+      <FormField htmlFor="target" label={t("admin.target")} required>
         <ReadOnlyField>{formatChoice(TARGET_OPTIONS, values.target)}</ReadOnlyField>
       </FormField>
 
@@ -457,12 +465,12 @@ function McpToolMockFieldValues({ values }: { values: McpToolMockFormValues }) {
           onChange={() => {}}
         />
       ) : (
-        <FormField htmlFor="toolName" label="Tool Name" required>
+        <FormField htmlFor="toolName" label={t("admin.toolName")} required>
           <ReadOnlyField>{values.toolName || EMPTY_VALUE}</ReadOnlyField>
         </FormField>
       )}
 
-      <FormField htmlFor="responses" label="Responses" required>
+      <FormField htmlFor="responses" label={t("common.responses")} required>
         <div className="flex flex-col gap-2">
           {values.responses.map((response, index) => (
             <ReadOnlyField
@@ -522,6 +530,7 @@ function McpToolMockEditableFields({
   target,
   showPlaceholders,
 }: McpToolMockEditableFieldsProps) {
+  const t = useT();
   const mcpServerId = useWatch({ control, name: "mcpServerId" });
   const toolName = useWatch({ control, name: "toolName" });
 
@@ -548,24 +557,28 @@ function McpToolMockEditableFields({
 
   return (
     <>
-      <FormField htmlFor="name" label="Name" required error={errors.name?.message}>
+      <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
         <Input
           id="name"
           {...register("name")}
-          placeholder={showPlaceholders ? "Jira search returns no hits" : undefined}
+          placeholder={showPlaceholders ? t("admin.jiraSearchReturnsNoHits") : undefined}
         />
       </FormField>
 
-      <FormField htmlFor="description" label="Description" error={errors.description?.message}>
+      <FormField
+        htmlFor="description"
+        label={t("common.description")}
+        error={errors.description?.message}
+      >
         <Textarea
           id="description"
           rows={2}
           {...register("description")}
-          placeholder={showPlaceholders ? "What this stub stands in for" : undefined}
+          placeholder={showPlaceholders ? t("admin.whatThisStubStandsInFor") : undefined}
         />
       </FormField>
 
-      <FormField htmlFor="target" label="Target" required>
+      <FormField htmlFor="target" label={t("admin.target")} required>
         <Controller
           control={control}
           name="target"
@@ -574,7 +587,7 @@ function McpToolMockEditableFields({
               options={TARGET_OPTIONS}
               value={field.value}
               onChange={field.onChange}
-              aria-label="Target"
+              aria-label={t("admin.target")}
             />
           )}
         />
@@ -583,7 +596,12 @@ function McpToolMockEditableFields({
       {target === "mcp" ? (
         <McpToolMockServerToolField control={control} errors={errors} tools={tools} />
       ) : (
-        <FormField htmlFor="toolName" label="Tool Name" required error={errors.toolName?.message}>
+        <FormField
+          htmlFor="toolName"
+          label={t("admin.toolName")}
+          required
+          error={errors.toolName?.message}
+        >
           <Controller
             control={control}
             name="toolName"
@@ -609,7 +627,7 @@ function McpToolMockEditableFields({
         />
       ) : null}
 
-      <FormField htmlFor="responses" label="Responses" required>
+      <FormField htmlFor="responses" label={t("common.responses")} required>
         <ResponseOrderHint />
         <ResponseListEditor
           control={control}

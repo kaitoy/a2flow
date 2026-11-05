@@ -1,3 +1,4 @@
+import { getActiveTranslator } from "@/i18n/translate";
 /**
  * @module read-only-display — Formatters turning form values into the plain text a
  * read-only field shows.
@@ -22,7 +23,8 @@ export const EMPTY_VALUE = "—";
  * @returns `"Yes"` or `"No"`.
  */
 export function formatFlag(value: boolean): string {
-  return value ? "Yes" : "No";
+  const t = getActiveTranslator();
+  return value ? t("common.yes") : t("common.no");
 }
 
 /**
@@ -40,7 +42,9 @@ export function formatChoice<T extends string>(
   options: ReadonlyArray<{ value: T; label: string }>,
   value: T
 ): string {
-  return options.find((option) => option.value === value)?.label ?? value;
+  return getActiveTranslator().maybe(
+    options.find((option) => option.value === value)?.label ?? value
+  );
 }
 
 /**

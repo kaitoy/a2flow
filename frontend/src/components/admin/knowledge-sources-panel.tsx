@@ -15,6 +15,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { Input } from "@/components/ui/input";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusDot } from "@/components/ui/status-dot";
+import { useT } from "@/i18n/provider";
 import {
   addKnowledgeFileSource,
   addKnowledgeUrlSource,
@@ -88,6 +89,7 @@ export function KnowledgeSourcesPanel({
   canEdit,
   onSettled,
 }: KnowledgeSourcesPanelProps) {
+  const t = useT();
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState("");
@@ -163,13 +165,13 @@ export function KnowledgeSourcesPanel({
 
   const columns: ColumnDef<KnowledgeSource>[] = [
     {
-      header: "Source",
+      header: "admin.source",
       visibility: "always",
       noTruncate: true,
       cell: (source) => <SourceCell source={source} />,
     },
     {
-      header: "Status",
+      header: "common.status",
       noTruncate: true,
       cell: (source) => (
         <div className="flex flex-col gap-0.5">
@@ -184,20 +186,20 @@ export function KnowledgeSourcesPanel({
       ),
     },
     {
-      header: "Read At",
+      header: "admin.readAt",
       cell: (source) => (source.ingestedAt ? <DateTime value={source.ingestedAt} /> : "—"),
     },
     ...(canEdit
       ? [
           {
-            header: "Actions",
+            header: "common.actions" as const,
             noTruncate: true,
             visibility: "always" as const,
             cell: (source: KnowledgeSource) => (
               <div className="flex justify-center gap-2">
                 <ActionIconButton
                   icon={RefreshCw}
-                  label={source.status === "unread" ? "Read" : "Read again"}
+                  label={source.status === "unread" ? t("common.read") : t("admin.readAgain")}
                   onClick={() =>
                     void act(() => reingestKnowledgeSource(knowledgeBaseId, source.id))
                   }
@@ -216,12 +218,16 @@ export function KnowledgeSourcesPanel({
   ];
 
   return (
-    <SectionCard icon={FileText} title="Sources" className={live ? "mt-4 live-edge" : "mt-4"}>
+    <SectionCard
+      icon={FileText}
+      title={t("admin.sources")}
+      className={live ? "mt-4 live-edge" : "mt-4"}
+    >
       {canEdit && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <form onSubmit={handleAddUrl} className="flex min-w-0 flex-1 gap-2">
             <Input
-              aria-label="Web page URL"
+              aria-label={t("admin.webPageUrl")}
               placeholder="https://example.com/handbook"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -232,7 +238,7 @@ export function KnowledgeSourcesPanel({
               disabled={adding || !url.trim()}
               className="shrink-0 whitespace-nowrap"
             >
-              Add URL
+              {t("admin.addUrl")}
             </Button>
           </form>
           <input
@@ -254,7 +260,7 @@ export function KnowledgeSourcesPanel({
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload size={16} aria-hidden="true" />
-            {uploading ? "Uploading…" : "Upload documents"}
+            {uploading ? t("common.uploading") : t("admin.uploadDocuments")}
           </Button>
         </div>
       )}
@@ -262,15 +268,15 @@ export function KnowledgeSourcesPanel({
         columns={columns}
         rows={sources}
         loading={loading}
-        emptyMessage="No sources yet. Add a web page or upload a document."
+        emptyMessage={t("admin.noSourcesYetAddAWebPage")}
         emptyIcon={FileText}
         getRowKey={(source) => source.id}
       />
       <ConfirmDialog
         open={removeTarget !== null}
-        title="Remove Source"
-        confirmLabel="Remove"
-        description="Remove this source? What the wiki learned only from it is taken out of its pages."
+        title={t("admin.removeSource")}
+        confirmLabel={t("common.remove")}
+        description={t("admin.removeThisSourceWhatTheWikiLearned")}
         onConfirm={() => {
           const target = removeTarget;
           setRemoveTarget(null);

@@ -6,6 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useT } from "@/i18n/provider";
 import type { TagColor } from "@/lib/api";
 import { Button } from "./button";
 import { Chip } from "./chip";
@@ -144,7 +145,8 @@ function packRows(widths: number[], available: number): { rows: number; fitted: 
  * technology in an `sr-only` span listing *only* the folded ones — a
  * screen-reader user hears them without having to open the dialog.
  */
-export function ChipRow({ items, title = "Details" }: ChipRowProps) {
+export function ChipRow({ items, title = "audit.details" }: ChipRowProps) {
+  const t = useT();
   const rowRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const [open, setOpen] = useState(false);
@@ -256,7 +258,10 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
                 on hover. */}
             <Chip
               label={`+${hidden.length}`}
-              ariaLabel={`Show all ${items.length} ${title.toLowerCase()}`}
+              ariaLabel={t("ui.showAllCountValue", {
+                count: items.length,
+                value: t.maybe(title).toLowerCase(),
+              })}
               size="xs"
               onClick={() => {
                 setEverOpened(true);
@@ -272,12 +277,12 @@ export function ChipRow({ items, title = "Details" }: ChipRowProps) {
           open={open}
           onClose={() => setOpen(false)}
           panelId={panelId}
-          title={title}
+          title={t.maybe(title)}
           size="md"
           scrollable
           footer={
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Close
+              {t("common.close")}
             </Button>
           }
         >

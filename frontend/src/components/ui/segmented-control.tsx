@@ -4,6 +4,7 @@ import { animated } from "@react-spring/web";
 import type { LucideIcon } from "lucide-react";
 import { useRef } from "react";
 import { useSlidingIndicator } from "@/hooks/useSlidingIndicator";
+import { useT } from "@/i18n/provider";
 
 /** A single selectable option within a {@link SegmentedControl}. */
 export interface SegmentedOption<T extends string> {
@@ -80,6 +81,7 @@ export function SegmentedControl<T extends string>({
   "aria-label": ariaLabel,
   className,
 }: SegmentedControlProps<T>) {
+  const t = useT();
   const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
   // Call sites pass a fresh array literal every render, so key the measurement
   // off the option values instead — otherwise the ResizeObserver is torn down
@@ -162,7 +164,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
           >
             {Icon && <Icon size={16} strokeWidth={1.8} aria-hidden="true" className="shrink-0" />}
-            {option.label}
+            {t.maybe(option.label)}
           </button>
         );
       })}

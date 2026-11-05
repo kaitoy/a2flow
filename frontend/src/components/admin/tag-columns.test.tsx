@@ -1,10 +1,13 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LOCKED_CHIP_LABEL } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import type { MessageKey } from "@/i18n/messages/en";
 import type { Tag } from "@/lib/api";
 import { render, screen, within } from "@/test/test-utils";
 import { inheritedTagsColumn, tagFilterOptions, tagsColumn } from "./tag-columns";
+
+/** The lock glyph's accessible name in English. */
+const LOCKED = "Access control";
 
 interface Row {
   id: string;
@@ -53,7 +56,7 @@ function renderTable(rows: Row[], onTagIdsChange = vi.fn(), tagIds: string[] = [
   render(
     <DataTable<Row>
       columns={[
-        { header: "Id", cell: (row) => row.id },
+        { header: "Id" as MessageKey, cell: (row) => row.id },
         tagsColumn<Row>((row) => row.tagIds, BY_ID),
       ]}
       rows={rows}
@@ -81,7 +84,7 @@ describe("tagsColumn", () => {
 
   it("marks an access-control tag's chip with the lock glyph, and only that chip", () => {
     renderTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
-    const locks = screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL });
+    const locks = screen.getAllByRole("img", { name: LOCKED });
     expect(locks).toHaveLength(1);
     expect(locks[0].closest("span")).toHaveTextContent("production");
   });
@@ -189,7 +192,7 @@ function renderInheritedTable(rows: Row[]) {
   render(
     <DataTable<Row>
       columns={[
-        { header: "Id", cell: (row) => row.id },
+        { header: "Id" as MessageKey, cell: (row) => row.id },
         inheritedTagsColumn<Row>((row) => row.tagIds, BY_ID),
       ]}
       rows={rows}
@@ -212,7 +215,7 @@ describe("inheritedTagsColumn", () => {
 
   it("marks an access-control tag's chip with the lock glyph", () => {
     renderInheritedTable([{ id: "r1", tagIds: ["tag-1", "tag-2"] }]);
-    expect(screen.getAllByRole("img", { name: LOCKED_CHIP_LABEL })).toHaveLength(1);
+    expect(screen.getAllByRole("img", { name: LOCKED })).toHaveLength(1);
   });
 
   it("renders a dash for a record carrying no inherited tags", () => {

@@ -16,6 +16,7 @@ import { DateTime } from "@/components/ui/date-time";
 import { DetailItem, DetailList } from "@/components/ui/detail-list";
 import { StatusDot } from "@/components/ui/status-dot";
 import { useUserNames } from "@/hooks/useNames";
+import { useT } from "@/i18n/provider";
 import {
   getImpersonationEvent,
   type ImpersonationEvent,
@@ -32,6 +33,7 @@ import { EMPTY_VALUE } from "@/lib/read-only-display";
  * actor and the instant are the record.
  */
 export default function AuditImpersonationDetailPage() {
+  const t = useT();
   const { eventId } = useParams<{ eventId: string }>();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -59,9 +61,9 @@ export default function AuditImpersonationDetailPage() {
   const names = useUserNames(event ? [event.impersonatorId, event.targetUserId] : []);
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Audit Logs", href: "/audit" },
-    { label: "Impersonations", href: "/audit/impersonations" },
+    { label: t("common.home"), href: "/" },
+    { label: t("common.auditLogs"), href: "/audit" },
+    { label: t("common.impersonations"), href: "/audit/impersonations" },
     { label: event ? (names.get(event.targetUserId) ?? event.targetUserId) : "…" },
   ];
 
@@ -94,20 +96,22 @@ export default function AuditImpersonationDetailPage() {
   return (
     <AdminPageContainer>
       <Breadcrumbs items={breadcrumbItems} />
-      <FormLayout header={<AdminPageHeader title="Impersonation Session" icon={VenetianMask} />}>
-        <StatusCard ariaLabel="Impersonation session state">
+      <FormLayout
+        header={<AdminPageHeader title={t("audit.impersonationSession")} icon={VenetianMask} />}
+      >
+        <StatusCard ariaLabel={t("audit.impersonationSessionState")}>
           {event.endedAt ? (
-            <StatusDot dotClass="bg-on-surface-variant" label="Ended" />
+            <StatusDot dotClass="bg-on-surface-variant" label={t("audit.ended")} />
           ) : (
-            <StatusDot dotClass="bg-accent" label="Active" />
+            <StatusDot dotClass="bg-accent" label={t("audit.active")} />
           )}
         </StatusCard>
         <div className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6">
           <DetailList singleColumn>
-            <DetailItem label="Impersonator" value={userLink(event.impersonatorId)} />
-            <DetailItem label="Target User" value={userLink(event.targetUserId)} />
+            <DetailItem label={t("audit.impersonator")} value={userLink(event.impersonatorId)} />
+            <DetailItem label={t("audit.targetUser")} value={userLink(event.targetUserId)} />
             <DetailItem
-              label="Target Tenant"
+              label={t("audit.targetTenant")}
               value={
                 event.targetTenantId ? (
                   <Link
@@ -121,9 +125,9 @@ export default function AuditImpersonationDetailPage() {
                 )
               }
             />
-            <DetailItem label="Started At" value={<DateTime value={event.startedAt} />} />
+            <DetailItem label={t("audit.startedAt")} value={<DateTime value={event.startedAt} />} />
             <DetailItem
-              label="Ended At"
+              label={t("audit.endedAt")}
               value={event.endedAt ? <DateTime value={event.endedAt} /> : EMPTY_VALUE}
             />
           </DetailList>

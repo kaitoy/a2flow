@@ -26,12 +26,14 @@ import {
 } from "@/hooks/useNames";
 import { useTableQuery } from "@/hooks/useTableQuery";
 import { useTags } from "@/hooks/useTags";
+import { useT } from "@/i18n/provider";
 import { type ApprovalDetail, listApprovals } from "@/lib/api";
 
 const LIMIT = 20;
 
 /** Admin list of approval requests ordered by most recent first. */
 export default function ApprovalsPage() {
+  const t = useT();
   const {
     rows,
     loading,
@@ -66,7 +68,7 @@ export default function ApprovalsPage() {
       ...(isAllTenantsView ? [tenantColumn<ApprovalDetail>(tenantNames)] : []),
       idColumn<ApprovalDetail>(),
       {
-        header: "Title",
+        header: "common.title",
         sortField: "title",
         filterField: "title",
         visibility: "always",
@@ -80,7 +82,7 @@ export default function ApprovalsPage() {
         ),
       },
       {
-        header: "Workflow Execution",
+        header: "common.workflowExecution",
         cell: (a) => (
           <Link
             href={`/workflow-executions/${a.workflowExecutionId}`}
@@ -91,23 +93,23 @@ export default function ApprovalsPage() {
         ),
       },
       {
-        header: "Status",
+        header: "common.status",
         sortField: "status",
         filterField: "status",
         noTruncate: true,
         cell: (a) => <ApprovalStatusLabel status={a.status} />,
       },
       {
-        header: "Description",
+        header: "common.description",
         cell: (a) => a.description || "—",
       },
       {
-        header: "Created At",
+        header: "common.createdAt",
         sortField: "createdAt",
         cell: (a) => <DateTime value={a.createdAt} className="text-on-surface-variant" />,
       },
       {
-        header: "Approver",
+        header: "approvals.approver",
         visibility: "optional",
         cell: (a) => {
           if (a.approver) return names.get(a.approver) ?? a.approver;
@@ -125,17 +127,17 @@ export default function ApprovalsPage() {
         },
       },
       {
-        header: "Decided By",
+        header: "approvals.decidedBy",
         visibility: "optional",
         cell: (a) => (a.decidedBy ? (names.get(a.decidedBy) ?? a.decidedBy) : "—"),
       },
       {
-        header: "Comment",
+        header: "common.comment",
         visibility: "optional",
         cell: (a) => a.response ?? "—",
       },
       {
-        header: "Decided At",
+        header: "approvals.decidedAt",
         visibility: "optional",
         cell: (a) =>
           a.decidedAt ? <DateTime value={a.decidedAt} className="text-on-surface-variant" /> : "—",
@@ -143,21 +145,21 @@ export default function ApprovalsPage() {
       ...auditColumns<ApprovalDetail>(names),
       tagsColumn<ApprovalDetail>((a) => a.tagIds, tagsById),
       {
-        header: "Actions",
+        header: "common.actions",
         noTruncate: true,
         visibility: "always",
         cell: (a) => (
           <div className="flex justify-center gap-2">
             <ActionIconButton
               icon={MessageSquareText}
-              label="Open workflow session"
+              label={t("common.openWorkflowSession")}
               href={`/workflow-executions/${a.workflowExecutionId}/session`}
             />
           </div>
         ),
       },
     ],
-    [names, groupNames, executionNames, tenantNames, isAllTenantsView, tagsById]
+    [names, groupNames, executionNames, tenantNames, isAllTenantsView, tagsById, t]
   );
 
   const { visibleColumns, options, selected, setSelected, reset, customized } = useColumnVisibility(
@@ -167,9 +169,11 @@ export default function ApprovalsPage() {
 
   return (
     <AdminPageContainer>
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Approvals" }]} />
+      <Breadcrumbs
+        items={[{ label: t("common.home"), href: "/" }, { label: t("common.approvals") }]}
+      />
       <AdminPageHeader
-        title="Approvals"
+        title={t("common.approvals")}
         icon={CheckCircle2}
         onRefresh={reload}
         refreshing={loading || refreshing}
@@ -187,7 +191,7 @@ export default function ApprovalsPage() {
         columns={visibleColumns}
         rows={rows}
         loading={loading}
-        emptyMessage="No approval requests yet."
+        emptyMessage={t("approvals.noApprovalRequestsYet")}
         emptyIcon={CheckCircle2}
         getRowKey={(a) => a.id}
         sort={sort}

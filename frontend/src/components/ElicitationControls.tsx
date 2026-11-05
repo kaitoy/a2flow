@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { FormField } from "@/components/admin/form-field";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import {
   answerSessionElicitation,
   getSessionElicitation,
@@ -53,10 +54,10 @@ interface Choice {
 type Outcome = "accepted" | "declined" | "cancelled" | "expired";
 
 const OUTCOME_DISPLAY: Record<Outcome, { label: string; className: string }> = {
-  accepted: { label: "Answered", className: "text-accent" },
-  declined: { label: "Declined", className: "text-error" },
-  cancelled: { label: "Dismissed", className: "text-on-surface-variant" },
-  expired: { label: "Expired without an answer", className: "text-on-surface-variant" },
+  accepted: { label: "app.answered", className: "text-accent" },
+  declined: { label: "app.declined", className: "text-error" },
+  cancelled: { label: "app.dismissed", className: "text-on-surface-variant" },
+  expired: { label: "app.expiredWithoutAnAnswer", className: "text-on-surface-variant" },
 };
 
 /** The options of a single-select field, or `null` for a free-form one. */
@@ -149,6 +150,7 @@ export function ElicitationControls({
   /** Whether the signed-in viewer is the run's initiator. */
   canAnswer: boolean;
 }) {
+  const t = useT();
   const [question, setQuestion] = useState<McpElicitation | null>(null);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
@@ -219,7 +221,7 @@ export function ElicitationControls({
       if (answered) setQuestion(answered);
     } catch (err) {
       if (isElicitationAlreadyAnsweredError(err)) {
-        setError("This question was already answered, or has expired.");
+        setError(t("app.thisQuestionWasAlreadyAnsweredOrHas"));
         try {
           setQuestion(await getSessionElicitation(executionId, sessionId, elicitationId));
         } catch {
@@ -228,7 +230,7 @@ export function ElicitationControls({
         return;
       }
       console.error("failed to answer the MCP server's question", err);
-      setError("Failed to send your answer. Please try again.");
+      setError(t("app.failedToSendYourAnswerPleaseTry"));
     }
   };
 
@@ -275,7 +277,7 @@ export function ElicitationControls({
           value={typeof values[key] === "string" ? (values[key] as string) : ""}
           onChange={(value) => setValue(key, value)}
           disabled={disabled}
-          placeholder="Choose…"
+          placeholder={t("app.choose")}
         />
       );
     } else {
@@ -303,12 +305,14 @@ export function ElicitationControls({
   return (
     <div className="glass-panel rounded-2xl p-4">
       <h3 className="text-sm font-semibold tracking-tight text-on-surface">
-        {question ? `${question.serverName} asks for confirmation` : "Confirmation requested"}
+        {question
+          ? t("app.servernameAsksForConfirmation", { serverName: question.serverName })
+          : t("app.confirmationRequested")}
       </h3>
       {question && (
         <>
           <p className="mt-1 text-xs text-on-surface-variant">
-            Before running <code>{question.toolName}</code>
+            {t.rich("app.beforeRunningCode1", { code1: <code>{question.toolName}</code> })}
           </p>
           <p className="mt-2 whitespace-pre-line text-sm text-on-surface">{question.message}</p>
         </>
@@ -326,41 +330,41 @@ export function ElicitationControls({
                   variant="primary"
                   disabled={action.inFlight || missingRequired}
                   status={pendingAction === "accept" ? action.status : "idle"}
-                  pendingLabel="Sending…"
+                  pendingLabel={t("common.sending")}
                   onClick={() => answer("accept")}
                 >
-                  Accept
+                  {t("app.accept")}
                 </Button>
                 <Button
                   variant="secondary"
                   disabled={action.inFlight}
                   status={pendingAction === "decline" ? action.status : "idle"}
-                  pendingLabel="Declining…"
+                  pendingLabel={t("app.declining")}
                   onClick={() => answer("decline")}
                 >
-                  Decline
+                  {t("app.decline")}
                 </Button>
                 <Button
                   variant="secondary"
                   disabled={action.inFlight}
                   status={pendingAction === "cancel" ? action.status : "idle"}
-                  pendingLabel="Cancelling…"
+                  pendingLabel={t("app.cancelling")}
                   onClick={() => answer("cancel")}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </div>
             </>
           ) : (
             <p className="mt-3 text-sm text-on-surface-variant">
-              Waiting for the initiator to respond.
+              {t("app.waitingForTheInitiatorToRespond")}
             </p>
           )
         ) : (
           <p
             className={`mt-3 text-sm font-medium ${OUTCOME_DISPLAY[outcomeOf(question)].className}`}
           >
-            {OUTCOME_DISPLAY[outcomeOf(question)].label}
+            {t.maybe(OUTCOME_DISPLAY[outcomeOf(question)].label)}
           </p>
         ))}
 

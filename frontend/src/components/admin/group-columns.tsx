@@ -34,7 +34,7 @@ export function groupsColumn<T>(
   byId: Map<string, UserGroup>
 ): ColumnDef<T> {
   return {
-    header: "Groups",
+    header: "common.groups",
     // A row of chips is not text, so the default single-line truncation would
     // clip it mid-pill; `ChipRow` does its own clipping instead, wrapping to at
     // most two lines and folding the rest into a `+N` chip.
@@ -57,7 +57,7 @@ export function groupsColumn<T>(
         label: byId.get(id)?.name ?? id,
         description: byId.get(id)?.description ?? undefined,
       }));
-      return <ChipRow items={items} title="Groups" />;
+      return <ChipRow items={items} title="common.groups" />;
     },
   };
 }

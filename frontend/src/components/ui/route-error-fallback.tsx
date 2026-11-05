@@ -1,6 +1,9 @@
+"use client";
+
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useT } from "@/i18n/provider";
 
 /** Props for {@link RouteErrorFallback}. */
 export interface RouteErrorFallbackProps {
@@ -26,20 +29,26 @@ export interface RouteErrorFallbackProps {
  */
 export function RouteErrorFallback({
   reset,
-  title = "Something went wrong",
-  description = "An unexpected error occurred.",
+  title = "ui.somethingWentWrong",
+  description = "ui.unexpectedError",
   homeHref,
   homeLabel,
   fill,
 }: RouteErrorFallbackProps) {
+  const t = useT();
   return (
     <div
       className={`flex ${fill === "screen" ? "h-dvh" : "h-full"} flex-col items-center justify-center gap-4`}
     >
-      <EmptyState icon={AlertTriangle} animation="wiggle" title={title} description={description} />
+      <EmptyState
+        icon={AlertTriangle}
+        animation="wiggle"
+        title={t.maybe(title)}
+        description={t.maybe(description)}
+      />
       <div className="flex gap-2">
         <Button variant="secondary" onClick={reset}>
-          Try again
+          {t("ui.tryAgain")}
         </Button>
         {homeHref && homeLabel && (
           <Button variant="ghost" href={homeHref}>

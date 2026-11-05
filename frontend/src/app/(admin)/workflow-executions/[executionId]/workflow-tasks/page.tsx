@@ -16,6 +16,8 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { WorkflowTaskGraph } from "@/components/workflow-task-graph";
 import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { useUserNames } from "@/hooks/useNames";
+import { useT } from "@/i18n/provider";
+import { getActiveTranslator, translateStatus } from "@/i18n/translate";
 import {
   type FilterSpec,
   getWorkflowExecution,
@@ -45,8 +47,8 @@ const SERVER_LIMIT = 1000;
 type View = "table" | "graph";
 
 const VIEW_OPTIONS = [
-  { value: "table" as const, label: "Table" },
-  { value: "graph" as const, label: "Graph" },
+  { value: "table" as const, label: "common.table" },
+  { value: "graph" as const, label: "common.graph" },
 ];
 
 function buildColumns(
@@ -66,21 +68,21 @@ function buildColumns(
       cell: (t) => indexById.get(t.id) ?? 0,
     },
     {
-      header: "Title",
+      header: "common.title",
       sortField: "title",
       filterField: "title",
       visibility: "always",
       cell: (t) => <span className="font-medium text-on-surface">{t.title}</span>,
     },
     {
-      header: "Description",
+      header: "common.description",
       sortField: "description",
       filterField: "description",
       cell: (t) => t.description || "—",
     },
     {
       // Resolved from the dependency join table; not a real column.
-      header: "Depends on",
+      header: "common.dependsOn",
       noTruncate: true,
       cell: (t) => {
         const deps = t.dependsOnIds ?? [];
@@ -101,7 +103,7 @@ function buildColumns(
     },
     {
       // Resolved from the tool-binding join table; not a real column.
-      header: "Tools",
+      header: "common.tools",
       noTruncate: true,
       cell: (t) => {
         const bindings = t.toolBindings ?? [];
@@ -121,7 +123,7 @@ function buildColumns(
       },
     },
     {
-      header: "Status",
+      header: "common.status",
       noTruncate: true,
       sortField: "status",
       filterField: "status",
@@ -137,12 +139,16 @@ function buildColumns(
     },
     {
       // Meaningful only alongside status "failed"; see TaskErrorKind's docstring.
-      header: "Error Kind",
+      header: "workflowExecutions.errorKind",
       cell: (t) =>
-        t.errorKind ? <span className="capitalize">{t.errorKind.replace("_", " ")}</span> : "—",
+        t.errorKind ? (
+          <span className="capitalize">{translateStatus(t.errorKind, getActiveTranslator())}</span>
+        ) : (
+          "—"
+        ),
     },
     {
-      header: "Error Message",
+      header: "workflowExecutions.errorMessage",
       cell: (t) => t.errorMessage || "—",
     },
     ...auditColumns<WorkflowTask>(names),
@@ -156,6 +162,7 @@ function buildColumns(
  * templates, not here, so a run's history stays faithful to what actually ran.
  */
 export default function WorkflowTasksPage() {
+  const t = useT();
   const { executionId } = useParams<{ executionId: string }>();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   const [loading, setLoading] = useState(false);
@@ -226,16 +233,16 @@ export default function WorkflowTasksPage() {
     <AdminPageContainer>
       <Breadcrumbs
         items={[
-          { label: "Home", href: "/" },
-          { label: "Workflow Executions", href: "/workflow-executions" },
+          { label: t("common.home"), href: "/" },
+          { label: t("common.workflowExecutions"), href: "/workflow-executions" },
           // Links back to this run's own admin record; an ellipsis stands in
           // until its workflow name has loaded.
           { label: workflowName || "…", href: `/workflow-executions/${executionId}` },
-          { label: "Workflow Tasks" },
+          { label: t("workflowExecutions.workflowTasks") },
         ]}
       />
       <AdminPageHeader
-        title="Workflow Tasks"
+        title={t("workflowExecutions.workflowTasks")}
         icon={ListTree}
         onRefresh={load}
         refreshing={loading}
@@ -257,7 +264,7 @@ export default function WorkflowTasksPage() {
           options={VIEW_OPTIONS}
           value={view}
           onChange={setView}
-          aria-label="Task view"
+          aria-label={t("workflowExecutions.taskView")}
         />
       </div>
       {view === "graph" ? (
@@ -267,7 +274,7 @@ export default function WorkflowTasksPage() {
           columns={visibleColumns}
           rows={tasks}
           loading={loading}
-          emptyMessage="No tasks for this session yet."
+          emptyMessage={t("workflowExecutions.noTasksForThisSessionYet")}
           emptyIcon={ListTree}
           getRowKey={(t) => t.id}
           sort={sort}

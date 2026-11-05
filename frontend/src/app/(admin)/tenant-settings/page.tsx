@@ -31,6 +31,7 @@ import {
 } from "@/components/admin/vault-connection-fields";
 import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useT } from "@/i18n/provider";
 import {
   getTenantSettings,
   SUPPRESS_FORBIDDEN_TOAST,
@@ -66,6 +67,7 @@ function toFormValues(settings: Partial<TenantSettings>): FormValues {
  * blocks every other viewer before this page mounts.
  */
 export default function TenantSettingsPage() {
+  const t = useT();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
@@ -106,15 +108,18 @@ export default function TenantSettingsPage() {
         });
         setSavedMethod(savedVaultMethod(saved));
         reset(toFormValues(saved));
-        dispatch(showToast({ message: "Tenant settings updated" }));
+        dispatch(showToast({ message: t("tenantSettings.tenantSettingsUpdated") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
 
-  const breadcrumbItems = [{ label: "Home", href: "/" }, { label: "Tenant Settings" }];
-  const header = <AdminPageHeader title="Tenant Settings" icon={ShieldCheck} />;
+  const breadcrumbItems = [
+    { label: t("common.home"), href: "/" },
+    { label: t("common.tenantSettings") },
+  ];
+  const header = <AdminPageHeader title={t("common.tenantSettings")} icon={ShieldCheck} />;
 
   if (loading) {
     return (
@@ -133,7 +138,7 @@ export default function TenantSettingsPage() {
         <Breadcrumbs items={breadcrumbItems} />
         <FormLayout header={header}>
           <p className="rounded-2xl glass-panel-strong p-6 text-on-surface-variant">
-            The tenant settings could not be loaded.
+            {t("tenantSettings.theTenantSettingsCouldNotBeLoaded")}
           </p>
         </FormLayout>
       </AdminPageContainer>
@@ -167,7 +172,7 @@ export default function TenantSettingsPage() {
             authMethod={watch("vaultAuthMethod")}
             onAuthMethodChange={(method) => setValue("vaultAuthMethod", method)}
             savedMethod={savedMethod}
-            addrHint="The HashiCorp Vault this tenant's Vault-type secrets are read from. Leave empty to use the global Vault set up by a super admin instead."
+            addrHint={t("tenantSettings.theHashicorpVaultThisTenantsVaultType")}
             errors={{
               vaultAddr: errors.vaultAddr?.message,
               vaultRoleId: errors.vaultRoleId?.message,
@@ -182,9 +187,9 @@ export default function TenantSettingsPage() {
               variant="primary"
               disabled={save.inFlight}
               status={save.status}
-              pendingLabel="Saving…"
+              pendingLabel={t("common.saving")}
             >
-              Save
+              {t("common.save")}
             </Button>
           </div>
         </form>

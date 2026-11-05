@@ -17,6 +17,7 @@ import type { PickerOption } from "@/components/admin/record-picker-dialog";
 import { RecordPickerField } from "@/components/admin/record-picker-field";
 import { USER_SHARED_COLUMNS } from "@/components/admin/user-columns";
 import type { ColumnDef } from "@/components/ui/data-table";
+import { useT } from "@/i18n/provider";
 import { formatUserName, type ListQuery, listUsers, type User } from "@/lib/api";
 import { useAppSelector } from "@/store/hooks";
 
@@ -27,7 +28,7 @@ import { useAppSelector } from "@/store/hooks";
  */
 const COLUMNS: ColumnDef<User>[] = [
   {
-    header: "Username",
+    header: "common.username",
     sortField: "username",
     filterField: "username",
     visibility: "always",
@@ -60,6 +61,7 @@ export interface UserPickerProps {
 
 /** Controlled multi-select over the acting tenant's users. */
 export function UserPicker({ value, onChange, readOnly = false }: UserPickerProps) {
+  const t = useT();
   // The acting tenant, resolved the same way the X-Tenant-Id interceptor does:
   // a tenant-scoped viewer's own tenant, or the tenant a super admin selected
   // in the app bar.
@@ -96,7 +98,7 @@ export function UserPicker({ value, onChange, readOnly = false }: UserPickerProp
 
   return (
     <RecordPickerField<User>
-      label="Members"
+      label={t("common.members")}
       value={value}
       onChange={onChange}
       readOnly={readOnly}
@@ -106,9 +108,9 @@ export function UserPicker({ value, onChange, readOnly = false }: UserPickerProp
       getId={(user) => user.id}
       getLabel={memberLabel}
       panelId="user-picker-dialog"
-      dialogTitle="Select members"
-      selectLabel="Select members…"
-      emptyMessage="This tenant has no users to add."
+      dialogTitle={t("admin.selectMembers")}
+      selectLabel={t("admin.selectMembers2")}
+      emptyMessage={t("admin.thisTenantHasNoUsersToAdd")}
       emptyIcon={UserIcon}
     />
   );
