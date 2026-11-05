@@ -212,8 +212,10 @@ class AuthService:
     async def authenticate(self, session_token: str) -> User:
         """Resolve the user for a session token, sliding the idle timeout.
 
-        The session's last-active time is written only once it is older than
-        :data:`TOUCH_INTERVAL` (or half the idle timeout, if shorter).
+        The session, its user, and the user's tenant flag come from one query,
+        and the session's last-active time is written only once it is older
+        than :data:`TOUCH_INTERVAL` (or half the idle timeout, if shorter), so
+        a typical request costs a single SELECT.
 
         Args:
             session_token: The raw token from the session cookie.
@@ -231,9 +233,10 @@ class AuthService:
         if not session_token:
             raise UnauthorizedError()
         token_hash = hash_token(session_token)
-        session = await self._sessions.get_by_token_hash(token_hash)
-        if session is None:
+        found = await self._sessions.get_with_user(token_hash)
+        if found is None:
             raise UnauthorizedError()
+        session, user, tenant_enabled = found
 
         now = datetime.now(UTC)
         last_active = session.last_active_at
@@ -243,15 +246,13 @@ class AuthService:
             await self._sessions.delete_by_token_hash(token_hash)
             raise UnauthorizedError("Session expired")
 
-        user = await self._users.get(session.user_id)
-        if user is None or not user.enabled or user.deleted_at is not None:
+        if (
+            not user.enabled
+            or user.deleted_at is not None
+            or (user.tenant_id is not None and not tenant_enabled)
+        ):
             await self._sessions.delete_by_token_hash(token_hash)
             raise UnauthorizedError()
-        if user.tenant_id is not None:
-            tenant = await self._tenants.get(user.tenant_id)
-            if tenant is None or not tenant.enabled:
-                await self._sessions.delete_by_token_hash(token_hash)
-                raise UnauthorizedError()
 
         if now - last_active > min(TOUCH_INTERVAL, self._idle_timeout() / 2):
             await self._sessions.touch(session, now)

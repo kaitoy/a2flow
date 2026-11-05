@@ -7,6 +7,8 @@ from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.auth_session import AuthSession
+from models.tenant import Tenant
+from models.user import User
 
 
 class AuthSessionRepository(Protocol):
@@ -22,6 +24,10 @@ class AuthSessionRepository(Protocol):
     ) -> AuthSession: ...
 
     async def get_by_token_hash(self, token_hash: str) -> AuthSession | None: ...
+
+    async def get_with_user(
+        self, token_hash: str
+    ) -> tuple[AuthSession, User, bool | None] | None: ...
 
     async def touch(self, session: AuthSession, now: datetime) -> None: ...
 
@@ -89,6 +95,34 @@ class SqlAuthSessionRepository:
         """
         stmt = select(AuthSession).where(col(AuthSession.token_hash) == token_hash)
         return (await self._db.exec(stmt)).first()
+
+    async def get_with_user(
+        self, token_hash: str
+    ) -> tuple[AuthSession, User, bool | None] | None:
+        """Return a session, its user, and its user's tenant flag in one query.
+
+        This is the per-request lookup behind
+        :meth:`services.auth.AuthService.authenticate`, so it is a single
+        round trip rather than one per table. ``users`` is inner-joined since
+        ``auth_sessions.user_id`` cascades on delete: a session never outlives
+        its user's row (a soft-deleted user keeps the row).
+
+        Args:
+            token_hash: SHA-256 hash of the presented session token.
+
+        Returns:
+            ``(session, user, tenant_enabled)``, where ``tenant_enabled`` is
+            ``None`` for a platform-scoped user (or a missing tenant row), or
+            ``None`` if no session matches.
+        """
+        stmt = (
+            select(AuthSession, User, Tenant.enabled)
+            .join(User, col(User.id) == AuthSession.user_id)
+            .outerjoin(Tenant, col(Tenant.id) == User.tenant_id)
+            .where(col(AuthSession.token_hash) == token_hash)
+        )
+        row = (await self._db.exec(stmt)).first()
+        return None if row is None else (row[0], row[1], row[2])
 
     async def touch(self, session: AuthSession, now: datetime) -> None:
         """Refresh a session's ``last_active_at`` to slide the idle timeout.

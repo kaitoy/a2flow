@@ -9,6 +9,7 @@ import bcrypt
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy import event
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -667,3 +668,73 @@ async def test_authenticate_rejects_when_tenant_disabled_mid_session(
         # Rejected session is deleted, matching the disabled-user path.
         stmt = select(AuthSession).where(col(AuthSession.user_id) == result.user.id)
         assert (await session.exec(stmt)).first() is None
+
+
+async def _logged_in(session: AsyncSession, username: str) -> Any:
+    """Create an enabled tenant user, log them in, and return the service and result."""
+    session.add(
+        User(
+            username=username,
+            first_name=username,
+            last_name="User",
+            password=hash_password(AUTH_PASSWORD),
+            email=f"{username}@test.local",
+            enabled=True,
+            tenant_id=DEFAULT_TEST_TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+    )
+    await session.commit()
+    service = AuthService(
+        SqlUserRepository(session),
+        SqlAuthSessionRepository(session),
+        SqlTenantRepository(session),
+        SqlLoginFailureRepository(session),
+    )
+    result = await service.login(
+        username, AUTH_PASSWORD, tenant_name=DEFAULT_TEST_TENANT_ID
+    )
+    return service, result
+
+
+@pytest.mark.asyncio
+async def test_authenticate_rejects_when_user_disabled_mid_session(
+    auth_service_engine: Any,
+) -> None:
+    """A disabled user's live session is refused and deleted."""
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        service, result = await _logged_in(session, "userof")
+        user = await session.get(User, result.user.id)
+        assert user is not None
+        user.enabled = False
+        session.add(user)
+        await session.commit()
+
+        with pytest.raises(UnauthorizedError):
+            await service.authenticate(result.session_token)
+        stmt = select(AuthSession).where(col(AuthSession.user_id) == result.user.id)
+        assert (await session.exec(stmt)).first() is None
+
+
+@pytest.mark.asyncio
+async def test_authenticate_is_a_single_query(auth_service_engine: Any) -> None:
+    """A request whose session needs no touch costs exactly one SQL statement."""
+    async with AsyncSession(auth_service_engine, expire_on_commit=False) as session:
+        service, result = await _logged_in(session, "oneshot")
+        session.expunge_all()  # no identity-map shortcuts: hit the database
+
+        statements: list[str] = []
+
+        def _count(*args: Any) -> None:
+            statements.append(args[2])
+
+        event.listen(auth_service_engine.sync_engine, "before_cursor_execute", _count)
+        try:
+            user = await service.authenticate(result.session_token)
+        finally:
+            event.remove(
+                auth_service_engine.sync_engine, "before_cursor_execute", _count
+            )
+        assert user.username == "oneshot"
+        assert len(statements) == 1, statements
