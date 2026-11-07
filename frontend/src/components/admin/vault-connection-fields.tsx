@@ -261,7 +261,7 @@ export function VaultConnectionFields({
           </FormField>
           <FormField
             htmlFor="vaultApproleMount"
-            label="AppRole Mount"
+            label={t("admin.approleMount")}
             error={errors.vaultApproleMount}
           >
             <Input id="vaultApproleMount" placeholder="approle" {...approleMount} />

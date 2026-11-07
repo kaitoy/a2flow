@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { ja } from "@/i18n/messages/ja";
+import { createTranslator, defaultTranslator } from "@/i18n/translate";
 import type { ApprovedCall } from "@/lib/api";
 import { ApprovedCallList, describeConstraint } from "./ApprovedCallList";
 
@@ -11,21 +13,34 @@ const call = (overrides: Partial<ApprovedCall> = {}): ApprovedCall => ({
 });
 
 describe("describeConstraint", () => {
+  const t = defaultTranslator;
+
   it("phrases each operator rather than showing raw JSON", () => {
-    expect(describeConstraint({ eq: "ap-northeast-1" })).toBe('is "ap-northeast-1"');
-    expect(describeConstraint({ in: ["t3.micro"] })).toBe('is one of ["t3.micro"]');
-    expect(describeConstraint({ lte: 2 })).toBe("is at most 2");
-    expect(describeConstraint({ gte: 8 })).toBe("is at least 8");
-    expect(describeConstraint({ matches: "^dev-" })).toBe('matches "^dev-"');
+    expect(describeConstraint({ eq: "ap-northeast-1" }, t)).toBe('is "ap-northeast-1"');
+    expect(describeConstraint({ in: ["t3.micro"] }, t)).toBe('is one of ["t3.micro"]');
+    expect(describeConstraint({ lte: 2 }, t)).toBe("is at most 2");
+    expect(describeConstraint({ gte: 8 }, t)).toBe("is at least 8");
+    expect(describeConstraint({ matches: "^dev-" }, t)).toBe('matches "^dev-"');
   });
 
   it("marks an argument the call may omit", () => {
-    expect(describeConstraint({ eq: "dev", optional: true })).toBe('is "dev", optional');
+    expect(describeConstraint({ eq: "dev", optional: true }, t)).toBe('is "dev", optional');
   });
 
   it("falls back to raw JSON for an operator this build does not know", () => {
     // A newer backend may declare one; showing it verbatim beats showing nothing.
-    expect(describeConstraint({ startsWith: "dev" })).toBe('{"startsWith":"dev"}');
+    expect(describeConstraint({ startsWith: "dev" }, t)).toBe('{"startsWith":"dev"}');
+  });
+
+  it("phrases the bounds in the viewer's language", () => {
+    const jaT = createTranslator("ja", ja);
+    expect(describeConstraint({ lte: 2, optional: true }, jaT)).toBe("2 以下(任意)");
+  });
+
+  it("does not expand placeholder-like text inside a bound", () => {
+    expect(describeConstraint({ eq: "{constraint}", optional: true }, t)).toBe(
+      'is "{constraint}", optional'
+    );
   });
 });
 

@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useT } from "@/i18n/provider";
+import type { Translator } from "@/i18n/translate";
 import { type ApprovedCall, listMcpServers } from "@/lib/api";
 import { Chip } from "./ui/chip";
 
@@ -22,29 +23,20 @@ const OPERATORS = ["eq", "in", "lte", "gte", "matches"] as const;
  * bounds are acceptable, and `{"lte": 2}` is a worse question than "at most 2".
  *
  * @param constraint - The stored constraint object.
+ * @param t - The translator for the phrase; the bound values stay as JSON.
  * @returns The phrase, or the raw JSON when the operator is not one this build
  *   knows — a newer backend may declare an operator this page has not learned,
  *   and showing it verbatim is honest where showing nothing would not be.
  */
-export function describeConstraint(constraint: Constraint): string {
-  const optional = constraint.optional === true ? ", optional" : "";
-  const value = (key: string) => JSON.stringify(constraint[key]);
-  for (const operator of OPERATORS) {
-    if (!(operator in constraint)) continue;
-    switch (operator) {
-      case "eq":
-        return `is ${value("eq")}${optional}`;
-      case "in":
-        return `is one of ${value("in")}${optional}`;
-      case "lte":
-        return `is at most ${value("lte")}${optional}`;
-      case "gte":
-        return `is at least ${value("gte")}${optional}`;
-      case "matches":
-        return `matches ${value("matches")}${optional}`;
-    }
-  }
-  return JSON.stringify(constraint);
+export function describeConstraint(constraint: Constraint, t: Translator): string {
+  const operator = OPERATORS.find((candidate) => candidate in constraint);
+  if (!operator) return JSON.stringify(constraint);
+  const phrase = t(`approvals.constraint.${operator}`, {
+    value: JSON.stringify(constraint[operator]),
+  });
+  return constraint.optional === true
+    ? t("approvals.constraint.optional", { constraint: phrase })
+    : phrase;
 }
 
 /** Props for {@link ApprovedCallList}. */
@@ -116,7 +108,9 @@ export function ApprovedCallList({ calls }: ApprovedCallListProps) {
                   {args.map(([name, constraint]) => (
                     <div key={name} className="flex gap-2 text-xs">
                       <dt className="font-mono text-on-surface">{name}</dt>
-                      <dd className="text-on-surface-variant">{describeConstraint(constraint)}</dd>
+                      <dd className="text-on-surface-variant">
+                        {describeConstraint(constraint, t)}
+                      </dd>
                     </div>
                   ))}
                 </dl>

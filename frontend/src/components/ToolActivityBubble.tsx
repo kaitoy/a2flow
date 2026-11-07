@@ -49,7 +49,7 @@ export function ToolActivityBubble({ content }: { content: ToolCallActivityConte
       <span className="font-mono font-medium text-on-surface">{content.name}</span>
       {content.isMcp && <Badge>MCP</Badge>}
       {content.mocked && <Badge>{t("common.mocked")}</Badge>}
-      <span>{running ? t("app.running") : "done"}</span>
+      <span>{running ? t("app.running") : t("app.done")}</span>
       {hasDetails && (
         <ChevronDown
           size={14}
