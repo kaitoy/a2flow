@@ -21,7 +21,7 @@
 
     <svg viewBox="0 0 780 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-executions-status-title workflow-executions-status-desc">
       <title id="workflow-executions-status-title">実行のステータス</title>
-      <desc id="workflow-executions-status-desc">実行が running で始まり、時刻を待つだけの間は scheduled になって再開すると running に戻り、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。</desc>
+      <desc id="workflow-executions-status-desc">実行は「実行中」で始まり、時刻を待つだけの間は「予定」になって再開すると「実行中」に戻り、全タスクが終わって失敗がなければ「完了」、1 つ以上が失敗していれば「失敗」に落ち着くことを示す状態遷移図。</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
       </defs>
@@ -53,19 +53,19 @@
 
       <!-- running (focal) -->
       <rect x="270" y="52" width="180" height="64" rx="8" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
-      <text x="360" y="91" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">running</text>
+      <text x="360" y="91" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行中</text>
 
       <!-- scheduled -->
       <rect x="560" y="52" width="180" height="64" rx="8" fill="#ffffff" stroke="#525860" stroke-width="1" stroke-dasharray="4 3"/>
-      <text x="650" y="91" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">scheduled</text>
+      <text x="650" y="91" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">予定</text>
 
       <!-- completed -->
       <rect x="140" y="200" width="180" height="56" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="230" y="235" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">completed</text>
+      <text x="230" y="235" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">完了</text>
 
       <!-- failed -->
       <rect x="400" y="200" width="180" height="56" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="490" y="235" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+      <text x="490" y="235" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">失敗</text>
     </svg>
   </div>
 </body>

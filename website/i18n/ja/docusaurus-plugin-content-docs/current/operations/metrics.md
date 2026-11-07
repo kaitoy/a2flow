@@ -9,7 +9,7 @@ sidebar_position: 6
 
 [アクセス制御タグ](../guides/tags.md#access-control-tags)によって呼び出し元から隠されている実行は、以下のどの集計からも除かれます。実行一覧に現れないのと同じ扱いで、開けない実行の名前が集計に出ることはありません。
 
-まだ `draft` のワークフローから開始された実行(`developer` や `super_admin` による[公開前のテスト実行](../guides/workflows.md#running-a-workflow))は `isDraft: true` で記録され、**以下のすべてのメトリクスから除外されます**。Prometheus の KPI も、承認の滞留のビューを含む集計サブリソースも同じです。使い捨てのテストデータが数字を歪めないようにするためです。このフラグは実行の開始時に決まります。あとからワークフローを公開しても、すでに起きた実行が分類し直されることはありません。
+まだ `下書き` のワークフローから開始された実行(開発者や上位管理者による[公開前のテスト実行](../guides/workflows.md#running-a-workflow))は `isDraft: true` で記録され、**以下のすべてのメトリクスから除外されます**。Prometheus の KPI も、承認の滞留のビューを含む集計サブリソースも同じです。使い捨てのテストデータが数字を歪めないようにするためです。このフラグは実行の開始時に決まります。あとからワークフローを公開しても、すでに起きた実行が分類し直されることはありません。
 
 ## Prometheus のエンドポイント {#prometheus-endpoint}
 
@@ -63,7 +63,7 @@ sidebar_position: 6
 |---|---|
 | `GET /api/v1/workflow-executions/by-workflow` | ワークフローごとの実行件数(`total` / `running` / `completed` / `failed`。`running` には `scheduled` の実行も含む)と平均リードタイム |
 | `GET /api/v1/workflow-executions/lead-time-trend` | 日ごとの平均リードタイム。空の日も含めて 1 日 1 バケット |
-| `GET /api/v1/workflow-executions/failures` | 調査が必要な実行。失敗したタスクと記録された原因つき。呼び出し元が関わっていない実行のタスク名やエラーメッセージも含むため、`admin` 専用 |
+| `GET /api/v1/workflow-executions/failures` | 調査が必要な実行。失敗したタスクと記録された原因つき。呼び出し元が関わっていない実行のタスク名やエラーメッセージも含むため、管理者専用 |
 | `GET /api/v1/approvals/by-approver` | 指名された承認者ごとの、承認待ちの滞留 |
 | `GET /api/v1/approvals/by-workflow` | 同じ滞留をワークフロー単位でまとめたもの |
 

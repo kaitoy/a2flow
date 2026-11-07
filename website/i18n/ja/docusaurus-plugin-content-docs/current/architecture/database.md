@@ -22,15 +22,15 @@ sidebar_position: 7
 |---|---|
 | `users` | アプリケーションのユーザーと、付与されたロール。[ユーザーとグループ](../guides/users-and-groups.md)を参照 |
 | `auth_sessions` | サーバー側のログインセッション |
-| `login_failures` | 直近の[サインインの失敗](../guides/users-and-groups.md#failed-sign-ins)。繰り返しの推測からアカウントをロックするために数えます。1 日より古い行は削除されます |
+| `login_failures` | 直近の[ログインの失敗](../guides/users-and-groups.md#failed-sign-ins)。繰り返しの推測からアカウントをロックするために数えます。1 日より古い行は削除されます |
 | `impersonation_events` | [代理ログイン](../concepts/impersonation.md)の監査証跡 |
-| `agent_skills` | [Agent Skill](../guides/agent-skills.md) の定義と、クローン元のリポジトリ |
+| `agent_skills` | [エージェントスキル](../guides/agent-skills.md) の定義と、クローン元のリポジトリ |
 | `mcp_servers` | 登録済みの [MCP サーバー](../guides/mcp-servers.md)と、その接続方法 |
 | `knowledge_bases`、`knowledge_sources`、`knowledge_pages` | [ナレッジベース](../guides/knowledge-bases.md)。アップロードした文書と登録した URL、そこから書かれたページ |
 | `secrets` | 名前付きの[認証情報のまとまり](../guides/secrets.md)。ローカルで暗号化するか、Vault を参照します |
 | `workflows` | [ワークフロー](../guides/workflows.md)の定義とライフサイクルの状態 |
 | `workflow_task_templates` | ワークフローの、あらかじめ設計されたタスクの一覧 |
-| `workflow_published_versions` | 公開時点で固めた設計。`modified` のワークフローはこれに対して実行されます |
+| `workflow_published_versions` | 公開時点で固めた設計。`変更あり` のワークフローはこれに対して実行されます |
 | `workflow_executions` | [実行](../guides/workflow-executions.md)ごとに 1 行。実行時点のワークフローとスキルのメタデータのスナップショットつき |
 | `workflow_tasks` | 実行が持つ個々のタスク。テンプレートからコピーされます |
 | `workflow_task_tool_bindings` | タスクに紐づけられた MCP ツール |

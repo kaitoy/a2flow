@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # Admin UI
 
-The admin area is where every record in A2Flow is created, inspected and edited. It is a single shell — an app bar across the top, a section sidebar down the left — and every section inside it works the same way, so learning one list teaches you all thirteen.
+The admin area is where every record in A2Flow is created, inspected and edited. It is a single shell — an app bar across the top, a section sidebar down the left — and every section inside it works the same way, so learning one list teaches you all fifteen.
 
 ## Welcome page {#welcome-page}
 
@@ -14,7 +14,7 @@ The welcome page is the landing screen: you arrive here after signing in, when y
 ![Flowchart of the admin UI navigation model: the welcome page leads to a section list, which opens a create form or a detail page by clicking a name, and a breadcrumb on the detail page returns to the list.](./img/admin-ui-navigation.svg#gh-light-mode-only)
 ![Flowchart of the admin UI navigation model: the welcome page leads to a section list, which opens a create form or a detail page by clicking a name, and a breadcrumb on the detail page returns to the list.](./img/admin-ui-navigation-dark.svg#gh-dark-mode-only)
 
-The breadcrumb trail above every title mirrors that path — `Admin › Workflows › my-workflow` — and every crumb but the last one links back up.
+The breadcrumb trail above every title mirrors that path — `Home › Workflows › my-workflow` — and every crumb but the last one links back up.
 
 ## The sections
 
@@ -51,7 +51,7 @@ Every section opens on a table, and every table offers the same controls:
 | **Hover on a cell** | Reveals the full text of anything clipped to the column width. |
 | **▥ Columns** | Opens the column picker (below). |
 | **Refresh** | Re-reads the list. |
-| **Add** | Opens the create form. Hidden without the write role. |
+| **+ Add …** | Opens the create form. Hidden without the write role. |
 | **Actions column** | Per-row actions — Delete, and whatever else the record type offers. Hidden without the write role. |
 
 A column holding one of a fixed set of values — a task's status, an MCP server's transport, a tag's colour — sorts in the order those values are meant to be read, not alphabetically. Sorting tasks by status therefore runs `pending`, `in_progress`, `completed`, `failed`, `skipped`, the same lifecycle order the status dots follow everywhere else.

@@ -98,7 +98,7 @@ No account to spare? The seeded [tool mocks](./demo-data.md#trying-it-out) let t
 | Run it, and confirm the result | `demo-aws-requester` | `demo-gcp-requester` | `demo-azure-requester` | `requester` |
 | Approve the request | `demo-approver-1` | `demo-approver-1` | `demo-approver-1` | `approver` |
 
-Every step below starts with **Impersonate** on the **Users** list and ends with **Stop** on the "Acting as" chip in the header. The stop is not optional: while you act as one of these accounts you are held to that account's roles, and none of them may impersonate, so **Impersonate** is not offered again until you have stopped. From a chat screen, the **A2Flow** logo in the app bar takes you back to the welcome page and its sidebar.
+Every step below starts with **Impersonate** on the **Users** list and ends with **Stop impersonating** on the "Acting as" chip in the header. The stop is not optional: while you act as one of these accounts you are held to that account's roles, and none of them may impersonate, so **Impersonate** is not offered again until you have stopped. From a chat screen, the **A2Flow** logo in the app bar takes you back to the welcome page and its sidebar.
 
 ## 1. Sign in as root \{#1-sign-in-as-root\}
 
@@ -173,14 +173,14 @@ Open **Knowledge Bases** and click **AWS EC2 Pricing**. Its one source, `ec2-on-
 </Tabs>
 
 4. You land on the new workflow's detail page with the status `generating`. The page refreshes itself; in a minute or two the status becomes `draft` and the bell shows a "draft ready" notification. Open its **Task Templates** to see the steps the design agent wrote — gathering the parameters, asking for approval, doing the work, and reporting back ([Generating a workflow](../guides/workflows.md#generating-a-workflow)).
-5. Press **Stop** on the "Acting as" chip.
+5. Press **Stop impersonating** on the "Acting as" chip.
 
 ## 3. Act as the reviewer and publish \{#3-act-as-the-reviewer-and-publish\}
 
 1. On **Users**, press **Impersonate** on the reviewer's row and confirm.
 2. Open **Workflows** and click the workflow's name. Look over its task templates; a reviewer may also **Open design session** to read the design conversation, but not steer it.
 3. Press **Publish**. The status becomes `published`: the design is frozen, and a `requester` may now run it ([Publishing](../guides/workflows.md#publishing)).
-4. **Stop**.
+4. **Stop impersonating**.
 
 ## 4. Act as the requester and run it \{#4-act-as-the-requester-and-run-it\}
 
@@ -209,7 +209,7 @@ Open **Knowledge Bases** and click **AWS EC2 Pricing**. Its one source, `ec2-on-
 </Tabs>
 
 4. The request is addressed to the **Demo Approvers** group, and under it the chat reads "Waiting for a decision from the approver group." — the requester cannot decide it. The run now waits.
-5. **Stop**.
+5. **Stop impersonating**.
 
 ## 5. Act as the approver and approve \{#5-act-as-the-approver-and-approve\}
 
@@ -256,7 +256,7 @@ Open **Knowledge Bases** and click **AWS EC2 Pricing**. Its one source, `ec2-on-
   </TabItem>
 </Tabs>
 
-6. **Stop**.
+6. **Stop impersonating**.
 
 ## 6. Back as the requester: confirm the result \{#6-back-as-the-requester-confirm-the-result\}
 
@@ -283,7 +283,7 @@ Open **Knowledge Bases** and click **AWS EC2 Pricing**. Its one source, `ec2-on-
 </Tabs>
 
 4. The agent closes with its summary, the last task completes, the run turns `completed`, and the bell shows a completion notification.
-5. **Stop**.
+5. **Stop impersonating**.
 
 ## Afterwards \{#afterwards\}
 

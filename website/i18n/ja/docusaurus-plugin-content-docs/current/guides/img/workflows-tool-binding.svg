@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 1010 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-tool-binding-title workflows-tool-binding-desc">
       <title id="workflows-tool-binding-title">ツールの割り当て: 設計時と実行時</title>
-      <desc id="workflows-tool-binding-desc">設計時のツールの割り当てが Run 時にタスクへコピーされ、呼び出し時に確認されることを示すフローチャート。進行中のタスクに割り当てられたツールなら呼び出しは届き、そうでなければ使えるツールの一覧とともに拒否される。</desc>
+      <desc id="workflows-tool-binding-desc">設計時のツールの割り当てが実行時にタスクへコピーされ、呼び出し時に確認されることを示すフローチャート。進行中のタスクに割り当てられたツールなら呼び出しは届き、そうでなければ使えるツールの一覧とともに拒否される。</desc>
       <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>

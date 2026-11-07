@@ -30,7 +30,7 @@
 
     <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-design-status-title workflow-design-status-desc">
       <title id="workflow-design-status-title">ワークフローのステータス遷移</title>
-      <desc id="workflow-design-status-desc">公開済みのエージェントスキルから generating を経て draft か failed になり、draft から published、modified へ進み、modified から公開で戻る、ワークフローの状態遷移図。</desc>
+      <desc id="workflow-design-status-desc">公開済みのエージェントスキルから「生成中」を経て「下書き」か「失敗」になり、「下書き」から「公開済み」、「変更あり」へ進み、「変更あり」から公開で戻る、ワークフローの状態遷移図。</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
@@ -77,27 +77,27 @@
 
       <!-- generating -->
       <rect x="240" y="72" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="320" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">generating</text>
+      <text x="320" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">生成中</text>
       <text x="320" y="124" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">設計実行が進行中</text>
 
       <!-- draft -->
       <rect x="440" y="72" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="520" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">draft</text>
+      <text x="520" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">下書き</text>
       <text x="520" y="124" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">テンプレートと割り当て</text>
 
       <!-- published (focal) -->
       <rect x="640" y="72" width="160" height="80" rx="8" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
-      <text x="720" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">published</text>
+      <text x="720" y="108" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">公開済み</text>
       <text x="720" y="124" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">設計が凍結される</text>
 
       <!-- failed -->
       <rect x="440" y="220" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="520" y="256" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+      <text x="520" y="256" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">失敗</text>
       <text x="520" y="272" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">理由がレコードに残る</text>
 
       <!-- modified -->
       <rect x="640" y="220" width="160" height="80" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="720" y="256" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">modified</text>
+      <text x="720" y="256" fill="#1c1e21" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">変更あり</text>
       <text x="720" y="272" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行は公開版を使う</text>
 
       <!-- Legend -->
@@ -111,7 +111,7 @@
       <text x="256" y="379" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">ステータス</text>
 
       <rect x="360" y="368" width="24" height="14" rx="8" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
-      <text x="396" y="379" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">実行に使われる版</text>
+      <text x="396" y="379" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">実行に使われるバージョン</text>
     </svg>
   </div>
 </body>

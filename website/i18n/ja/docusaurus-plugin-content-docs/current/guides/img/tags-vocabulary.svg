@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="tags-vocabulary-title tags-vocabulary-desc">
       <title id="tags-vocabulary-title">1 つの語彙、7 つのレジストリ</title>
-      <desc id="tags-vocabulary-desc">テナントごとに 1 つのタグ語彙が、タグを付けられる 7 つのレジストリ(Secrets、MCP Servers、Agent Skills、Knowledge Bases、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。</desc>
+      <desc id="tags-vocabulary-desc">テナントごとに 1 つのタグ語彙が、タグを付けられる 7 つのレジストリ(シークレット、MCP サーバー、エージェントスキル、ナレッジベース、ワークフロー、ツールモック、ユーザーグループ)に共有されることを示すフローチャート。</desc>
       <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
@@ -25,23 +25,23 @@
 
       <!-- Seven registries -->
       <rect x="12" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="74" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Secrets</text>
+      <text x="74" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">シークレット</text>
 
       <rect x="154" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="216" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP Servers</text>
+      <text x="216" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">MCP サーバー</text>
 
-      <rect x="296" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="358" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Agent Skills</text>
+      <rect x="290" y="240" width="136" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="358" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">エージェントスキル</text>
 
       <rect x="438" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="500" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Knowledge Bases</text>
+      <text x="500" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ナレッジベース</text>
 
       <rect x="580" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="642" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Workflows</text>
+      <text x="642" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフロー</text>
 
       <rect x="722" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="784" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tool Mocks</text>
+      <text x="784" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ツールモック</text>
 
       <rect x="864" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="926" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">User Groups</text>
+      <text x="926" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ユーザーグループ</text>
     </svg>

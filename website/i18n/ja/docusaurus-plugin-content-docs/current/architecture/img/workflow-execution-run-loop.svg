@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-execution-run-loop-title workflow-execution-run-loop-desc">
       <title id="workflow-execution-run-loop-title">実行の進み方</title>
-      <desc id="workflow-execution-run-loop-desc">タスクを進めるループのフローチャート。タスクを一覧し、依存が完了したものを選んで in_progress にし、作業して終了状態にする。全タスクが終わって実行が確定するまでこれを繰り返す。</desc>
+      <desc id="workflow-execution-run-loop-desc">タスクを進めるループのフローチャート。タスクを一覧し、依存が完了したものを選んで「進行中」にし、作業して終了状態にする。全タスクが終わって実行が確定するまでこれを繰り返す。</desc>
       <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
@@ -31,11 +31,11 @@
       <!-- Decision diamond -->
       <polygon points="500,112 600,160 500,208 400,160" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
       <text x="500" y="156" fill="#1c1e21" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">依存が完了した</text>
-      <text x="500" y="170" fill="#1c1e21" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">pending タスクは?</text>
+      <text x="500" y="170" fill="#1c1e21" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">保留中のタスクは?</text>
 
       <!-- Mark it in_progress -->
       <rect x="400" y="256" width="200" height="48" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="500" y="284" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">in_progress にする</text>
+      <text x="500" y="284" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">進行中にする</text>
 
       <!-- Do the work -->
       <rect x="400" y="344" width="200" height="48" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
@@ -44,8 +44,8 @@
 
       <!-- Mark it ended -->
       <rect x="400" y="432" width="200" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="500" y="460" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">completed、failed、</text>
-      <text x="500" y="476" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">skipped のいずれかにする</text>
+      <text x="500" y="460" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">完了、失敗、</text>
+      <text x="500" y="476" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">スキップのいずれかにする</text>
 
       <!-- Run settles (end oval) -->
       <rect x="720" y="136" width="200" height="48" rx="24" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>

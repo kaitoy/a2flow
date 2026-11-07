@@ -16,8 +16,8 @@
       <line x1="560" y1="128" x2="460" y2="128" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
 
       <!-- Labels -->
-      <rect x="382" y="180" width="32" height="14" rx="2" fill="#f2f8fc"/>
-      <text x="398" y="191" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">ADD</text>
+      <rect x="382" y="179" width="32" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="398" y="191" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">追加</text>
 
       <rect x="466" y="83" width="92" height="16" rx="2" fill="#f2f8fc"/>
       <text x="512" y="95" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">名前をクリック</text>
@@ -33,7 +33,7 @@
       <!-- Section list (focal) -->
       <rect x="280" y="80" width="180" height="72" rx="6" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
       <text x="370" y="110" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">セクションの一覧</text>
-      <text x="370" y="130" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">例: Workflows</text>
+      <text x="370" y="130" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">例: ワークフロー</text>
 
       <!-- Create form -->
       <rect x="280" y="220" width="180" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>

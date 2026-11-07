@@ -20,7 +20,7 @@ sidebar_position: 2
 
 | 変数 | 既定値 | 役割 |
 |---|---|---|
-| `BACKEND_BASE_URL` | `http://localhost:8000` | リバースプロキシが先に `/api/*` をバックエンドへ振り分けない構成(コンテナを使わずに動かすとき)で、フロントエンドが `/api/*` を転送する先。API ドキュメントのページがサインイン中のセッションを確かめる先でもあります。プロセス起動時に一度だけ読まれます。Docker Compose の構成では、公開アドレスではなく内部ネットワーク上のバックエンドのアドレスです |
+| `BACKEND_BASE_URL` | `http://localhost:8000` | リバースプロキシが先に `/api/*` をバックエンドへ振り分けない構成(コンテナを使わずに動かすとき)で、フロントエンドが `/api/*` を転送する先。API ドキュメントのページがログイン中のセッションを確かめる先でもあります。プロセス起動時に一度だけ読まれます。Docker Compose の構成では、公開アドレスではなく内部ネットワーク上のバックエンドのアドレスです |
 | `APP_PORT` | `3000` | Docker Compose 専用。アプリを公開するホスト側のポートです。画面と API の両方を受け持つ `ingress` サービスのポートで、バックエンドの `CORS_ORIGINS` は自動的にこれに追従します |
 | `OPENBAO_PORT` | `8200` | Docker Compose で `--profile openbao` を付けたときだけ使います。OpenBao の UI を公開するホスト側のポートです。[OpenBao で Vault 型シークレットを試す](../getting-started/docker-compose.md#openbao)を参照してください。A2Flow はこの値に関係なく内部ネットワーク経由でアクセスします |
 
@@ -44,8 +44,8 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 
 起動時、バックエンドは隠れた**システムユーザー**と、実在の 2 アカウントを投入します。それぞれ、対象のレコードが無いことを見つけた最初の起動でのみ作られます。
 
-- **`super_admin`** ロールを持つ初期の **`root`** ユーザー([認可](../concepts/authorization.md)を参照)。プラットフォーム全体のスコープです(`tenantId: null`)。実在の(システム以外の)ユーザーが*1 人でも*いればスキップされるので、実質的にいちばん最初の起動でだけ走ります。
-- **Default** テナント(`slug: default`)と、その中の **`admin`** ロールを持つ初期の **`admin`** ユーザー。テナント(`slug` で判定)とユーザー(そのテナント内の `username` で判定)は独立に確認されるので、片方だけを再作成しても、もう片方が重複することはありません。
+- **上位管理者**ロールを持つ初期の **`root`** ユーザー([認可](../concepts/authorization.md)を参照)。プラットフォーム全体のスコープです(`tenantId: null`)。実在の(システム以外の)ユーザーが*1 人でも*いればスキップされるので、実質的にいちばん最初の起動でだけ走ります。
+- **Default** テナント(`slug: default`)と、その中の**管理者**ロールを持つ初期の **`admin`** ユーザー。テナント(`slug` で判定)とユーザー(そのテナント内の `username` で判定)は独立に確認されるので、片方だけを再作成しても、もう片方が重複することはありません。
 
 隠れた**システムユーザー**はブートストラップのレコードを所有します(ログインできず、ユーザー一覧にも出ません)。
 
@@ -83,9 +83,9 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 
 | 変数 | 既定値 | 役割 |
 |---|---|---|
-| `SKILLS_DIR` | `backend/.skills` | Agent Skill のリポジトリを浅くクローンして置くストアのルート。`docker compose` では `/var/lib/a2flow/skills` で、`skills` という名前付きボリュームが実体です |
+| `SKILLS_DIR` | `backend/.skills` | エージェントスキルのリポジトリを浅くクローンして置くストアのルート。`docker compose` では `/var/lib/a2flow/skills` で、`skills` という名前付きボリュームが実体です |
 | `SKILLS_PRUNE_GRACE_SECONDS` | `3600` | 参照の有無にかかわらずリビジョンのディレクトリを残す時間。取得のたびに、どの実行からも固定されていないリビジョンを削除しますが、実行が現在のリビジョンを読んでからそれを指す行を挿入するまでの隙間を、この猶予が埋めます |
-| `SKILLS_CLONE_TIMEOUT_SECONDS` | `120` | クローンの個々の HTTP リクエストにかけられる時間の上限。これがないと応答しないリモートでクローンが止まり続け、スキルが `pending` のままになります |
+| `SKILLS_CLONE_TIMEOUT_SECONDS` | `120` | クローンの個々の HTTP リクエストにかけられる時間の上限。これがないと応答しないリモートでクローンが止まり続け、スキルが `クローン中` のままになります |
 
 ストアはリビジョンごとに 1 つの不変なディレクトリを持ちます。公開されたリビジョンがあとから変更されることはないので、取得処理が既存のリビジョンを読み込み中のエージェントを妨げることはありません。
 
@@ -129,7 +129,7 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 **キーはバックアップしてください。** 失うと保存済みのローカルシークレットがすべて復号できなくなり、同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
 
-HashiCorp Vault 用の環境変数はありません。テナント専用の Vault はテナントの admin が [Tenant Settings](../guides/users-and-groups.md#tenant-vault) で、グローバル Vault のアドレスは Super Admin が [System Settings](../guides/system-settings.md#global-vault) で、各テナントの[その資格情報](../guides/users-and-groups.md#global-vault-credential)はテナントのページで設定します。テナント専用の Vault のアドレスには、ユーザーが入力するほかの URL と同じ SSRF チェックがかかるので、公開アドレスである必要があります。グローバル Vault のアドレスはこのチェックの対象外です。設定できるのは Super Admin だけで、Vault は通常プライベートアドレスにあるからです。
+HashiCorp Vault 用の環境変数はありません。テナント専用の Vault はテナントの管理者が [テナント設定](../guides/users-and-groups.md#tenant-vault) で、グローバル Vault のアドレスは上位管理者が [システム設定](../guides/system-settings.md#global-vault) で、各テナントの[その認証情報](../guides/users-and-groups.md#global-vault-credential)はテナントのページで設定します。テナント専用の Vault のアドレスには、ユーザーが入力するほかの URL と同じ SSRF チェックがかかるので、公開アドレスである必要があります。グローバル Vault のアドレスはこのチェックの対象外です。設定できるのは上位管理者だけで、Vault は通常プライベートアドレスにあるからです。
 
 ## MCP ツールと承認 {#mcp-tools-and-approvals}
 
@@ -141,7 +141,7 @@ MCP ツールの呼び出しはどれも、そのタスク向けに発行され�
 | `MCP_TOOL_CERT_SIGNATURE_WINDOW_SECONDS` | `60` | プロキシ経由の各呼び出しに付く所持証明の署名について、許容する時刻のずれ |
 | `MCP_CA_COMMON_NAME` / `MCP_CA_VALIDITY_DAYS` | `A2Flow MCP Approval CA` / `3650` | 生成されるルートのサブジェクトと有効期間。ルートの初回生成時にだけ読まれ、あとから変えても既存のルートには影響しません |
 | `MCP_REGISTRY_URL` | `https://registry.modelcontextprotocol.io` | [レジストリを見る](../guides/mcp-servers.md#registering-from-the-mcp-registry)ダイアログが検索するレジストリのベース URL |
-| `MCP_ELICITATION_TIMEOUT_SECONDS` | `900` | MCP サーバーが求める[確認](../guides/workflow-executions.md#mcp-server-confirmations)に実行の申請者が答えるのを、ツール呼び出しが待つ時間。過ぎると質問は期限切れになります。申請者はタスクを再開した直後なので、これが効くのは放置された質問だけです |
+| `MCP_ELICITATION_TIMEOUT_SECONDS` | `900` | MCP サーバーが求める[確認](../guides/workflow-executions.md#mcp-server-confirmations)に実行の開始者が答えるのを、ツール呼び出しが待つ時間。過ぎると質問は期限切れになります。開始者はタスクを再開した直後なので、これが効くのは放置された質問だけです |
 | `AGENT_TURN_TIMEOUT_SECONDS` | `3600` | 実行のエージェントの 1 ターンが続けられる最長の時間で、待ち時間も含みます。ツール呼び出しが人を待っている間もターンは実行中なので、`MCP_ELICITATION_TIMEOUT_SECONDS` より十分長くしてください |
 
 ## MCP プロキシ {#mcp-sandbox}

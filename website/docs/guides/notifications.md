@@ -12,7 +12,7 @@ A **bell icon** sits in the top toolbar, on both the chat header and the admin s
 ![Flowchart showing a workflow event routing to the one concerned user, or every eligible approver-group member, and fanning out to the bell, the Notifications page, and email if it is enabled.](./img/notifications-routing.svg#gh-light-mode-only)
 ![Flowchart showing a workflow event routing to the one concerned user, or every eligible approver-group member, and fanning out to the bell, the Notifications page, and email if it is enabled.](./img/notifications-routing-dark.svg#gh-dark-mode-only)
 
-## The four events
+## The five events
 
 | Type | Raised when | Who receives it |
 |---|---|---|
@@ -37,7 +37,7 @@ Nothing in the dropdown deletes a notification; marking it read only moves it ou
 
 ## Notification history page {#notification-history-page}
 
-The Notifications page lists every notification you have received as a sortable, filterable table of title, type and creation time. An **All / Unread** switch above it toggles the read-state filter. This is the only place a notification can be permanently deleted.
+The Notifications page lists every notification you have received as a sortable, filterable table of title, type and creation time. Filter the **Read** column by **Yes** or **No** to narrow it to read or unread notifications. This is the only place a notification can be permanently deleted.
 
 A2Flow's own notifications appear in [your language](./users-and-groups.md#language), while an approval's title and description stay as the agent wrote them. Sorting and filtering by title work on the English text, so outside English the **Title** column offers neither; filter by **Type** instead.
 
@@ -45,7 +45,7 @@ Notifications are per-user throughout: you see only your own, and one disappears
 
 ## Email delivery {#email-delivery}
 
-Once a `super_admin` has configured an SMTP server under [System Settings](./system-settings.md), the same four events are **also emailed** to the recipient, so an approval request does not have to wait for someone to open the app.
+Once a `super_admin` has configured an SMTP server under [System Settings](./system-settings.md), the same five events are **also emailed** to the recipient, so an approval request does not have to wait for someone to open the app.
 
 The message carries the notification's title as its subject, its body as the text, and a link back to what it is about — the run, or the workflow. The link is built from the configured **Application Base URL**; when none is set, the message is sent without one.
 

@@ -23,7 +23,7 @@ Four more targets are refused regardless of roles: **yourself**, the seeded **sy
 
 ## Starting and stopping {#starting-and-stopping}
 
-Start it from the **Impersonate** action on the [Users](../guides/users-and-groups.md#users) list; confirming lands on the welcome page acting as that user. While it is active, a header chip shows "Acting as `<user>`" with a one-click **Stop**.
+Start it from the **Impersonate** action on the [Users](../guides/users-and-groups.md#users) list; confirming lands on the welcome page acting as that user. While it is active, a header chip shows "Acting as `<user>`" with a **Stop impersonating** button.
 
 Only one impersonation is open at a time: starting a new one closes whatever was open before. Stopping is always safe to call, even when nothing is open.
 

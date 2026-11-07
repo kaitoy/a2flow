@@ -14,8 +14,8 @@
       <line x1="280" y1="228" x2="280" y2="280" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
 
       <!-- Labels -->
-      <rect x="174" y="126" width="32" height="14" rx="2" fill="#030711"/>
-      <text x="190" y="137" fill="#9aa1ab" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">RUN</text>
+      <rect x="174" y="125" width="32" height="16" rx="2" fill="#030711"/>
+      <text x="190" y="137" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">実行</text>
 
       <rect x="316" y="125" width="92" height="16" rx="2" fill="#030711"/>
       <text x="362" y="137" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">値としてコピー</text>
@@ -23,7 +23,7 @@
       <!-- Workflow -->
       <rect x="60" y="40" width="200" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
       <text x="160" y="67" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">ワークフロー</text>
-      <text x="160" y="86" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">公開済みの版</text>
+      <text x="160" y="86" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">公開版</text>
 
       <!-- Chosen tool mocks -->
       <rect x="300" y="40" width="200" height="68" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>

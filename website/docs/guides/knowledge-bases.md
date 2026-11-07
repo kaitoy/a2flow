@@ -63,7 +63,7 @@ Click **Delete** on a source and confirm. The LLM revisits only the pages that c
 
 ## Browsing the pages
 
-The **Pages** section lists every page with its **Title**, **Path**, **Type**, and **Description**. Click a title to read the page. The pages are read-only: to correct one, fix or remove the source it came from and read it again.
+The **Pages** section lists every page, each row showing its title and path, its **Type**, and when it was last updated (**Updated At**). Click a title to read the page. The pages are read-only: to correct one, fix or remove the source it came from and read it again.
 
 Click **Download bundle** in the page header to download the whole knowledge base as a zip file. The bundle follows the [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) — one Markdown file per page with its metadata at the top, plus an `index.md` in every folder — so other tools that read the format can use it too.
 

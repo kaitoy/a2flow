@@ -9,9 +9,10 @@ silently shipping a half-translated diagram.
 Conventions the translations follow, mirroring the Japanese prose:
 
 * node names, edge labels, notes and legends are Japanese;
-* status values (``draft``, ``running``), UI button names (``Run``, ``Publish``,
-  ``Deactivate``) and technical strings (``name/key``, ``POST /AGENT``, ``HTTPS``) stay
-  English, so their 9px mono labels are left untouched;
+* status values and UI button names use the exact wording of the Japanese GUI catalog
+  (``frontend/src/i18n/messages/ja.ts``), e.g. ``下書き``, ``実行中``, ``公開``, ``無効化``;
+* technical strings (``name/key``, ``POST /AGENT``, ``HTTPS``) stay English, so their 9px
+  mono labels are left untouched;
 * a translated edge label goes from 9px mono to 12px sans, so its background mask is
   widened with :func:`mask` — budget 1em per full-width glyph plus 8px;
 * zone-title chips stay anchored to the zone's top-left corner rather than re-centred.
@@ -66,7 +67,7 @@ SPECS["guides/secrets-usage"] = [
     ('<title id="secrets-usage-title">Where a secret entry is used</title>', '<title id="secrets-usage-title">シークレットのエントリが使われる場所</title>'),
     (
         "Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.",
-        "シークレットのエントリが、MCP サーバーのヘッダーと環境変数から参照されるか、エージェントスキルのリポジトリの Auth Password として参照されるかを示すフローチャート。",
+        "シークレットのエントリが、MCP サーバーのヘッダーと環境変数から参照されるか、エージェントスキルのリポジトリの認証パスワードとして参照されるかを示すフローチャート。",
     ),
     # edge label HEADERS -> ヘッダー (12px needs a 56px mask)
     ('<rect x="423" y="56" width="54" height="14" rx="2" fill="#f2f8fc"/>', '<rect x="422" y="56" width="56" height="16" rx="2" fill="#f2f8fc"/>'),
@@ -76,7 +77,9 @@ SPECS["guides/secrets-usage"] = [
     (">MCP server</text>", ">MCP サーバー</text>"),
     (">headers + env vars</text>", ">ヘッダー + 環境変数</text>"),
     (">Agent Skill</text>", ">エージェントスキル</text>"),
-    (">repo auth password</text>", ">リポジトリの Auth Password</text>"),
+    (">repo auth password</text>", ">リポジトリの認証パスワード</text>"),
+    mask(430, 164, 40, 32),
+    label("AUTH", "認証"),
 ]
 
 # ---------------------------------------------------------------- guides/admin-ui-navigation
@@ -87,12 +90,14 @@ SPECS["guides/admin-ui-navigation"] = head(
 ) + [
     mask(492, 84, 40, 92),
     label("NAME", "名前をクリック"),
+    mask(382, 180, 32, 32),
+    label("ADD", "追加"),
     mask(476, 134, 72, 56),
     label("BREADCRUMB", "パンくず"),
     label("Welcome page", "ようこそページ"),
     label("quick-action cards", "クイックアクションカード"),
     label("Section list", "セクションの一覧"),
-    label("e.g. Workflows", "例: Workflows"),
+    label("e.g. Workflows", "例: ワークフロー"),
     label("Create form", "新規作成フォーム"),
     label("Detail page", "詳細ページ"),
     label("titled by name", "レコード名がタイトル"),
@@ -102,8 +107,16 @@ SPECS["guides/admin-ui-navigation"] = head(
 SPECS["guides/agent-skills-lifecycle"] = head(
     "Agent Skill lifecycle", "エージェントスキルのライフサイクル",
     "State machine showing an Agent Skill registered, cloning in the background, becoming ready or failed, pulling to retry from either state, and a ready skill generating a new workflow.",
-    "エージェントスキルの状態遷移図。登録するとバックグラウンドでクローンされ、ready か failed になる。どちらの状態からも Pull でやり直せ、ready のスキルから新しいワークフローを生成できる。",
+    "エージェントスキルの状態遷移図。登録するとバックグラウンドでクローンされ、「準備完了」か「失敗」になる。どちらの状態からもプルでやり直せ、「準備完了」のスキルから新しいワークフローを生成できる。",
 ) + [
+    mask(376, 176, 40, 32),
+    mask(394, 18, 52, 32),
+    (">PULL</text>", ">プル</text>", 2),
+    mask(534, 176, 64, 32),
+    label("GENERATE", "生成"),
+    label("Cloning", "クローン中"),
+    label("ready", "準備完了"),
+    label("failed", "失敗"),
     label("Register", "登録"),
     label("returns immediately", "フォームはすぐ返る"),
     label("in the background", "バックグラウンドで処理"),
@@ -159,11 +172,19 @@ SPECS["guides/notifications-routing"] = head(
 SPECS["guides/tags-vocabulary"] = head(
     "One vocabulary, seven registries", "1 つの語彙、7 つのレジストリ",
     "Flowchart showing one shared tag vocabulary per tenant applied to seven taggable registries: Secrets, MCP Servers, Agent Skills, Knowledge Bases, Workflows, Tool Mocks, and User Groups.",
-    "テナントごとに 1 つのタグ語彙が、タグを付けられる 7 つのレジストリ(Secrets、MCP Servers、Agent Skills、Knowledge Bases、Workflows、Tool Mocks、User Groups)に共有されることを示すフローチャート。",
+    "テナントごとに 1 つのタグ語彙が、タグを付けられる 7 つのレジストリ(シークレット、MCP サーバー、エージェントスキル、ナレッジベース、ワークフロー、ツールモック、ユーザーグループ)に共有されることを示すフローチャート。",
     page_title="Tag vocabulary", svg_title="Tag vocabulary",
 ) + [
     label("Tag vocabulary", "タグ語彙"),
     label("one per tenant", "テナントごとに 1 つ"),
+    ('<rect x="296" y="240" width="124"', '<rect x="290" y="240" width="136"'),
+    label("Secrets", "シークレット"),
+    label("MCP Servers", "MCP サーバー"),
+    label("Agent Skills", "エージェントスキル"),
+    label("Knowledge Bases", "ナレッジベース"),
+    label("Workflows", "ワークフロー"),
+    label("Tool Mocks", "ツールモック"),
+    label("User Groups", "ユーザーグループ"),
 ]
 
 # ---------------------------------------------------------------- guides/tool-mocks-decision
@@ -213,7 +234,7 @@ SPECS["guides/users-groups-relationship"] = head(
 SPECS["guides/workflow-executions-status"] = head(
     "Run status", "実行のステータス",
     "State machine showing a run starting as running, moving to scheduled while it only waits on a time and back when it resumes, then settling completed once every task has ended with none failed, or failed once every task has ended with at least one failure.",
-    "実行が running で始まり、時刻を待つだけの間は scheduled になって再開すると running に戻り、全タスクが終わって失敗がなければ completed、1 つ以上が失敗していれば failed に落ち着くことを示す状態遷移図。",
+    "実行は「実行中」で始まり、時刻を待つだけの間は「予定」になって再開すると「実行中」に戻り、全タスクが終わって失敗がなければ「完了」、1 つ以上が失敗していれば「失敗」に落ち着くことを示す状態遷移図。",
 ) + [
     mask(244, 130, 72, 56),
     label("NONE FAILED", "失敗なし"),
@@ -221,6 +242,10 @@ SPECS["guides/workflow-executions-status"] = head(
     label("1+ FAILED", "1 つ以上失敗"),
     label("WAITS ON A TIME", "時刻を待つ"),
     label("RESUMES", "再開"),
+    label("running", "実行中"),
+    label("scheduled", "予定"),
+    label("completed", "完了"),
+    label("failed", "失敗"),
 ]
 
 # ---------------------------------------------------------------- guides/workflow-executions-layout
@@ -258,7 +283,7 @@ SPECS["guides/workflows-lifecycle"] = head(
 SPECS["guides/workflows-status"] = head(
     "Detailed workflow status", "ワークフローの詳細ステータス",
     "State machine of a workflow's detailed status: generating leads to draft or failed, failed can be rewritten back to draft, draft publishes to published, published and modified toggle on further edits and publishes, and either can be deactivated back to draft.",
-    "ワークフローの詳細ステータスの状態遷移図。generating から draft か failed になり、failed は書き直して draft に戻せる。draft は公開すると published になり、published と modified は編集と公開で行き来し、どちらも Deactivate で draft に戻る。",
+    "ワークフローの詳細ステータスの状態遷移図。「生成中」から「下書き」か「失敗」になり、「失敗」は書き直して「下書き」に戻せる。「下書き」は公開すると「公開済み」になり、「公開済み」と「変更あり」は編集と公開で行き来し、どちらも無効化で「下書き」に戻る。",
 ) + [
     mask(168, 162, 54, 40),
     label("FAILED", "失敗"),
@@ -266,6 +291,17 @@ SPECS["guides/workflows-status"] = head(
     label("BY HAND", "手動で"),
     mask(663, 54, 54, 40),
     label("EDITED", "編集"),
+    mask(445, 70, 50, 32),
+    mask(663, 116, 54, 32),
+    (">PUBLISH</text>", ">公開</text>", 2),
+    mask(445, 302, 70, 44),
+    mask(579, 322, 70, 44),
+    (">DEACTIVATE</text>", ">無効化</text>", 2),
+    label("generating", "生成中"),
+    label("draft", "下書き"),
+    label("published", "公開済み"),
+    label("modified", "変更あり"),
+    label("failed", "失敗"),
 ]
 
 # ---------------------------------------------------------------- guides/workflows-snapshot
@@ -276,8 +312,10 @@ SPECS["guides/workflows-snapshot"] = head(
 ) + [
     mask(328, 126, 68, 92),
     label("COPIED", "値としてコピー"),
+    mask(174, 126, 32, 32),
+    label("RUN", "実行"),
     label("Workflow", "ワークフロー"),
-    label("published version", "公開済みの版"),
+    label("published version", "公開版"),
     label("Chosen tool mocks", "選んだツールモック"),
     label("Workflow execution", "ワークフロー実行"),
     label("the snapshot", "スナップショット"),
@@ -288,7 +326,7 @@ SPECS["guides/workflows-snapshot"] = head(
 SPECS["guides/workflows-tool-binding"] = head(
     "Tool binding: design time vs run time", "ツールの割り当て: 設計時と実行時",
     "Flowchart showing a design-time tool binding copied at run onto the task, then checked at call time: if the tool is bound to an in-progress task the call goes through, otherwise it is refused with the tools that are allowed.",
-    "設計時のツールの割り当てが Run 時にタスクへコピーされ、呼び出し時に確認されることを示すフローチャート。進行中のタスクに割り当てられたツールなら呼び出しは届き、そうでなければ使えるツールの一覧とともに拒否される。",
+    "設計時のツールの割り当てが実行時にタスクへコピーされ、呼び出し時に確認されることを示すフローチャート。進行中のタスクに割り当てられたツールなら呼び出しは届き、そうでなければ使えるツールの一覧とともに拒否される。",
 ) + [
     mask(253, 70, 54, 44),
     label("COPIED", "コピー"),
@@ -329,13 +367,14 @@ SPECS["concepts/authorization-effective-roles"] = head(
 # ---------------------------------------------------------------- concepts/authorization-session-matrix
 SPECS["concepts/authorization-session-matrix"] = head(
     "Who can reach which session", "誰がどのセッションに入れるか",
-    "Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.",
-    "開発者、ワークフローの作成者、スーパー管理者が設計セッションに入れ、実行の開始者、指名された承認者、スーパー管理者がワークフローセッションに入れること、そして管理者はワークフローセッションを読み取りのみできることを示すアクセスマトリクス。",
+    "Access matrix showing that Developers, the workflow's creator, and Super Admin reach a Design session, with Reviewers holding read-only access to it, while the run's initiator, its designated approvers, and Super Admin reach a Workflow session, with Admin holding read-only access to the Workflow session.",
+    "開発者、ワークフローの作成者、上位管理者が設計セッションに入れ、レビュアーはそこを読み取りのみで閲覧でき、実行の開始者、指名された承認者、上位管理者がワークフローセッションに入れること、そして管理者はワークフローセッションを読み取りのみできることを示すアクセスマトリクス。",
 ) + [
     label("Session", "セッション"),
     label("vs. actor", "vs. アクター"),
     label("Developer", "開発者"),
-    label("any in tenant", "テナントの全員"),
+    label("Reviewer", "レビュアー"),
+    (">any in tenant</text>", ">テナントの全員</text>", 2),
     label("Creator", "作成者"),
     label("workflow's createdBy", "createdBy"),
     label("Initiator", "開始者"),
@@ -344,14 +383,14 @@ SPECS["concepts/authorization-session-matrix"] = head(
     label("designated for it", "その実行で指名"),
     label("Admin", "管理者"),
     label("tenant admin", "テナントの管理者"),
-    label("Super Admin", "スーパー管理者"),
+    label("Super Admin", "上位管理者"),
     label("unrestricted", "制限なし"),
     label("Design session", "設計セッション"),
     label("Workflow session", "ワークフローセッション"),
     (">Yes</text>", ">フルアクセス</text>", 6),
-    (">No access</text>", ">アクセス不可</text>", 6),
-    (">Read only</text>", ">読み取りのみ</text>", 2),
-    label("the one asymmetry", "唯一の例外"),
+    (">No access</text>", ">アクセス不可</text>", 7),
+    (">Read only</text>", ">読み取りのみ</text>", 3),
+    (">can't drive it</text>", ">動かせない</text>", 2),
     label("LEGEND", "凡例"),
     label("Full access", "フルアクセス"),
 ]
@@ -505,9 +544,11 @@ SPECS["architecture/overview-lifecycle"] = head(
 SPECS["architecture/secrets-resolution"] = head(
     "How a secret reference resolves", "シークレット参照の解決",
     "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed an MCP server connection or a skill repository clone.",
-    "name/key のシークレット参照が保管の型で分岐することを示すフローチャート。local のシークレットは保管された値を復号し、Vault のシークレットはその場で読み、どちらも MCP サーバーへの接続かスキルのリポジトリのクローンに使われる。",
+    "name/key のシークレット参照が保管の型で分岐することを示すフローチャート。ローカルのシークレットは保管された値を復号し、Vault のシークレットはその場で読み、どちらも MCP サーバーへの接続かスキルのリポジトリのクローンに使われる。",
     page_title="Secret reference resolution", svg_title="Secret reference resolution",
 ) + [
+    mask(305, 160, 48, 56, h=12),
+    label("LOCAL", "ローカル"),
     label("A reference", "参照"),
     label("Which type?", "どちらの型か"),
     label("Decrypt the", "保管された値を"),
@@ -541,12 +582,12 @@ _POLICY_MASKS = [
 SPECS["architecture/mcp-gateway-and-proxy-policy-chain"] = head(
     "The policy chain", "ポリシーチェーン",
     "Flowchart showing how the MCP gateway decides a tool call: a policy chain either refuses it or allows it, an allowed call is either answered from a mock or goes through credential injection and the MCP proxy to the real MCP server, and both the refusal and the real call produce an audit record.",
-    "MCP ゲートウェイがツール呼び出しをどう裁くかを示すフローチャート。ポリシーチェーンが拒否するか許可し、許可された呼び出しはモックが応答するか、資格情報の展開と MCP プロキシを経て本物の MCP サーバーに届く。拒否も本物の呼び出しも監査の記録を残す。",
+    "MCP ゲートウェイがツール呼び出しをどう裁くかを示すフローチャート。ポリシーチェーンが拒否するか許可し、許可された呼び出しはモックが応答するか、認証情報の展開と MCP プロキシを経て本物の MCP サーバーに届く。拒否も本物の呼び出しも監査の記録を残す。",
     page_title="Policy chain", svg_title="Policy chain",
 ) + _POLICY_MASKS + [
     label("Execution agent", "実行エージェント"),
     label("lists what is allowed", "使えるツールの一覧が返る"),
-    label("Credential injection", "資格情報の展開"),
+    label("Credential injection", "認証情報の展開"),
     label("MCP proxy", "MCP プロキシ"),
     label("Audit record", "監査の記録"),
 ]
@@ -566,7 +607,7 @@ SPECS["architecture/mcp-gateway-and-proxy-tool-mocks"] = head(
 SPECS["architecture/mcp-gateway-and-proxy-trust-boundary"] = head(
     "Crossing the trust boundary", "信頼境界を越える",
     "Architecture diagram showing the MCP gateway, which decides whether a call is allowed, mocked, and which credentials it needs, handing exactly one authorized call across a trust boundary into the MCP proxy, which starts or connects to the real MCP server.",
-    "呼び出しを許可するか、モックするか、どの資格情報が要るかを決める MCP ゲートウェイが、認可済みの呼び出しをちょうど 1 件だけ信頼境界を越えて MCP プロキシに渡し、MCP プロキシが本物の MCP サーバーを起動または接続することを示すアーキテクチャ図。",
+    "呼び出しを許可するか、モックするか、どの認証情報が要るかを決める MCP ゲートウェイが、認可済みの呼び出しをちょうど 1 件だけ信頼境界を越えて MCP プロキシに渡し、MCP プロキシが本物の MCP サーバーを起動または接続することを示すアーキテクチャ図。",
 ) + [
     ('<rect x="52" y="64" width="112" height="12"', '<rect x="52" y="63" width="128" height="14"'),
     ('<text x="108" y="73"', '<text x="116" y="73"'),
@@ -577,7 +618,7 @@ SPECS["architecture/mcp-gateway-and-proxy-trust-boundary"] = head(
     mask(328, 104, 84, 56, h=12),
     label("AUTHORIZED", "認可済み"),
     label("MCP gateway", "MCP ゲートウェイ"),
-    label("allowed, mocked, credentials", "許可・モック・資格情報を決める"),
+    label("allowed, mocked, credentials", "許可・モック・認証情報を決める"),
     label("MCP proxy", "MCP プロキシ"),
     label("starts or connects", "起動または接続"),
     label("MCP server", "MCP サーバー"),
@@ -629,7 +670,7 @@ SPECS["architecture/sessions-turn-flow"] = head(
 SPECS["architecture/workflow-design-status"] = head(
     "Workflow status lifecycle", "ワークフローのステータス遷移",
     "State machine showing a workflow moving from a published Agent Skill through generating to draft or failed, then from draft through published and modified, with publish looping back from modified.",
-    "公開済みのエージェントスキルから generating を経て draft か failed になり、draft から published、modified へ進み、modified から公開で戻る、ワークフローの状態遷移図。",
+    "公開済みのエージェントスキルから「生成中」を経て「下書き」か「失敗」になり、「下書き」から「公開済み」、「変更あり」へ進み、「変更あり」から公開で戻る、ワークフローの状態遷移図。",
 ) + [
     mask(196, 96, 48, 32, h=12),
     label("GENERATE", "生成"),
@@ -642,6 +683,11 @@ SPECS["architecture/workflow-design-status"] = head(
     label("EDITED", "編集"),
     mask(736, 180, 48, 32, h=12),
     (">PUBLISH</text>", ">公開</text>", 2),
+    label("generating", "生成中"),
+    label("draft", "下書き"),
+    label("published", "公開済み"),
+    label("failed", "失敗"),
+    label("modified", "変更あり"),
     label("Agent Skill", "エージェントスキル"),
     label("published revision", "公開済みのリビジョン"),
     label("design run in progress", "設計実行が進行中"),
@@ -652,14 +698,14 @@ SPECS["architecture/workflow-design-status"] = head(
     label("LEGEND", "凡例"),
     label("Precondition", "前提条件"),
     label("Status", "ステータス"),
-    label("Live version", "実行に使われる版"),
+    label("Live version", "実行に使われるバージョン"),
 ]
 
 # ---------------------------------------------------------------- architecture/workflow-execution-snapshot
 SPECS["architecture/workflow-execution-snapshot"] = head(
     "Running a workflow copies its design", "ワークフローの実行は設計を写す",
     "Flowchart showing a published workflow and its chosen tool mocks copied by value onto a new workflow execution snapshot, which opens a workflow session containing tasks that all start pending.",
-    "公開版のワークフローと選ばれたツールモックが、新しいワークフロー実行のスナップショットに値のまま写され、開始時はすべて pending のタスクを持つワークフローセッションが開くことを示すフローチャート。",
+    "公開版のワークフローと選ばれたツールモックが、新しいワークフロー実行のスナップショットに値のまま写され、開始時はすべて保留中のタスクを持つワークフローセッションが開くことを示すフローチャート。",
     page_title="Running a workflow", svg_title="Running a workflow copies its design",
 ) + [
     mask(404, 136, 32, 32, h=12),
@@ -675,14 +721,14 @@ SPECS["architecture/workflow-execution-snapshot"] = head(
     label("Workflow session", "ワークフローセッション"),
     label("the run's chat", "実行が進むチャット"),
     label("Tasks", "タスク"),
-    label("all pending at the start", "開始時はすべて pending"),
+    label("all pending at the start", "開始時はすべて保留中"),
 ]
 
 # ---------------------------------------------------------------- architecture/workflow-execution-run-loop
 SPECS["architecture/workflow-execution-run-loop"] = head(
     "How the run advances", "実行の進み方",
     "Flowchart showing the task-advancement loop: list tasks, pick one whose dependencies have completed, mark it in progress, do the work, mark it ended, and repeat until every task has ended and the run settles.",
-    "タスクを進めるループのフローチャート。タスクを一覧し、依存が完了したものを選んで in_progress にし、作業して終了状態にする。全タスクが終わって実行が確定するまでこれを繰り返す。",
+    "タスクを進めるループのフローチャート。タスクを一覧し、依存が完了したものを選んで「進行中」にし、作業して終了状態にする。全タスクが終わって実行が確定するまでこれを繰り返す。",
 ) + [
     mask(484, 222, 32, 32, h=12),
     label("YES", "ある"),
@@ -690,12 +736,12 @@ SPECS["architecture/workflow-execution-run-loop"] = head(
     label("NO", "ない"),
     label("List the run's tasks", "実行のタスクを一覧する"),
     label("A pending task whose", "依存が完了した"),
-    label("deps have completed?", "pending タスクは?"),
-    label("Mark it in_progress", "in_progress にする"),
+    label("deps have completed?", "保留中のタスクは?"),
+    label("Mark it in_progress", "進行中にする"),
     label("Do the work", "作業する"),
     label("tools, approvals, conversation", "ツール、承認、会話"),
-    label("Mark it completed,", "completed、failed、"),
-    label("failed, or skipped", "skipped のいずれかにする"),
+    label("Mark it completed,", "完了、失敗、"),
+    label("failed, or skipped", "スキップのいずれかにする"),
     label("Run settles", "実行が確定する"),
     label("every task has ended", "全タスクが終わった"),
     label("LEGEND", "凡例"),

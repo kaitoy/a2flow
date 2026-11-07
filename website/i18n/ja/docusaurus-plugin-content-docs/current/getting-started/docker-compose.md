@@ -23,7 +23,7 @@ docker compose up --build
 | **db** | PostgreSQL 17。A2Flow が記録するものはすべてここに入ります |
 | **backend** | エージェントと API |
 | **worker** | バックエンドが積んだ[通知メール](../guides/notifications.md#the-delivery-queue)を送ります |
-| **mcp-proxy** | 登録した [MCP サーバ](../guides/mcp-servers.md)を実行します。分けている理由は[登録したサーバーが動く場所](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を参照してください |
+| **mcp-proxy** | 登録した [MCP サーバー](../guides/mcp-servers.md)を実行します。分けている理由は[登録したサーバーが動く場所](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を参照してください |
 | **ingress** | ブラウザが話す入口。画面のリクエストはフロントエンドへ、API のリクエストはバックエンドへ直接送ります |
 | **frontend** | 実際に操作する画面 |
 | **openbao** | `--profile openbao` を付けたときだけ起動します。[OpenBao で Vault 型シークレットを試す](#openbao)を参照してください |
@@ -74,9 +74,9 @@ docker compose exec -e BAO_TOKEN=<root-token> openbao sh -c '
 
 ### 4. A2Flow からつなぐ
 
-1. A2Flow に `root` でサインインし、**System Settings** の **Global Vault Address** に `http://openbao:8200` を設定して保存します。
-2. **Tenants** を開いて **Default** を選び、**Log in to the global Vault** にチェックを入れます。**Vault Auth Method** に **AppRole** を選び、手順 2 の role id と secret id を入力して保存します。
-3. `admin` でサインインし、**Secrets** で種類が **HashiCorp Vault**、**Vault Mount** が `secret`、**Vault Path** が `a2flow/demo` のシークレットを作ります。
+1. A2Flow に `root` でログインし、**システム設定**の**グローバル Vault のアドレス**に `http://openbao:8200` を設定して保存します。
+2. **テナント**を開いて **Default** を選び、**グローバル Vault へのログイン**にチェックを入れます。**Vault の認証方式**に **AppRole** を選び、手順 2 の role id と secret id を入力して保存します。
+3. `admin` でログインし、**シークレット**で種類が **HashiCorp Vault**、**Vault のマウント**が `secret`、**Vault のパス**が `a2flow/demo` のシークレットを作ります。
 
 あとはほかのシークレットと同じように参照できます。たとえば [MCP サーバー](../guides/mcp-servers.md)の環境変数に `${secret:<名前>/password}` と書きます。シークレットを選ぶ画面では、そのキー `username` と `password` が一覧に出ます。これはその場で OpenBao から読んだものなので、表示されれば接続できています。
 

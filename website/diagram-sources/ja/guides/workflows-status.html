@@ -21,7 +21,7 @@
 
     <svg viewBox="0 0 920 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-status-title workflows-status-desc">
       <title id="workflows-status-title">ワークフローの詳細ステータス</title>
-      <desc id="workflows-status-desc">ワークフローの詳細ステータスの状態遷移図。generating から draft か failed になり、failed は書き直して draft に戻せる。draft は公開すると published になり、published と modified は編集と公開で行き来し、どちらも Deactivate で draft に戻る。</desc>
+      <desc id="workflows-status-desc">ワークフローの詳細ステータスの状態遷移図。「生成中」から「下書き」か「失敗」になり、「失敗」は書き直して「下書き」に戻せる。「下書き」は公開すると「公開済み」になり、「公開済み」と「変更あり」は編集と公開で行き来し、どちらも無効化で「下書き」に戻る。</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
@@ -47,43 +47,43 @@
       <rect x="303" y="153" width="44" height="16" rx="2" fill="#f2f8fc"/>
       <text x="325" y="165" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">手動で</text>
 
-      <rect x="445" y="70" width="50" height="14" rx="2" fill="#f2f8fc"/>
-      <text x="470" y="81" fill="#00877a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PUBLISH</text>
+      <rect x="454" y="69" width="32" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="470" y="81" fill="#00877a" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">公開</text>
 
       <rect x="670" y="53" width="40" height="16" rx="2" fill="#f2f8fc"/>
       <text x="690" y="65" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">編集</text>
 
-      <rect x="663" y="116" width="54" height="14" rx="2" fill="#f2f8fc"/>
-      <text x="690" y="125" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">PUBLISH</text>
+      <rect x="674" y="115" width="32" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="690" y="125" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">公開</text>
 
-      <rect x="445" y="302" width="70" height="14" rx="2" fill="#f2f8fc"/>
-      <text x="480" y="313" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">DEACTIVATE</text>
+      <rect x="458" y="301" width="44" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="480" y="313" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">無効化</text>
 
-      <rect x="579" y="322" width="70" height="14" rx="2" fill="#f2f8fc"/>
-      <text x="614" y="333" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.02em">DEACTIVATE</text>
+      <rect x="592" y="321" width="44" height="16" rx="2" fill="#f2f8fc"/>
+      <text x="614" y="333" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">無効化</text>
 
       <!-- Start -->
       <circle cx="16" cy="92" r="6" fill="#1c1e21"/>
 
       <!-- generating -->
       <rect x="60" y="60" width="160" height="64" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="140" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">generating</text>
+      <text x="140" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">生成中</text>
 
       <!-- draft -->
       <rect x="280" y="60" width="160" height="64" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="360" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">draft</text>
+      <text x="360" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">下書き</text>
 
       <!-- published (focal) -->
       <rect x="500" y="60" width="160" height="64" rx="8" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
-      <text x="580" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">published</text>
+      <text x="580" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">公開済み</text>
 
       <!-- modified -->
       <rect x="720" y="60" width="160" height="64" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="800" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">modified</text>
+      <text x="800" y="99" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">変更あり</text>
 
       <!-- failed -->
       <rect x="170" y="220" width="160" height="64" rx="8" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
-      <text x="250" y="259" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">failed</text>
+      <text x="250" y="259" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">失敗</text>
     </svg>
   </div>
 </body>

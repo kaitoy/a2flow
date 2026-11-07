@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 1412 296" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="authorization-session-matrix-dark-title authorization-session-matrix-dark-desc">
-      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style></defs>
+<svg viewBox="0 0 1412 296" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="authorization-session-matrix-dark-title authorization-session-matrix-dark-desc"><defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+JP:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style></defs>
       <title id="authorization-session-matrix-dark-title">誰がどのセッションに入れるか</title>
-      <desc id="authorization-session-matrix-dark-desc">開発者、ワークフローの作成者、スーパー管理者が設計セッションに入れ、レビュアーはそこを読み取りのみで閲覧でき、実行の開始者、指名された承認者、スーパー管理者がワークフローセッションに入れること、そして管理者はワークフローセッションを読み取りのみできることを示すアクセスマトリクス。</desc>
+      <desc id="authorization-session-matrix-dark-desc">開発者、ワークフローの作成者、上位管理者が設計セッションに入れ、レビュアーはそこを読み取りのみで閲覧でき、実行の開始者、指名された承認者、上位管理者がワークフローセッションに入れること、そして管理者はワークフローセッションを読み取りのみできることを示すアクセスマトリクス。</desc>
 
       <rect width="100%" height="100%" fill="#030711"/>
 
@@ -36,7 +35,7 @@
       <text x="1126" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">テナントの管理者</text>
 
       <rect x="1216" y="72" width="148" height="56" rx="6" fill="#242526"/>
-      <text x="1290" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">スーパー管理者</text>
+      <text x="1290" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">上位管理者</text>
       <text x="1290" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" text-anchor="middle">制限なし</text>
 
       <!-- Row 0: Design session -->
