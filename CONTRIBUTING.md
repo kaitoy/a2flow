@@ -4,11 +4,11 @@ Work on a branch, and let the git hooks run the checks: `lefthook` runs the lint
 formatters, type checkers, and both test suites before a commit lands, and `next build`
 before a push. A change is done when those pass **and** its documentation is updated in
 the same commit — a new symbol carries its doc comment, a user-visible feature carries
-its manual page in both locales, a new build step carries its line in this file. The
+its manual page in every locale, a new build step carries its line in this file. The
 conventions are collected in [CLAUDE.md](CLAUDE.md).
 
 All documentation — docs, comments, commit messages — is written in English. The one
-exception is `website/i18n/ja/`, which holds the manual's Japanese translation.
+exception is `website/i18n/`, which holds the manual's translations.
 
 ## Repository layout
 
@@ -248,15 +248,21 @@ same login gate as the rest of the app.
 cd website
 pnpm install
 pnpm start                 # dev server on http://localhost:3100/a2flow/ (English)
-pnpm start --locale ja     # dev server in Japanese (one locale at a time)
+pnpm start --locale ja     # dev server in another locale: ja, es, zh-CN, ko, fr (one at a time)
 pnpm build                 # builds every locale; fails on broken links
 pnpm serve                 # serves the build — the only way to exercise search
+python scripts/check-translations.py  # every translation still has the English page's shape
 ```
 
-Every page has an English original under `website/docs/` and a Japanese translation
-under `website/i18n/ja/docusaurus-plugin-content-docs/current/`; **both are updated in
-the same change**. What belongs on the site and what stays in this repository is
-described in [website/README.md](website/README.md).
+The manual comes in the GUI's six languages. Every page has an English original under
+`website/docs/` and a translation under
+`website/i18n/<locale>/docusaurus-plugin-content-docs/current/` for each of `ja`, `es`,
+`zh-CN`, `ko` and `fr`; **all are updated in the same change**. Docusaurus silently falls
+back to English for a missing page and only warns about a broken anchor, so the build
+does not catch a translation that is absent or has drifted. `check-translations.py` does:
+it compares headings and their ids, code fences, table rows, front matter, links, images,
+and bold that would not render. What belongs on the site and what stays in this repository
+is described in [website/README.md](website/README.md).
 
 ### Diagrams
 
@@ -266,18 +272,19 @@ renders, not Mermaid. Each has an editable HTML source under
 light/dark SVG pair next to the page under `img/`, referenced with a `#gh-light-mode-only`
 / `#gh-dark-mode-only` fragment that `website/src/css/custom.css` toggles on.
 
-The Japanese diagrams are **derived, not drawn**: `website/diagram-sources/ja/` and the SVGs
-under `website/i18n/ja/…/img/` are rebuilt from the English sources by
+The translated diagrams are **derived, not drawn**: `website/diagram-sources/<locale>/` and
+the SVGs under `website/i18n/<locale>/…/img/` are rebuilt from the English sources by
 
 ```bash
-python website/scripts/ja-diagrams/render.py                       # every diagram
-python website/scripts/ja-diagrams/render.py guides/secrets-usage  # one diagram
+python website/scripts/diagrams/render.py                                  # every locale
+python website/scripts/diagrams/render.py --locale es                      # one locale
+python website/scripts/diagrams/render.py --locale es guides/secrets-usage # one diagram
 ```
 
-which applies the label translations in `website/scripts/ja-diagrams/specs.py`, recolours
-the result into the dark variant, and exports both SVGs. After changing an English diagram,
-update its entry in `specs.py` (the script fails if a translated string no longer matches)
-and rerun it; never hand-edit the generated Japanese files.
+which applies the label translations in `website/scripts/diagrams/specs/<locale>.py`,
+recolours the result into the dark variant, and exports both SVGs. After changing an English
+diagram, update its entry in each spec (the script fails if a translated string no longer
+matches) and rerun it; never hand-edit the generated files.
 
 ## Demo assets
 

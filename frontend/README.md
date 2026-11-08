@@ -115,7 +115,7 @@ Use `{ one, other }` for a message with a count; a language without plural forms
 
 ### Glossary
 
-Keep these consistent when adding text. Japanese follows the manual under `website/i18n/ja/`.
+Keep these consistent when adding text. The manual under `website/i18n/` uses the same wording.
 
 | English | ja | es | zh-CN | ko | fr |
 |---|---|---|---|---|---|

@@ -21,10 +21,12 @@ references stay in the repository instead:
 ```bash
 pnpm install
 pnpm start                 # dev server on http://localhost:3100/a2flow/ (English)
-pnpm start --locale ja     # dev server in Japanese (one locale at a time)
+pnpm start --locale ja     # dev server in another locale: ja, es, zh-CN, ko, fr (one at a time)
 pnpm build                 # builds every locale; fails on broken links
 pnpm serve                 # serves the build — the only way to exercise search
+python scripts/check-translations.py  # every translation still has the English page's shape
 ```
 
-Every page has an English original under `docs/` and a Japanese translation under
-`i18n/ja/docusaurus-plugin-content-docs/current/`. Both must be updated in the same change.
+Every page has an English original under `docs/` and a translation under
+`i18n/<locale>/docusaurus-plugin-content-docs/current/` for each of `ja`, `es`, `zh-CN`, `ko`
+and `fr`. All must be updated in the same change.

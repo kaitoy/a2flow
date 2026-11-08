@@ -12,7 +12,7 @@ repeatability of a procedure.
 There is no flowchart to draw and no diagram to return to. A workflow is not something
 the agent takes part in — it is what the agent does.
 
-📖 **[Read the manual](https://kaitoy.github.io/a2flow/)** ([日本語](https://kaitoy.github.io/a2flow/ja/))
+📖 **[Read the manual](https://kaitoy.github.io/a2flow/)** ([日本語](https://kaitoy.github.io/a2flow/ja/) · [Español](https://kaitoy.github.io/a2flow/es/) · [简体中文](https://kaitoy.github.io/a2flow/zh-CN/) · [한국어](https://kaitoy.github.io/a2flow/ko/) · [Français](https://kaitoy.github.io/a2flow/fr/))
 
 ## Features
 
@@ -86,7 +86,9 @@ To run the backend and the frontend directly instead of in containers, see
 ## Documentation
 
 The user and operator manual lives at **<https://kaitoy.github.io/a2flow/>**
-([日本語](https://kaitoy.github.io/a2flow/ja/)). It is built from [`website/`](website/)
+([日本語](https://kaitoy.github.io/a2flow/ja/), [Español](https://kaitoy.github.io/a2flow/es/),
+[简体中文](https://kaitoy.github.io/a2flow/zh-CN/), [한국어](https://kaitoy.github.io/a2flow/ko/),
+[Français](https://kaitoy.github.io/a2flow/fr/)). It is built from [`website/`](website/)
 and deployed by [pages.yml](.github/workflows/pages.yml).
 
 | | |

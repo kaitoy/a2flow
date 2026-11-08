@@ -15,7 +15,7 @@ See each directory's README.md for details.
 
 ## Conventions
 
-All documentation (docs, comments, commit messages) must be written in English. The one exception is `website/i18n/ja/`, which holds the manual's Japanese translation.
+All documentation (docs, comments, commit messages) must be written in English. The one exception is `website/i18n/`, which holds the manual's translations.
 
 ## Toolchain versions
 
@@ -90,7 +90,7 @@ published to <https://kaitoy.github.io/a2flow/> by
 ```bash
 cd website
 pnpm start                 # dev server on http://localhost:3100/a2flow/ (English)
-pnpm start --locale ja     # dev server in Japanese (one locale at a time)
+pnpm start --locale ja     # dev server in another locale: ja, es, zh-CN, ko, fr (one at a time)
 pnpm build                 # builds every locale; fails on broken links
 pnpm serve                 # serves the build — the only way to exercise search
 ```
@@ -133,17 +133,22 @@ Environment variables are documented only in
 [operations/configuration.md](website/docs/operations/configuration.md), which collects
 them all — never on a feature page.
 
-Every page has an English original under `website/docs/` and a Japanese translation
-under `website/i18n/ja/docusaurus-plugin-content-docs/current/`. **Both are written in
-the same change** — a page that exists in only one locale is not done.
+The manual comes in the GUI's six languages. Every page has an English original under
+`website/docs/` and a translation under
+`website/i18n/<locale>/docusaurus-plugin-content-docs/current/` for each of `ja`, `es`,
+`zh-CN`, `ko` and `fr`. **All are written in the same change** — a page missing from a
+locale is not done, and the site silently shows English in its place. UI names in a
+translation match that language's GUI catalog (`frontend/src/i18n/messages/`) exactly.
+Run `python website/scripts/check-translations.py` to confirm the translations still have
+the shape of the English.
 
 Two things to know when editing:
 
 - Cross-page links are relative `.md` links (`../guides/approvals.md`), so Docusaurus
   resolves them per locale and `onBrokenLinks: 'throw'` catches a dead one at build time.
-- A Japanese heading that another page links into needs an explicit `{#anchor}` id
-  matching the English slug. Docusaurus derives the slug from the heading text, so
-  without it the anchor breaks in the `ja` locale only.
+- A translated heading carries an explicit `{#anchor}` id matching the English slug.
+  Docusaurus derives the slug from the heading text, so without it a link into the
+  heading breaks in that locale only.
 
 A change to the developer-facing files above follows the same rule in its own place:
 a new build step, test command, or pinned version belongs in `CONTRIBUTING.md` in the same
