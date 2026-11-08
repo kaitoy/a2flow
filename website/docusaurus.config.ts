@@ -43,10 +43,15 @@ const config: Config = {
 
   i18n: {
     defaultLocale: 'en',
-    locales: ['en', 'ja'],
+    // The same languages as the GUI (frontend/src/i18n/config.ts).
+    locales: ['en', 'ja', 'es', 'zh-CN', 'ko', 'fr'],
     localeConfigs: {
       en: {label: 'English'},
       ja: {label: '日本語'},
+      es: {label: 'Español'},
+      'zh-CN': {label: '简体中文'},
+      ko: {label: '한국어'},
+      fr: {label: 'Français'},
     },
   },
 
@@ -91,7 +96,10 @@ const config: Config = {
         hashed: true,
         indexBlog: false,
         docsRouteBasePath: '/docs',
-        language: ['en', 'ja'],
+        // No 'zh', although zh-CN is a locale: it applies to every locale, and its
+        // tokenizer keeps only ASCII words and Han, which empties Korean search and
+        // breaks Japanese kana. The 'ja' tokenizer segments Han well enough for zh-CN.
+        language: ['en', 'ja', 'es', 'ko', 'fr'],
         highlightSearchTermsOnTargetPage: true,
       },
     ],
