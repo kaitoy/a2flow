@@ -1,24 +1,26 @@
-"""Derive the Japanese manual diagrams from the English diagram-design sources.
+"""Derive the translated manual diagrams from the English diagram-design sources.
 
-Every diagram under ``website/diagram-sources/<section>/`` has a Japanese twin under
-``website/diagram-sources/ja/<section>/`` and a light/dark SVG pair under
-``website/i18n/ja/docusaurus-plugin-content-docs/current/<section>/img/``. Rather than
+Every diagram under ``website/diagram-sources/<section>/`` has a translated twin under
+``website/diagram-sources/<locale>/<section>/`` and a light/dark SVG pair under
+``website/i18n/<locale>/docusaurus-plugin-content-docs/current/<section>/img/``. Rather than
 hand-editing those, this script rebuilds them from the English light HTML:
 
-1. apply the exact-string replacements listed for the diagram in ``specs.py``
+1. apply the exact-string replacements listed for the diagram in ``specs/<locale>.py``
    (translated labels, widened edge-label masks, occasional box geometry);
-2. give every ``<text>`` that now contains CJK a Noto Sans JP fallback stack and a
-   12px floor, as diagram-design's CJK guidance requires;
+2. give every ``<text>`` that now contains CJK the locale's font stack and a 12px floor, as
+   diagram-design's CJK guidance requires (Latin labels keep the English styling);
 3. derive the dark HTML by re-applying the colour substitutions that turn the English
    light file into the English dark file (they differ only by colour tokens and the
    ``-dark`` suffix on the accessible-name ids);
 4. export both HTML files to standalone SVGs the way diagram-design's ``export.md`` does.
 
-Run it from anywhere, with no arguments to rebuild every diagram in ``specs.py`` or with
-``<section>/<name>`` arguments to rebuild a subset::
+Run it from anywhere, with no arguments to rebuild every diagram of every locale, with
+``--locale`` to limit it to one locale, or with ``<section>/<name>`` arguments to rebuild a
+subset::
 
-    python website/scripts/ja-diagrams/render.py
-    python website/scripts/ja-diagrams/render.py guides/secrets-usage
+    python website/scripts/diagrams/render.py
+    python website/scripts/diagrams/render.py --locale es
+    python website/scripts/diagrams/render.py --locale es guides/secrets-usage
 
 It needs only the standard library. A rough text-fit report is printed per diagram; it
 estimates 1em per full-width glyph and flags labels that overrun their box or sit below
@@ -27,28 +29,66 @@ estimates 1em per full-width glyph and flags labels that overrun their box or si
 
 from __future__ import annotations
 
+import argparse
+import importlib
 import re
 import sys
 from pathlib import Path
-
-from specs import SPECS
+from typing import NamedTuple
 
 WEBSITE = Path(__file__).resolve().parents[2]
 EN_SRC = WEBSITE / "diagram-sources"
-JA_SRC = EN_SRC / "ja"
-JA_DOCS = WEBSITE / "i18n" / "ja" / "docusaurus-plugin-content-docs" / "current"
 
 COLOR = re.compile(r"#[0-9a-fA-F]{6}\b|rgba\([^)]*\)")
 TEXT = re.compile(r"<text\b([^>]*)>([^<]*)</text>")
-JP_SANS = "'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif"
-FONT_LINK_JA = "&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Sans+KR"
 FONT_IMPORT = (
     "@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1"
     "&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600"
-    "&amp;family=Noto+Sans+JP:wght@400;500;600"
+    "{extra}"
     "&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400"
     "&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');"
 )
+
+
+class Locale(NamedTuple):
+    """How one locale's diagrams differ from the English ones.
+
+    Attributes:
+        code: The Docusaurus locale, which also names its folders and ``<html lang>``.
+        sans: The font stack for labels containing CJK; empty for Latin-script locales,
+            whose labels keep the English styling.
+        web_font: The Google Fonts family the English sources do not load yet, if any.
+    """
+
+    code: str
+    sans: str = ""
+    web_font: str = ""
+
+    @property
+    def src(self) -> Path:
+        """The folder holding this locale's HTML sources."""
+        return EN_SRC / self.code
+
+    @property
+    def docs(self) -> Path:
+        """The translated docs folder the exported SVGs land in."""
+        return WEBSITE / "i18n" / self.code / "docusaurus-plugin-content-docs" / "current"
+
+    def specs(self) -> dict[str, list[tuple]]:
+        """Load this locale's ``SPECS`` from ``specs/<code>.py``."""
+        return importlib.import_module(f"specs.{self.code.replace('-', '_')}").SPECS
+
+
+LOCALES = {
+    locale.code: locale
+    for locale in (
+        Locale("ja", "'Inter', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif", "Noto+Sans+JP"),
+        Locale("zh-CN", "'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif", "Noto+Sans+SC"),
+        Locale("ko", "'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif"),
+        Locale("es"),
+        Locale("fr"),
+    )
+}
 
 ColorKey = tuple[str, str, str]
 
@@ -70,17 +110,24 @@ def has_cjk(text: str) -> bool:
     return any(ord(c) > 0x2E7F for c in text)
 
 
-def localize_text(match: re.Match[str]) -> str:
-    """Rewrite one ``<text>`` element for Japanese content.
+def localize_text(match: re.Match[str], sans: str) -> str:
+    """Rewrite one ``<text>`` element for CJK content.
 
-    Latin-only labels are returned unchanged. Labels containing CJK get the Noto Sans JP
+    Latin-only labels are returned unchanged. Labels containing CJK get the locale's
     fallback stack, lose ``letter-spacing`` (meaningless on full-width glyphs) and
-    ``font-style="italic"`` (Noto Sans JP has no italic face), and are raised to 12px.
+    ``font-style="italic"`` (the CJK faces have no italic), and are raised to 12px.
+
+    Args:
+        match: A :data:`TEXT` match.
+        sans: The locale's font stack.
+
+    Returns:
+        The rewritten element.
     """
     attrs, content = match.group(1), match.group(2)
     if not has_cjk(content):
         return match.group(0)
-    attrs = re.sub(r'font-family="[^"]*"', f'font-family="{JP_SANS}"', attrs)
+    attrs = re.sub(r'font-family="[^"]*"', f'font-family="{sans}"', attrs)
     attrs = re.sub(r'\s*letter-spacing="[^"]*"', "", attrs)
     attrs = re.sub(r'\s*font-style="italic"', "", attrs)
     size = re.search(r'font-size="([\d.]+)"', attrs)
@@ -89,26 +136,29 @@ def localize_text(match: re.Match[str]) -> str:
     return f"<text{attrs}>{content}</text>"
 
 
-def build_light(name: str) -> None:
-    """Write the Japanese light HTML for ``name`` from the English one and its spec.
+def build_light(locale: Locale, name: str, spec: list[tuple]) -> None:
+    """Write the translated light HTML for ``name`` from the English one and its spec.
 
     Args:
+        locale: The locale to build.
         name: Diagram id as ``<section>/<basename>``, e.g. ``guides/secrets-usage``.
+        spec: The diagram's replacements.
 
     Raises:
         AssertionError: If a spec's search string does not occur exactly as often as the
             spec says (once by default), which means the English source changed.
     """
     out = read(EN_SRC / f"{name}.html")
-    out = out.replace('<html lang="en">', '<html lang="ja">', 1)
-    out = out.replace("&family=Noto+Sans+KR", FONT_LINK_JA, 1)
-    for old, new, *rest in SPECS[name]:
+    out = out.replace('<html lang="en">', f'<html lang="{locale.code}">', 1)
+    if locale.web_font:
+        out = out.replace("&family=Noto+Sans+KR", f"&family={locale.web_font}:wght@400;500;600&family=Noto+Sans+KR", 1)
+    for old, new, *rest in spec:
         want = rest[0] if rest else 1
         found = out.count(old)
         assert found == want, f"{name}: {old!r} found {found} times, expected {want}"
         out = out.replace(old, new)
-    out = TEXT.sub(localize_text, out)
-    write(JA_SRC / f"{name}.html", out)
+    out = TEXT.sub(lambda match: localize_text(match, locale.sans), out)
+    write(locale.src / f"{name}.html", out)
 
 
 def color_keys(src: str) -> list[tuple[ColorKey, re.Match[str]]]:
@@ -139,10 +189,10 @@ def color_map(name: str) -> dict[ColorKey, str]:
     return mapping
 
 
-def build_dark(name: str) -> None:
-    """Write the Japanese dark HTML for ``name`` by recolouring the Japanese light HTML."""
+def build_dark(locale: Locale, name: str) -> None:
+    """Write the translated dark HTML for ``name`` by recolouring the translated light HTML."""
     mapping = color_map(name)
-    src = read(JA_SRC / f"{name}.html")
+    src = read(locale.src / f"{name}.html")
     pieces, pos = [], 0
     for key, match in color_keys(src):
         if key not in mapping:
@@ -157,10 +207,10 @@ def build_dark(name: str) -> None:
     base = ids.group(1)
     out = out.replace(f'aria-labelledby="{base}-title {base}-desc"', f'aria-labelledby="{base}-dark-title {base}-dark-desc"')
     out = out.replace(f'id="{base}-title"', f'id="{base}-dark-title"').replace(f'id="{base}-desc"', f'id="{base}-dark-desc"')
-    write(JA_SRC / f"{name}-dark.html", out)
+    write(locale.src / f"{name}-dark.html", out)
 
 
-def export_svg(html: Path, svg_out: Path) -> None:
+def export_svg(locale: Locale, html: Path, svg_out: Path) -> None:
     """Extract the first ``<svg>`` of ``html`` as a standalone SVG file.
 
     Follows diagram-design's ``references/export.md``: inject the Google Fonts ``@import``
@@ -172,7 +222,8 @@ def export_svg(html: Path, svg_out: Path) -> None:
     assert match, f"{html}: no <svg>"
     svg = match.group(0)
     assert 'xmlns="http://www.w3.org/2000/svg"' in svg and "viewBox=" in svg
-    style = f"<style>{FONT_IMPORT}</style>"
+    extra = f"&amp;family={locale.web_font}:wght@400;500;600" if locale.web_font else ""
+    style = f"<style>{FONT_IMPORT.format(extra=extra)}</style>"
     if "<defs>" in svg:
         svg = svg.replace("<defs>", f"<defs>{style}", 1)
     else:
@@ -188,11 +239,11 @@ def export_svg(html: Path, svg_out: Path) -> None:
     write(svg_out, '<?xml version="1.0" encoding="UTF-8"?>\n' + svg + "\n")
 
 
-def export_pair(name: str) -> None:
-    """Export the Japanese light and dark HTML of ``name`` to the i18n ``img/`` folder."""
+def export_pair(locale: Locale, name: str) -> None:
+    """Export the translated light and dark HTML of ``name`` to the i18n ``img/`` folder."""
     section, base = name.split("/")
     for suffix in ("", "-dark"):
-        export_svg(JA_SRC / f"{name}{suffix}.html", JA_DOCS / section / "img" / f"{base}{suffix}.svg")
+        export_svg(locale, locale.src / f"{name}{suffix}.html", locale.docs / section / "img" / f"{base}{suffix}.svg")
 
 
 def estimate_width(text: str, size: float, mono: bool) -> float:
@@ -212,9 +263,9 @@ def estimate_width(text: str, size: float, mono: bool) -> float:
     return total * size
 
 
-def check_fit(name: str) -> None:
-    """Print labels in the Japanese light HTML that look too wide for their box or too small."""
-    src = read(JA_SRC / f"{name}.html")
+def check_fit(locale: Locale, name: str) -> None:
+    """Print labels in the translated light HTML that look too wide for their box or too small."""
+    src = read(locale.src / f"{name}.html")
     rects = []
     for match in re.finditer(r"<rect\b([^>]*)/?>", src):
         attrs = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', match.group(1)))
@@ -243,16 +294,26 @@ def check_fit(name: str) -> None:
                     print(f"  OVERFLOW rect({rx:g},{ry:g},{rw:g}x{rh:g}) text [{left:.0f}..{right:.0f}] {text!r}")
                     problems += 1
                 break
-    print(f"{name}: {problems} fit issue(s)")
+    print(f"{locale.code} {name}: {problems} fit issue(s)")
 
 
-def main(names: list[str]) -> None:
-    """Rebuild the given diagrams (all of ``SPECS`` when empty)."""
-    for name in names or sorted(SPECS):
-        build_light(name)
-        check_fit(name)
-        build_dark(name)
-        export_pair(name)
+def main(argv: list[str]) -> None:
+    """Rebuild the requested diagrams.
+
+    Args:
+        argv: The command-line arguments; see the module docstring.
+    """
+    parser = argparse.ArgumentParser(description="Derive the translated manual diagrams.")
+    parser.add_argument("--locale", choices=sorted(LOCALES), help="only this locale (default: all)")
+    parser.add_argument("names", nargs="*", help="only these <section>/<name> diagrams (default: all)")
+    args = parser.parse_args(argv)
+    for locale in [LOCALES[args.locale]] if args.locale else LOCALES.values():
+        specs = locale.specs()
+        for name in args.names or sorted(specs):
+            build_light(locale, name, specs[name])
+            check_fit(locale, name)
+            build_dark(locale, name)
+            export_pair(locale, name)
 
 
 if __name__ == "__main__":
