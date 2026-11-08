@@ -1,0 +1,77 @@
+---
+title: Introduction
+description: A2Flow est un moteur de workflow reconstruit de fond en comble autour d'un agent IA — l'agent ne se trouve pas dans le workflow, il est le workflow.
+slug: /intro
+sidebar_position: 1
+hide_title: true
+hide_table_of_contents: true
+---
+
+import {IntroPage, IntroHero, IntroContrast, IntroPanel, IntroActs, IntroAct, IntroClosing, IntroNext} from '@site/src/components/IntroSections';
+
+<IntroPage>
+
+<IntroHero
+  eyebrow="AI Agent as a Workflow"
+  title={<>Le moteur de workflow <span className="grad">est l'agent</span>.</>}>
+
+A2Flow est un moteur de workflow conversationnel, reconstruit de fond en comble autour d'un agent IA. Ce n'est pas un moteur auquel on aurait greffé une étape d'IA, mais un moteur dont l'environnement d'exécution *est* un agent. Il planifie le travail, interroge les personnes qui doivent décider et se charge lui-même du reste. Le plan qu'il établit est conservé sous forme de workflow et réexécuté : la souplesse d'une session de discussion, avec la répétabilité d'une procédure.
+
+</IntroHero>
+
+<IntroContrast>
+
+<IntroPanel kind="past" title="Un agent dans un workflow">
+
+L'organigramme est le programme, et quelque part s'y trouve une case intitulée « IA ». Elle remplit un champ, rédige un résumé, classe un ticket. Puis le contrôle revient au schéma que quelqu'un a dessiné l'an dernier, et le reste du processus se déroule comme il l'a toujours fait.
+
+</IntroPanel>
+
+<IntroPanel kind="next" title="L'agent est le workflow">
+
+Il n'y a plus de schéma vers lequel revenir. L'agent lit la procédure, planifie les étapes, associe les outils, demande les approbations et exécute. Un workflow n'est pas une chose à laquelle l'agent participe. C'est ce que fait l'agent.
+
+</IntroPanel>
+
+</IntroContrast>
+
+<IntroActs>
+
+<IntroAct step="01 — Conception" icon="design" title="Conçu par la conversation, pas sur un canevas">
+
+Vous partez d'une [compétence d'agent](./guides/agent-skills.md) : un fichier `SKILL.md` dans un dépôt Git, versionné et relu comme n'importe quel autre code. Ensuite, vous discutez avec l'IA. Elle ébauche le graphe de tâches, vous l'ajustez, et les [outils MCP](./guides/mcp-servers.md) nécessaires à chaque étape sont associés au fur et à mesure. Ce que vous [publiez](./guides/workflows.md), c'est le plan de l'agent lui-même, conservé : un workflow que personne n'a eu à dessiner, et que chaque exécution suit de la même façon.
+
+</IntroAct>
+
+<IntroAct step="02 — Exécution" icon="run" title="Une exécution est une conversation à plusieurs">
+
+Exécuter un workflow ouvre une seule discussion partagée. Le demandeur énonce son intention, l'agent parcourt le graphe de tâches et l'approbateur décide sur place, dans le même fil, avec un commentaire. Pas de file de tickets, pas de canal parallèle, pas de « où en est ma demande ? »
+
+</IntroAct>
+
+<IntroAct step="03 — Contrôle" icon="control" title="Chaque appel d'outil porte une autorisation signée">
+
+Une [approbation](./guides/approvals.md) n'est pas un conseil que l'agent est prié de suivre. Chaque tâche qui appelle un outil détient un certificat X.509 de courte durée couvrant exactement les outils qu'elle détenait au moment de son émission, et la passerelle MCP refuse tout appel qui n'en présente pas un, signé. C'est l'approbation d'une tâche qui inscrit le nom d'un approbateur sur son certificat ; une tâche pour laquelle personne n'a été sollicité porte l'autorité de la personne qui a lancé l'exécution. Une injection de prompt ne peut contourner ni l'un ni l'autre à force de persuasion, et l'agent ne peut pas les élargir après coup. Chaque appel, autorisé ou refusé, est enregistré avec le numéro de série du certificat et les octets exacts signés pour lui.
+
+</IntroAct>
+
+</IntroActs>
+
+<IntroClosing headline={<>Planifier. Approuver. Exécuter.</>}>
+
+Les trois choses dont un workflow a toujours été réellement fait. A2Flow les conserve et confie à l'agent tout ce qui se trouve entre les deux : une procédure opérationnelle standard que vous menez à bien avec l'IA.
+
+</IntroClosing>
+
+<IntroNext title="Pour aller plus loin">
+
+- **[Démarrage rapide](./getting-started/quick-start.md)** — faites tourner le backend et le frontend sur votre machine.
+- **[Terminologie](./concepts/terminology.md)** — workflows, sessions de conception, exécutions et sessions du workflow.
+- **[Compétences d'agent](./guides/agent-skills.md)** — les procédures versionnées dans Git à partir desquelles un workflow est conçu.
+- **[Workflows](./guides/workflows.md)** — générez un workflow à partir d'une compétence, ajustez-le, publiez-le, exécutez-le.
+- **[Approbations](./guides/approvals.md)** — comment une exécution s'arrête pour attendre une personne, et ce qu'un certificat autorise.
+- **[Référence de configuration](./operations/configuration.md)** — toutes les variables d'environnement que lit le backend.
+
+</IntroNext>
+
+</IntroPage>

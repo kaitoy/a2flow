@@ -1,0 +1,664 @@
+{
+  "home.meta.title": {
+    "message": "L'agent comme workflow"
+  },
+  "home.meta.description": {
+    "message": "A2Flow est un moteur de workflow conversationnel. Il reconstruit les workflows de type ITSM autour d'un agent IA : celui-ci planifie le travail sous forme de graphe de tâches, s'interrompt pour les personnes qui doivent donner leur accord et exécute le reste. Le plan est conservé sous forme de workflow : la prochaine exécution suit donc les mêmes étapes."
+  },
+  "home.nav.concept": {
+    "message": "Concept"
+  },
+  "home.nav.how": {
+    "message": "Fonctionnement"
+  },
+  "home.nav.features": {
+    "message": "Fonctionnalités"
+  },
+  "home.nav.architecture": {
+    "message": "Architecture"
+  },
+  "home.hero.eyebrow": {
+    "message": "Agent as Workflow"
+  },
+  "home.hero.title": {
+    "message": "Le moteur de workflow{br}est désormais {agent}."
+  },
+  "home.hero.title.agent": {
+    "message": "un agent"
+  },
+  "home.hero.sub": {
+    "message": "A2Flow est un moteur de workflow conversationnel. Il reconstruit les workflows de type ITSM (demandes de service, mise en œuvre de changements, annonces) autour d'un agent IA : celui-ci planifie le travail sous forme de graphe de tâches, s'interrompt pour les personnes qui doivent donner leur accord et exécute le reste. Le plan est conservé sous forme de workflow : la prochaine exécution suit donc les mêmes étapes."
+  },
+  "home.hero.cta.github": {
+    "message": "Voir sur GitHub"
+  },
+  "home.hero.cta.how": {
+    "message": "Découvrir le fonctionnement"
+  },
+  "home.hero.demoCaption": {
+    "message": "Deux discussions, un workflow : conçu avec l'agent, puis exécuté dans sa propre session, formulaires et approbations compris."
+  },
+  "home.concept.eyebrow": {
+    "message": "Le concept"
+  },
+  "home.concept.title": {
+    "message": "Les workflows ITSM, {reimagined}"
+  },
+  "home.concept.title.reimagined": {
+    "message": "réinventés"
+  },
+  "home.concept.lead": {
+    "message": "Les moteurs de workflow classiques sont reproductibles mais rigides : formulaires figés, files de tickets, passages de relais entre personnes et, surtout, beaucoup d'attente. Une discussion avec un agent IA, c'est l'inverse : elle est souple, mais le plan établi disparaît à la fin de la session, et personne ne l'a validé. A2Flow garde la procédure et les approbations des premiers, la conversation de la seconde, et confie à l'agent tout ce qui se trouve entre les deux."
+  },
+  "home.concept.past.title": {
+    "message": "Le circuit de tickets"
+  },
+  "home.concept.past.sub": {
+    "message": "Le processus comme logiciel : reproductible mais rigide, avec des formulaires et des états figés, et des humains pour faire le lien."
+  },
+  "home.concept.past.form": {
+    "message": "Remplir le formulaire"
+  },
+  "home.concept.past.form.note": {
+    "message": "Un champ erroné, et tout vous revient."
+  },
+  "home.concept.past.queue": {
+    "message": "Attendre son tour"
+  },
+  "home.concept.past.queue.note": {
+    "message": "Votre demande est en 14e position."
+  },
+  "home.concept.past.handoff": {
+    "message": "Passer le relais entre équipes"
+  },
+  "home.concept.past.handoff.note": {
+    "message": "Le contexte se perd à chaque étape."
+  },
+  "home.concept.past.chase": {
+    "message": "Relancer pour avoir des nouvelles"
+  },
+  "home.concept.past.chase.note": {
+    "message": "« Du nouveau sur mon ticket ? »"
+  },
+  "home.concept.chat.title": {
+    "message": "La session de discussion IA"
+  },
+  "home.concept.chat.sub": {
+    "message": "Le processus comme improvisation : souple, mais jamais deux fois pareil."
+  },
+  "home.concept.chat.ask": {
+    "message": "Demander à l'agent dans la discussion"
+  },
+  "home.concept.chat.ask.note": {
+    "message": "Pas de formulaire, formulation libre."
+  },
+  "home.concept.chat.plan": {
+    "message": "L'agent planifie et agit"
+  },
+  "home.concept.chat.plan.note": {
+    "message": "Un nouveau plan à chaque fois, et chaque fois un peu différent."
+  },
+  "home.concept.chat.gate": {
+    "message": "Aucun contrôle par un approbateur"
+  },
+  "home.concept.chat.gate.note": {
+    "message": "Celui qui discute décide. Personne d'autre ne le voit."
+  },
+  "home.concept.chat.gone": {
+    "message": "Session terminée, plan disparu"
+  },
+  "home.concept.chat.gone.note": {
+    "message": "La demande suivante repart de zéro."
+  },
+  "home.concept.next.title": {
+    "message": "Le workflow conversationnel"
+  },
+  "home.concept.next.sub": {
+    "message": "Un mode opératoire que vous déroulez avec l'IA : aussi souple qu'une discussion, aussi reproductible qu'une procédure."
+  },
+  "home.concept.next.intent": {
+    "message": "Décrire votre intention dans la discussion"
+  },
+  "home.concept.next.intent.note": {
+    "message": "Pas de formulaire. La compétence sait quoi demander."
+  },
+  "home.concept.next.plan": {
+    "message": "Le plan est conservé sous forme de workflow"
+  },
+  "home.concept.next.plan.note": {
+    "message": "Le graphe de tâches que l'agent a rédigé à partir de la compétence : publié une fois, exécuté aussi souvent que nécessaire."
+  },
+  "home.concept.next.approve": {
+    "message": "Les humains approuvent les moments décisifs"
+  },
+  "home.concept.next.approve.note": {
+    "message": "La publication de la conception et chaque appel d'outil qui modifie quelque chose."
+  },
+  "home.concept.next.execute": {
+    "message": "L'agent exécute et vérifie"
+  },
+  "home.concept.next.execute.note": {
+    "message": "La progression en direct, dans la même conversation."
+  },
+  "home.concept.note": {
+    "message": "La procédure elle-même n'est pas du code enfermé dans un moteur de workflow. C'est une {skill} : versionnée, ouverte à la relecture et lisible par toute l'équipe."
+  },
+  "home.concept.note.skill": {
+    "message": "compétence d'agent, un fichier {file} dans un dépôt Git"
+  },
+  "home.how.eyebrow": {
+    "message": "Fonctionnement"
+  },
+  "home.how.title": {
+    "message": "Planifier. Approuver. {execute}"
+  },
+  "home.how.title.execute": {
+    "message": "Exécuter."
+  },
+  "home.how.lead": {
+    "message": "Chaque exécution franchit les deux mêmes barrières : rien ne s'exécute tant qu'un humain n'a pas publié la conception, et aucun appel d'outil qui modifie quelque chose ne passe tant que l'approbateur désigné n'a pas donné son accord."
+  },
+  "home.how.step1.label": {
+    "message": "ÉTAPE 1 — PLANIFIER"
+  },
+  "home.how.step1.title": {
+    "message": "L'agent transforme l'intention en graphe de tâches"
+  },
+  "home.how.step1.body": {
+    "message": "Dans une session de conception, il lit la compétence d'agent, décompose votre prompt en modèles de tâches aux dépendances explicites et enregistre tout le DAG en un seul appel, détection des cycles comprise. Ajustez-le dans la discussion ou à la main : rien ne s'exécute encore."
+  },
+  "home.how.step2.label": {
+    "message": "ÉTAPE 2 — APPROUVER"
+  },
+  "home.how.step2.title": {
+    "message": "Les humains gardent la main sur les moments décisifs"
+  },
+  "home.how.step2.body": {
+    "message": "Publier le workflow vaut approbation du plan : une exécution en part sans rien à confirmer. Les appels d'outils qui modifient quelque chose sont soumis à un {approver} : les commandes Approuver / Rejeter / Renvoyer s'affichent directement dans la discussion, avec la liste exacte des appels qu'elles autorisent, et seule cette personne peut statuer ; toute autre personne reçoit un {forbidden}."
+  },
+  "home.how.step2.body.approver": {
+    "message": "approbateur désigné"
+  },
+  "home.how.step3.label": {
+    "message": "ÉTAPE 3 — EXÉCUTER"
+  },
+  "home.how.step3.title": {
+    "message": "L'agent parcourt le graphe"
+  },
+  "home.how.step3.body": {
+    "message": "Appuyez sur Exécuter et l'agent démarre aussitôt dans la session du workflow propre à l'exécution. Les tâches passent par {statuses} dans l'ordre des dépendances, en n'appelant que les outils MCP liés à la tâche en cours, et l'agent pose ses questions au moyen de formulaires affichés directement dans la discussion."
+  },
+  "home.teams.eyebrow": {
+    "message": "Conçu pour les équipes"
+  },
+  "home.teams.title": {
+    "message": "Trois rôles, {conversation}"
+  },
+  "home.teams.title.conversation": {
+    "message": "une seule conversation"
+  },
+  "home.teams.lead": {
+    "message": "Une session du workflow est une discussion partagée. Le demandeur, l'approbateur et l'agent publient tous dans le même fil : pas de canaux parallèles, pas de « du nouveau sur mon ticket ? »"
+  },
+  "home.teams.applicant.title": {
+    "message": "Le demandeur"
+  },
+  "home.teams.applicant.body": {
+    "message": "Exécute un workflow publié. Répond aux questions de l'agent, dans les formulaires que celui-ci affiche dans la discussion, et suit la progression des tâches dans le même fil."
+  },
+  "home.teams.approver.title": {
+    "message": "L'approbateur"
+  },
+  "home.teams.approver.body": {
+    "message": "Reçoit une notification, ouvre la session et décide directement dans la discussion, avec un commentaire. Seul l'approbateur désigné peut statuer sur une approbation."
+  },
+  "home.teams.agent.title": {
+    "message": "L'agent"
+  },
+  "home.teams.agent.body": {
+    "message": "Planifie le graphe de tâches, demande les approbations au bon moment, exécute chaque étape selon la compétence et rend compte de sa progression au fur et à mesure."
+  },
+  "home.teams.trust.notifications.title": {
+    "message": "Des notifications qui vous mènent à la décision"
+  },
+  "home.teams.trust.notifications.body": {
+    "message": "Les demandes d'approbation et les fins de session arrivent dans la cloche de notifications de chaque utilisateur et renvoient directement vers la conversation concernée."
+  },
+  "home.teams.trust.audit.title": {
+    "message": "Une piste d'audit pour chaque approbation"
+  },
+  "home.teams.trust.audit.body": {
+    "message": "Qui a approuvé, ce qui a été écrit et à quel moment précis : tout est conservé dans l'enregistrement de l'approbation et consultable dans la interface d'administration."
+  },
+  "home.features.eyebrow": {
+    "message": "Fonctionnalités"
+  },
+  "home.features.title": {
+    "message": "Tout ce qu'il faut à un workflow, {nothing}"
+  },
+  "home.features.title.nothing": {
+    "message": "rien de superflu"
+  },
+  "home.features.skills.title": {
+    "message": "Des compétences d'agent dans Git"
+  },
+  "home.features.skills.body": {
+    "message": "Les procédures sont des fichiers {file} dans des dépôts Git, clonés à la première exécution. Versionnez-les, passez-les en revue, lisez-les, comme n'importe quel autre code."
+  },
+  "home.features.graph.title": {
+    "message": "Un plan que l'on peut réexécuter"
+  },
+  "home.features.graph.body": {
+    "message": "Le graphe de tâches que l'agent rédige à partir d'une compétence est publié sous forme de workflow : un vrai DAG, dépendances respectées et cycles rejetés. Chaque exécution parcourt le même graphe, affiché sous forme de tableau triable ou de graphe à disposition automatique, mis à jour au fil du travail de l'agent."
+  },
+  "home.features.gates.title": {
+    "message": "Des barrières d'approbation en cours d'exécution"
+  },
+  "home.features.gates.body": {
+    "message": "Avant une étape destructive, l'agent demande l'approbation d'un utilisateur précis et se met en pause. Les boutons Approuver / Rejeter / Renvoyer apparaissent dans la discussion, pour cet utilisateur seulement."
+  },
+  "home.features.mcp.title": {
+    "message": "Des outils MCP limités à chaque tâche"
+  },
+  "home.features.mcp.body": {
+    "message": "Enregistrez des serveurs MCP : au moment de la planification, l'agent ne lie que les outils nécessaires à chaque tâche. À l'exécution, une tâche ne peut appeler que ses propres outils, et chaque serveur lancé par A2Flow s'exécute dans son propre bac à sable bubblewrap."
+  },
+  "home.features.a2ui.title": {
+    "message": "Une interface riche dans la discussion"
+  },
+  "home.features.a2ui.body": {
+    "message": "Grâce au protocole A2UI, l'agent affiche boutons, formulaires et cartes directement dans le fil, et vos clics reviennent dans l'exécution sous forme de résultats d'outils."
+  },
+  "home.features.llm.title": {
+    "message": "Apportez votre propre LLM"
+  },
+  "home.features.llm.body": {
+    "message": "Gemini par défaut ; les modèles OpenAI et Anthropic via LiteLLM. Changer de fournisseur ne demande qu'une variable d'environnement."
+  },
+  "home.architecture.eyebrow": {
+    "message": "Sous le capot"
+  },
+  "home.architecture.title": {
+    "message": "Une {stack} aux protocoles ouverts"
+  },
+  "home.architecture.title.stack": {
+    "message": "pile technique"
+  },
+  "home.architecture.lead": {
+    "message": "L'interface de discussion reçoit en flux les événements AG-UI d'un backend FastAPI, et l'agent affiche des surfaces A2UI dans la discussion. Les compétences d'agent viennent de Git, les outils de serveurs MCP, et une seule base de données relationnelle conserve le tout."
+  },
+  "home.cta.eyebrow": {
+    "message": "Démarrer"
+  },
+  "home.cta.title": {
+    "message": "Lancez-le {machine}"
+  },
+  "home.cta.title.machine": {
+    "message": "sur votre machine"
+  },
+  "home.cta.lead": {
+    "message": "Toute la pile (PostgreSQL, backend, frontend) démarre avec Docker Compose. Munissez-vous d'une clé d'API Google : vous êtes à deux commandes de votre premier workflow."
+  },
+  "theme.ErrorPageContent.title": {
+    "message": "Cette page a planté.",
+    "description": "The title of the fallback page when the page crashed"
+  },
+  "theme.BackToTopButton.buttonAriaLabel": {
+    "message": "Retour au début de la page",
+    "description": "The ARIA label for the back to top button"
+  },
+  "theme.blog.archive.title": {
+    "message": "Archive",
+    "description": "The page & hero title of the blog archive page"
+  },
+  "theme.blog.archive.description": {
+    "message": "Archive",
+    "description": "The page & hero description of the blog archive page"
+  },
+  "theme.blog.paginator.navAriaLabel": {
+    "message": "Pagination de la liste des articles du blog",
+    "description": "The ARIA label for the blog pagination"
+  },
+  "theme.blog.paginator.newerEntries": {
+    "message": "Nouvelles entrées",
+    "description": "The label used to navigate to the newer blog posts page (previous page)"
+  },
+  "theme.blog.paginator.olderEntries": {
+    "message": "Anciennes entrées",
+    "description": "The label used to navigate to the older blog posts page (next page)"
+  },
+  "theme.blog.post.paginator.navAriaLabel": {
+    "message": "Pagination des articles du blog",
+    "description": "The ARIA label for the blog posts pagination"
+  },
+  "theme.blog.post.paginator.newerPost": {
+    "message": "Article plus récent",
+    "description": "The blog post button label to navigate to the newer/previous post"
+  },
+  "theme.blog.post.paginator.olderPost": {
+    "message": "Article plus ancien",
+    "description": "The blog post button label to navigate to the older/next post"
+  },
+  "theme.tags.tagsPageLink": {
+    "message": "Voir toutes les étiquettes",
+    "description": "The label of the link targeting the tag list page"
+  },
+  "theme.colorToggle.ariaLabel.mode.system": {
+    "message": "mode système",
+    "description": "The name for the system color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.light": {
+    "message": "mode clair",
+    "description": "The name for the light color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.dark": {
+    "message": "mode sombre",
+    "description": "The name for the dark color mode"
+  },
+  "theme.colorToggle.ariaLabel": {
+    "message": "Basculer entre le mode sombre et clair (actuellement {mode})",
+    "description": "The ARIA label for the color mode toggle"
+  },
+  "theme.docs.breadcrumbs.navAriaLabel": {
+    "message": "Fil d'Ariane",
+    "description": "The ARIA label for the breadcrumbs"
+  },
+  "theme.docs.paginator.navAriaLabel": {
+    "message": "Pages de documentation",
+    "description": "The ARIA label for the docs pagination"
+  },
+  "theme.docs.paginator.previous": {
+    "message": "Précédent",
+    "description": "The label used to navigate to the previous doc"
+  },
+  "theme.docs.paginator.next": {
+    "message": "Suivant",
+    "description": "The label used to navigate to the next doc"
+  },
+  "theme.docs.tagDocListPageTitle.nDocsTagged": {
+    "message": "Un document étiqueté|{count} documents étiquetés",
+    "description": "Pluralized label for \"{count} docs tagged\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.docs.tagDocListPageTitle": {
+    "message": "{nDocsTagged} « {tagName} »",
+    "description": "The title of the page for a docs tag"
+  },
+  "theme.docs.versionBadge.label": {
+    "message": "Version : {versionLabel}"
+  },
+  "theme.docs.versions.unreleasedVersionLabel": {
+    "message": "Ceci est la documentation de la prochaine version {versionLabel} de {siteTitle}.",
+    "description": "The label used to tell the user that he's browsing an unreleased doc version"
+  },
+  "theme.docs.versions.unmaintainedVersionLabel": {
+    "message": "Ceci est la documentation de {siteTitle} {versionLabel}, qui n'est plus activement maintenue.",
+    "description": "The label used to tell the user that he's browsing an unmaintained doc version"
+  },
+  "theme.docs.versions.latestVersionSuggestionLabel": {
+    "message": "Pour une documentation à jour, consultez la {latestVersionLink} ({versionLabel}).",
+    "description": "The label used to tell the user to check the latest version"
+  },
+  "theme.docs.versions.latestVersionLinkLabel": {
+    "message": "dernière version",
+    "description": "The label used for the latest version suggestion link label"
+  },
+  "theme.common.editThisPage": {
+    "message": "Éditer cette page",
+    "description": "The link label to edit the current page"
+  },
+  "theme.common.headingLinkTitle": {
+    "message": "Lien direct vers {heading}",
+    "description": "Title for link to heading"
+  },
+  "theme.lastUpdated.atDate": {
+    "message": " le {date}",
+    "description": "The words used to describe on which date a page has been last updated"
+  },
+  "theme.lastUpdated.byUser": {
+    "message": " par {user}",
+    "description": "The words used to describe by who the page has been last updated"
+  },
+  "theme.lastUpdated.lastUpdatedAtBy": {
+    "message": "Dernière mise à jour{atDate}{byUser}",
+    "description": "The sentence used to display when a page has been last updated, and by who"
+  },
+  "theme.navbar.mobileVersionsDropdown.label": {
+    "message": "Versions",
+    "description": "The label for the navbar versions dropdown on mobile view"
+  },
+  "theme.NotFound.title": {
+    "message": "Page introuvable",
+    "description": "The title of the 404 page"
+  },
+  "theme.tags.tagsListLabel": {
+    "message": "Étiquettes :",
+    "description": "The label alongside a tag list"
+  },
+  "theme.AnnouncementBar.closeButtonAriaLabel": {
+    "message": "Fermer",
+    "description": "The ARIA label for close button of announcement bar"
+  },
+  "theme.admonition.caution": {
+    "message": "attention",
+    "description": "The default label used for the Caution admonition (:::caution)"
+  },
+  "theme.admonition.danger": {
+    "message": "danger",
+    "description": "The default label used for the Danger admonition (:::danger)"
+  },
+  "theme.admonition.info": {
+    "message": "info",
+    "description": "The default label used for the Info admonition (:::info)"
+  },
+  "theme.admonition.note": {
+    "message": "remarque",
+    "description": "The default label used for the Note admonition (:::note)"
+  },
+  "theme.admonition.tip": {
+    "message": "astuce",
+    "description": "The default label used for the Tip admonition (:::tip)"
+  },
+  "theme.admonition.warning": {
+    "message": "attention",
+    "description": "The default label used for the Warning admonition (:::warning)"
+  },
+  "theme.blog.sidebar.navAriaLabel": {
+    "message": "Navigation article de blog récent",
+    "description": "The ARIA label for recent posts in the blog sidebar"
+  },
+  "theme.DocSidebarItem.expandCategoryAriaLabel": {
+    "message": "Développer la catégorie « {label} » de la barre latérale",
+    "description": "The ARIA label to expand the sidebar category"
+  },
+  "theme.DocSidebarItem.collapseCategoryAriaLabel": {
+    "message": "Réduire la catégorie « {label} » de la barre latérale",
+    "description": "The ARIA label to collapse the sidebar category"
+  },
+  "theme.IconExternalLink.ariaLabel": {
+    "message": "(s'ouvre dans un nouvel onglet)",
+    "description": "The ARIA label for the external link icon"
+  },
+  "theme.NavBar.navAriaLabel": {
+    "message": "Principale",
+    "description": "The ARIA label for the main navigation"
+  },
+  "theme.navbar.mobileLanguageDropdown.label": {
+    "message": "Langues",
+    "description": "The label for the mobile language switcher dropdown"
+  },
+  "theme.TOCCollapsible.toggleButtonLabel": {
+    "message": "Sur cette page",
+    "description": "The label used by the button on the collapsible TOC component"
+  },
+  "theme.NotFound.p1": {
+    "message": "Nous n'avons pas trouvé ce que vous recherchez.",
+    "description": "The first paragraph of the 404 page"
+  },
+  "theme.NotFound.p2": {
+    "message": "Veuillez contacter le propriétaire du site qui vous a dirigé vers cette URL et lui signaler que son lien est rompu.",
+    "description": "The 2nd paragraph of the 404 page"
+  },
+  "theme.blog.post.readMore": {
+    "message": "Lire plus",
+    "description": "The label used in blog post item excerpts to link to full blog posts"
+  },
+  "theme.blog.post.readMoreLabel": {
+    "message": "En savoir plus sur {title}",
+    "description": "The ARIA label for the link to full blog posts from excerpts"
+  },
+  "theme.blog.post.readingTime.plurals": {
+    "message": "Une minute de lecture|{readingTime} minutes de lecture",
+    "description": "Pluralized label for \"{readingTime} min read\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.CodeBlock.copy": {
+    "message": "Copier",
+    "description": "The copy button label on code blocks"
+  },
+  "theme.CodeBlock.copied": {
+    "message": "Copié",
+    "description": "The copied button label on code blocks"
+  },
+  "theme.CodeBlock.copyButtonAriaLabel": {
+    "message": "Copier le code",
+    "description": "The ARIA label for copy code blocks button"
+  },
+  "theme.CodeBlock.wordWrapToggle": {
+    "message": "Activer/désactiver le retour à la ligne",
+    "description": "The title attribute for toggle word wrapping button of code block lines"
+  },
+  "theme.docs.breadcrumbs.home": {
+    "message": "Page d'accueil",
+    "description": "The ARIA label for the home page in the breadcrumbs"
+  },
+  "theme.docs.sidebar.collapseButtonTitle": {
+    "message": "Réduire le menu latéral",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.collapseButtonAriaLabel": {
+    "message": "Réduire le menu latéral",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.navAriaLabel": {
+    "message": "Barre latérale de la documentation",
+    "description": "The ARIA label for the sidebar navigation"
+  },
+  "theme.docs.sidebar.closeSidebarButtonAriaLabel": {
+    "message": "Fermer la barre de navigation",
+    "description": "The ARIA label for close button of mobile sidebar"
+  },
+  "theme.navbar.mobileSidebarSecondaryMenu.backButtonLabel": {
+    "message": "← Retour au menu principal",
+    "description": "The label of the back button to return to main menu, inside the mobile navbar sidebar secondary menu (notably used to display the docs sidebar)"
+  },
+  "theme.docs.sidebar.toggleSidebarButtonAriaLabel": {
+    "message": "Ouvrir/fermer la barre de navigation",
+    "description": "The ARIA label for hamburger menu button of mobile navigation"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.expandAriaLabel": {
+    "message": "Développer le menu déroulant",
+    "description": "The ARIA label of the button to expand the mobile dropdown navbar item"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.collapseAriaLabel": {
+    "message": "Réduire le menu déroulant",
+    "description": "The ARIA label of the button to collapse the mobile dropdown navbar item"
+  },
+  "theme.docs.sidebar.expandButtonTitle": {
+    "message": "Déplier le menu latéral",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.docs.sidebar.expandButtonAriaLabel": {
+    "message": "Déplier le menu latéral",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.SearchBar.noResultsText": {
+    "message": "Aucun résultat"
+  },
+  "theme.SearchBar.seeAllOutsideContext": {
+    "message": "Voir tous les résultats hors de « {context} »"
+  },
+  "theme.SearchBar.searchInContext": {
+    "message": "Voir tous les résultats dans « {context} »"
+  },
+  "theme.SearchBar.seeAll": {
+    "message": "Voir tous les résultats"
+  },
+  "theme.SearchBar.label": {
+    "message": "Rechercher",
+    "description": "The ARIA label and placeholder for search button"
+  },
+  "theme.SearchPage.existingResultsTitle": {
+    "message": "Résultats de recherche pour « {query} »",
+    "description": "The search page title for non-empty query"
+  },
+  "theme.SearchPage.emptyResultsTitle": {
+    "message": "Rechercher dans la documentation",
+    "description": "The search page title for empty query"
+  },
+  "theme.SearchPage.searchContext.everywhere": {
+    "message": "Partout"
+  },
+  "theme.SearchPage.documentsFound.plurals": {
+    "message": "1 document trouvé|{count} documents trouvés",
+    "description": "Pluralized label for \"{count} documents found\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.SearchPage.noResultsText": {
+    "message": "Aucun document trouvé",
+    "description": "The paragraph for empty search result"
+  },
+  "theme.blog.post.plurals": {
+    "message": "Un article|{count} articles",
+    "description": "Pluralized label for \"{count} posts\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.tagTitle": {
+    "message": "{nPosts} avec l'étiquette « {tagName} »",
+    "description": "The title of the page for a blog tag"
+  },
+  "theme.blog.author.pageTitle": {
+    "message": "{authorName} - {nPosts}",
+    "description": "The title of the page for a blog author"
+  },
+  "theme.blog.authorsList.pageTitle": {
+    "message": "Auteurs",
+    "description": "The title of the authors page"
+  },
+  "theme.blog.authorsList.viewAll": {
+    "message": "Voir tous les auteurs",
+    "description": "The label of the link targeting the blog authors page"
+  },
+  "theme.blog.author.noPosts": {
+    "message": "Cet auteur n'a encore publié aucun article.",
+    "description": "The text for authors with 0 blog post"
+  },
+  "theme.contentVisibility.unlistedBanner.title": {
+    "message": "Page non répertoriée",
+    "description": "The unlisted content banner title"
+  },
+  "theme.contentVisibility.unlistedBanner.message": {
+    "message": "Cette page n'est pas répertoriée. Les moteurs de recherche ne l'indexeront pas, et seuls les utilisateurs ayant un lien direct peuvent y accéder.",
+    "description": "The unlisted content banner message"
+  },
+  "theme.contentVisibility.draftBanner.title": {
+    "message": "Page en brouillon",
+    "description": "The draft content banner title"
+  },
+  "theme.contentVisibility.draftBanner.message": {
+    "message": "Cette page est un brouillon. Elle n'est visible qu'en environnement de développement et sera exclue du build de production.",
+    "description": "The draft content banner message"
+  },
+  "theme.docs.DocCard.categoryDescription.plurals": {
+    "message": "1 élément|{count} éléments",
+    "description": "The default description for a category card in the generated index about how many items this category includes"
+  },
+  "theme.ErrorPageContent.tryAgain": {
+    "message": "Réessayer",
+    "description": "The label of the button to try again rendering when the React error boundary captures an error"
+  },
+  "theme.common.skipToMainContent": {
+    "message": "Aller au contenu principal",
+    "description": "The skip to content label used for accessibility, allowing to rapidly navigate to main content with keyboard tab/enter navigation"
+  },
+  "theme.tags.tagsPageTitle": {
+    "message": "Étiquettes",
+    "description": "The title of the tag list page"
+  }
+}

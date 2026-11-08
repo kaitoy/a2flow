@@ -1,0 +1,313 @@
+---
+title: Visite guidée
+sidebar_position: 5
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Visite guidée
+
+Cette page déroule un workflow de [démonstration](./demo-data.md) du début à la fin : le générer à partir de sa compétence d'agent, le publier, l'exécuter, approuver la demande qu'il soumet et confirmer le résultat, le tout sans jamais vous déconnecter. Vous vous connectez en tant que `root` et utilisez l'[emprunt d'identité](../concepts/impersonation.md) pour agir tour à tour en tant que chaque compte de démonstration : toute la visite tient dans un seul onglet du navigateur.
+
+Choisissez ici un fournisseur. Tous les blocs propres à un fournisseur sur cette page suivent ce choix.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  Vous allez lancer une instance EC2 à partir de la compétence `Demo AWS EC2 Launch`.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Vous allez redémarrer progressivement une charge de travail sur un cluster GKE à partir de la compétence `Demo GKE Pod Restart`.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  Vous allez effectuer la rotation d'un secret dans un Azure Key Vault à partir de la compétence `Demo Azure Key Vault Secret Rotation`.
+
+  </TabItem>
+</Tabs>
+
+## Avant de commencer \{#before-you-start\}
+
+- Le backend tourne avec les [données de démonstration](./demo-data.md) activées.
+- Vous connaissez le mot de passe de `root` : `ROOT_PASSWORD`, ou la ligne que le backend a consignée une seule fois au démarrage s'il n'était pas défini ([Utilisateurs initiaux](../operations/configuration.md#seeded-users)).
+- Le fournisseur est réellement joignable :
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  Le [secret](../guides/secrets.md) `demo-aws-credentials` contient une vraie clé d'accès : soit `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` ont été définis avant le premier démarrage, soit vous modifiez le secret sous **Secrets**. L'exécution **lance une véritable instance EC2**, qui vous est facturée jusqu'à ce que vous la résiliiez.
+
+  L'utilisateur IAM de la clé a besoin d'une stratégie qui lui permette de résoudre l'AMI, de consulter le réseau et la paire de clés, et de lancer l'instance. Celle-ci suffit :
+
+  ```json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "ResolveAmi",
+        "Effect": "Allow",
+        "Action": "ssm:GetParameter",
+        "Resource": "arn:aws:ssm:*::parameter/aws/service/*"
+      },
+      {
+        "Sid": "LookupAndLaunch",
+        "Effect": "Allow",
+        "Action": [
+          "ec2:DescribeImages",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeKeyPairs",
+          "ec2:DescribeInstances",
+          "ec2:RunInstances",
+          "ec2:CreateTags"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }
+  ```
+
+  La première instruction ne lit que les paramètres publics sous lesquels AWS publie les ID des dernières AMI, pas les paramètres de votre propre compte. La stratégie ne permet pas à la clé de résilier l'instance : faites-le vous-même dans la console AWS.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Le [secret](../guides/secrets.md) `demo-gcp-credentials` contient un identifiant Google Cloud dont l'identité peut accéder à un cluster GKE : soit `DEMO_GCP_CREDENTIALS_JSON` a été défini avant le premier démarrage, soit vous modifiez le secret sous **Secrets**. Préparez un projet, un cluster, sa région et une charge de travail que vous avez le droit de redémarrer : l'exécution **la redémarre réellement de façon progressive**.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  Le [secret](../guides/secrets.md) `demo-azure-credentials` contient un vrai principal de service : soit `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET` ont été définis avant le premier démarrage, soit vous modifiez le secret sous **Secrets**. Le principal a besoin, sur un coffre, d'un rôle qui lui permette de lister et d'écrire les secrets. Préférez un rôle personnalisé limité aux actions de données `Microsoft.KeyVault/vaults/secrets/readMetadata/action` et `Microsoft.KeyVault/vaults/secrets/setSecret/action` au rôle intégré **Key Vault Secrets Officer**, qui peut aussi lire la valeur de tous les secrets : l'agent ne peut alors lire aucune valeur, même si on le persuade d'essayer. Sur un coffre qui utilise plutôt des stratégies d'accès, accordez uniquement les autorisations de secret **List** et **Set**. Préparez ce coffre et un secret dont vous avez le droit d'effectuer la rotation : l'exécution **écrit réellement une nouvelle version du secret**, et tout ce qui lit sa version actuelle récupère la nouvelle valeur.
+
+  </TabItem>
+</Tabs>
+
+Pas de compte à sacrifier ? Les [simulacres d'outils](./demo-data.md#trying-it-out) fournis permettent de dérouler le même workflow sans contacter de fournisseur. Ce parcours exécute le workflow tant qu'il est encore à l'état de `brouillon` : il saute donc l'étape de publication ci-dessous.
+
+## Les intervenants \{#the-cast\}
+
+| Étape | AWS | Google Cloud | Azure | Rôle |
+|---|---|---|---|---|
+| Générer le workflow | `demo-aws-developer` | `demo-gcp-developer` | `demo-azure-developer` | Développeur |
+| Le publier | `demo-aws-reviewer` | `demo-gcp-reviewer` | `demo-azure-reviewer` | Relecteur |
+| L'exécuter et confirmer le résultat | `demo-aws-requester` | `demo-gcp-requester` | `demo-azure-requester` | Demandeur |
+| Approuver la demande | `demo-approver-1` | `demo-approver-1` | `demo-approver-1` | Approbateur |
+
+Chaque étape ci-dessous commence par **Agir en tant que** dans la liste **Utilisateurs** et se termine par **Cesser d'agir en tant que cet utilisateur** sur la pastille « Vous agissez en tant que … » de l'en-tête. Cet arrêt n'est pas facultatif : tant que vous agissez en tant que l'un de ces comptes, vous êtes soumis aux rôles de ce compte, et aucun d'eux n'a le droit d'agir en tant qu'un autre : **Agir en tant que** ne vous est donc plus proposé tant que vous n'avez pas arrêté. Depuis un écran de discussion, le logo **A2Flow** de la barre d'application vous ramène à la page de bienvenue et à sa barre latérale.
+
+## 1. Se connecter en tant que root \{#1-sign-in-as-root\}
+
+1. Sur la page de connexion, saisissez `root` comme **Nom d'utilisateur**, laissez **Tenant** vide (`root` est un administrateur de la plateforme et n'appartient à aucun tenant) et saisissez le mot de passe. Cliquez sur **Se connecter**.
+2. Vous arrivez sur la page de bienvenue. Le sélecteur de tenant de la barre d'application indique **Default**, le tenant où se trouvent les données de démonstration. Choisissez-le si un autre est sélectionné.
+
+## 2. Agir en tant que développeur et générer le workflow \{#2-act-as-the-developer-and-generate-the-workflow\}
+
+1. Ouvrez **Utilisateurs** dans la barre latérale d'administration et cliquez sur **Agir en tant que** sur la ligne du développeur. Confirmez avec **Agir en tant que** dans la boîte de dialogue **Agir en tant que cet utilisateur**. Vous revenez sur la page de bienvenue, et la pastille de l'en-tête indique « Vous agissez en tant que `demo-…-developer` ».
+2. Ouvrez **Compétences d'agent**. Seule la compétence de ce fournisseur est listée : les autres sont masquées par leurs [étiquettes de contrôle d'accès](../guides/tags.md#access-control-tags). Attendez que son **État** indique `prêt`, en actualisant la liste tant qu'il affiche `Clonage` ; **Générer un workflow** reste désactivé jusque-là.
+
+:::info[AWS : lisez d'abord la grille tarifaire]
+
+Ouvrez **Bases de connaissances** et cliquez sur **AWS EC2 Pricing**. Son unique source, `ec2-on-demand-pricing.pdf`, indique **Non lue**. Cliquez sur **Lire** et attendez que son état indique **Prête**. Le LLM transforme la grille tarifaire en pages, qui apparaissent sous **Pages** ; cela prend une minute ou deux ([Bases de connaissances](../guides/knowledge-bases.md)). À l'étape suivante, cliquez aussi sur **Sélectionner des bases de connaissances…** dans la boîte de dialogue **Générer un workflow** et choisissez **AWS EC2 Pricing**, afin que l'agent de l'exécution puisse consulter les prix.
+
+:::
+
+3. Cliquez sur **Générer un workflow** sur la ligne. Laissez **Nom du workflow** tel quel, collez le prompt ci-dessous dans **Prompt**, puis cliquez sur **Générer**.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  ```text
+  Recueillir auprès du demandeur les paramètres souhaités ainsi que la date et l'heure de lancement, obtenir l'approbation du groupe Demo Approvers, puis lancer une instance EC2 à ce moment-là.
+  Lui faire choisir le type d'instance parmi :
+  - t4g.nano
+  - t4g.micro
+  - t4g.small
+  - t4g.medium
+  - t3.micro
+  - t3a.micro
+  - c6g.medium
+  - m6g.medium
+  - t2.micro
+  - t4g.large
+
+  Lui faire choisir la région parmi :
+  - us-east-1
+  - us-east-2
+  - us-west-2
+
+  Pour l'AMI, utiliser la dernière image Amazon Linux 2023 de la région demandée.
+  Utiliser le VPC, le sous-réseau et le groupe de sécurité par défaut.
+  Ne pas créer de paire de clés.
+  Résoudre les ID de l'AMI, du VPC et du sous-réseau avant de demander l'approbation.
+  Ne pas lancer l'instance avant l'heure demandée.
+  Répondre aux questions sur le coût d'une instance à partir de la base de connaissances AWS EC2 Pricing, et indiquer dans la demande d'approbation le coût mensuel de l'instance demandée, tiré de cette base.
+  ```
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Remplacez les trois substituts par votre projet, votre cluster et votre région.
+
+  ```text
+  Redémarrer une charge de travail sur le cluster <your cluster name> du projet <your project name> après approbation de Demo Approvers.
+  L'emplacement du cluster est la région <cluster region>. Faire choisir au demandeur le namespace de la charge de travail dans une liste récupérée depuis le cluster réel.
+  ```
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  Remplacez le substitut par le nom de votre coffre.
+
+  ```text
+  Effectuer la rotation d'un secret dans le Key Vault <your vault name> après approbation de Demo Approvers.
+  Lister les secrets du coffre et faire choisir au demandeur celui dont il faut effectuer la rotation.
+  Générer la nouvelle valeur avec Secret Value Generator, et ne jamais l'afficher dans la discussion.
+  ```
+
+  </TabItem>
+</Tabs>
+
+4. Vous arrivez sur la page de détail du nouveau workflow, avec l'état `génération en cours`. La page s'actualise d'elle-même ; au bout d'une minute ou deux, l'état passe à `brouillon` et la cloche affiche la notification « Le brouillon du workflow est prêt ». Ouvrez ses **Modèles de tâches** pour voir les étapes rédigées par l'agent de conception : recueillir les paramètres, demander l'approbation, effectuer le travail et rendre compte ([Générer un workflow](../guides/workflows.md#generating-a-workflow)).
+5. Cliquez sur **Cesser d'agir en tant que cet utilisateur** sur la pastille « Vous agissez en tant que … ».
+
+## 3. Agir en tant que relecteur et publier \{#3-act-as-the-reviewer-and-publish\}
+
+1. Dans **Utilisateurs**, cliquez sur **Agir en tant que** sur la ligne du relecteur et confirmez.
+2. Ouvrez **Workflows** et cliquez sur le nom du workflow. Parcourez ses modèles de tâches ; un relecteur peut aussi cliquer sur **Ouvrir la session de conception** pour lire la conversation de conception, mais pas l'orienter.
+3. Cliquez sur **Publier**. L'état passe à `publié` : la conception est figée, et un demandeur peut désormais l'exécuter ([Publier](../guides/workflows.md#publishing)).
+4. Cliquez sur **Cesser d'agir en tant que cet utilisateur**.
+
+## 4. Agir en tant que demandeur et l'exécuter \{#4-act-as-the-requester-and-run-it\}
+
+1. Dans **Utilisateurs**, cliquez sur **Agir en tant que** sur la ligne du demandeur et confirmez.
+2. Ouvrez **Workflows** et cliquez sur **Exécuter** sur le workflow. La boîte de dialogue **Exécuter le workflow** ne propose aucun simulacre : le workflow est publié, il s'agit donc d'une véritable demande. Cliquez sur **Exécuter**.
+3. La session du workflow s'ouvre et l'agent commence la première tâche, en demandant ce que le prompt a laissé au choix du demandeur. Une question dont les réponses sont fixes prend la forme d'un choix dans le message ; sinon, une rangée de [réponses suggérées](../guides/workflow-executions.md#suggested-replies) apparaît au-dessus de la zone de saisie.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  Vous hésitez sur le type d'instance ? Posez la question, par exemple : « Combien coûte t4g.medium par mois dans us-east-2, par rapport à t3.micro ? » L'agent consulte les prix dans la base de connaissances **AWS EC2 Pricing** et cite la page qu'il a utilisée.
+
+  Choisissez un type d'instance parmi les dix du prompt et une région parmi les trois, indiquez une heure de lancement dans quelques minutes pour que la visite ne traîne pas, et répondez à ses éventuelles autres questions, comme le nom de l'instance. L'agent recherche alors la dernière image Amazon Linux 2023 de cette région ainsi que le VPC et le sous-réseau par défaut, résume la configuration et l'heure de lancement, puis envoie le tout pour approbation.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Choisissez un namespace dans la liste que l'agent a récupérée depuis le cluster, et indiquez le nom du Deployment ou du StatefulSet à redémarrer. L'agent recherche la charge de travail, confirme son type, résume la cible et l'envoie pour approbation.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  Avant que l'agent liste les secrets du coffre, l'exécution vous attend : une note au-dessus de la zone de saisie de la discussion indique que la tâche va vous poser des questions. Cliquez sur **Reprendre**. L'Azure MCP Server vous demande alors de confirmer : une carte intitulée « Azure MCP Server demande une confirmation » apparaît dans la discussion. Choisissez **Approve** et cliquez sur **Accepter** ([Confirmations d'un serveur MCP](../guides/workflow-executions.md#mcp-server-confirmations)). Choisissez ensuite le secret dont il faut effectuer la rotation dans la liste que l'agent a récupérée. L'agent résume le coffre et le secret, puis les envoie pour approbation.
+
+  </TabItem>
+</Tabs>
+
+4. La demande est adressée au groupe **Demo Approvers**, et sous celle-ci, la discussion indique « En attente de la décision du groupe d'approbateurs. » : le demandeur ne peut pas décider. L'exécution est maintenant en attente.
+5. Cliquez sur **Cesser d'agir en tant que cet utilisateur**.
+
+## 5. Agir en tant qu'approbateur et approuver \{#5-act-as-the-approver-and-approve\}
+
+1. Dans **Utilisateurs**, cliquez sur **Agir en tant que** sur la ligne de `demo-approver-1` et confirmez. `demo-approver-2` conviendrait tout aussi bien : la première décision règle une demande adressée à un groupe.
+2. La cloche de la barre d'outils affiche une notification non lue, la demande d'approbation. Cliquez dessus pour ouvrir la discussion de l'exécution. **Approbations** dans la barre latérale, puis **Ouvrir la session du workflow** sur la ligne, mènent au même endroit.
+3. Lisez la demande. Sous le résumé de l'agent, **Ceci autorise** liste les appels que la décision permettrait et les limites imposées à leurs entrées ([Ce qu'une demande autorise](../guides/approvals.md#what-a-request-authorizes)) :
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  L'appel sur l'**AWS MCP Server** qui lance l'instance. Comparez-le, ainsi que l'heure de lancement et le coût mensuel figurant dans le résumé, avec ce que le demandeur a choisi. Les recherches d'image, de VPC et de sous-réseau ne sont pas listées, car elles ont eu lieu avant la demande et ne nécessitaient aucune approbation.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  L'appel `patch_k8s_resource` sur le **GKE MCP Server**, qui vise le namespace et la charge de travail choisis par le demandeur.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  L'appel `keyvault_secret_create` sur l'**Azure MCP Server**, qui vise le coffre et le secret choisis par le demandeur. La nouvelle valeur ne figure pas dans la demande : l'agent ne la génère qu'après votre approbation.
+
+  </TabItem>
+</Tabs>
+
+4. Vous voulez en savoir plus avant de décider ? Saisissez une question dans la discussion et envoyez-la. Dans l'onglet AWS, par exemple, demandez : « Combien coûterait cette instance par mois si elle ne tournait que les jours ouvrés, pendant les heures de bureau ? » La session attend votre décision : un onglet **Consultation** s'ouvre donc et l'agent y répond, à partir du contexte de la demande et des bases de connaissances liées ([Consultations](../guides/workflow-executions.md#consultations)). Le demandeur peut aussi se joindre à cette conversation. Lorsque vous avez terminé, cliquez sur l'onglet **Principale** pour revenir à la demande.
+5. Laissez un **Commentaire** si vous le souhaitez et cliquez sur **Approuver**. La décision clôt la consultation, si vous en avez ouvert une. L'exécution reprend dans la même discussion et l'agent effectue le travail, puis demande au demandeur de confirmer le résultat. C'est au demandeur de répondre à cette question : pour vous, la zone de saisie est en lecture seule, avec la mention « En attente de la réponse de l'initiateur. » en dessous.
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  Si l'heure de lancement n'est pas encore arrivée, l'agent laisse le lancement en attente, indique en une ligne quand il reprendra et se met en pause. La session reprend d'elle-même à cette heure-là, sans que personne n'ait à garder la discussion ouverte, et l'agent lance l'instance ([L'écran de session du workflow](../guides/workflow-executions.md#the-workflow-session-screen)).
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  L'agent redémarre immédiatement la charge de travail.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  L'écriture demande une confirmation au demandeur : l'exécution attend donc qu'il revienne dans la discussion avant de commencer. La session affiche **En attente de l'initiateur**, et le demandeur reçoit une notification.
+
+  </TabItem>
+</Tabs>
+
+6. Cliquez sur **Cesser d'agir en tant que cet utilisateur**.
+
+## 6. Retour au demandeur : confirmer le résultat \{#6-back-as-the-requester-confirm-the-result\}
+
+1. Dans **Utilisateurs**, cliquez de nouveau sur **Agir en tant que** sur la ligne du demandeur et confirmez.
+2. Ouvrez **Exécutions de workflows** et cliquez sur **Ouvrir la session du workflow** sur l'exécution.
+3. L'agent a rendu compte de ce qu'il a fait et vous attend :
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  L'ID de l'instance et son état, une fois passée l'heure de lancement que vous avez indiquée. Vérifiez l'instance dans la console AWS si vous le souhaitez, puis confirmez dans la discussion.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Le nombre de pods remplacés, une fois terminé le déploiement que l'agent a surveillé. Confirmez dans la discussion.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  L'exécution vous attend d'abord avant l'écriture : cliquez sur **Reprendre** dans la note au-dessus de la zone de saisie de la discussion. L'agent génère une nouvelle valeur et lance l'écriture, puis la carte de confirmation de l'Azure MCP Server apparaît : choisissez **Approve** et cliquez sur **Accepter**. L'agent indique ensuite quand la nouvelle version a été créée, mais jamais la valeur elle-même. L'Azure MCP Server ne communique pas d'ID de version : vérifiez les versions du secret dans le portail Azure si vous en avez besoin, puis confirmez dans la discussion.
+
+  </TabItem>
+</Tabs>
+
+4. L'agent conclut par son résumé, la dernière tâche se termine, l'exécution passe à l'état `terminé` et la cloche affiche une notification de fin.
+5. Cliquez sur **Cesser d'agir en tant que cet utilisateur**.
+
+## Après la visite \{#afterwards\}
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  L'instance continue de tourner, et de vous être facturée, jusqu'à ce que vous la résiliiez dans la console AWS.
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  Rien à nettoyer : la charge de travail est revenue à son nombre de réplicas avec de nouveaux pods.
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  La version précédente du secret reste activée. Une fois que tout ce qui lit le secret utilise la nouvelle valeur, désactivez l'ancienne version dans le portail Azure. La nouvelle valeur a transité par la conversation de l'agent avant d'arriver dans Key Vault ([Données de démonstration](./demo-data.md)) : traitez donc la discussion de cette exécution comme vous traiteriez le secret.
+
+  </TabItem>
+</Tabs>
+
+Deux traces laissées par la visite méritent un coup d'œil :
+
+| Où | Ce qu'on y voit |
+|---|---|
+| **Journaux d'audit** → **Emprunts d'identité** | Toutes les sessions que vous venez d'ouvrir : qui a agi en tant que qui, et quand. Chaque écriture ci-dessus est attribuée au compte emprunté : c'est donc cette piste qui répond à la question « qui était vraiment derrière ? » ([Piste d'audit](../concepts/impersonation.md#audit-trail)) |
+| La page **Appels d'outils** de l'exécution | Chaque appel d'outil effectué par l'exécution et le certificat qu'il a présenté : c'est l'approbation que vous avez accordée qui a débloqué celui qui a effectué le travail ([Appels d'outils](../guides/workflow-executions.md#tool-invocations)) |

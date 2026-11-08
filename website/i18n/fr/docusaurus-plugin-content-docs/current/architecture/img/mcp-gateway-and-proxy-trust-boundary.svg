@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mcp-gateway-and-proxy-trust-boundary-title mcp-gateway-and-proxy-trust-boundary-desc">
+      <title id="mcp-gateway-and-proxy-trust-boundary-title">Franchir la frontière de confiance</title>
+      <desc id="mcp-gateway-and-proxy-trust-boundary-desc">Schéma d'architecture montrant la passerelle MCP, qui décide si un appel est autorisé, simulé et de quels identifiants il a besoin, et qui remet exactement un appel autorisé à travers une frontière de confiance au proxy MCP, lequel démarre le vrai serveur MCP ou s'y connecte.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Zones (bg -> zones -> arrows -> nodes) -->
+      <rect x="40" y="60" width="300" height="120" rx="8" fill="#1c1e21" fill-opacity="0.02" stroke="#1c1e21" stroke-opacity="0.20" stroke-width="1" stroke-dasharray="4,3"/>
+      <rect x="52" y="64" width="112" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="108" y="73" fill="#1c1e21" fill-opacity="0.40" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">EXÉCUTE L'AGENT</text>
+
+      <rect x="400" y="60" width="240" height="120" rx="8" fill="#1c1e21" fill-opacity="0.02" stroke="#1c1e21" stroke-opacity="0.20" stroke-width="1" stroke-dasharray="4,3"/>
+      <rect x="412" y="64" width="76" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="450" y="73" fill="#1c1e21" fill-opacity="0.40" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">BAC À SABLE</text>
+
+      <!-- Arrows -->
+      <line x1="300" y1="124" x2="440" y2="124" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="600" y1="124" x2="700" y2="124" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Arrow label -->
+      <rect x="328" y="104" width="84" height="12" rx="2" fill="#f2f8fc"/>
+      <text x="370" y="113" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTORISÉ</text>
+
+      <!-- MCP gateway -->
+      <rect x="80" y="92" width="220" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="190" y="118" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Passerelle MCP</text>
+      <text x="190" y="134" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">autorisé, simulé, identifiants</text>
+
+      <!-- MCP proxy (inside sandbox zone) -->
+      <rect x="440" y="92" width="160" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="520" y="118" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Proxy MCP</text>
+      <text x="520" y="134" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">démarre ou se connecte</text>
+
+      <!-- MCP server (outside both zones) -->
+      <rect x="700" y="92" width="160" height="64" rx="6" fill="#1c1e21" fill-opacity="0.03" stroke="#1c1e21" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="780" y="118" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Serveur MCP</text>
+      <text x="780" y="134" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">hors de notre contrôle</text>
+
+      <!-- Legend -->
+      <line x1="40" y1="204" x2="860" y2="204" stroke="#1c1e21" stroke-opacity="0.10" stroke-width="0.8"/>
+      <text x="40" y="220" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LÉGENDE</text>
+
+      <rect x="40" y="232" width="24" height="14" rx="4" fill="#1c1e21" fill-opacity="0.02" stroke="#1c1e21" stroke-opacity="0.20" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="72" y="243" fill="#525860" font-size="9.5" font-family="'Inter', sans-serif">Frontière de confiance</text>
+    </svg>
