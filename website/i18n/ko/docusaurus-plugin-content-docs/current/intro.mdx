@@ -1,0 +1,77 @@
+---
+title: 소개
+description: A2Flow는 AI 에이전트를 중심으로 처음부터 다시 만든 워크플로 엔진입니다. 에이전트는 워크플로 안에 자리한 부품이 아니라 워크플로 그 자체입니다.
+slug: /intro
+sidebar_position: 1
+hide_title: true
+hide_table_of_contents: true
+---
+
+import {IntroPage, IntroHero, IntroContrast, IntroPanel, IntroActs, IntroAct, IntroClosing, IntroNext} from '@site/src/components/IntroSections';
+
+<IntroPage>
+
+<IntroHero
+  eyebrow="워크플로가 된 AI 에이전트"
+  title={<>워크플로 엔진이 <span className="grad">곧 에이전트</span>입니다.</>}>
+
+A2Flow는 AI 에이전트를 중심으로 처음부터 다시 만든, 채팅으로 진행하는 워크플로 엔진입니다. 기존 엔진에 AI 단계를 덧붙인 것이 아니라 런타임 자체가 에이전트인 엔진입니다. 에이전트는 작업을 계획하고, 결정해야 할 사람에게 묻고, 나머지는 스스로 처리합니다. 이렇게 세운 계획은 워크플로로 보관되어 다시 실행됩니다. 채팅 세션의 유연함과 절차서의 반복 가능성을 함께 갖춘 셈입니다.
+
+</IntroHero>
+
+<IntroContrast>
+
+<IntroPanel kind="past" title="워크플로 안의 에이전트">
+
+순서도가 곧 프로그램이고, 그 어딘가에 "AI"라고 적힌 상자가 하나 놓여 있습니다. 이 상자는 필드를 채우고, 요약문 초안을 쓰고, 티켓을 분류합니다. 그런 다음 제어는 누군가 작년에 그린 도표로 돌아가고, 나머지 과정은 늘 그랬듯이 흘러갑니다.
+
+</IntroPanel>
+
+<IntroPanel kind="next" title="에이전트가 곧 워크플로">
+
+돌아갈 도표가 없습니다. 에이전트가 절차를 읽고, 단계를 계획하고, 도구를 연결하고, 승인을 요청하고, 실행합니다. 워크플로는 에이전트가 참여하는 대상이 아니라 에이전트가 하는 일 그 자체입니다.
+
+</IntroPanel>
+
+</IntroContrast>
+
+<IntroActs>
+
+<IntroAct step="01 — 디자인" icon="design" title="캔버스가 아니라 대화로 디자인합니다">
+
+출발점은 [에이전트 스킬](./guides/agent-skills.md)입니다. Git 저장소에 있는 `SKILL.md` 파일이므로 다른 코드처럼 버전을 관리하고 검토할 수 있습니다. 그다음에는 AI와 대화합니다. AI가 작업 그래프의 초안을 만들면 사용자가 이를 조정하고, 각 단계에 필요한 [MCP 도구](./guides/mcp-servers.md)는 진행하면서 연결됩니다. 이렇게 [게시](./guides/workflows.md)되는 것은 에이전트가 직접 세운 계획입니다. 아무도 그릴 필요가 없었고, 모든 실행이 똑같이 따르는 워크플로입니다.
+
+</IntroAct>
+
+<IntroAct step="02 — 실행" icon="run" title="실행은 여러 사람이 함께하는 하나의 대화입니다">
+
+워크플로를 실행하면 공유 채팅이 하나 열립니다. 요청자가 의도를 밝히면 에이전트가 작업 그래프를 따라 진행하고, 승인자는 같은 스레드에서 댓글과 함께 바로 결정합니다. 티켓 대기열도, 별도의 연락 경로도, "제 요청은 어떻게 되고 있나요?"라는 문의도 필요 없습니다.
+
+</IntroAct>
+
+<IntroAct step="03 — 통제" icon="control" title="모든 도구 호출에는 서명된 권한이 따릅니다">
+
+[승인](./guides/approvals.md)은 에이전트에게 따라 달라고 건네는 조언이 아닙니다. 도구를 호출하는 모든 작업은 수명이 짧은 X.509 인증서를 지니며, 이 인증서는 발급 시점에 그 작업이 보유한 도구만을 정확히 대상으로 합니다. MCP 게이트웨이는 이 인증서를 서명과 함께 제시하지 않는 호출을 모두 거부합니다. 작업을 승인하면 그 인증서에 승인자의 이름이 올라갑니다. 아무에게도 승인을 요청하지 않은 작업은 실행을 시작한 사람의 권한을 갖습니다. 프롬프트 인젝션으로 어느 쪽도 말로 구슬려 통과할 수 없으며, 에이전트가 나중에 범위를 넓힐 수도 없습니다. 허용된 호출이든 거부된 호출이든 모든 호출은 인증서 일련번호 및 해당 호출에 서명한 정확한 바이트와 함께 기록됩니다.
+
+</IntroAct>
+
+</IntroActs>
+
+<IntroClosing headline={<>계획. 승인. 실행.</>}>
+
+워크플로를 이루는 것은 결국 이 세 가지였습니다. A2Flow는 이 세 가지를 남기고 그 사이의 모든 일을 에이전트에게 맡깁니다. AI와 함께 수행하는 표준 운영 절차입니다.
+
+</IntroClosing>
+
+<IntroNext title="다음에 읽을 내용">
+
+- **[빠른 시작](./getting-started/quick-start.md)** — 내 컴퓨터에서 백엔드와 프런트엔드를 실행합니다.
+- **[용어](./concepts/terminology.md)** — 워크플로, 디자인 세션, 실행, 워크플로 세션을 설명합니다.
+- **[에이전트 스킬](./guides/agent-skills.md)** — 워크플로 디자인의 바탕이 되는, Git으로 관리하는 절차입니다.
+- **[워크플로](./guides/workflows.md)** — 스킬에서 워크플로를 생성하고, 조정하고, 게시하고, 실행합니다.
+- **[승인](./guides/approvals.md)** — 실행이 사람을 기다리며 멈추는 방식과 인증서가 허가하는 범위를 설명합니다.
+- **[구성 참조](./operations/configuration.md)** — 백엔드가 읽는 모든 환경 변수를 안내합니다.
+
+</IntroNext>
+
+</IntroPage>

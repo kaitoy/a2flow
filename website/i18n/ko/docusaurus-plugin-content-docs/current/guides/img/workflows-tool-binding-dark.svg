@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1010 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-tool-binding-dark-title workflows-tool-binding-dark-desc">
+      <title id="workflows-tool-binding-dark-title">도구 연결: 디자인 시점과 실행 시점</title>
+      <desc id="workflows-tool-binding-dark-desc">디자인 시점의 도구 연결이 실행할 때 작업으로 복사되고 호출 시점에 검사되는 과정을 보여 주는 순서도. 도구가 진행 중인 작업에 연결되어 있으면 호출이 통과하고, 그렇지 않으면 허용된 도구 목록과 함께 거부된다.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#9aa1ab"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3bf5c4"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Arrows -->
+      <line x1="240" y1="92" x2="320" y2="92" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="520" y1="92" x2="570" y2="92" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="750" y1="92" x2="790" y2="92" stroke="#3bf5c4" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <line x1="660" y1="148" x2="660" y2="220" stroke="#9aa1ab" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Labels -->
+      <rect x="264" y="69" width="32" height="16" rx="2" fill="#030711"/>
+      <text x="280" y="81" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">복사</text>
+
+      <rect x="758" y="69" width="24" height="16" rx="2" fill="#030711"/>
+      <text x="770" y="81" fill="#3bf5c4" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">예</text>
+
+      <rect x="664" y="176" width="44" height="16" rx="2" fill="#030711"/>
+      <text x="686" y="188" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">아니요</text>
+
+      <!-- Design time -->
+      <rect x="40" y="60" width="200" height="64" rx="6" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="140" y="87" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">디자인 시점</text>
+      <text x="140" y="104" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">서버와 도구를 연결</text>
+
+      <!-- Run time -->
+      <rect x="320" y="60" width="200" height="64" rx="6" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="420" y="87" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">실행 시점</text>
+      <text x="420" y="104" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">작업이 연결을 보유</text>
+
+      <!-- Decision -->
+      <polygon points="660,36 750,92 660,148 570,92" fill="#242526" stroke="#e3e3e3" stroke-width="1"/>
+      <text x="660" y="88" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">진행 중인 작업에</text>
+      <text x="660" y="103" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">연결되어 있는가?</text>
+
+      <!-- Call goes through (focal) -->
+      <rect x="790" y="64" width="180" height="56" rx="28" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="880" y="98" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">호출 통과</text>
+
+      <!-- Refused -->
+      <rect x="570" y="220" width="180" height="64" rx="28" fill="#e3e3e3" fill-opacity="0.03" stroke="#e3e3e3" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="660" y="247" fill="#e3e3e3" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">거부됨</text>
+      <text x="660" y="264" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">허용된 도구 목록 반환</text>
+    </svg>

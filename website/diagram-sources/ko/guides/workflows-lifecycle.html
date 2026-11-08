@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>스킬에서 실행 중인 워크플로까지</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f2f8fc; color: #1c1e21; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #525860; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', 'Noto Serif KR', serif; font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; color: #1c1e21; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Flowchart · Diagram Design</p>
+    <h1>스킬에서 실행 중인 워크플로까지</h1>
+
+    <svg viewBox="0 0 1020 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflows-lifecycle-title workflows-lifecycle-desc">
+      <title id="workflows-lifecycle-title">스킬에서 실행 중인 워크플로까지</title>
+      <desc id="workflows-lifecycle-desc">에이전트 스킬에서 워크플로를 생성하고, 조정된 초안으로 다듬어 게시한 다음, 워크플로 실행으로 실행하는 과정을 보여 주는 순서도.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <line x1="200" y1="94" x2="232" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="402" y1="94" x2="434" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="604" y1="94" x2="636" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="808" y1="94" x2="840" y2="94" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Agent Skill -->
+      <rect x="60" y="60" width="140" height="68" rx="6" fill="rgba(28,30,33,0.03)" stroke="rgba(28,30,33,0.30)" stroke-width="1"/>
+      <text x="130" y="100" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">에이전트 스킬</text>
+
+      <!-- Workflow -->
+      <rect x="232" y="60" width="170" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="317" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">워크플로</text>
+      <text x="317" y="106" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">AI가 디자인한 템플릿</text>
+
+      <!-- Adjusted draft -->
+      <rect x="434" y="60" width="170" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="519" y="100" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">조정된 초안</text>
+
+      <!-- Published (focal) -->
+      <rect x="636" y="60" width="172" height="68" rx="6" fill="rgba(0,135,122,0.08)" stroke="#00877a" stroke-width="1"/>
+      <text x="722" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">게시됨</text>
+      <text x="722" y="106" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">디자인 고정됨</text>
+
+      <!-- Workflow execution -->
+      <rect x="840" y="60" width="140" height="68" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="910" y="87" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">워크플로</text>
+      <text x="910" y="103" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">실행</text>
+    </svg>
+  </div>
+</body>
+</html>

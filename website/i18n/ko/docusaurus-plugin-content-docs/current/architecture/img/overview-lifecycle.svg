@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="overview-lifecycle-title overview-lifecycle-desc">
+      <title id="overview-lifecycle-title">워크플로의 흐름</title>
+      <desc id="overview-lifecycle-desc">에이전트 스킬에서 워크플로가 생성되고, 워크플로 세션 안에서 워크플로 실행으로 수행되며, 그 작업이 사람의 승인을 요청하거나 MCP 게이트웨이를 통해 MCP 도구를 호출하여 MCP 서버에 도달하는 과정을 보여 주는 순서도.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Spine arrows -->
+      <line x1="500" y1="104" x2="500" y2="144" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="208" x2="500" y2="248" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="312" x2="500" y2="352" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="416" x2="500" y2="456" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Spine labels (beside the line) -->
+      <rect x="508" y="117" width="90" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="516" y="127" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif">워크플로 생성</text>
+      <rect x="508" y="221" width="92" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="516" y="231" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif">게시 후 실행</text>
+
+      <!-- Branch elbows: Tasks -> Approval gate / MCP gateway -->
+      <path d="M460,512 L460,532 Q460,540 452,540 L298,540 Q290,540 290,548 L290,552" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M540,512 L540,532 Q540,540 548,540 L702,540 Q710,540 710,548 L710,552" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <rect x="333" y="519" width="84" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="375" y="529" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">사람이 필요함</text>
+      <rect x="583" y="519" width="84" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="625" y="529" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">도구가 필요함</text>
+
+      <!-- Approval gate -> MCP gateway -->
+      <line x1="380" y1="580" x2="620" y2="580" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="478" y="559" width="44" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="500" y="569" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">인증서</text>
+
+      <!-- MCP gateway -> MCP server -->
+      <line x1="710" y1="608" x2="710" y2="648" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Nodes: main spine -->
+      <rect x="400" y="40" width="200" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="68" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">에이전트 스킬</text>
+      <text x="500" y="88" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">Git 저장소</text>
+
+      <rect x="390" y="144" width="220" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="172" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">워크플로</text>
+      <text x="500" y="192" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">템플릿 + 도구 연결</text>
+
+      <rect x="380" y="248" width="240" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="276" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">워크플로 실행</text>
+      <text x="500" y="296" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">디자인의 스냅샷</text>
+
+      <rect x="390" y="352" width="220" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="380" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">워크플로 세션</text>
+      <text x="500" y="400" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">실행이 진행되는 공유 채팅</text>
+
+      <rect x="420" y="456" width="160" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="480" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">작업</text>
+      <text x="500" y="500" fill="#525860" font-size="12" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">한 번에 하나씩</text>
+
+      <!-- Nodes: branch row -->
+      <rect x="200" y="552" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="290" y="585" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">승인 게이트</text>
+
+      <rect x="620" y="552" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="710" y="585" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">MCP 게이트웨이</text>
+
+      <!-- Node: MCP server -->
+      <rect x="620" y="648" width="180" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="710" y="681" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle">MCP 서버</text>
+    </svg>

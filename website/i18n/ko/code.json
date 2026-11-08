@@ -1,0 +1,664 @@
+{
+  "home.meta.title": {
+    "message": "에이전트가 곧 워크플로"
+  },
+  "home.meta.description": {
+    "message": "A2Flow는 채팅으로 진행하는 워크플로 엔진입니다. ITSM 방식의 워크플로를 AI 에이전트 중심으로 재구성하여, 업무를 작업 그래프로 계획하고, 승인해야 할 사람을 기다리며, 나머지는 직접 실행합니다. 계획은 워크플로로 보존되므로 다음 실행도 같은 단계를 따릅니다."
+  },
+  "home.nav.concept": {
+    "message": "개념"
+  },
+  "home.nav.how": {
+    "message": "작동 방식"
+  },
+  "home.nav.features": {
+    "message": "기능"
+  },
+  "home.nav.architecture": {
+    "message": "아키텍처"
+  },
+  "home.hero.eyebrow": {
+    "message": "Agent as Workflow"
+  },
+  "home.hero.title": {
+    "message": "워크플로 엔진은{br}이제 {agent}입니다."
+  },
+  "home.hero.title.agent": {
+    "message": "에이전트"
+  },
+  "home.hero.sub": {
+    "message": "A2Flow는 채팅으로 진행하는 워크플로 엔진입니다. 서비스 요청, 변경 실행, 공지 같은 ITSM 방식의 워크플로를 AI 에이전트 중심으로 재구성하여, 업무를 작업 그래프로 계획하고, 승인해야 할 사람을 기다리며, 나머지는 직접 실행합니다. 계획은 워크플로로 보존되므로 다음 실행도 같은 단계를 따릅니다."
+  },
+  "home.hero.cta.github": {
+    "message": "GitHub에서 보기"
+  },
+  "home.hero.cta.how": {
+    "message": "작동 방식 보기"
+  },
+  "home.hero.demoCaption": {
+    "message": "채팅은 둘, 워크플로는 하나. 에이전트와 함께 설계하고 전용 세션에서 실행합니다. 양식과 승인도 그 안에서 이루어집니다."
+  },
+  "home.concept.eyebrow": {
+    "message": "개념"
+  },
+  "home.concept.title": {
+    "message": "ITSM 워크플로를 {reimagined}"
+  },
+  "home.concept.title.reimagined": {
+    "message": "다시 구상합니다"
+  },
+  "home.concept.lead": {
+    "message": "기존 워크플로 엔진은 반복할 수 있지만 경직되어 있습니다. 고정된 양식, 티켓 대기열, 사람 간 인계가 이어지고 시간 대부분은 기다림에 쓰입니다. AI 에이전트와의 채팅은 정반대입니다. 유연하지만 세운 계획은 세션이 끝나면 사라지고, 누구의 승인도 거치지 않습니다. A2Flow는 전자에서 절차와 승인을, 후자에서 대화를 가져오고, 그 사이의 모든 일은 에이전트에게 맡깁니다."
+  },
+  "home.concept.past.title": {
+    "message": "티켓 파이프라인"
+  },
+  "home.concept.past.sub": {
+    "message": "소프트웨어로 굳어진 업무. 반복할 수 있지만 경직되어 있습니다. 양식도 상태도 고정이고, 그 틈은 사람이 메웁니다."
+  },
+  "home.concept.past.form": {
+    "message": "양식 작성"
+  },
+  "home.concept.past.form.note": {
+    "message": "한 항목만 틀려도 되돌아옵니다."
+  },
+  "home.concept.past.queue": {
+    "message": "대기열에서 기다리기"
+  },
+  "home.concept.past.queue.note": {
+    "message": "귀하의 요청은 대기 14번입니다."
+  },
+  "home.concept.past.handoff": {
+    "message": "팀 간 인계"
+  },
+  "home.concept.past.handoff.note": {
+    "message": "넘어갈 때마다 맥락이 사라집니다."
+  },
+  "home.concept.past.chase": {
+    "message": "진행 상황 독촉"
+  },
+  "home.concept.past.chase.note": {
+    "message": "“제 티켓 어떻게 됐나요?”"
+  },
+  "home.concept.chat.title": {
+    "message": "AI 채팅 세션"
+  },
+  "home.concept.chat.sub": {
+    "message": "즉흥으로 처리하는 업무. 유연하지만 할 때마다 달라집니다."
+  },
+  "home.concept.chat.ask": {
+    "message": "채팅으로 에이전트에게 요청"
+  },
+  "home.concept.chat.ask.note": {
+    "message": "양식 없이, 어떤 표현으로든."
+  },
+  "home.concept.chat.plan": {
+    "message": "에이전트가 계획하고 실행"
+  },
+  "home.concept.chat.plan.note": {
+    "message": "매번 새로운 계획이고, 매번 조금씩 다릅니다."
+  },
+  "home.concept.chat.gate": {
+    "message": "승인자를 위한 관문 없음"
+  },
+  "home.concept.chat.gate.note": {
+    "message": "채팅하는 사람이 결정합니다. 다른 사람은 볼 수 없습니다."
+  },
+  "home.concept.chat.gone": {
+    "message": "세션이 끝나면 계획도 사라짐"
+  },
+  "home.concept.chat.gone.note": {
+    "message": "다음 요청은 처음부터 다시 시작합니다."
+  },
+  "home.concept.next.title": {
+    "message": "채팅으로 진행하는 워크플로"
+  },
+  "home.concept.next.sub": {
+    "message": "AI와 함께 수행하는 SOP. 채팅만큼 유연하고 절차서만큼 반복 가능합니다."
+  },
+  "home.concept.next.intent": {
+    "message": "채팅으로 의도 설명"
+  },
+  "home.concept.next.intent.note": {
+    "message": "양식은 없습니다. 무엇을 물어야 할지는 스킬이 압니다."
+  },
+  "home.concept.next.plan": {
+    "message": "계획을 워크플로로 보존"
+  },
+  "home.concept.next.plan.note": {
+    "message": "에이전트가 스킬로 작성한 작업 그래프를 한 번 게시하면 필요한 만큼 실행할 수 있습니다."
+  },
+  "home.concept.next.approve": {
+    "message": "중요한 순간은 사람이 승인"
+  },
+  "home.concept.next.approve.note": {
+    "message": "설계 게시와, 무언가를 변경하는 모든 도구 호출이 대상입니다."
+  },
+  "home.concept.next.execute": {
+    "message": "에이전트가 실행하고 검증"
+  },
+  "home.concept.next.execute.note": {
+    "message": "진행 상황은 같은 대화에서 실시간으로 보입니다."
+  },
+  "home.concept.note": {
+    "message": "절차 자체는 워크플로 엔진 안에 갇힌 코드가 아닙니다. {skill}이며, 버전을 관리하고 검토할 수 있고 팀의 누구나 읽을 수 있습니다."
+  },
+  "home.concept.note.skill": {
+    "message": "에이전트 스킬, 즉 Git 저장소의 {file} 파일"
+  },
+  "home.how.eyebrow": {
+    "message": "작동 방식"
+  },
+  "home.how.title": {
+    "message": "계획. 승인. {execute}"
+  },
+  "home.how.title.execute": {
+    "message": "실행."
+  },
+  "home.how.lead": {
+    "message": "모든 실행은 같은 두 관문을 거칩니다. 사람이 설계를 게시하기 전에는 아무것도 실행되지 않으며, 지정된 승인자가 승인하기 전에는 무언가를 변경하는 도구 호출이 통과하지 못합니다."
+  },
+  "home.how.step1.label": {
+    "message": "1단계 — 계획"
+  },
+  "home.how.step1.title": {
+    "message": "에이전트가 의도를 작업 그래프로 바꿉니다"
+  },
+  "home.how.step1.body": {
+    "message": "디자인 세션에서 에이전트 스킬을 읽고, 프롬프트를 종속 관계가 명시된 작업 템플릿으로 나눈 뒤, 순환 감지까지 포함해 DAG 전체를 한 번의 호출로 등록합니다. 채팅이나 직접 편집으로 조정할 수 있으며, 이 시점에는 아직 아무것도 실행되지 않습니다."
+  },
+  "home.how.step2.label": {
+    "message": "2단계 — 승인"
+  },
+  "home.how.step2.title": {
+    "message": "중요한 순간은 사람이 통제합니다"
+  },
+  "home.how.step2.body": {
+    "message": "워크플로 게시가 곧 계획의 승인입니다. 실행은 게시된 워크플로에서 시작되며 따로 확인할 것이 없습니다. 무언가를 변경하는 도구 호출은 {approver}의 결정을 기다립니다. 승인 / 반려 / 반환 버튼이 허용 대상 호출 목록과 함께 채팅 안에 바로 표시되고, 그 사람만 처리할 수 있습니다. 다른 사람에게는 {forbidden} 오류가 반환됩니다."
+  },
+  "home.how.step2.body.approver": {
+    "message": "지정된 승인자"
+  },
+  "home.how.step3.label": {
+    "message": "3단계 — 실행"
+  },
+  "home.how.step3.title": {
+    "message": "에이전트가 그래프를 따라 진행합니다"
+  },
+  "home.how.step3.body": {
+    "message": "실행을 누르면 에이전트가 해당 실행 전용 워크플로 세션에서 바로 시작합니다. 작업은 종속 순서에 따라 {statuses}로 진행되며 현재 작업에 연결된 MCP 도구만 호출하고, 에이전트는 채팅 안에 바로 그린 양식으로 질문합니다."
+  },
+  "home.teams.eyebrow": {
+    "message": "팀을 위한 도구"
+  },
+  "home.teams.title": {
+    "message": "세 가지 역할, {conversation}"
+  },
+  "home.teams.title.conversation": {
+    "message": "하나의 대화"
+  },
+  "home.teams.lead": {
+    "message": "워크플로 세션은 공유 채팅입니다. 요청자, 승인자, 에이전트가 모두 같은 스레드에 글을 남깁니다. 별도의 연락 경로도, “제 티켓 어떻게 됐나요?”도 없습니다."
+  },
+  "home.teams.applicant.title": {
+    "message": "요청자"
+  },
+  "home.teams.applicant.body": {
+    "message": "게시된 워크플로를 실행합니다. 에이전트가 채팅에 그리는 양식으로 질문에 답하고, 같은 스레드에서 작업 진행 상황을 지켜봅니다."
+  },
+  "home.teams.approver.title": {
+    "message": "승인자"
+  },
+  "home.teams.approver.body": {
+    "message": "알림을 받으면 세션을 열어 채팅 안에서 바로 결정하고 댓글을 남깁니다. 승인은 지정된 승인자만 처리할 수 있습니다."
+  },
+  "home.teams.agent.title": {
+    "message": "에이전트"
+  },
+  "home.teams.agent.body": {
+    "message": "작업 그래프를 계획하고, 필요한 시점에 승인을 요청하며, 스킬에 따라 각 단계를 실행하면서 진행 상황을 보고합니다."
+  },
+  "home.teams.trust.notifications.title": {
+    "message": "결정할 곳까지 안내하는 알림"
+  },
+  "home.teams.trust.notifications.body": {
+    "message": "승인 요청과 세션 완료는 각 사용자의 알림 벨로 전달되며, 해당 대화로 바로 이동할 수 있습니다."
+  },
+  "home.teams.trust.audit.title": {
+    "message": "모든 승인에 남는 감사 기록"
+  },
+  "home.teams.trust.audit.body": {
+    "message": "누가 승인했고, 무엇을 적었으며, 정확히 언제였는지. 승인 기록에 저장되어 관리 콘솔에서 찾아볼 수 있습니다."
+  },
+  "home.features.eyebrow": {
+    "message": "기능"
+  },
+  "home.features.title": {
+    "message": "워크플로에 필요한 것은 모두, {nothing}"
+  },
+  "home.features.title.nothing": {
+    "message": "군더더기는 없이"
+  },
+  "home.features.skills.title": {
+    "message": "Git에 두는 에이전트 스킬"
+  },
+  "home.features.skills.body": {
+    "message": "절차는 Git 저장소에 {file} 파일로 저장되고 첫 실행 때 복제됩니다. 다른 코드처럼 버전을 관리하고, 검토하고, 읽을 수 있습니다."
+  },
+  "home.features.graph.title": {
+    "message": "다시 실행할 수 있는 계획"
+  },
+  "home.features.graph.body": {
+    "message": "에이전트가 스킬로 작성한 작업 그래프는 워크플로로 게시됩니다. 종속 관계를 강제하고 순환을 거부하는 진짜 DAG이며, 모든 실행이 같은 그래프를 따릅니다. 정렬 가능한 표나 자동 배치된 그래프로 표시되고, 에이전트의 작업에 맞춰 갱신됩니다."
+  },
+  "home.features.gates.title": {
+    "message": "실행 도중의 승인 관문"
+  },
+  "home.features.gates.body": {
+    "message": "파괴적인 단계 전에 에이전트는 특정 사용자에게 승인을 요청하고 멈춥니다. 승인 / 반려 / 반환 버튼이 채팅에 나타나며, 해당 사용자에게만 표시됩니다."
+  },
+  "home.features.mcp.title": {
+    "message": "작업별로 범위를 제한한 MCP 도구"
+  },
+  "home.features.mcp.body": {
+    "message": "MCP 서버를 등록하면 에이전트가 계획 시점에 각 작업에 필요한 도구만 연결합니다. 실행 시 작업은 자신의 도구만 호출할 수 있으며, A2Flow가 시작하는 모든 서버는 각자의 bubblewrap 샌드박스에서 실행됩니다."
+  },
+  "home.features.a2ui.title": {
+    "message": "채팅 안의 리치 UI"
+  },
+  "home.features.a2ui.body": {
+    "message": "A2UI 프로토콜을 통해 에이전트가 버튼, 양식, 카드를 대화 안에 바로 그립니다. 클릭은 도구 결과로 실행에 다시 전달됩니다."
+  },
+  "home.features.llm.title": {
+    "message": "원하는 LLM 사용"
+  },
+  "home.features.llm.body": {
+    "message": "기본값은 Gemini이며, OpenAI와 Anthropic 모델은 LiteLLM을 통해 사용합니다. 제공자 전환은 환경 변수 하나면 됩니다."
+  },
+  "home.architecture.eyebrow": {
+    "message": "내부 구조"
+  },
+  "home.architecture.title": {
+    "message": "개방형 프로토콜 {stack}"
+  },
+  "home.architecture.title.stack": {
+    "message": "스택"
+  },
+  "home.architecture.lead": {
+    "message": "채팅 UI는 FastAPI 백엔드에서 AG-UI 이벤트를 스트리밍으로 받고, 에이전트는 A2UI 서피스를 채팅에 그립니다. 에이전트 스킬은 Git에서, 도구는 MCP 서버에서 가져오며, 하나의 관계형 데이터베이스가 모두 보관합니다."
+  },
+  "home.cta.eyebrow": {
+    "message": "시작하기"
+  },
+  "home.cta.title": {
+    "message": "{machine} 실행해 보세요"
+  },
+  "home.cta.title.machine": {
+    "message": "내 컴퓨터에서"
+  },
+  "home.cta.lead": {
+    "message": "PostgreSQL, 백엔드, 프런트엔드까지 전체 스택이 Docker Compose로 실행됩니다. Google API 키만 있으면 명령 두 개로 첫 워크플로에 도달합니다."
+  },
+  "theme.ErrorPageContent.title": {
+    "message": "페이지에 오류가 발생하였습니다.",
+    "description": "The title of the fallback page when the page crashed"
+  },
+  "theme.BackToTopButton.buttonAriaLabel": {
+    "message": "맨 위로 스크롤하기",
+    "description": "The ARIA label for the back to top button"
+  },
+  "theme.blog.archive.title": {
+    "message": "게시물 목록",
+    "description": "The page & hero title of the blog archive page"
+  },
+  "theme.blog.archive.description": {
+    "message": "게시물 목록",
+    "description": "The page & hero description of the blog archive page"
+  },
+  "theme.blog.paginator.navAriaLabel": {
+    "message": "블로그 게시물 목록 탐색",
+    "description": "The ARIA label for the blog pagination"
+  },
+  "theme.blog.paginator.newerEntries": {
+    "message": "이전 페이지",
+    "description": "The label used to navigate to the newer blog posts page (previous page)"
+  },
+  "theme.blog.paginator.olderEntries": {
+    "message": "다음 페이지",
+    "description": "The label used to navigate to the older blog posts page (next page)"
+  },
+  "theme.blog.post.paginator.navAriaLabel": {
+    "message": "블로그 게시물 탐색",
+    "description": "The ARIA label for the blog posts pagination"
+  },
+  "theme.blog.post.paginator.newerPost": {
+    "message": "이전 게시물",
+    "description": "The blog post button label to navigate to the newer/previous post"
+  },
+  "theme.blog.post.paginator.olderPost": {
+    "message": "다음 게시물",
+    "description": "The blog post button label to navigate to the older/next post"
+  },
+  "theme.tags.tagsPageLink": {
+    "message": "모든 태그 보기",
+    "description": "The label of the link targeting the tag list page"
+  },
+  "theme.colorToggle.ariaLabel.mode.system": {
+    "message": "시스템 모드",
+    "description": "The name for the system color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.light": {
+    "message": "밝은 모드",
+    "description": "The name for the light color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.dark": {
+    "message": "어두운 모드",
+    "description": "The name for the dark color mode"
+  },
+  "theme.colorToggle.ariaLabel": {
+    "message": "어두운 모드와 밝은 모드 전환하기 (현재 {mode})",
+    "description": "The ARIA label for the color mode toggle"
+  },
+  "theme.docs.breadcrumbs.navAriaLabel": {
+    "message": "탐색 경로",
+    "description": "The ARIA label for the breadcrumbs"
+  },
+  "theme.docs.paginator.navAriaLabel": {
+    "message": "문서 페이지",
+    "description": "The ARIA label for the docs pagination"
+  },
+  "theme.docs.paginator.previous": {
+    "message": "이전",
+    "description": "The label used to navigate to the previous doc"
+  },
+  "theme.docs.paginator.next": {
+    "message": "다음",
+    "description": "The label used to navigate to the next doc"
+  },
+  "theme.docs.tagDocListPageTitle.nDocsTagged": {
+    "message": "{count}개 문서가",
+    "description": "Pluralized label for \"{count} docs tagged\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.docs.tagDocListPageTitle": {
+    "message": "{nDocsTagged} \"{tagName}\" 태그에 분류되었습니다",
+    "description": "The title of the page for a docs tag"
+  },
+  "theme.docs.versionBadge.label": {
+    "message": "버전: {versionLabel}"
+  },
+  "theme.docs.versions.unreleasedVersionLabel": {
+    "message": "{siteTitle} {versionLabel} 문서는 아직 정식 공개되지 않았습니다.",
+    "description": "The label used to tell the user that he's browsing an unreleased doc version"
+  },
+  "theme.docs.versions.unmaintainedVersionLabel": {
+    "message": "{siteTitle} {versionLabel} 문서는 더 이상 업데이트되지 않습니다.",
+    "description": "The label used to tell the user that he's browsing an unmaintained doc version"
+  },
+  "theme.docs.versions.latestVersionSuggestionLabel": {
+    "message": "최신 문서는 {latestVersionLink} ({versionLabel})을 확인하세요.",
+    "description": "The label used to tell the user to check the latest version"
+  },
+  "theme.docs.versions.latestVersionLinkLabel": {
+    "message": "최신 버전",
+    "description": "The label used for the latest version suggestion link label"
+  },
+  "theme.common.editThisPage": {
+    "message": "페이지 편집",
+    "description": "The link label to edit the current page"
+  },
+  "theme.common.headingLinkTitle": {
+    "message": "{heading}에 대한 직접 링크",
+    "description": "Title for link to heading"
+  },
+  "theme.lastUpdated.atDate": {
+    "message": " {date}에",
+    "description": "The words used to describe on which date a page has been last updated"
+  },
+  "theme.lastUpdated.byUser": {
+    "message": " {user}가",
+    "description": "The words used to describe by who the page has been last updated"
+  },
+  "theme.lastUpdated.lastUpdatedAtBy": {
+    "message": "최종 수정: {atDate}{byUser}",
+    "description": "The sentence used to display when a page has been last updated, and by who"
+  },
+  "theme.NotFound.title": {
+    "message": "페이지를 찾을 수 없습니다.",
+    "description": "The title of the 404 page"
+  },
+  "theme.navbar.mobileVersionsDropdown.label": {
+    "message": "버전",
+    "description": "The label for the navbar versions dropdown on mobile view"
+  },
+  "theme.tags.tagsListLabel": {
+    "message": "태그:",
+    "description": "The label alongside a tag list"
+  },
+  "theme.admonition.caution": {
+    "message": "주의",
+    "description": "The default label used for the Caution admonition (:::caution)"
+  },
+  "theme.admonition.danger": {
+    "message": "위험",
+    "description": "The default label used for the Danger admonition (:::danger)"
+  },
+  "theme.admonition.info": {
+    "message": "정보",
+    "description": "The default label used for the Info admonition (:::info)"
+  },
+  "theme.admonition.note": {
+    "message": "노트",
+    "description": "The default label used for the Note admonition (:::note)"
+  },
+  "theme.admonition.tip": {
+    "message": "팁",
+    "description": "The default label used for the Tip admonition (:::tip)"
+  },
+  "theme.admonition.warning": {
+    "message": "경고",
+    "description": "The default label used for the Warning admonition (:::warning)"
+  },
+  "theme.AnnouncementBar.closeButtonAriaLabel": {
+    "message": "닫기",
+    "description": "The ARIA label for close button of announcement bar"
+  },
+  "theme.blog.sidebar.navAriaLabel": {
+    "message": "최근 블로그 문서 둘러보기",
+    "description": "The ARIA label for recent posts in the blog sidebar"
+  },
+  "theme.DocSidebarItem.expandCategoryAriaLabel": {
+    "message": "사이드바 분류 '{label}' 펼치기",
+    "description": "The ARIA label to expand the sidebar category"
+  },
+  "theme.DocSidebarItem.collapseCategoryAriaLabel": {
+    "message": "사이드바 분류 '{label}' 접기",
+    "description": "The ARIA label to collapse the sidebar category"
+  },
+  "theme.IconExternalLink.ariaLabel": {
+    "message": "(새 탭에서 열림)",
+    "description": "The ARIA label for the external link icon"
+  },
+  "theme.NavBar.navAriaLabel": {
+    "message": "메인",
+    "description": "The ARIA label for the main navigation"
+  },
+  "theme.NotFound.p1": {
+    "message": "원하는 페이지를 찾을 수 없습니다.",
+    "description": "The first paragraph of the 404 page"
+  },
+  "theme.NotFound.p2": {
+    "message": "사이트 관리자에게 링크가 깨진 것을 알려주세요.",
+    "description": "The 2nd paragraph of the 404 page"
+  },
+  "theme.TOCCollapsible.toggleButtonLabel": {
+    "message": "이 페이지에서",
+    "description": "The label used by the button on the collapsible TOC component"
+  },
+  "theme.navbar.mobileLanguageDropdown.label": {
+    "message": "언어",
+    "description": "The label for the mobile language switcher dropdown"
+  },
+  "theme.blog.post.readingTime.plurals": {
+    "message": "약 {readingTime}분",
+    "description": "Pluralized label for \"{readingTime} min read\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.post.readMore": {
+    "message": "자세히 보기",
+    "description": "The label used in blog post item excerpts to link to full blog posts"
+  },
+  "theme.blog.post.readMoreLabel": {
+    "message": "{title} 에 대해 더 읽어보기",
+    "description": "The ARIA label for the link to full blog posts from excerpts"
+  },
+  "theme.CodeBlock.wordWrapToggle": {
+    "message": "줄 바꿈 전환",
+    "description": "The title attribute for toggle word wrapping button of code block lines"
+  },
+  "theme.CodeBlock.copy": {
+    "message": "복사",
+    "description": "The copy button label on code blocks"
+  },
+  "theme.CodeBlock.copied": {
+    "message": "복사했습니다",
+    "description": "The copied button label on code blocks"
+  },
+  "theme.CodeBlock.copyButtonAriaLabel": {
+    "message": "클립보드에 코드 복사",
+    "description": "The ARIA label for copy code blocks button"
+  },
+  "theme.docs.breadcrumbs.home": {
+    "message": "홈",
+    "description": "The ARIA label for the home page in the breadcrumbs"
+  },
+  "theme.docs.sidebar.collapseButtonTitle": {
+    "message": "사이드바 숨기기",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.collapseButtonAriaLabel": {
+    "message": "사이드바 숨기기",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.navAriaLabel": {
+    "message": "문서 사이드바",
+    "description": "The ARIA label for the sidebar navigation"
+  },
+  "theme.docs.sidebar.closeSidebarButtonAriaLabel": {
+    "message": "사이드바 닫기",
+    "description": "The ARIA label for close button of mobile sidebar"
+  },
+  "theme.docs.sidebar.toggleSidebarButtonAriaLabel": {
+    "message": "사이드바 펼치거나 접기",
+    "description": "The ARIA label for hamburger menu button of mobile navigation"
+  },
+  "theme.navbar.mobileSidebarSecondaryMenu.backButtonLabel": {
+    "message": "← 메인 메뉴로 돌아가기",
+    "description": "The label of the back button to return to main menu, inside the mobile navbar sidebar secondary menu (notably used to display the docs sidebar)"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.expandAriaLabel": {
+    "message": "드롭다운 펼치기",
+    "description": "The ARIA label of the button to expand the mobile dropdown navbar item"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.collapseAriaLabel": {
+    "message": "드롭다운 접기",
+    "description": "The ARIA label of the button to collapse the mobile dropdown navbar item"
+  },
+  "theme.docs.sidebar.expandButtonTitle": {
+    "message": "사이드바 열기",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.docs.sidebar.expandButtonAriaLabel": {
+    "message": "사이드바 열기",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.SearchBar.noResultsText": {
+    "message": "결과가 없습니다"
+  },
+  "theme.SearchBar.seeAllOutsideContext": {
+    "message": "\"{context}\" 외부의 모든 결과 보기"
+  },
+  "theme.SearchBar.searchInContext": {
+    "message": "\"{context}\" 내의 모든 결과 보기"
+  },
+  "theme.SearchBar.seeAll": {
+    "message": "모든 결과 보기"
+  },
+  "theme.SearchBar.label": {
+    "message": "검색",
+    "description": "The ARIA label and placeholder for search button"
+  },
+  "theme.SearchPage.existingResultsTitle": {
+    "message": "\"{query}\" 검색 결과",
+    "description": "The search page title for non-empty query"
+  },
+  "theme.SearchPage.emptyResultsTitle": {
+    "message": "문서 검색",
+    "description": "The search page title for empty query"
+  },
+  "theme.SearchPage.searchContext.everywhere": {
+    "message": "전체"
+  },
+  "theme.SearchPage.documentsFound.plurals": {
+    "message": "문서 {count}개를 찾았습니다",
+    "description": "Pluralized label for \"{count} documents found\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.SearchPage.noResultsText": {
+    "message": "찾은 문서가 없습니다",
+    "description": "The paragraph for empty search result"
+  },
+  "theme.blog.post.plurals": {
+    "message": "{count}개 게시물",
+    "description": "Pluralized label for \"{count} posts\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.tagTitle": {
+    "message": "\"{tagName}\" 태그로 연결된 {nPosts}개의 게시물이 있습니다.",
+    "description": "The title of the page for a blog tag"
+  },
+  "theme.blog.author.pageTitle": {
+    "message": "{authorName} - {nPosts}",
+    "description": "The title of the page for a blog author"
+  },
+  "theme.blog.authorsList.pageTitle": {
+    "message": "저자",
+    "description": "The title of the authors page"
+  },
+  "theme.blog.authorsList.viewAll": {
+    "message": "모든 저자 보기",
+    "description": "The label of the link targeting the blog authors page"
+  },
+  "theme.blog.author.noPosts": {
+    "message": "작성자가 아직 게시글을 작성하지 않았습니다.",
+    "description": "The text for authors with 0 blog post"
+  },
+  "theme.contentVisibility.unlistedBanner.title": {
+    "message": "색인되지 않은 문서",
+    "description": "The unlisted content banner title"
+  },
+  "theme.contentVisibility.unlistedBanner.message": {
+    "message": "이 문서는 색인되지 않습니다. 검색 엔진이 이 문서를 색인하지 않으며, 주소를 알고 있는 사용자만 접근할 수 있습니다.",
+    "description": "The unlisted content banner message"
+  },
+  "theme.contentVisibility.draftBanner.title": {
+    "message": "작성 중인 페이지",
+    "description": "The draft content banner title"
+  },
+  "theme.contentVisibility.draftBanner.message": {
+    "message": "이 페이지는 아직 작성 중입니다. 개발 환경에서만 보이며 프로덕션 빌드에서는 제외됩니다.",
+    "description": "The draft content banner message"
+  },
+  "theme.docs.DocCard.categoryDescription.plurals": {
+    "message": "{count} 항목",
+    "description": "The default description for a category card in the generated index about how many items this category includes"
+  },
+  "theme.ErrorPageContent.tryAgain": {
+    "message": "다시 시도해 보세요",
+    "description": "The label of the button to try again rendering when the React error boundary captures an error"
+  },
+  "theme.common.skipToMainContent": {
+    "message": "본문으로 건너뛰기",
+    "description": "The skip to content label used for accessibility, allowing to rapidly navigate to main content with keyboard tab/enter navigation"
+  },
+  "theme.tags.tagsPageTitle": {
+    "message": "태그",
+    "description": "The title of the tag list page"
+  }
+}
