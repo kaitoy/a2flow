@@ -16,7 +16,7 @@ docker compose up --build
 
 アプリをホスト側の別のポートで公開したい場合は、`.env` に `APP_PORT` を設定します。バックエンドの `CORS_ORIGINS` は自動的にそれに追従します。
 
-## 起動するコンテナ
+## 起動するコンテナ {#what-comes-up}
 
 | コンテナ | 役割 |
 |---|---|
@@ -42,7 +42,7 @@ docker compose --profile openbao up --build
 
 OpenBao のデータは A2Flow と同じ PostgreSQL に保存されるので、再起動しても消えません。起動のたびに自動でアンシールもされます。アンシールに使う鍵は `openbao-unseal` ボリュームにあり、鍵がないとデータを読めないので、`pgdata` と一緒にバックアップしてください。この構成は連携を試すためのもので、本番向けではありません。
 
-### 1. OpenBao を初期化する(初回のみ)
+### 1. OpenBao を初期化する(初回のみ) {#1-initialize-openbao-first-start-only}
 
 ```bash
 docker compose exec openbao bao operator init -recovery-shares=1 -recovery-threshold=1
@@ -50,7 +50,7 @@ docker compose exec openbao bao operator init -recovery-shares=1 -recovery-thres
 
 表示される **Initial Root Token** を控えておきます。表示されるのはこの一度だけです。
 
-### 2. A2Flow 用の AppRole を作る
+### 2. A2Flow 用の AppRole を作る {#2-create-an-approle-for-a2flow}
 
 AppRole のロールは UI からは作れないので、ここはコマンドラインで行います。`<root-token>` は手順 1 のトークンに置き換えてください。
 
@@ -66,13 +66,13 @@ docker compose exec -e BAO_TOKEN=<root-token> openbao sh -c '
 
 最後の 2 行で **role id** と **secret id** が表示されます。このポリシーで A2Flow が読めるのは `a2flow/` 以下のパスだけです。
 
-### 3. OpenBao の UI でシークレットを作る
+### 3. OpenBao の UI でシークレットを作る {#3-create-a-secret-in-the-openbao-ui}
 
 1. [http://localhost:8200/ui](http://localhost:8200/ui) を開き、**Token** 方式でルートトークンを使ってサインインします。ルートトークンでのサインインはページを再読み込みすると消えるので、URL を直接入力せず画面上のリンクをクリックして移動してください。
 2. **secret/** エンジンを開き、**Create secret** を選びます。
 3. パスに `a2flow/demo` を入れ、エントリ `username` と `password` を追加して保存します。
 
-### 4. A2Flow からつなぐ
+### 4. A2Flow からつなぐ {#4-connect-a2flow}
 
 1. A2Flow に `root` でログインし、**システム設定**の**グローバル Vault のアドレス**に `http://openbao:8200` を設定して保存します。
 2. **テナント**を開いて **Default** を選び、**グローバル Vault へのログイン**にチェックを入れます。**Vault の認証方式**に **AppRole** を選び、手順 2 の role id と secret id を入力して保存します。

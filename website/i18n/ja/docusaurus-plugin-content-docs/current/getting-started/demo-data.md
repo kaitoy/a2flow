@@ -7,7 +7,7 @@ sidebar_position: 4
 
 バックエンドで `DEMO_DATA=true` を設定すると、承認つきで状態を変える 3 つの例 — 「EC2 インスタンスを起動する」例、「GKE の Pod を再起動する」例、「Azure Key Vault のシークレットをローテーションする」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、実際に生成するところからの手順が[ウォークスルー](./walkthrough.mdx)です。
 
-## 有効にする
+## 有効にする {#enabling-it}
 
 `backend/.env` にフラグを足してバックエンドを再起動します。[Docker Compose](./docker-compose.md) ならすでに有効です。`compose.yml` が `DEMO_DATA: ${DEMO_DATA:-true}` を設定しています。
 
@@ -31,7 +31,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 
 ⚠️ AWS・GKE・Azure の MCP サーバーは、読み取りだけでなく、**状態を変える**操作を実行できます。AWS MCP サーバーの認証情報は実際の AWS リソースを作成・削除でき、GKE MCP サーバーの身元は実際のクラスタでワークロードのローリング再起動や Pod の削除を行え、Azure MCP サーバーのサービスプリンシパルは Key Vault のシークレットを書き込めます。いずれも使い捨てのアカウントか、権限を絞った認証情報を使ってください。実際のプロバイダにまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。
 
-## 登録されるもの
+## 登録されるもの {#what-gets-registered}
 
 - **[エージェントスキル](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — インスタンスの構成を聞き取り、それについて管理職の明示的な承認を得てから、MCP ツールでインスタンスを起動します。リポジトリは起動後にバックグラウンドで clone するので、使えるようになるまでの間スキルは `クローン中` と表示されます。
 - **[エージェントスキル](../guides/agent-skills.md) `Demo GKE Pod Restart`** — 対象(プロジェクト・クラスタ・namespace・そして Deployment/StatefulSet 名か単一の Pod 名のいずれか)をユーザーと合意し、その対象について管理職の明示的な承認を得てから、既定では GKE MCP Server でワークロードをローリング再起動し、ユーザーが1つの Pod だけを望む場合はその Pod を削除して所有コントローラーに再作成させ、結果を報告します。リポジトリの clone も同じ仕組みなので、最初は同様に `クローン中` と表示されます。
@@ -73,7 +73,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 
 **AWS アカウントも GKE クラスタも Key Vault もない場合。** 公開せず、`下書き` のまま実行してください。開発者であるそのプロバイダの開発者アカウント(`demo-aws-developer`、`demo-gcp-developer`、`demo-azure-developer`)はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる**実行**ダイアログが出るのは下書きの実行のときだけです。**モックツール**に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script`、Pod 再起動用の `patch_k8s_resource` または `delete_k8s_resource`、ローテーション用の `keyvault_secret_get` と `keyvault_secret_create`、`request_approval`)にチェックを入れれば、実際のプロバイダに届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。ローテーションのモックを選んだ場合は Key Vault のシークレット一覧も作り物になるので、その中から `db-password` を選んでください。
 
-## 削除する
+## 削除する {#removing-it}
 
 `DEMO_DATA=false` にすると(または行を削除すると)、次の起動時にこれらのレコードが**削除されます**。どちらの方向にも宣言的に働くということです。
 

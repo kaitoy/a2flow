@@ -163,8 +163,7 @@ Everything the run needs is copied onto the execution when it starts, so later e
 
 | Copied onto the run | Taken from |
 |---|---|
-| Name and effective prompt | The last published version
- — or the editor's current state, for a `draft` workflow, or when a Developer chose the unpublished edits |
+| Name and effective prompt | The last published version — or the editor's current state, for a `draft` workflow, or when a Developer chose the unpublished edits |
 | Task templates, as `pending` tasks with their dependencies and tool bindings | The same design |
 | The agent skill revision the run is pinned to | The skill's published revision |
 | The chosen tool mocks, by value | The mocks as they read at that moment |

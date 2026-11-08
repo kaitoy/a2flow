@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # クイックスタート
 
-## 0. ツールチェーン([mise](https://mise.jdx.dev/))
+## 0. ツールチェーン([mise](https://mise.jdx.dev/)) {#0-toolchain-mise}
 
 Python、Node.js、pnpm、uv のバージョンは [mise.toml](https://github.com/kaitoy/a2flow/blob/master/mise.toml) で固定し、mise が用意します。どのマシンでも同じツールチェーンが動くようにするためです。mise 自体のインストールは一度だけです。
 
@@ -26,7 +26,7 @@ Windows では、mise の shims ディレクトリ(`%LOCALAPPDATA%\mise\shims`)�
 
 mise を使わない場合は、Python 3.11 以上、Node.js 20 以上に加えて、[uv](https://docs.astral.sh/uv/) と pnpm を手動で入れてください。
 
-## 1. バックエンド
+## 1. バックエンド {#1-backend}
 
 バックエンド自体に必要なのは Python と uv だけです。Node.js は npm パッケージとして公開されている stdio 方式の [MCP サーバー](../guides/mcp-servers.md)を `npx` で起動するときにしか使いません。`docker compose` のイメージには同梱されています。
 
@@ -42,7 +42,7 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 3
 
 これで API が `http://localhost:8000` で使えるようになります。
 
-## 2. フロントエンド
+## 2. フロントエンド {#2-frontend}
 
 ```bash
 cd frontend

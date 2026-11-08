@@ -16,28 +16,28 @@ sidebar_position: 3
 
 バックエンドのそれ以外の設定は[設定リファレンス](../operations/configuration.md)にまとめてあります。
 
-## Gemini(既定)
+## Gemini(既定) {#gemini-default}
 
 ```env
 LLM_MODEL=gemini-3.8-flash
 GOOGLE_API_KEY=your_google_api_key_here
 ```
 
-## OpenAI(LiteLLM 経由)
+## OpenAI(LiteLLM 経由) {#openai-via-litellm}
 
 ```env
 LLM_MODEL=litellm:openai/gpt-6.1-sol
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-## Anthropic(LiteLLM 経由)
+## Anthropic(LiteLLM 経由) {#anthropic-via-litellm}
 
 ```env
 LLM_MODEL=litellm:anthropic/claude-sonnet-5-5
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
-## Amazon Bedrock(LiteLLM 経由)
+## Amazon Bedrock(LiteLLM 経由) {#amazon-bedrock-via-litellm}
 
 この経路が必要とする `boto3` と `botocore[crt]` はバックエンドに同梱されているため、追加のインストールは不要です。
 
