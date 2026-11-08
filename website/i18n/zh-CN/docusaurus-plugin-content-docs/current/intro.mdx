@@ -1,0 +1,77 @@
+---
+title: 简介
+description: A2Flow 是围绕 AI 代理从零重新构建的工作流引擎。代理并不置身于工作流之中，它本身就是工作流。
+slug: /intro
+sidebar_position: 1
+hide_title: true
+hide_table_of_contents: true
+---
+
+import {IntroPage, IntroHero, IntroContrast, IntroPanel, IntroActs, IntroAct, IntroClosing, IntroNext} from '@site/src/components/IntroSections';
+
+<IntroPage>
+
+<IntroHero
+  eyebrow="AI 代理即工作流"
+  title={<>工作流引擎，<span className="grad">就是代理</span>。</>}>
+
+A2Flow 是一款由聊天驱动的工作流引擎，围绕 AI 代理从零重新构建。它不是在现成的引擎里加上一个 AI 步骤，而是一个运行时*本身*就是代理的引擎。代理负责规划工作，向需要做决定的人提问，其余的事情都自己完成。它制定的计划会保存为工作流，可以反复运行：既有聊天会话的灵活，又有固定流程的可重复性。
+
+</IntroHero>
+
+<IntroContrast>
+
+<IntroPanel kind="past" title="工作流里的代理">
+
+流程图就是程序，其中某个位置放着一个标有“AI”的方框。它填写一个字段、起草一段摘要、给一张工单分类。然后控制权又回到某人去年画的那张图上，流程的其余部分还是老样子。
+
+</IntroPanel>
+
+<IntroPanel kind="next" title="代理就是工作流">
+
+这里没有可以返回的图。代理阅读流程说明，规划步骤，绑定工具，请求审批，然后执行。工作流不是代理参与其中的某个东西，而是代理所做的事情本身。
+
+</IntroPanel>
+
+</IntroContrast>
+
+<IntroActs>
+
+<IntroAct step="01 — 设计" icon="design" title="在对话中设计，而不是在画布上">
+
+一切从[代理技能](./guides/agent-skills.md)开始：它是 Git 仓库中的一个 `SKILL.md` 文件，和其他代码一样可以进行版本管理和审查。接下来您只需与 AI 对话。AI 起草任务图，您来调整，每个步骤需要的 [MCP 工具](./guides/mcp-servers.md)也随之绑定。您[发布](./guides/workflows.md)的正是代理自己的计划：这个工作流无需任何人绘制，而且每次运行都按同样的方式进行。
+
+</IntroAct>
+
+<IntroAct step="02 — 运行" icon="run" title="一次运行，就是一场多人参与的对话">
+
+执行工作流会打开一个共享的聊天。发起人说明意图，代理沿着任务图推进，审批人就在同一个会话里作出决定并附上评论。没有工单队列，没有额外的沟通渠道，也不用再追问“我的请求有进展吗？”
+
+</IntroAct>
+
+<IntroAct step="03 — 管控" icon="control" title="每次工具调用都带有签名的授权">
+
+[审批](./guides/approvals.md)不是要求代理遵守的建议。每个调用工具的任务都持有一张短期有效的 X.509 证书，其范围恰好是证书签发时该任务所持有的工具；未出示已签名证书的调用，MCP 网关一律拒绝。批准一个任务，就是把审批人的名字写进该任务的证书；没有要求任何人审批的任务，则带有发起这次运行的人的权限。这两种权限都无法通过提示词注入蒙混过关，代理事后也无法扩大其范围。每次调用，无论被允许还是被拒绝，都会连同证书序列号和为其签名的确切字节一起记录下来。
+
+</IntroAct>
+
+</IntroActs>
+
+<IntroClosing headline={<>规划。批准。执行。</>}>
+
+工作流真正需要的，从来就只有这三件事。A2Flow 保留了它们，把中间的一切都交给代理：这是一套由您和 AI 共同执行的标准操作流程。
+
+</IntroClosing>
+
+<IntroNext title="接下来读什么">
+
+- **[快速开始](./getting-started/quick-start.md)**：在本机运行后端和前端。
+- **[术语](./concepts/terminology.md)**：工作流、设计会话、执行和工作流会话。
+- **[代理技能](./guides/agent-skills.md)**：设计工作流所依据的、由 Git 管理的流程说明。
+- **[工作流](./guides/workflows.md)**：从技能生成工作流，加以调整、发布并运行。
+- **[审批](./guides/approvals.md)**：运行如何停下来等待人工决定，以及证书授权了哪些内容。
+- **[配置参考](./operations/configuration.md)**：后端读取的所有环境变量。
+
+</IntroNext>
+
+</IntroPage>

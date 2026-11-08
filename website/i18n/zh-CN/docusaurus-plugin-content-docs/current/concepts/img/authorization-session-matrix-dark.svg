@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1412 296" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="authorization-session-matrix-dark-title authorization-session-matrix-dark-desc"><defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+SC:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style></defs>
+      <title id="authorization-session-matrix-dark-title">谁可以进入哪个会话</title>
+      <desc id="authorization-session-matrix-dark-desc">访问矩阵，显示开发人员、工作流的创建者和超级管理员可以进入设计会话，审阅者对其拥有只读访问权限；运行的发起人、指定审批人和超级管理员可以进入工作流会话，管理员对工作流会话拥有只读访问权限。</desc>
+
+      <rect width="100%" height="100%" fill="#030711"/>
+
+      <!-- Header row -->
+      <rect x="12" y="72" width="208" height="56" rx="6" fill="#242526" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="116" y="98" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">会话</text>
+      <text x="116" y="116" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">vs. 操作者</text>
+
+      <rect x="232" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="306" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">开发人员</text>
+      <text x="306" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">租户内任何人</text>
+
+      <rect x="396" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="470" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">审阅者</text>
+      <text x="470" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">租户内任何人</text>
+
+      <rect x="560" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="634" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">创建者</text>
+      <text x="634" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">工作流的创建者</text>
+
+      <rect x="724" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="798" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">发起人</text>
+      <text x="798" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">启动此次运行</text>
+
+      <rect x="888" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="962" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">审批人</text>
+      <text x="962" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">为其指定</text>
+
+      <rect x="1052" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="1126" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">管理员</text>
+      <text x="1126" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">租户管理员</text>
+
+      <rect x="1216" y="72" width="148" height="56" rx="6" fill="#242526"/>
+      <text x="1290" y="94" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">超级管理员</text>
+      <text x="1290" y="112" fill="#e3e3e3" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">不受限制</text>
+
+      <!-- Row 0: Design session -->
+      <rect x="12" y="144" width="208" height="40" rx="4" fill="#242526" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="24" y="168" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">设计会话</text>
+
+      <rect x="232" y="144" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="306" y="168" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">完全访问</text>
+
+      <rect x="396" y="144" width="148" height="40" rx="4" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1.4"/>
+      <text x="470" y="160" fill="#3bf5c4" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">只读</text>
+      <text x="470" y="174" fill="#3bf5c4" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无法操作</text>
+
+      <rect x="560" y="144" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="634" y="168" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">完全访问</text>
+
+      <rect x="724" y="144" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="798" y="168" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无权访问</text>
+
+      <rect x="888" y="144" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="962" y="168" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无权访问</text>
+
+      <rect x="1052" y="144" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="1126" y="168" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无权访问</text>
+
+      <rect x="1216" y="144" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="1290" y="168" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">完全访问</text>
+
+      <!-- Row 1: Workflow session -->
+      <rect x="12" y="188" width="208" height="40" rx="4" fill="#242526" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="24" y="212" fill="#e3e3e3" font-size="13" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">工作流会话</text>
+
+      <rect x="232" y="188" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="306" y="212" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无权访问</text>
+
+      <rect x="396" y="188" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="470" y="212" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无权访问</text>
+
+      <rect x="560" y="188" width="148" height="40" rx="4" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="634" y="212" fill="#7e8794" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无权访问</text>
+
+      <rect x="724" y="188" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="798" y="212" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">完全访问</text>
+
+      <rect x="888" y="188" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="962" y="212" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">完全访问</text>
+
+      <rect x="1052" y="188" width="148" height="40" rx="4" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1.4"/>
+      <text x="1126" y="204" fill="#3bf5c4" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">只读</text>
+      <text x="1126" y="218" fill="#3bf5c4" fill-opacity="0.85" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">无法操作</text>
+
+      <rect x="1216" y="188" width="148" height="40" rx="4" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="1290" y="212" fill="#e3e3e3" font-size="12" font-weight="600" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">完全访问</text>
+
+      <!-- Legend -->
+      <line x1="12" y1="248" x2="1364" y2="248" stroke="#e3e3e3" stroke-opacity="0.10" stroke-width="0.8"/>
+      <text x="12" y="269" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">图例</text>
+
+      <rect x="120" y="260" width="18" height="15" rx="2" fill="#e3e3e3" fill-opacity="0.08" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="146" y="272" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">完全访问</text>
+
+      <rect x="260" y="260" width="18" height="15" rx="2" fill="#3bf5c4" fill-opacity="0.10" stroke="#3bf5c4" stroke-width="1"/>
+      <text x="286" y="272" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">只读</text>
+
+      <rect x="400" y="260" width="18" height="15" rx="2" fill="#030711" stroke="#e3e3e3" stroke-opacity="0.12" stroke-width="0.6"/>
+      <text x="426" y="272" fill="#9aa1ab" font-size="12" font-family="'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">无权访问</text>
+    </svg>

@@ -1,0 +1,664 @@
+{
+  "home.meta.title": {
+    "message": "代理即工作流"
+  },
+  "home.meta.description": {
+    "message": "A2Flow 是一款由聊天驱动的工作流引擎。它以 AI 代理为核心重构 ITSM 式工作流：把工作规划成任务图，在必须由人审批的环节暂停等待，其余部分自行执行。计划会保存为工作流，下次运行时遵循相同的步骤。"
+  },
+  "home.nav.concept": {
+    "message": "理念"
+  },
+  "home.nav.how": {
+    "message": "工作原理"
+  },
+  "home.nav.features": {
+    "message": "功能"
+  },
+  "home.nav.architecture": {
+    "message": "架构"
+  },
+  "home.hero.eyebrow": {
+    "message": "Agent as Workflow"
+  },
+  "home.hero.title": {
+    "message": "工作流引擎{br}现在就是{agent}。"
+  },
+  "home.hero.title.agent": {
+    "message": "代理"
+  },
+  "home.hero.sub": {
+    "message": "A2Flow 是一款由聊天驱动的工作流引擎。它以 AI 代理为核心，重构服务请求、变更执行、公告发布等 ITSM 式工作流：把工作规划成任务图，在必须由人审批的环节暂停等待，其余部分自行执行。计划会保存为工作流，下次运行时遵循相同的步骤。"
+  },
+  "home.hero.cta.github": {
+    "message": "在 GitHub 上查看"
+  },
+  "home.hero.cta.how": {
+    "message": "了解工作原理"
+  },
+  "home.hero.demoCaption": {
+    "message": "两个聊天，一个工作流：先与代理一起设计，再在专属会话中运行，表单和审批都在其中。"
+  },
+  "home.concept.eyebrow": {
+    "message": "理念"
+  },
+  "home.concept.title": {
+    "message": "{reimagined} ITSM 工作流"
+  },
+  "home.concept.title.reimagined": {
+    "message": "重新构想"
+  },
+  "home.concept.lead": {
+    "message": "传统工作流引擎可重复，却很僵化：固定的表单、工单队列、人与人之间的交接，大部分时间都在等待。与 AI 代理聊天则恰恰相反：灵活，但它制定的计划在会话结束后就消失了，也没有人审批过。A2Flow 保留前者的流程和审批、后者的对话，中间的一切都交给代理。"
+  },
+  "home.concept.past.title": {
+    "message": "工单流水线"
+  },
+  "home.concept.past.sub": {
+    "message": "流程即软件：可重复，却很僵化——表单固定，状态固定，全靠人来衔接。"
+  },
+  "home.concept.past.form": {
+    "message": "填写表单"
+  },
+  "home.concept.past.form.note": {
+    "message": "填错一个字段就被打回。"
+  },
+  "home.concept.past.queue": {
+    "message": "排队等待"
+  },
+  "home.concept.past.queue.note": {
+    "message": "您的请求排在第 14 位。"
+  },
+  "home.concept.past.handoff": {
+    "message": "在团队间交接"
+  },
+  "home.concept.past.handoff.note": {
+    "message": "每交接一次，上下文就丢失一些。"
+  },
+  "home.concept.past.chase": {
+    "message": "追问进度"
+  },
+  "home.concept.past.chase.note": {
+    "message": "“我的工单有进展吗？”"
+  },
+  "home.concept.chat.title": {
+    "message": "AI 聊天会话"
+  },
+  "home.concept.chat.sub": {
+    "message": "流程靠即兴发挥：灵活，但每次都不一样。"
+  },
+  "home.concept.chat.ask": {
+    "message": "在聊天中向代理提出请求"
+  },
+  "home.concept.chat.ask.note": {
+    "message": "无需表单，怎么说都行。"
+  },
+  "home.concept.chat.plan": {
+    "message": "代理自行规划并执行"
+  },
+  "home.concept.chat.plan.note": {
+    "message": "每次都是新计划，而且都略有不同。"
+  },
+  "home.concept.chat.gate": {
+    "message": "没有审批人把关"
+  },
+  "home.concept.chat.gate.note": {
+    "message": "聊天的人自己说了算，其他人都看不到。"
+  },
+  "home.concept.chat.gone": {
+    "message": "会话结束，计划消失"
+  },
+  "home.concept.chat.gone.note": {
+    "message": "下一次请求又要从零开始。"
+  },
+  "home.concept.next.title": {
+    "message": "聊天驱动的工作流"
+  },
+  "home.concept.next.sub": {
+    "message": "与 AI 一起运行的 SOP：像聊天一样灵活，像规程一样可重复。"
+  },
+  "home.concept.next.intent": {
+    "message": "在聊天中说明意图"
+  },
+  "home.concept.next.intent.note": {
+    "message": "无需表单，技能知道该问什么。"
+  },
+  "home.concept.next.plan": {
+    "message": "计划保存为工作流"
+  },
+  "home.concept.next.plan.note": {
+    "message": "代理根据技能起草的任务图，只需发布一次，便可按需反复运行。"
+  },
+  "home.concept.next.approve": {
+    "message": "关键环节由人批准"
+  },
+  "home.concept.next.approve.note": {
+    "message": "包括发布设计，以及每一次会更改内容的工具调用。"
+  },
+  "home.concept.next.execute": {
+    "message": "代理执行并验证"
+  },
+  "home.concept.next.execute.note": {
+    "message": "在同一对话中实时显示进度。"
+  },
+  "home.concept.note": {
+    "message": "流程本身并不是锁在工作流引擎里的代码，而是{skill}——有版本管理、可以审查，团队中的任何人都能读懂。"
+  },
+  "home.concept.note.skill": {
+    "message": "代理技能，即 Git 仓库中的 {file} 文件"
+  },
+  "home.how.eyebrow": {
+    "message": "工作原理"
+  },
+  "home.how.title": {
+    "message": "规划。批准。{execute}"
+  },
+  "home.how.title.execute": {
+    "message": "执行。"
+  },
+  "home.how.lead": {
+    "message": "每次运行都要通过同样的两道门禁：在有人发布设计之前，什么都不会运行；在指定审批人同意之前，任何会更改内容的工具调用都无法通过。"
+  },
+  "home.how.step1.label": {
+    "message": "第 1 步——规划"
+  },
+  "home.how.step1.title": {
+    "message": "代理把意图转化为任务图"
+  },
+  "home.how.step1.body": {
+    "message": "在设计会话中，它读取代理技能，将您的提示词拆分为依赖关系明确的任务模板，并通过一次调用注册整个 DAG，同时完成循环检测。您可以通过聊天或手动调整，此时还不会运行任何内容。"
+  },
+  "home.how.step2.label": {
+    "message": "第 2 步——批准"
+  },
+  "home.how.step2.title": {
+    "message": "关键环节由人把关"
+  },
+  "home.how.step2.body": {
+    "message": "发布工作流即是批准计划——运行由此开始，无需再次确认。会更改内容的工具调用要经过{approver}把关：批准、驳回、退回控件直接显示在聊天中，并列出它们所授权的具体调用，只有这个人才能处理——其他人只会收到 {forbidden}。"
+  },
+  "home.how.step2.body.approver": {
+    "message": "指定审批人"
+  },
+  "home.how.step3.label": {
+    "message": "第 3 步——执行"
+  },
+  "home.how.step3.title": {
+    "message": "代理沿着图逐步推进"
+  },
+  "home.how.step3.body": {
+    "message": "按下运行，代理立即在此次运行专属的工作流会话中开始工作。任务按依赖顺序依次经历 {statuses}，只调用绑定到当前任务的 MCP 工具；代理需要询问时，则通过直接绘制在聊天中的表单提问。"
+  },
+  "home.teams.eyebrow": {
+    "message": "为团队而生"
+  },
+  "home.teams.title": {
+    "message": "三种角色，{conversation}"
+  },
+  "home.teams.title.conversation": {
+    "message": "同一场对话"
+  },
+  "home.teams.lead": {
+    "message": "工作流会话是共享的聊天。发起人、审批人和代理都在同一对话中发言——没有私下沟通，也不会再有“我的工单有进展吗？”"
+  },
+  "home.teams.applicant.title": {
+    "message": "发起人"
+  },
+  "home.teams.applicant.body": {
+    "message": "运行已发布的工作流。在代理绘制到聊天中的表单里回答问题，并在同一对话中查看任务进度。"
+  },
+  "home.teams.approver.title": {
+    "message": "审批人"
+  },
+  "home.teams.approver.body": {
+    "message": "收到通知后打开会话，直接在聊天中作出决定，并可附上评论。只有指定审批人才能处理审批。"
+  },
+  "home.teams.agent.title": {
+    "message": "代理"
+  },
+  "home.teams.agent.body": {
+    "message": "规划任务图，在恰当的时机请求审批，按技能执行每个步骤，并随时报告进度。"
+  },
+  "home.teams.trust.notifications.title": {
+    "message": "把您直接带到决策处的通知"
+  },
+  "home.teams.trust.notifications.body": {
+    "message": "审批请求和会话完成通知会进入每位用户的通知铃铛，并可直接跳转到相关对话。"
+  },
+  "home.teams.trust.audit.title": {
+    "message": "每次审批都有审计记录"
+  },
+  "home.teams.trust.audit.body": {
+    "message": "谁批准的、写了什么、具体何时——都保存在审批记录中，可在管理界面中查看。"
+  },
+  "home.features.eyebrow": {
+    "message": "功能"
+  },
+  "home.features.title": {
+    "message": "工作流所需的一切，{nothing}"
+  },
+  "home.features.title.nothing": {
+    "message": "多余的一概没有"
+  },
+  "home.features.skills.title": {
+    "message": "Git 中的代理技能"
+  },
+  "home.features.skills.body": {
+    "message": "流程以 {file} 文件的形式保存在 Git 仓库中，并在首次运行时克隆。可以像其他代码一样进行版本管理、审查和阅读。"
+  },
+  "home.features.graph.title": {
+    "message": "可重复运行的计划"
+  },
+  "home.features.graph.body": {
+    "message": "代理根据技能起草的任务图会发布为工作流——真正的 DAG，强制依赖关系，拒绝循环——每次运行都遵循同一张图，并以可排序的表格或自动布局的图表呈现，随代理的工作实时更新。"
+  },
+  "home.features.gates.title": {
+    "message": "运行中途的审批门禁"
+  },
+  "home.features.gates.body": {
+    "message": "在执行破坏性步骤之前，代理会向特定用户请求审批并暂停。批准、驳回、退回按钮会出现在聊天中——仅该用户可见。"
+  },
+  "home.features.mcp.title": {
+    "message": "按任务限定的 MCP 工具"
+  },
+  "home.features.mcp.body": {
+    "message": "注册 MCP 服务器后，代理在规划时只为每个任务绑定所需的工具。运行时，任务只能调用自己的工具——而且 A2Flow 启动的每个服务器都运行在各自的 bubblewrap 沙箱中。"
+  },
+  "home.features.a2ui.title": {
+    "message": "聊天中的富 UI"
+  },
+  "home.features.a2ui.body": {
+    "message": "通过 A2UI 协议，代理可直接在聊天中渲染按钮、表单和卡片——您的点击会作为工具结果回传到运行中。"
+  },
+  "home.features.llm.title": {
+    "message": "自带 LLM"
+  },
+  "home.features.llm.body": {
+    "message": "默认使用 Gemini，也可通过 LiteLLM 使用 OpenAI 和 Anthropic 的模型。更换提供商只需修改一个环境变量。"
+  },
+  "home.architecture.eyebrow": {
+    "message": "技术内幕"
+  },
+  "home.architecture.title": {
+    "message": "基于开放协议的{stack}"
+  },
+  "home.architecture.title.stack": {
+    "message": "技术栈"
+  },
+  "home.architecture.lead": {
+    "message": "聊天界面从 FastAPI 后端接收 AG-UI 事件流，代理则把 A2UI 界面绘制到聊天中。代理技能来自 Git，工具来自 MCP 服务器，所有数据都保存在同一个关系型数据库中。"
+  },
+  "home.cta.eyebrow": {
+    "message": "开始使用"
+  },
+  "home.cta.title": {
+    "message": "{machine}运行"
+  },
+  "home.cta.title.machine": {
+    "message": "在您的电脑上"
+  },
+  "home.cta.lead": {
+    "message": "整个技术栈（PostgreSQL、后端、前端）通过 Docker Compose 启动。准备好 Google API 密钥，只需两条命令就能运行您的第一个工作流。"
+  },
+  "theme.ErrorPageContent.title": {
+    "message": "页面已崩溃。",
+    "description": "The title of the fallback page when the page crashed"
+  },
+  "theme.blog.archive.title": {
+    "message": "历史博文",
+    "description": "The page & hero title of the blog archive page"
+  },
+  "theme.blog.archive.description": {
+    "message": "历史博文",
+    "description": "The page & hero description of the blog archive page"
+  },
+  "theme.BackToTopButton.buttonAriaLabel": {
+    "message": "回到顶部",
+    "description": "The ARIA label for the back to top button"
+  },
+  "theme.blog.paginator.navAriaLabel": {
+    "message": "博文列表分页导航",
+    "description": "The ARIA label for the blog pagination"
+  },
+  "theme.blog.paginator.newerEntries": {
+    "message": "较新的博文",
+    "description": "The label used to navigate to the newer blog posts page (previous page)"
+  },
+  "theme.blog.paginator.olderEntries": {
+    "message": "较旧的博文",
+    "description": "The label used to navigate to the older blog posts page (next page)"
+  },
+  "theme.blog.post.paginator.navAriaLabel": {
+    "message": "博文分页导航",
+    "description": "The ARIA label for the blog posts pagination"
+  },
+  "theme.blog.post.paginator.newerPost": {
+    "message": "较新一篇",
+    "description": "The blog post button label to navigate to the newer/previous post"
+  },
+  "theme.blog.post.paginator.olderPost": {
+    "message": "较旧一篇",
+    "description": "The blog post button label to navigate to the older/next post"
+  },
+  "theme.tags.tagsPageLink": {
+    "message": "查看所有标签",
+    "description": "The label of the link targeting the tag list page"
+  },
+  "theme.colorToggle.ariaLabel.mode.system": {
+    "message": "系统模式",
+    "description": "The name for the system color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.light": {
+    "message": "浅色模式",
+    "description": "The name for the light color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.dark": {
+    "message": "深色模式",
+    "description": "The name for the dark color mode"
+  },
+  "theme.colorToggle.ariaLabel": {
+    "message": "切换浅色/深色模式（当前为{mode}）",
+    "description": "The ARIA label for the color mode toggle"
+  },
+  "theme.docs.breadcrumbs.navAriaLabel": {
+    "message": "页面路径",
+    "description": "The ARIA label for the breadcrumbs"
+  },
+  "theme.docs.paginator.navAriaLabel": {
+    "message": "文档分页导航",
+    "description": "The ARIA label for the docs pagination"
+  },
+  "theme.docs.paginator.previous": {
+    "message": "上一页",
+    "description": "The label used to navigate to the previous doc"
+  },
+  "theme.docs.paginator.next": {
+    "message": "下一页",
+    "description": "The label used to navigate to the next doc"
+  },
+  "theme.docs.tagDocListPageTitle.nDocsTagged": {
+    "message": "{count} 篇文档带有标签",
+    "description": "Pluralized label for \"{count} docs tagged\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.docs.tagDocListPageTitle": {
+    "message": "{nDocsTagged}“{tagName}”",
+    "description": "The title of the page for a docs tag"
+  },
+  "theme.docs.versionBadge.label": {
+    "message": "版本：{versionLabel}"
+  },
+  "theme.docs.versions.unreleasedVersionLabel": {
+    "message": "此为 {siteTitle} {versionLabel} 版尚未发行的文档。",
+    "description": "The label used to tell the user that he's browsing an unreleased doc version"
+  },
+  "theme.docs.versions.unmaintainedVersionLabel": {
+    "message": "此为 {siteTitle} {versionLabel} 版的文档，现已不再积极维护。",
+    "description": "The label used to tell the user that he's browsing an unmaintained doc version"
+  },
+  "theme.docs.versions.latestVersionSuggestionLabel": {
+    "message": "最新的文档请参阅 {latestVersionLink}（{versionLabel}）。",
+    "description": "The label used to tell the user to check the latest version"
+  },
+  "theme.docs.versions.latestVersionLinkLabel": {
+    "message": "最新版本",
+    "description": "The label used for the latest version suggestion link label"
+  },
+  "theme.common.editThisPage": {
+    "message": "编辑此页",
+    "description": "The link label to edit the current page"
+  },
+  "theme.common.headingLinkTitle": {
+    "message": "{heading}的直接链接",
+    "description": "Title for link to heading"
+  },
+  "theme.lastUpdated.atDate": {
+    "message": "于 {date} ",
+    "description": "The words used to describe on which date a page has been last updated"
+  },
+  "theme.lastUpdated.byUser": {
+    "message": "由 {user} ",
+    "description": "The words used to describe by who the page has been last updated"
+  },
+  "theme.lastUpdated.lastUpdatedAtBy": {
+    "message": "最后{byUser}{atDate}更新",
+    "description": "The sentence used to display when a page has been last updated, and by who"
+  },
+  "theme.navbar.mobileVersionsDropdown.label": {
+    "message": "选择版本",
+    "description": "The label for the navbar versions dropdown on mobile view"
+  },
+  "theme.NotFound.title": {
+    "message": "找不到页面",
+    "description": "The title of the 404 page"
+  },
+  "theme.tags.tagsListLabel": {
+    "message": "标签：",
+    "description": "The label alongside a tag list"
+  },
+  "theme.admonition.caution": {
+    "message": "警告",
+    "description": "The default label used for the Caution admonition (:::caution)"
+  },
+  "theme.admonition.danger": {
+    "message": "危险",
+    "description": "The default label used for the Danger admonition (:::danger)"
+  },
+  "theme.admonition.info": {
+    "message": "信息",
+    "description": "The default label used for the Info admonition (:::info)"
+  },
+  "theme.admonition.note": {
+    "message": "备注",
+    "description": "The default label used for the Note admonition (:::note)"
+  },
+  "theme.admonition.tip": {
+    "message": "提示",
+    "description": "The default label used for the Tip admonition (:::tip)"
+  },
+  "theme.admonition.warning": {
+    "message": "注意",
+    "description": "The default label used for the Warning admonition (:::warning)"
+  },
+  "theme.AnnouncementBar.closeButtonAriaLabel": {
+    "message": "关闭",
+    "description": "The ARIA label for close button of announcement bar"
+  },
+  "theme.blog.sidebar.navAriaLabel": {
+    "message": "最近博文导航",
+    "description": "The ARIA label for recent posts in the blog sidebar"
+  },
+  "theme.DocSidebarItem.expandCategoryAriaLabel": {
+    "message": "展开侧边栏分类“{label}”",
+    "description": "The ARIA label to expand the sidebar category"
+  },
+  "theme.DocSidebarItem.collapseCategoryAriaLabel": {
+    "message": "折叠侧边栏分类“{label}”",
+    "description": "The ARIA label to collapse the sidebar category"
+  },
+  "theme.IconExternalLink.ariaLabel": {
+    "message": "（在新标签页中打开）",
+    "description": "The ARIA label for the external link icon"
+  },
+  "theme.NavBar.navAriaLabel": {
+    "message": "主导航",
+    "description": "The ARIA label for the main navigation"
+  },
+  "theme.navbar.mobileLanguageDropdown.label": {
+    "message": "选择语言",
+    "description": "The label for the mobile language switcher dropdown"
+  },
+  "theme.NotFound.p1": {
+    "message": "我们找不到您要找的页面。",
+    "description": "The first paragraph of the 404 page"
+  },
+  "theme.NotFound.p2": {
+    "message": "请联系原始链接来源网站的所有者，并告知他们链接已损坏。",
+    "description": "The 2nd paragraph of the 404 page"
+  },
+  "theme.TOCCollapsible.toggleButtonLabel": {
+    "message": "本页总览",
+    "description": "The label used by the button on the collapsible TOC component"
+  },
+  "theme.blog.post.readingTime.plurals": {
+    "message": "阅读需 {readingTime} 分钟",
+    "description": "Pluralized label for \"{readingTime} min read\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.post.readMore": {
+    "message": "阅读更多",
+    "description": "The label used in blog post item excerpts to link to full blog posts"
+  },
+  "theme.blog.post.readMoreLabel": {
+    "message": "阅读 {title} 的全文",
+    "description": "The ARIA label for the link to full blog posts from excerpts"
+  },
+  "theme.CodeBlock.wordWrapToggle": {
+    "message": "切换自动换行",
+    "description": "The title attribute for toggle word wrapping button of code block lines"
+  },
+  "theme.CodeBlock.copy": {
+    "message": "复制",
+    "description": "The copy button label on code blocks"
+  },
+  "theme.CodeBlock.copied": {
+    "message": "复制成功",
+    "description": "The copied button label on code blocks"
+  },
+  "theme.CodeBlock.copyButtonAriaLabel": {
+    "message": "复制代码到剪贴板",
+    "description": "The ARIA label for copy code blocks button"
+  },
+  "theme.docs.breadcrumbs.home": {
+    "message": "主页面",
+    "description": "The ARIA label for the home page in the breadcrumbs"
+  },
+  "theme.docs.sidebar.collapseButtonTitle": {
+    "message": "收起侧边栏",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.collapseButtonAriaLabel": {
+    "message": "收起侧边栏",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.navAriaLabel": {
+    "message": "文档侧边栏",
+    "description": "The ARIA label for the sidebar navigation"
+  },
+  "theme.docs.sidebar.closeSidebarButtonAriaLabel": {
+    "message": "关闭导航栏",
+    "description": "The ARIA label for close button of mobile sidebar"
+  },
+  "theme.navbar.mobileSidebarSecondaryMenu.backButtonLabel": {
+    "message": "← 回到主菜单",
+    "description": "The label of the back button to return to main menu, inside the mobile navbar sidebar secondary menu (notably used to display the docs sidebar)"
+  },
+  "theme.docs.sidebar.toggleSidebarButtonAriaLabel": {
+    "message": "切换导航栏",
+    "description": "The ARIA label for hamburger menu button of mobile navigation"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.expandAriaLabel": {
+    "message": "展开下拉菜单",
+    "description": "The ARIA label of the button to expand the mobile dropdown navbar item"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.collapseAriaLabel": {
+    "message": "折叠下拉菜单",
+    "description": "The ARIA label of the button to collapse the mobile dropdown navbar item"
+  },
+  "theme.docs.sidebar.expandButtonTitle": {
+    "message": "展开侧边栏",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.docs.sidebar.expandButtonAriaLabel": {
+    "message": "展开侧边栏",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.SearchBar.noResultsText": {
+    "message": "没有找到任何文档"
+  },
+  "theme.SearchBar.seeAllOutsideContext": {
+    "message": "查看“{context}”以外的全部结果"
+  },
+  "theme.SearchBar.searchInContext": {
+    "message": "查看“{context}”以内的全部结果"
+  },
+  "theme.SearchBar.seeAll": {
+    "message": "查看全部结果"
+  },
+  "theme.SearchBar.label": {
+    "message": "搜索",
+    "description": "The ARIA label and placeholder for search button"
+  },
+  "theme.SearchPage.existingResultsTitle": {
+    "message": "“{query}”的搜索结果",
+    "description": "The search page title for non-empty query"
+  },
+  "theme.SearchPage.emptyResultsTitle": {
+    "message": "搜索文档",
+    "description": "The search page title for empty query"
+  },
+  "theme.SearchPage.searchContext.everywhere": {
+    "message": "所有"
+  },
+  "theme.SearchPage.documentsFound.plurals": {
+    "message": "共找到 {count} 篇文档",
+    "description": "Pluralized label for \"{count} documents found\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.SearchPage.noResultsText": {
+    "message": "没有找到任何文档",
+    "description": "The paragraph for empty search result"
+  },
+  "theme.blog.post.plurals": {
+    "message": "{count} 篇博文",
+    "description": "Pluralized label for \"{count} posts\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.tagTitle": {
+    "message": "{nPosts} 含有标签“{tagName}”",
+    "description": "The title of the page for a blog tag"
+  },
+  "theme.blog.author.pageTitle": {
+    "message": "{authorName} - {nPosts}",
+    "description": "The title of the page for a blog author"
+  },
+  "theme.blog.authorsList.pageTitle": {
+    "message": "作者",
+    "description": "The title of the authors page"
+  },
+  "theme.blog.authorsList.viewAll": {
+    "message": "查看所有作者",
+    "description": "The label of the link targeting the blog authors page"
+  },
+  "theme.blog.author.noPosts": {
+    "message": "该作者尚未撰写任何文章。",
+    "description": "The text for authors with 0 blog post"
+  },
+  "theme.contentVisibility.unlistedBanner.title": {
+    "message": "未列出页",
+    "description": "The unlisted content banner title"
+  },
+  "theme.contentVisibility.unlistedBanner.message": {
+    "message": "此页面未列出。搜索引擎不会对其索引，只有拥有直接链接的用户才能访问。",
+    "description": "The unlisted content banner message"
+  },
+  "theme.contentVisibility.draftBanner.title": {
+    "message": "草稿页",
+    "description": "The draft content banner title"
+  },
+  "theme.contentVisibility.draftBanner.message": {
+    "message": "此页面是草稿，仅在开发环境中可见，不会包含在正式版本中。",
+    "description": "The draft content banner message"
+  },
+  "theme.docs.DocCard.categoryDescription.plurals": {
+    "message": "{count} 个项目",
+    "description": "The default description for a category card in the generated index about how many items this category includes"
+  },
+  "theme.ErrorPageContent.tryAgain": {
+    "message": "重试",
+    "description": "The label of the button to try again rendering when the React error boundary captures an error"
+  },
+  "theme.common.skipToMainContent": {
+    "message": "跳到主要内容",
+    "description": "The skip to content label used for accessibility, allowing to rapidly navigate to main content with keyboard tab/enter navigation"
+  },
+  "theme.tags.tagsPageTitle": {
+    "message": "标签",
+    "description": "The title of the tag list page"
+  }
+}

@@ -1,0 +1,313 @@
+---
+title: 操作演练
+sidebar_position: 5
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# 操作演练
+
+本页从头到尾演练一个[演示](./demo-data.md)工作流：从代理技能生成它、发布它、运行它、批准它发起的请求，再确认结果，全程无需退出登录。您以 `root` 身份登录，并通过[代理登录](../concepts/impersonation.md)依次以各个演示账户的身份操作，因此整个过程在一个浏览器标签页中就能完成。
+
+请在这里选择提供商。本页所有与提供商相关的内容都会随之切换。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  您将通过 `Demo AWS EC2 Launch` 技能启动一个 EC2 实例。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  您将通过 `Demo GKE Pod Restart` 技能滚动重启 GKE 集群上的一个工作负载。
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  您将通过 `Demo Azure Key Vault Secret Rotation` 技能轮换 Azure Key Vault 中的一个密钥。
+
+  </TabItem>
+</Tabs>
+
+## 开始之前 \{#before-you-start\}
+
+- 后端正在运行，并且已启用[演示数据](./demo-data.md)。
+- 您知道 `root` 的密码：`ROOT_PASSWORD` 的值，如果未设置，则是后端启动时在日志中输出过一次的那一行（[预置用户](../operations/configuration.md#seeded-users)）。
+- 确实能够访问提供商：
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  `demo-aws-credentials` [密钥](../guides/secrets.md)中保存着真实的访问密钥：要么在首次启动前设置了 `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY`，要么在**密钥**中编辑该密钥。这次运行会**真实启动一个 EC2 实例**，在您终止它之前会持续产生费用。
+
+  该访问密钥的 IAM 用户需要一个策略，允许其解析 AMI、查询网络和密钥对，并启动实例。下面的策略已经足够：
+
+  ```json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "ResolveAmi",
+        "Effect": "Allow",
+        "Action": "ssm:GetParameter",
+        "Resource": "arn:aws:ssm:*::parameter/aws/service/*"
+      },
+      {
+        "Sid": "LookupAndLaunch",
+        "Effect": "Allow",
+        "Action": [
+          "ec2:DescribeImages",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeKeyPairs",
+          "ec2:DescribeInstances",
+          "ec2:RunInstances",
+          "ec2:CreateTags"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }
+  ```
+
+  第一条语句只读取 AWS 发布最新 AMI ID 的公共参数，不读取您账户自己的参数。该策略不允许此访问密钥终止实例，请自行在 AWS 控制台中终止。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  `demo-gcp-credentials` [密钥](../guides/secrets.md)中保存着 Google Cloud 凭据，其身份可以访问 GKE 集群：要么在首次启动前设置了 `DEMO_GCP_CREDENTIALS_JSON`，要么在**密钥**中编辑该密钥。请准备好项目、集群、集群所在区域，以及一个可以重启的工作负载，这次运行会**真实地滚动重启它**。
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  `demo-azure-credentials` [密钥](../guides/secrets.md)中保存着真实的服务主体：要么在首次启动前设置了 `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET`，要么在**密钥**中编辑该密钥。该主体需要在某个 Key Vault 上拥有可以列出和写入密钥的角色。内置的 **Key Vault Secrets Officer** 角色还能读取所有密钥的值，因此建议改用只包含 `Microsoft.KeyVault/vaults/secrets/readMetadata/action` 和 `Microsoft.KeyVault/vaults/secrets/setSecret/action` 这两个数据操作的自定义角色：这样即使代理被人诱导，也无法读取值。如果 Key Vault 使用访问策略，则只授予 **List** 和 **Set** 这两项密钥权限。请准备好该 Key Vault 以及其中一个可以轮换的密钥，这次运行会**真实写入该密钥的新版本**，读取其当前版本的所有内容都会改用新值。
+
+  </TabItem>
+</Tabs>
+
+没有可用的账户？借助预置的[工具模拟](./demo-data.md#trying-it-out)，同一个工作流无需连接提供商也能运行到底。这种方式在工作流仍为 `草稿` 时运行它，因此会跳过下面的发布步骤。
+
+## 角色分工 \{#the-cast\}
+
+| 步骤 | AWS | Google Cloud | Azure | 角色 |
+|---|---|---|---|---|
+| 生成工作流 | `demo-aws-developer` | `demo-gcp-developer` | `demo-azure-developer` | 开发人员 |
+| 发布 | `demo-aws-reviewer` | `demo-gcp-reviewer` | `demo-azure-reviewer` | 审阅者 |
+| 运行并确认结果 | `demo-aws-requester` | `demo-gcp-requester` | `demo-azure-requester` | 请求者 |
+| 批准请求 | `demo-approver-1` | `demo-approver-1` | `demo-approver-1` | 审批人 |
+
+下面每个步骤都从**用户**列表中的**代理登录**开始，到页眉中“正在以 … 身份操作”胶囊上的**停止代理登录**结束。停止这一步不能省略：以这些账户身份操作时，您受该账户角色的限制，而这些账户都不能代理登录，所以在停止之前不会再出现**代理登录**。在聊天界面中，点击应用栏上的 **A2Flow** 徽标可以回到欢迎页及其侧边栏。
+
+## 1. 以 root 身份登录 \{#1-sign-in-as-root\}
+
+1. 在登录页上，**用户名**输入 `root`，**租户**留空（`root` 是平台管理员，不属于任何租户），然后输入密码。点击**登录**。
+2. 您会进入欢迎页。应用栏中的租户选择器显示 **Default**，也就是演示数据所在的租户。如果选中的是其他租户，请选择它。
+
+## 2. 以开发人员身份生成工作流 \{#2-act-as-the-developer-and-generate-the-workflow\}
+
+1. 打开管理侧边栏中的**用户**，在开发人员所在行点击**代理登录**。在**以用户身份代理登录**对话框中点击**代理登录**进行确认。您会回到欢迎页，页眉胶囊显示“正在以 `demo-…-developer` 身份操作”。
+2. 打开**代理技能**。列表中只有此提供商的技能，其他技能被[访问控制标签](../guides/tags.md#access-control-tags)隐藏了。等待其**状态**变为 `就绪`，如果仍显示 `克隆中`，请刷新列表；在此之前**生成工作流**一直处于禁用状态。
+
+:::info[AWS：先读取价格表]
+
+打开**知识库**并点击 **AWS EC2 Pricing**。它唯一的来源 `ec2-on-demand-pricing.pdf` 显示为**未读取**。点击**读取**，等待其状态变为**就绪**。LLM 正在把价格表转换成页面，这些页面会出现在**页面**下，大约需要一两分钟（[知识库](../guides/knowledge-bases.md)）。在下一步中，还要在**生成工作流**对话框中点击**选择知识库…** 并选择 **AWS EC2 Pricing**，这样运行时代理才能查询价格。
+
+:::
+
+3. 在该行点击**生成工作流**。**工作流名称**保持不变，将下面的提示词粘贴到**提示词**中，然后点击**生成**。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  ```text
+  向请求者询问所需的参数以及启动的日期和时间，获得 Demo Approvers 用户组的批准后，在该时间启动一个 EC2 实例。
+  让请求者从以下实例类型中选择：
+  - t4g.nano
+  - t4g.micro
+  - t4g.small
+  - t4g.medium
+  - t3.micro
+  - t3a.micro
+  - c6g.medium
+  - m6g.medium
+  - t2.micro
+  - t4g.large
+
+  让请求者从以下区域中选择：
+  - us-east-1
+  - us-east-2
+  - us-west-2
+
+  AMI 使用所请求区域中最新的 Amazon Linux 2023 映像。
+  使用默认的 VPC、子网和安全组。
+  不要创建密钥对。
+  在请求审批之前解析好 AMI、VPC 和子网的 ID。
+  在请求的时间之前不要启动实例。
+  根据 AWS EC2 Pricing 知识库回答有关实例费用的问题，并在审批请求中附上从该知识库查到的所请求实例的月费用。
+  ```
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  将三个占位符替换为您自己的项目、集群和区域。
+
+  ```text
+  在 Demo Approvers 批准后，重启 <your project name> 项目中 <your cluster name> 集群上的一个工作负载。
+  集群位置是 <cluster region> 区域。让请求者从实时集群获取的列表中选择工作负载的命名空间。
+  ```
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  将占位符替换为您的 Key Vault 名称。
+
+  ```text
+  在 Demo Approvers 批准后，轮换 <your vault name> Key Vault 中的一个密钥。
+  列出该 Key Vault 的密钥，让请求者选择要轮换的密钥。
+  使用 Secret Value Generator 生成新值，并且绝不在聊天中显示它。
+  ```
+
+  </TabItem>
+</Tabs>
+
+4. 您会进入新工作流的详情页，状态为 `生成中`。页面会自动刷新；一两分钟后状态变为 `草稿`，铃铛图标上会出现“工作流草稿已就绪”通知。打开**任务模板**，查看设计代理编写的步骤：收集参数、请求审批、执行工作、报告结果（[生成工作流](../guides/workflows.md#generating-a-workflow)）。
+5. 点击“正在以 … 身份操作”胶囊上的**停止代理登录**。
+
+## 3. 以审阅者身份发布 \{#3-act-as-the-reviewer-and-publish\}
+
+1. 在**用户**中，在审阅者所在行点击**代理登录**并确认。
+2. 打开**工作流**并点击工作流名称。查看它的任务模板；审阅者还可以点击**打开设计会话**来阅读设计对话，但不能加以引导。
+3. 点击**发布**。状态变为 `已发布`：设计已冻结，请求者现在可以运行它了（[发布](../guides/workflows.md#publishing)）。
+4. 点击**停止代理登录**。
+
+## 4. 以请求者身份运行 \{#4-act-as-the-requester-and-run-it\}
+
+1. 在**用户**中，在请求者所在行点击**代理登录**并确认。
+2. 打开**工作流**，在该工作流上点击**运行**。**运行工作流**对话框不提供模拟选项，因为工作流已发布，所以这是一次真实的请求。点击**运行**。
+3. 工作流会话随即打开，代理开始执行第一个任务，询问提示词中留给请求者决定的内容。答案固定的问题会以消息内选项的形式出现；其他情况下，输入框上方会出现一排[建议回复](../guides/workflow-executions.md#suggested-replies)。
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  不确定该选哪种实例类型？可以直接问，例如“t4g.medium 在 us-east-2 每月多少钱？和 t3.micro 相比如何？”代理会在 **AWS EC2 Pricing** 知识库中查询价格，并指明所参考的页面。
+
+  从提示词列出的十种实例类型和三个区域中各选一个，把启动时间定在几分钟之后，以免演练停滞，然后回答它提出的其他问题，例如实例的名称。接着代理会查询该区域最新的 Amazon Linux 2023 映像以及默认的 VPC 和子网，汇总配置和启动时间，然后提交审批。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  从代理从集群获取的列表中选择一个命名空间，并说出要重启的 Deployment 或 StatefulSet 的名称。代理会查询该工作负载，确认其类型，汇总目标，然后提交审批。
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  在代理列出 Key Vault 的密钥之前，运行会等待您操作：聊天输入框上方的提示说明该任务将向您提问。点击**继续**。随后 Azure MCP Server 会请您确认：聊天中出现一张标题为“Azure MCP Server 请求确认”的卡片。选择 **Approve** 并点击**接受**（[来自 MCP 服务器的确认](../guides/workflow-executions.md#mcp-server-confirmations)）。然后从代理获取的列表中选择要轮换的密钥。代理会汇总 Key Vault 和密钥，然后提交审批。
+
+  </TabItem>
+</Tabs>
+
+4. 该请求发送给 **Demo Approvers** 用户组，聊天中在它下方显示“正在等待审批组的决定。”，请求者无法自行决定。此时运行进入等待状态。
+5. 点击**停止代理登录**。
+
+## 5. 以审批人身份批准 \{#5-act-as-the-approver-and-approve\}
+
+1. 在**用户**中，在 `demo-approver-1` 所在行点击**代理登录**并确认。使用 `demo-approver-2` 也完全可以：用户组请求以第一个决定为准。
+2. 工具栏中的铃铛图标显示一条未读通知，即该审批请求。点击它可以打开这次运行的聊天。也可以依次点击侧边栏中的**审批**和该行的**打开工作流会话**，到达同一位置。
+3. 阅读请求。在代理的摘要下方，**这将授权**列出了此决定将允许的调用及其输入的限制范围（[请求授权的内容](../guides/approvals.md#what-a-request-authorizes)）：
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  **AWS MCP Server** 上启动实例的调用。请将它以及摘要中的启动时间和月费用与请求者的选择进行核对。映像、VPC 和子网的查询没有列出，因为它们在请求之前就已运行，不需要审批。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  **GKE MCP Server** 上的 `patch_k8s_resource` 调用，指向请求者选择的命名空间和工作负载。
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  **Azure MCP Server** 上的 `keyvault_secret_create` 调用，指向请求者选择的 Key Vault 和密钥。新值不在请求中：代理要在您批准之后才会生成它。
+
+  </TabItem>
+</Tabs>
+
+4. 想在决定之前了解更多？在聊天中输入问题并发送。例如在 AWS 选项卡中，可以问“如果这个实例只在工作日的工作时间运行，每月要花多少钱？”会话正在等待您的决定，因此会打开一个**咨询**选项卡，代理会根据请求的上下文和关联的知识库在那里回答（[咨询](../guides/workflow-executions.md#consultations)）。请求者也可以加入这场对话。结束后，点击**主会话**选项卡返回请求。
+5. 如有需要，可以填写**评论**，然后点击**批准**。如果您开启过咨询，该决定会将其关闭。运行在同一个聊天中继续，代理完成工作后请请求者确认结果。这个问题要由请求者回答：对您来说输入框是只读的，其下方显示“正在等待发起人响应。”
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  如果启动时间还没到，代理会让启动操作等待，用一行文字说明何时继续，然后暂停。到时间后会话会自行恢复，无需有人一直开着聊天，随后代理启动实例（[工作流会话界面](../guides/workflow-executions.md#the-workflow-session-screen)）。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  代理会立即重启工作负载。
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  写入操作要请求者确认，因此运行在开始之前会等请求者回到聊天：会话显示**等待发起人**，请求者会收到通知。
+
+  </TabItem>
+</Tabs>
+
+6. 点击**停止代理登录**。
+
+## 6. 回到请求者身份：确认结果 \{#6-back-as-the-requester-confirm-the-result\}
+
+1. 在**用户**中，再次在请求者所在行点击**代理登录**并确认。
+2. 打开**工作流执行**，在这次运行上点击**打开工作流会话**。
+3. 代理已报告它所做的事情，正在等您回复：
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  过了您指定的启动时间后，代理会报告实例 ID 及其状态。如有需要，可以在 AWS 控制台中查看该实例，然后在聊天中确认。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  代理所监视的滚动重启完成后，会报告替换了多少个 Pod。请在聊天中确认。
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  首先，运行会在写入之前等待您操作：点击聊天输入框上方提示中的**继续**。代理生成新值并开始写入，然后出现 Azure MCP Server 的确认卡片：选择 **Approve** 并点击**接受**。随后代理会报告新版本的创建时间，但绝不会报告值本身。Azure MCP Server 不报告版本 ID，如果需要，请在 Azure 门户中查看该密钥的版本，然后在聊天中确认。
+
+  </TabItem>
+</Tabs>
+
+4. 代理以摘要收尾，最后一个任务完成，运行变为 `已完成`，铃铛图标上出现完成通知。
+5. 点击**停止代理登录**。
+
+## 演练结束后 \{#afterwards\}
+
+<Tabs groupId="provider" queryString>
+  <TabItem value="aws" label="AWS">
+
+  实例会一直运行并产生费用，直到您在 AWS 控制台中终止它。
+
+  </TabItem>
+  <TabItem value="gcp" label="Google Cloud">
+
+  无需清理：工作负载已恢复到原来的副本数，Pod 都是新的。
+
+  </TabItem>
+  <TabItem value="azure" label="Azure">
+
+  该密钥的上一个版本仍处于启用状态。等所有读取该密钥的内容都改用新值后，请在 Azure 门户中禁用旧版本。新值在发送到 Key Vault 的途中经过了代理的对话（[演示数据](./demo-data.md)），因此请像对待密钥本身一样对待这次运行的聊天。
+
+  </TabItem>
+</Tabs>
+
+这次演练留下的两份记录值得一看：
+
+| 位置 | 显示的内容 |
+|---|---|
+| **审计日志** → **代理登录** | 您刚才开启的每个会话：谁以谁的身份操作、在什么时间。上面的每次写入都归属于被代理的账户，所以要回答“背后究竟是谁”，靠的就是这条记录（[审计跟踪](../concepts/impersonation.md#audit-trail)） |
+| 这次运行的**工具调用**页面 | 这次运行发起的每次工具调用及其出示的证书。正是您作出的批准，解锁了完成实际工作的那次调用（[工具调用](../guides/workflow-executions.md#tool-invocations)） |
