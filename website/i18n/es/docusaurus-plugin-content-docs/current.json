@@ -1,0 +1,26 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.manualSidebar.category.Getting started": {
+    "message": "Primeros pasos",
+    "description": "The label for category 'Getting started' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Concepts": {
+    "message": "Conceptos",
+    "description": "The label for category 'Concepts' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Guides": {
+    "message": "Guías",
+    "description": "The label for category 'Guides' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Architecture": {
+    "message": "Arquitectura",
+    "description": "The label for category 'Architecture' in sidebar 'manualSidebar'"
+  },
+  "sidebar.manualSidebar.category.Operations": {
+    "message": "Operaciones",
+    "description": "The label for category 'Operations' in sidebar 'manualSidebar'"
+  }
+}

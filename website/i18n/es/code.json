@@ -1,0 +1,664 @@
+{
+  "home.meta.title": {
+    "message": "El agente como flujo de trabajo"
+  },
+  "home.meta.description": {
+    "message": "A2Flow es un motor de flujos de trabajo guiado por chat. Reconstruye los flujos de trabajo de tipo ITSM en torno a un agente de IA: planifica el trabajo como un grafo de tareas, espera a las personas que deben dar su aprobación y ejecuta el resto. El plan se conserva como flujo de trabajo, de modo que la siguiente ejecución sigue los mismos pasos."
+  },
+  "home.nav.concept": {
+    "message": "Concepto"
+  },
+  "home.nav.how": {
+    "message": "Cómo funciona"
+  },
+  "home.nav.features": {
+    "message": "Funciones"
+  },
+  "home.nav.architecture": {
+    "message": "Arquitectura"
+  },
+  "home.hero.eyebrow": {
+    "message": "Agent as Workflow"
+  },
+  "home.hero.title": {
+    "message": "El motor de flujos de trabajo{br}ahora es {agent}."
+  },
+  "home.hero.title.agent": {
+    "message": "un agente"
+  },
+  "home.hero.sub": {
+    "message": "A2Flow es un motor de flujos de trabajo guiado por chat. Reconstruye los flujos de trabajo de tipo ITSM (solicitudes de servicio, ejecución de cambios, comunicados) en torno a un agente de IA: planifica el trabajo como un grafo de tareas, espera a las personas que deben dar su aprobación y ejecuta el resto. El plan se conserva como flujo de trabajo, de modo que la siguiente ejecución sigue los mismos pasos."
+  },
+  "home.hero.cta.github": {
+    "message": "Ver en GitHub"
+  },
+  "home.hero.cta.how": {
+    "message": "Ver cómo funciona"
+  },
+  "home.hero.demoCaption": {
+    "message": "Dos chats, un flujo de trabajo: se diseña con el agente y luego se ejecuta en su propia sesión, con formularios y aprobaciones incluidos."
+  },
+  "home.concept.eyebrow": {
+    "message": "El concepto"
+  },
+  "home.concept.title": {
+    "message": "Los flujos de trabajo ITSM, {reimagined}"
+  },
+  "home.concept.title.reimagined": {
+    "message": "reinventados"
+  },
+  "home.concept.lead": {
+    "message": "Los motores de flujos de trabajo clásicos son repetibles pero rígidos: formularios fijos, colas de tickets, traspasos entre personas y, sobre todo, esperas. Un chat con un agente de IA es lo contrario: flexible, pero el plan que trazó desaparece al terminar la sesión, y nadie lo aprobó. A2Flow conserva el procedimiento y las aprobaciones de los primeros, la conversación del segundo, y confía al agente todo lo que queda en medio."
+  },
+  "home.concept.past.title": {
+    "message": "El circuito de tickets"
+  },
+  "home.concept.past.sub": {
+    "message": "El proceso como software: repetible, pero rígido, con formularios fijos, estados fijos y personas que hacen de pegamento."
+  },
+  "home.concept.past.form": {
+    "message": "Rellenar el formulario"
+  },
+  "home.concept.past.form.note": {
+    "message": "Un campo mal y te lo devuelven."
+  },
+  "home.concept.past.queue": {
+    "message": "Esperar en la cola"
+  },
+  "home.concept.past.queue.note": {
+    "message": "Tu solicitud es la n.º 14 de la cola."
+  },
+  "home.concept.past.handoff": {
+    "message": "Pasar de un equipo a otro"
+  },
+  "home.concept.past.handoff.note": {
+    "message": "El contexto se pierde en cada traspaso."
+  },
+  "home.concept.past.chase": {
+    "message": "Reclamar novedades"
+  },
+  "home.concept.past.chase.note": {
+    "message": "«¿Hay novedades de mi ticket?»"
+  },
+  "home.concept.chat.title": {
+    "message": "La sesión de chat con IA"
+  },
+  "home.concept.chat.sub": {
+    "message": "El proceso como improvisación: flexible, pero nunca igual dos veces."
+  },
+  "home.concept.chat.ask": {
+    "message": "Pedírselo al agente por chat"
+  },
+  "home.concept.chat.ask.note": {
+    "message": "Sin formulario, con tus propias palabras."
+  },
+  "home.concept.chat.plan": {
+    "message": "El agente planifica y actúa"
+  },
+  "home.concept.chat.plan.note": {
+    "message": "Un plan nuevo cada vez, y cada vez un poco distinto."
+  },
+  "home.concept.chat.gate": {
+    "message": "Sin control de ningún aprobador"
+  },
+  "home.concept.chat.gate.note": {
+    "message": "Decide quien esté chateando. Nadie más lo ve."
+  },
+  "home.concept.chat.gone": {
+    "message": "Fin de la sesión, adiós al plan"
+  },
+  "home.concept.chat.gone.note": {
+    "message": "La siguiente solicitud empieza de cero."
+  },
+  "home.concept.next.title": {
+    "message": "El flujo de trabajo guiado por chat"
+  },
+  "home.concept.next.sub": {
+    "message": "Un SOP que ejecutas junto con la IA: tan flexible como un chat, tan repetible como un procedimiento."
+  },
+  "home.concept.next.intent": {
+    "message": "Describir lo que quieres en el chat"
+  },
+  "home.concept.next.intent.note": {
+    "message": "Sin formulario. La skill sabe qué preguntar."
+  },
+  "home.concept.next.plan": {
+    "message": "El plan se conserva como flujo de trabajo"
+  },
+  "home.concept.next.plan.note": {
+    "message": "El grafo de tareas que el agente redactó a partir de la skill: se publica una vez y se ejecuta tantas veces como haga falta."
+  },
+  "home.concept.next.approve": {
+    "message": "Las personas aprueban los momentos clave"
+  },
+  "home.concept.next.approve.note": {
+    "message": "La publicación del diseño y cada llamada a herramienta que cambia algo."
+  },
+  "home.concept.next.execute": {
+    "message": "El agente ejecuta y verifica"
+  },
+  "home.concept.next.execute.note": {
+    "message": "El progreso en directo, en la misma conversación."
+  },
+  "home.concept.note": {
+    "message": "El procedimiento en sí no es código encerrado en un motor de flujos de trabajo. Es una {skill}: con control de versiones, revisable y legible por cualquiera del equipo."
+  },
+  "home.concept.note.skill": {
+    "message": "skill de agente, un archivo {file} en un repositorio Git"
+  },
+  "home.how.eyebrow": {
+    "message": "Cómo funciona"
+  },
+  "home.how.title": {
+    "message": "Planificar. Aprobar. {execute}"
+  },
+  "home.how.title.execute": {
+    "message": "Ejecutar."
+  },
+  "home.how.lead": {
+    "message": "Cada ejecución pasa por las mismas dos barreras: nada se ejecuta hasta que una persona publica el diseño, y ninguna llamada a herramienta que cambie algo se realiza hasta que el aprobador designado da su conformidad."
+  },
+  "home.how.step1.label": {
+    "message": "PASO 1 — PLANIFICAR"
+  },
+  "home.how.step1.title": {
+    "message": "El agente convierte la intención en un grafo de tareas"
+  },
+  "home.how.step1.body": {
+    "message": "En una sesión de diseño lee la skill de agente, divide tu prompt en plantillas de tarea con dependencias explícitas y registra todo el DAG en una sola llamada, con detección de ciclos incluida. Puedes ajustarlo por chat o a mano; todavía no se ejecuta nada."
+  },
+  "home.how.step2.label": {
+    "message": "PASO 2 — APROBAR"
+  },
+  "home.how.step2.title": {
+    "message": "Las personas controlan los momentos clave"
+  },
+  "home.how.step2.body": {
+    "message": "Publicar el flujo de trabajo es aprobar el plan: una ejecución parte de él sin nada que confirmar. Las llamadas a herramientas que cambian algo esperan a un {approver}: los controles Aprobar / Rechazar / Devolver aparecen en el propio chat, con la lista exacta de las llamadas que autorizan, y solo esa persona puede decidir; cualquier otra recibe un {forbidden}."
+  },
+  "home.how.step2.body.approver": {
+    "message": "aprobador designado"
+  },
+  "home.how.step3.label": {
+    "message": "PASO 3 — EJECUTAR"
+  },
+  "home.how.step3.title": {
+    "message": "El agente recorre el grafo"
+  },
+  "home.how.step3.body": {
+    "message": "Haz clic en Ejecutar y el agente arranca de inmediato en la sesión del flujo de trabajo propia de esa ejecución. Las tareas pasan por {statuses} en orden de dependencia, llaman solo a las herramientas MCP vinculadas a la tarea en curso, y el agente hace sus preguntas mediante formularios que dibuja en el propio chat."
+  },
+  "home.teams.eyebrow": {
+    "message": "Pensado para equipos"
+  },
+  "home.teams.title": {
+    "message": "Tres roles, {conversation}"
+  },
+  "home.teams.title.conversation": {
+    "message": "una conversación"
+  },
+  "home.teams.lead": {
+    "message": "Una sesión del flujo de trabajo es un chat compartido. El solicitante, el aprobador y el agente escriben en el mismo hilo: sin canales paralelos, sin «¿hay novedades de mi ticket?»."
+  },
+  "home.teams.applicant.title": {
+    "message": "El solicitante"
+  },
+  "home.teams.applicant.body": {
+    "message": "Ejecuta un flujo de trabajo publicado. Responde a las preguntas del agente, en los formularios que este dibuja en el chat, y sigue el avance de las tareas en el mismo hilo."
+  },
+  "home.teams.approver.title": {
+    "message": "El aprobador"
+  },
+  "home.teams.approver.body": {
+    "message": "Recibe una notificación, abre la sesión y decide en el propio chat, con un comentario. Solo el aprobador designado puede decidir una aprobación."
+  },
+  "home.teams.agent.title": {
+    "message": "El agente"
+  },
+  "home.teams.agent.body": {
+    "message": "Planifica el grafo de tareas, solicita aprobaciones en el momento oportuno, ejecuta cada paso según la skill e informa del progreso sobre la marcha."
+  },
+  "home.teams.trust.notifications.title": {
+    "message": "Notificaciones que te llevan a la decisión"
+  },
+  "home.teams.trust.notifications.body": {
+    "message": "Las solicitudes de aprobación y las sesiones finalizadas llegan a la campana de notificaciones de cada usuario y enlazan directamente con la conversación correspondiente."
+  },
+  "home.teams.trust.audit.title": {
+    "message": "Un registro de auditoría en cada aprobación"
+  },
+  "home.teams.trust.audit.body": {
+    "message": "Quién aprobó, qué escribió y cuándo exactamente: queda guardado en el registro de la aprobación y se puede consultar en la consola de administración."
+  },
+  "home.features.eyebrow": {
+    "message": "Funciones"
+  },
+  "home.features.title": {
+    "message": "Todo lo que un flujo de trabajo necesita, {nothing}"
+  },
+  "home.features.title.nothing": {
+    "message": "nada que no necesite"
+  },
+  "home.features.skills.title": {
+    "message": "Skills de agente en Git"
+  },
+  "home.features.skills.body": {
+    "message": "Los procedimientos viven como archivos {file} en repositorios Git y se clonan en la primera ejecución. Versiónalos, revísalos y léelos como cualquier otro código."
+  },
+  "home.features.graph.title": {
+    "message": "Un plan que puedes volver a ejecutar"
+  },
+  "home.features.graph.body": {
+    "message": "El grafo de tareas que el agente redacta a partir de una skill se publica como flujo de trabajo (un DAG de verdad, con dependencias obligatorias y ciclos rechazados) y cada ejecución recorre el mismo grafo, que se muestra como una tabla ordenable o como un gráfico con disposición automática que se actualiza a medida que el agente trabaja."
+  },
+  "home.features.gates.title": {
+    "message": "Barreras de aprobación en plena ejecución"
+  },
+  "home.features.gates.body": {
+    "message": "Antes de un paso destructivo, el agente solicita la aprobación de un usuario concreto y se detiene. Los botones Aprobar / Rechazar / Devolver aparecen en el chat, solo para ese usuario."
+  },
+  "home.features.mcp.title": {
+    "message": "Herramientas MCP acotadas a cada tarea"
+  },
+  "home.features.mcp.body": {
+    "message": "Registra servidores MCP y el agente vincula, al planificar, solo las herramientas que necesita cada tarea. Durante la ejecución, una tarea solo puede llamar a sus propias herramientas, y cada servidor que inicia A2Flow se ejecuta en su propio sandbox de bubblewrap."
+  },
+  "home.features.a2ui.title": {
+    "message": "Interfaz enriquecida dentro del chat"
+  },
+  "home.features.a2ui.body": {
+    "message": "Mediante el protocolo A2UI, el agente muestra botones, formularios y tarjetas en la propia conversación, y tus clics vuelven a la ejecución como resultados de herramientas."
+  },
+  "home.features.llm.title": {
+    "message": "Usa tu propio LLM"
+  },
+  "home.features.llm.body": {
+    "message": "Gemini de forma predeterminada; modelos de OpenAI y Anthropic a través de LiteLLM. Cambiar de proveedor es cuestión de una variable de entorno."
+  },
+  "home.architecture.eyebrow": {
+    "message": "Bajo el capó"
+  },
+  "home.architecture.title": {
+    "message": "Una {stack} de protocolos abiertos"
+  },
+  "home.architecture.title.stack": {
+    "message": "pila"
+  },
+  "home.architecture.lead": {
+    "message": "La interfaz de chat recibe en streaming eventos AG-UI de un backend FastAPI, y el agente dibuja superficies A2UI en el chat. Las skills de agente vienen de Git; las herramientas, de servidores MCP, y una sola base de datos relacional lo guarda todo."
+  },
+  "home.cta.eyebrow": {
+    "message": "Empezar"
+  },
+  "home.cta.title": {
+    "message": "Ejecútalo {machine}"
+  },
+  "home.cta.title.machine": {
+    "message": "en tu máquina"
+  },
+  "home.cta.lead": {
+    "message": "Toda la pila (PostgreSQL, backend y frontend) se levanta con Docker Compose. Con una clave de API de Google estás a dos comandos de tu primer flujo de trabajo."
+  },
+  "theme.ErrorPageContent.title": {
+    "message": "Esta página ha fallado.",
+    "description": "The title of the fallback page when the page crashed"
+  },
+  "theme.BackToTopButton.buttonAriaLabel": {
+    "message": "Volver al principio",
+    "description": "The ARIA label for the back to top button"
+  },
+  "theme.blog.archive.title": {
+    "message": "Archivo",
+    "description": "The page & hero title of the blog archive page"
+  },
+  "theme.blog.archive.description": {
+    "message": "Archivo",
+    "description": "The page & hero description of the blog archive page"
+  },
+  "theme.blog.paginator.navAriaLabel": {
+    "message": "Navegación por la página de la lista de blogs",
+    "description": "The ARIA label for the blog pagination"
+  },
+  "theme.blog.paginator.newerEntries": {
+    "message": "Entradas más recientes",
+    "description": "The label used to navigate to the newer blog posts page (previous page)"
+  },
+  "theme.blog.paginator.olderEntries": {
+    "message": "Entradas más antiguas",
+    "description": "The label used to navigate to the older blog posts page (next page)"
+  },
+  "theme.blog.post.paginator.navAriaLabel": {
+    "message": "Barra de paginación de publicaciones del blog",
+    "description": "The ARIA label for the blog posts pagination"
+  },
+  "theme.blog.post.paginator.newerPost": {
+    "message": "Publicación más reciente",
+    "description": "The blog post button label to navigate to the newer/previous post"
+  },
+  "theme.blog.post.paginator.olderPost": {
+    "message": "Publicación más antigua",
+    "description": "The blog post button label to navigate to the older/next post"
+  },
+  "theme.tags.tagsPageLink": {
+    "message": "Ver todas las etiquetas",
+    "description": "The label of the link targeting the tag list page"
+  },
+  "theme.colorToggle.ariaLabel.mode.system": {
+    "message": "modo del sistema",
+    "description": "The name for the system color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.light": {
+    "message": "modo claro",
+    "description": "The name for the light color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.dark": {
+    "message": "modo oscuro",
+    "description": "The name for the dark color mode"
+  },
+  "theme.colorToggle.ariaLabel": {
+    "message": "Cambiar entre modo oscuro y claro (actualmente {mode})",
+    "description": "The ARIA label for the color mode toggle"
+  },
+  "theme.docs.breadcrumbs.navAriaLabel": {
+    "message": "Ruta de navegación",
+    "description": "The ARIA label for the breadcrumbs"
+  },
+  "theme.docs.paginator.navAriaLabel": {
+    "message": "Página del documento",
+    "description": "The ARIA label for the docs pagination"
+  },
+  "theme.docs.paginator.previous": {
+    "message": "Anterior",
+    "description": "The label used to navigate to the previous doc"
+  },
+  "theme.docs.paginator.next": {
+    "message": "Siguiente",
+    "description": "The label used to navigate to the next doc"
+  },
+  "theme.docs.tagDocListPageTitle.nDocsTagged": {
+    "message": "Un documento etiquetado|{count} documentos etiquetados",
+    "description": "Pluralized label for \"{count} docs tagged\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.docs.tagDocListPageTitle": {
+    "message": "{nDocsTagged} con \"{tagName}\"",
+    "description": "The title of the page for a docs tag"
+  },
+  "theme.docs.versionBadge.label": {
+    "message": "Versión: {versionLabel}"
+  },
+  "theme.docs.versions.unreleasedVersionLabel": {
+    "message": "Esta es la documentación sin publicar para {siteTitle}, versión {versionLabel}.",
+    "description": "The label used to tell the user that he's browsing an unreleased doc version"
+  },
+  "theme.docs.versions.unmaintainedVersionLabel": {
+    "message": "Esta es la documentación para {siteTitle} {versionLabel}, que ya no se mantiene activamente.",
+    "description": "The label used to tell the user that he's browsing an unmaintained doc version"
+  },
+  "theme.docs.versions.latestVersionSuggestionLabel": {
+    "message": "Para la documentación actualizada, consulta {latestVersionLink} ({versionLabel}).",
+    "description": "The label used to tell the user to check the latest version"
+  },
+  "theme.docs.versions.latestVersionLinkLabel": {
+    "message": "última versión",
+    "description": "The label used for the latest version suggestion link label"
+  },
+  "theme.common.editThisPage": {
+    "message": "Editar esta página",
+    "description": "The link label to edit the current page"
+  },
+  "theme.common.headingLinkTitle": {
+    "message": "Enlace directo a {heading}",
+    "description": "Title for link to heading"
+  },
+  "theme.lastUpdated.atDate": {
+    "message": " el {date}",
+    "description": "The words used to describe on which date a page has been last updated"
+  },
+  "theme.lastUpdated.byUser": {
+    "message": " por {user}",
+    "description": "The words used to describe by who the page has been last updated"
+  },
+  "theme.lastUpdated.lastUpdatedAtBy": {
+    "message": "Última actualización{atDate}{byUser}",
+    "description": "The sentence used to display when a page has been last updated, and by who"
+  },
+  "theme.navbar.mobileVersionsDropdown.label": {
+    "message": "Versiones",
+    "description": "The label for the navbar versions dropdown on mobile view"
+  },
+  "theme.NotFound.title": {
+    "message": "Página no encontrada",
+    "description": "The title of the 404 page"
+  },
+  "theme.tags.tagsListLabel": {
+    "message": "Etiquetas:",
+    "description": "The label alongside a tag list"
+  },
+  "theme.admonition.caution": {
+    "message": "precaución",
+    "description": "The default label used for the Caution admonition (:::caution)"
+  },
+  "theme.admonition.danger": {
+    "message": "peligro",
+    "description": "The default label used for the Danger admonition (:::danger)"
+  },
+  "theme.admonition.info": {
+    "message": "información",
+    "description": "The default label used for the Info admonition (:::info)"
+  },
+  "theme.admonition.note": {
+    "message": "nota",
+    "description": "The default label used for the Note admonition (:::note)"
+  },
+  "theme.admonition.tip": {
+    "message": "consejo",
+    "description": "The default label used for the Tip admonition (:::tip)"
+  },
+  "theme.admonition.warning": {
+    "message": "aviso",
+    "description": "The default label used for the Warning admonition (:::warning)"
+  },
+  "theme.AnnouncementBar.closeButtonAriaLabel": {
+    "message": "Cerrar",
+    "description": "The ARIA label for close button of announcement bar"
+  },
+  "theme.blog.sidebar.navAriaLabel": {
+    "message": "Navegación de publicaciones recientes",
+    "description": "The ARIA label for recent posts in the blog sidebar"
+  },
+  "theme.DocSidebarItem.expandCategoryAriaLabel": {
+    "message": "Ampliar la categoría '{label}' de la barra lateral",
+    "description": "The ARIA label to expand the sidebar category"
+  },
+  "theme.DocSidebarItem.collapseCategoryAriaLabel": {
+    "message": "Colapsar categoría '{label}' de la barra lateral",
+    "description": "The ARIA label to collapse the sidebar category"
+  },
+  "theme.IconExternalLink.ariaLabel": {
+    "message": "(se abre en una nueva pestaña)",
+    "description": "The ARIA label for the external link icon"
+  },
+  "theme.NavBar.navAriaLabel": {
+    "message": "Principal",
+    "description": "The ARIA label for the main navigation"
+  },
+  "theme.NotFound.p1": {
+    "message": "No pudimos encontrar lo que buscabas.",
+    "description": "The first paragraph of the 404 page"
+  },
+  "theme.NotFound.p2": {
+    "message": "Comunícate con el dueño del sitio que te proporcionó la URL original y hazle saber que su enlace está roto.",
+    "description": "The 2nd paragraph of the 404 page"
+  },
+  "theme.navbar.mobileLanguageDropdown.label": {
+    "message": "Idiomas",
+    "description": "The label for the mobile language switcher dropdown"
+  },
+  "theme.TOCCollapsible.toggleButtonLabel": {
+    "message": "En esta página",
+    "description": "The label used by the button on the collapsible TOC component"
+  },
+  "theme.blog.post.readMore": {
+    "message": "Leer más",
+    "description": "The label used in blog post item excerpts to link to full blog posts"
+  },
+  "theme.blog.post.readMoreLabel": {
+    "message": "Leer más acerca de {title}",
+    "description": "The ARIA label for the link to full blog posts from excerpts"
+  },
+  "theme.blog.post.readingTime.plurals": {
+    "message": "Lectura de un minuto|{readingTime} min de lectura",
+    "description": "Pluralized label for \"{readingTime} min read\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.CodeBlock.copy": {
+    "message": "Copiar",
+    "description": "The copy button label on code blocks"
+  },
+  "theme.CodeBlock.copied": {
+    "message": "Copiado",
+    "description": "The copied button label on code blocks"
+  },
+  "theme.CodeBlock.copyButtonAriaLabel": {
+    "message": "Copiar código",
+    "description": "The ARIA label for copy code blocks button"
+  },
+  "theme.CodeBlock.wordWrapToggle": {
+    "message": "Alternar ajuste de palabras",
+    "description": "The title attribute for toggle word wrapping button of code block lines"
+  },
+  "theme.docs.breadcrumbs.home": {
+    "message": "Página de inicio",
+    "description": "The ARIA label for the home page in the breadcrumbs"
+  },
+  "theme.docs.sidebar.collapseButtonTitle": {
+    "message": "Colapsar barra lateral",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.collapseButtonAriaLabel": {
+    "message": "Colapsar barra lateral",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.navAriaLabel": {
+    "message": "Barra lateral de documentos",
+    "description": "The ARIA label for the sidebar navigation"
+  },
+  "theme.docs.sidebar.closeSidebarButtonAriaLabel": {
+    "message": "Cerrar barra lateral",
+    "description": "The ARIA label for close button of mobile sidebar"
+  },
+  "theme.navbar.mobileSidebarSecondaryMenu.backButtonLabel": {
+    "message": "← Volver al menú principal",
+    "description": "The label of the back button to return to main menu, inside the mobile navbar sidebar secondary menu (notably used to display the docs sidebar)"
+  },
+  "theme.docs.sidebar.toggleSidebarButtonAriaLabel": {
+    "message": "Alternar barra lateral",
+    "description": "The ARIA label for hamburger menu button of mobile navigation"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.expandAriaLabel": {
+    "message": "Expandir el menú desplegable",
+    "description": "The ARIA label of the button to expand the mobile dropdown navbar item"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.collapseAriaLabel": {
+    "message": "Contraer el menú desplegable",
+    "description": "The ARIA label of the button to collapse the mobile dropdown navbar item"
+  },
+  "theme.docs.sidebar.expandButtonTitle": {
+    "message": "Expandir barra lateral",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.docs.sidebar.expandButtonAriaLabel": {
+    "message": "Expandir barra lateral",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.SearchBar.noResultsText": {
+    "message": "Sin resultados"
+  },
+  "theme.SearchBar.seeAllOutsideContext": {
+    "message": "Ver todos los resultados fuera de «{context}»"
+  },
+  "theme.SearchBar.searchInContext": {
+    "message": "Ver todos los resultados en «{context}»"
+  },
+  "theme.SearchBar.seeAll": {
+    "message": "Ver todos los resultados"
+  },
+  "theme.SearchBar.label": {
+    "message": "Buscar",
+    "description": "The ARIA label and placeholder for search button"
+  },
+  "theme.SearchPage.existingResultsTitle": {
+    "message": "Resultados de búsqueda de «{query}»",
+    "description": "The search page title for non-empty query"
+  },
+  "theme.SearchPage.emptyResultsTitle": {
+    "message": "Buscar en la documentación",
+    "description": "The search page title for empty query"
+  },
+  "theme.SearchPage.searchContext.everywhere": {
+    "message": "En todas partes"
+  },
+  "theme.SearchPage.documentsFound.plurals": {
+    "message": "1 documento encontrado|{count} documentos encontrados",
+    "description": "Pluralized label for \"{count} documents found\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.SearchPage.noResultsText": {
+    "message": "No se encontró ningún documento",
+    "description": "The paragraph for empty search result"
+  },
+  "theme.ErrorPageContent.tryAgain": {
+    "message": "Reintentar",
+    "description": "The label of the button to try again rendering when the React error boundary captures an error"
+  },
+  "theme.common.skipToMainContent": {
+    "message": "Saltar al contenido principal",
+    "description": "The skip to content label used for accessibility, allowing to rapidly navigate to main content with keyboard tab/enter navigation"
+  },
+  "theme.tags.tagsPageTitle": {
+    "message": "Etiquetas",
+    "description": "The title of the tag list page"
+  },
+  "theme.blog.post.plurals": {
+    "message": "Una publicación|{count} publicaciones",
+    "description": "Pluralized label for \"{count} posts\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.tagTitle": {
+    "message": "{nPosts} etiquetadas con \"{tagName}\"",
+    "description": "The title of the page for a blog tag"
+  },
+  "theme.blog.author.pageTitle": {
+    "message": "{authorName} - {nPosts}",
+    "description": "The title of the page for a blog author"
+  },
+  "theme.blog.authorsList.pageTitle": {
+    "message": "Autores",
+    "description": "The title of the authors page"
+  },
+  "theme.blog.authorsList.viewAll": {
+    "message": "Ver todos los autores",
+    "description": "The label of the link targeting the blog authors page"
+  },
+  "theme.blog.author.noPosts": {
+    "message": "Este autor aún no ha escrito ninguna publicación.",
+    "description": "The text for authors with 0 blog post"
+  },
+  "theme.contentVisibility.unlistedBanner.title": {
+    "message": "Página sin clasificar",
+    "description": "The unlisted content banner title"
+  },
+  "theme.contentVisibility.unlistedBanner.message": {
+    "message": "Esta página está sin clasificar. Los motores de búsqueda no la indexarán, y solo los usuarios con el enlace directo podrán acceder a ella.",
+    "description": "The unlisted content banner message"
+  },
+  "theme.contentVisibility.draftBanner.title": {
+    "message": "Página en borrador",
+    "description": "The draft content banner title"
+  },
+  "theme.contentVisibility.draftBanner.message": {
+    "message": "Esta página es un borrador. Solo será visible en desarrollo y será excluida de la compilación de producción.",
+    "description": "The draft content banner message"
+  },
+  "theme.docs.DocCard.categoryDescription.plurals": {
+    "message": "1 artículo|{count} artículos",
+    "description": "The default description for a category card in the generated index about how many items this category includes"
+  }
+}

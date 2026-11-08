@@ -1,0 +1,77 @@
+---
+title: Introducción
+description: A2Flow es un motor de flujos de trabajo reconstruido desde cero en torno a un agente de IA. El agente no está dentro del flujo de trabajo, es el flujo de trabajo.
+slug: /intro
+sidebar_position: 1
+hide_title: true
+hide_table_of_contents: true
+---
+
+import {IntroPage, IntroHero, IntroContrast, IntroPanel, IntroActs, IntroAct, IntroClosing, IntroNext} from '@site/src/components/IntroSections';
+
+<IntroPage>
+
+<IntroHero
+  eyebrow="El agente de IA como flujo de trabajo"
+  title={<>El motor de flujos de trabajo <span className="grad">es el agente</span>.</>}>
+
+A2Flow es un motor de flujos de trabajo guiado por chat, reconstruido desde cero en torno a un agente de IA. No es un motor al que se le ha añadido un paso de IA, sino un motor cuyo entorno de ejecución *es* un agente. Planifica el trabajo, pregunta a las personas que tienen que decidir y hace el resto por su cuenta. El plan que elabora se conserva como flujo de trabajo y se vuelve a ejecutar: la flexibilidad de una sesión de chat con la repetibilidad de un procedimiento.
+
+</IntroHero>
+
+<IntroContrast>
+
+<IntroPanel kind="past" title="Un agente dentro de un flujo de trabajo">
+
+El diagrama de flujo es el programa, y en algún punto de él hay una caja con el rótulo «IA». Rellena un campo, redacta un resumen, clasifica un ticket. Luego el control vuelve al diagrama que alguien dibujó el año pasado, y el resto del proceso sigue funcionando como siempre.
+
+</IntroPanel>
+
+<IntroPanel kind="next" title="El agente es el flujo de trabajo">
+
+No hay ningún diagrama al que volver. El agente lee el procedimiento, planifica los pasos, vincula las herramientas, solicita las aprobaciones y ejecuta. Un flujo de trabajo no es algo en lo que el agente participa. Es lo que el agente hace.
+
+</IntroPanel>
+
+</IntroContrast>
+
+<IntroActs>
+
+<IntroAct step="01 — Diseño" icon="design" title="Se diseña conversando, no en un lienzo">
+
+Partes de una [skill de agente](./guides/agent-skills.md): un archivo `SKILL.md` en un repositorio Git, versionado y revisable como cualquier otro código. Después hablas con la IA. Ella redacta el grafo de tareas, tú lo ajustas, y las [herramientas MCP](./guides/mcp-servers.md) que necesita cada paso se van vinculando sobre la marcha. Lo que [publicas](./guides/workflows.md) es el propio plan del agente, conservado: un flujo de trabajo que nadie tuvo que dibujar y que todas las ejecuciones siguen de la misma manera.
+
+</IntroAct>
+
+<IntroAct step="02 — Ejecución" icon="run" title="Una ejecución es una conversación con varias personas">
+
+Ejecutar un flujo de trabajo abre un único chat compartido. El solicitante expone lo que necesita, el agente recorre el grafo de tareas y el aprobador decide ahí mismo, en el mismo hilo y con un comentario. Sin colas de tickets, sin canales paralelos, sin «¿hay novedades sobre mi solicitud?».
+
+</IntroAct>
+
+<IntroAct step="03 — Control" icon="control" title="Cada llamada a una herramienta lleva una concesión firmada">
+
+Una [aprobación](./guides/approvals.md) no es un consejo que se le pide al agente que siga. Cada tarea que llama a una herramienta posee un certificado X.509 de corta duración que cubre exactamente las herramientas que tenía cuando se emitió ese certificado, y el gateway MCP rechaza cualquier llamada que no presente uno, firmado. Aprobar una tarea es lo que pone el nombre de un aprobador en su certificado; una tarea cuya aprobación no se solicitó a nadie lleva la autoridad de quien inició la ejecución. Una inyección de prompt no puede sortear ninguna de las dos a base de palabras, y el agente no puede ampliar ninguna después. Cada llamada, permitida o rechazada, queda registrada con el número de serie del certificado y los bytes exactos que se firmaron para ella.
+
+</IntroAct>
+
+</IntroActs>
+
+<IntroClosing headline={<>Planificar. Aprobar. Ejecutar.</>}>
+
+Las tres cosas de las que siempre ha estado hecho, en realidad, un flujo de trabajo. A2Flow las conserva y deja todo lo que hay entre ellas en manos del agente: un procedimiento operativo estándar que llevas a cabo junto con la IA.
+
+</IntroClosing>
+
+<IntroNext title="Por dónde seguir">
+
+- **[Inicio rápido](./getting-started/quick-start.md)** — pon en marcha el backend y el frontend en tu máquina.
+- **[Terminología](./concepts/terminology.md)** — flujos de trabajo, sesiones de diseño, ejecuciones y sesiones del flujo de trabajo.
+- **[Skills de agente](./guides/agent-skills.md)** — los procedimientos respaldados por Git a partir de los cuales se diseña un flujo de trabajo.
+- **[Flujos de trabajo](./guides/workflows.md)** — genera un flujo de trabajo a partir de una skill, ajústalo, publícalo y ejecútalo.
+- **[Aprobaciones](./guides/approvals.md)** — cómo se detiene una ejecución a la espera de una persona y qué autoriza un certificado.
+- **[Referencia de configuración](./operations/configuration.md)** — todas las variables de entorno que lee el backend.
+
+</IntroNext>
+
+</IntroPage>

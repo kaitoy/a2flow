@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="workflow-execution-snapshot-title workflow-execution-snapshot-desc">
+      <title id="workflow-execution-snapshot-title">Ejecutar un flujo de trabajo copia su diseño</title>
+      <desc id="workflow-execution-snapshot-desc">Diagrama de flujo que muestra un flujo de trabajo publicado y los mocks de herramientas elegidos, copiados en una nueva instantánea de ejecución, que abre una sesión del flujo de trabajo con todas las tareas pendientes al principio.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows -->
+      <path d="M380,124 L380,144 Q380,152 388,152 L452,152 Q460,152 460,160 L460,180" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M660,124 L660,144 Q660,152 652,152 L548,152 Q540,152 540,160 L540,180" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="244" x2="500" y2="300" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="500" y1="364" x2="500" y2="420" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Arrow labels -->
+      <rect x="391" y="135" width="58" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="420" y="145" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EJECUTAR</text>
+
+      <rect x="545" y="135" width="110" height="14" rx="2" fill="#f2f8fc"/>
+      <text x="600" y="145" fill="#525860" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">COPIADO POR VALOR</text>
+
+      <!-- Workflow -->
+      <rect x="280" y="60" width="200" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="380" y="88" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Flujo de trabajo</text>
+      <text x="380" y="104" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">versión publicada</text>
+
+      <!-- Chosen tool mocks -->
+      <rect x="530" y="60" width="260" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="660" y="88" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Mocks de herramientas elegidos</text>
+      <text x="660" y="104" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">solo ejecuciones de prueba</text>
+
+      <!-- Workflow execution (focal) -->
+      <rect x="370" y="180" width="260" height="64" rx="6" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="500" y="208" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Ejecución del flujo de trabajo</text>
+      <text x="500" y="224" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">la instantánea</text>
+
+      <!-- Workflow session -->
+      <rect x="370" y="300" width="260" height="64" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="328" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Sesión del flujo de trabajo</text>
+      <text x="500" y="344" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">el chat de la ejecución</text>
+
+      <!-- Tasks -->
+      <rect x="370" y="420" width="260" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="448" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tareas</text>
+      <text x="500" y="464" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">todas pendientes al principio</text>
+    </svg>

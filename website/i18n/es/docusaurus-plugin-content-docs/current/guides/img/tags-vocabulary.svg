@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="tags-vocabulary-title tags-vocabulary-desc">
+      <title id="tags-vocabulary-title">Un vocabulario, siete catálogos</title>
+      <desc id="tags-vocabulary-desc">Diagrama de flujo que muestra un único vocabulario de etiquetas compartido por tenant, aplicado a siete catálogos etiquetables: Secretos, Servidores MCP, Skills de agente, Bases de conocimiento, Flujos de trabajo, Mocks de herramientas y Grupos de usuarios.</desc>
+      <defs><style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#525860"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00877a"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f2f8fc"/>
+
+      <!-- Arrows: hub -> 7 registries; the left ones bend lower the further in they leave the hub, the right ones mirror it, so none cross -->
+      <path d="M380,132 L380,136 Q380,144 372,144 L82,144 Q74,144 74,152 L74,240" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M420,132 L420,152 Q420,160 412,160 L224,160 Q216,160 216,168 L216,240" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M460,132 L460,168 Q460,176 452,176 L366,176 Q358,176 358,184 L358,240" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M500,132 L500,240" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M540,132 L540,168 Q540,176 548,176 L634,176 Q642,176 642,184 L642,240" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M580,132 L580,152 Q580,160 588,160 L776,160 Q784,160 784,168 L784,240" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M620,132 L620,136 Q620,144 628,144 L918,144 Q926,144 926,152 L926,240" fill="none" stroke="#525860" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Hub (focal) -->
+      <rect x="360" y="60" width="280" height="72" rx="6" fill="#00877a" fill-opacity="0.08" stroke="#00877a" stroke-width="1"/>
+      <text x="500" y="90" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Vocabulario de etiquetas</text>
+      <text x="500" y="110" fill="#525860" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle">uno por tenant</text>
+
+      <!-- Seven registries -->
+      <rect x="12" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="74" y="272" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Secretos</text>
+
+      <rect x="154" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="216" y="263" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Servidores</text><text x="216" y="280" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MCP</text>
+
+      <rect x="296" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="358" y="263" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Skills de</text><text x="358" y="280" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">agente</text>
+
+      <rect x="438" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="500" y="263" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Bases de</text><text x="500" y="280" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">conocimiento</text>
+
+      <rect x="580" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="642" y="263" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Flujos de</text><text x="642" y="280" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">trabajo</text>
+
+      <rect x="722" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="784" y="263" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Mocks de</text><text x="784" y="280" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">herramientas</text>
+
+      <rect x="864" y="240" width="124" height="56" rx="6" fill="#ffffff" stroke="#1c1e21" stroke-width="1"/>
+      <text x="926" y="263" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Grupos de</text><text x="926" y="280" fill="#1c1e21" font-size="14" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">usuarios</text>
+    </svg>
