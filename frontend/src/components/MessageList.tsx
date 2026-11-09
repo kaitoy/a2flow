@@ -3,15 +3,17 @@
 import type { A2UIUserAction } from "@ag-ui/a2ui-middleware";
 import { contentToText, type Message } from "@ag-ui/core";
 import { animated, useSpring } from "@react-spring/web";
-import { Sparkles } from "lucide-react";
+import { ArrowDown, Sparkles } from "lucide-react";
 import {
   Fragment,
   type ReactNode,
   type UIEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { useT } from "@/i18n/provider";
 import type { PendingRenderCall } from "@/lib/a2uiAction";
@@ -26,6 +28,7 @@ import { useMotionConfig } from "@/lib/motion";
 import type { RenderedMessage } from "@/store/chatSlice";
 import { ELICITATION_ACTIVITY_TYPE } from "./ElicitationControls";
 import { MessageBubble } from "./MessageBubble";
+import { Button } from "./ui/button";
 import { EmptyState } from "./ui/empty-state";
 import { WorkflowTaskGroup } from "./WorkflowTaskGroup";
 
@@ -90,6 +93,11 @@ function shouldShowWorkingIndicator(
   return true;
 }
 
+/** Whether a scroll container is scrolled to within 120px of its bottom. */
+function isNearBottom(el: HTMLElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+}
+
 /**
  * Subtle "agent is thinking" pulse shown at the bottom of the list while a run
  * is in flight and no other surface (streaming text, a running tool line, a
@@ -109,15 +117,31 @@ function WorkingIndicator() {
 }
 
 /**
- * Scrollable list of chat messages. New messages follow to the bottom only when
- * the viewer is already near the bottom, so an incoming message (for example one
- * polled in from another workflow participant) never yanks a reader away from
- * earlier history they're scrolled up to read. The same following also covers
- * content that grows *after* `messages` itself last changed — an A2UI surface
- * that finishes mounting a beat after its activity bubble appears, or an
- * approval control that swaps in its resolved state once its fetch lands —
- * tracked via a `ResizeObserver` on the message column rather than the
- * `messages` prop alone.
+ * Scrollable list of chat messages.
+ *
+ * When a run starts while the viewer is near the bottom, the list scrolls once
+ * so the latest message (usually the prompt just sent) sits at the top of the
+ * viewport, with a trailing spacer reserving a screenful of empty room below
+ * it. The reply streams into that room and the list does not scroll again for
+ * the rest of the run — even once the reply outgrows the room — so text already
+ * on screen never drifts while it is being read. The spacer shrinks as content
+ * fills it and stays until the next run, since removing it would clamp the
+ * scroll position and make the view jump.
+ *
+ * When a message is added, or a run finishes, with the end of the messages out
+ * of sight below the viewport — a reply that outgrew its room, or a message that
+ * arrived while the viewer was scrolled up — a "New messages below" button
+ * floats over the bottom of the list until the viewer scrolls down to the end.
+ * Clicking it jumps there and follows the reply for the rest of the run.
+ *
+ * Outside a run, new messages follow to the bottom only when the viewer is
+ * already near the bottom, so an incoming message (for example one polled in
+ * from another workflow participant) never yanks a reader away from earlier
+ * history they're scrolled up to read. The same following also covers content
+ * that grows *after* `messages` itself last changed — an A2UI surface that
+ * finishes mounting a beat after its activity bubble appears, or an approval
+ * control that swaps in its resolved state once its fetch lands — tracked via a
+ * `ResizeObserver` on the message column rather than the `messages` prop alone.
  */
 export function MessageList({
   messages,
@@ -196,6 +220,16 @@ export function MessageList({
   // Whether the viewer is parked near the bottom. Updated on scroll *before* the
   // next content append, so the scroll effect can decide whether to follow.
   const stickToBottomRef = useRef(true);
+  // Trailing room below the message column that a run's reply streams into.
+  const spacerRef = useRef<HTMLDivElement>(null);
+  // The message scrolled to the top when the current (or last) run started;
+  // the spacer is sized so it can stay there.
+  const anchorElRef = useRef<HTMLElement | null>(null);
+  // True for the duration of a run that scrolled to its anchor: no following.
+  const anchoredRef = useRef(false);
+  const prevIsRunningRef = useRef(false);
+  // Content has landed below the viewport that the viewer hasn't scrolled to.
+  const [hasUnseenBelow, setHasUnseenBelow] = useState(false);
   const emptyConfig = useMotionConfig("gentle");
   const emptyStateSpring = useSpring({
     from: { opacity: 0, transform: "scale(0.92)" },
@@ -257,32 +291,147 @@ export function MessageList({
 
   const lastMessageId = messages[messages.length - 1]?.id;
 
-  /** Follow to the bottom, but only while the viewer is already parked there. */
-  const scrollToBottomIfStuck = useCallback(() => {
-    if (stickToBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  /** Whether the end of the messages lies below the bottom edge of the viewport. */
+  const isEndBelowView = useCallback(() => {
+    const scrollEl = scrollRef.current;
+    const bottom = bottomRef.current;
+    if (!scrollEl || !bottom) return false;
+    return bottom.getBoundingClientRect().top > scrollEl.getBoundingClientRect().bottom + 1;
   }, []);
 
+  /**
+   * Follow to the bottom, but only while the viewer is already parked there and
+   * no run is filling its reserved room. `nearest` leaves the view alone while
+   * the end of the content is still on screen above a leftover spacer.
+   */
+  const scrollToBottomIfStuck = useCallback(() => {
+    if (anchoredRef.current || !stickToBottomRef.current) return;
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+
+  /**
+   * Jump to the end of the messages (the "New messages below" button) and keep
+   * following it for the rest of the current run.
+   */
+  const scrollToEnd = () => {
+    anchoredRef.current = false;
+    stickToBottomRef.current = true;
+    setHasUnseenBelow(false);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  };
+
+  /**
+   * Size the spacer so the anchor message can sit at the top of the viewport:
+   * a viewport's height minus the content already below the anchor's top.
+   */
+  const updateSpacer = useCallback(() => {
+    const scrollEl = scrollRef.current;
+    const spacer = spacerRef.current;
+    const bottom = bottomRef.current;
+    if (!scrollEl || !spacer || !bottom) return;
+    const anchor = anchorElRef.current;
+    let height = 0;
+    if (anchor?.isConnected) {
+      const style = getComputedStyle(scrollEl);
+      const room =
+        scrollEl.clientHeight -
+        (Number.parseFloat(style.paddingTop) || 0) -
+        (Number.parseFloat(style.paddingBottom) || 0);
+      const used = bottom.getBoundingClientRect().top - anchor.getBoundingClientRect().top;
+      height = Math.max(0, room - used);
+    }
+    spacer.style.height = `${height}px`;
+  }, []);
+
+  /**
+   * Show the "New messages below" button if the list is not following and the
+   * end of the messages is out of sight. Called only when a message is added or
+   * a run finishes — not as a reply merely grows, nor on a resize — so the
+   * button means "something new arrived", not "there is more to scroll".
+   */
+  const flagIfUnseen = useCallback(() => {
+    if (!anchoredRef.current && stickToBottomRef.current) return;
+    if (anchoredRef.current) {
+      // While the reply still has room, its end is (or is about to be, once
+      // the anchoring scroll lands) on screen.
+      updateSpacer();
+      if (Number.parseFloat(spacerRef.current?.style.height ?? "") > 0) return;
+    }
+    if (isEndBelowView()) setHasUnseenBelow(true);
+  }, [isEndBelowView, updateSpacer]);
+
+  const prevMessageCountRef = useRef(messages.length);
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll to bottom whenever messages change
   useEffect(() => {
     scrollToBottomIfStuck();
+    if (messages.length > prevMessageCountRef.current) flagIfUnseen();
+    prevMessageCountRef.current = messages.length;
   }, [messages]);
+
+  // Whether the latest message is a prompt the viewer just sent themselves.
+  const lastMessage = messages[messages.length - 1];
+  const lastSentByViewer = lastMessage?.role === "user" && (isOwnMessage?.(lastMessage) ?? true);
+
+  // When a run starts, scroll the latest message to the top in one go and
+  // reserve the room below it for the reply. Always done for the viewer's own
+  // prompt — wherever they were scrolled to, e.g. still partway up the previous
+  // reply that ran past the screen. Otherwise skipped for a viewer scrolled up
+  // into the history: in a workflow session a run can start on someone else's
+  // message, or on A2Flow's own, and must not pull a reader away.
+  useLayoutEffect(() => {
+    const wasRunning = prevIsRunningRef.current;
+    prevIsRunningRef.current = isRunning;
+    if (!isRunning) {
+      // The reply grew without a scroll event, so the last reading of
+      // stickToBottomRef predates it. Re-measure, or a reply that ran past the
+      // screen would be followed to the bottom the moment the run ends.
+      if (anchoredRef.current && scrollRef.current) {
+        stickToBottomRef.current = isNearBottom(scrollRef.current);
+      }
+      anchoredRef.current = false;
+      if (wasRunning) flagIfUnseen();
+      return;
+    }
+    if (wasRunning || !(stickToBottomRef.current || lastSentByViewer)) return;
+    // The last message that renders something: a `tool` message renders
+    // nothing, leaving an empty wrapper.
+    const wrappers = contentRef.current?.querySelectorAll<HTMLElement>("[data-message-key]") ?? [];
+    let anchor: HTMLElement | null = null;
+    for (let i = wrappers.length - 1; i >= 0; i--) {
+      if (wrappers[i].childElementCount > 0) {
+        anchor = wrappers[i];
+        break;
+      }
+    }
+    if (!anchor) return;
+    anchorElRef.current = anchor;
+    anchoredRef.current = true;
+    updateSpacer();
+    anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isRunning, lastSentByViewer, updateSpacer, flagIfUnseen]);
 
   // Content can grow after `messages` last changed — an A2UI surface finishes
   // mounting a beat after its activity bubble appears, an approval control
   // swaps in its resolved state once its fetch lands — so watch the actual
   // layout height rather than relying on `messages` alone to know when to follow.
+  // The scroll container is watched too, so a window resize re-sizes the spacer.
   useEffect(() => {
     const content = contentRef.current;
-    if (!content) return;
-    const observer = new ResizeObserver(scrollToBottomIfStuck);
+    const scrollEl = scrollRef.current;
+    if (!content || !scrollEl) return;
+    const observer = new ResizeObserver(() => {
+      updateSpacer();
+      scrollToBottomIfStuck();
+    });
     observer.observe(content);
+    observer.observe(scrollEl);
     return () => observer.disconnect();
-  }, [scrollToBottomIfStuck]);
+  }, [scrollToBottomIfStuck, updateSpacer]);
 
   /** Track whether the viewer is near the bottom so new messages only follow then. */
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    stickToBottomRef.current = isNearBottom(e.currentTarget);
+    if (!isEndBelowView()) setHasUnseenBelow(false);
   };
 
   // Scroll-spy: report which task group sits at the top of the viewport so the
@@ -296,9 +445,9 @@ export function MessageList({
 
     let lastReported: string | null = null;
     // The trailing sentinel (bottomRef) is a zero-height marker pinned at the
-    // very end of the scrollable content, so it enters the viewport at
-    // essentially the same moment scrollTop reaches its max. That's the only
-    // reliable way to know the last group is "active": its own top may never
+    // end of the messages (only the run spacer follows it), so it enters the
+    // viewport once the viewer has scrolled to the last of the content. That's
+    // the only reliable way to know the last group is "active": its own top may never
     // cross the 30% line below if there isn't enough trailing content to push
     // it there (e.g. a short final task with no WorkingIndicator after it).
     let atBottom = false;
@@ -352,62 +501,85 @@ export function MessageList({
   /**
    * Render a message bubble, marking the global last message as streaming (or,
    * absent a text stream, as still-thinking so a trailing reasoning panel gets
-   * the live edge).
+   * the live edge). The wrapper is what a run's scroll anchors to.
    */
   const renderBubble = (msg: RenderedMessage): ReactNode => (
-    <MessageBubble
-      key={renderKeyOf(msg)}
-      message={msg}
-      isStreaming={isStreaming && msg.id === lastMessageId}
-      isThinking={isRunning && !isStreaming && msg.id === lastMessageId}
-      avatar={renderAvatar?.(msg)}
-      isOwn={isOwnMessage?.(msg) ?? true}
-      onAction={onAction}
-      onApprovalResolved={onApprovalResolved}
-      pendingToolCallIds={pendingToolCallIds}
-      toolResultContentByCallId={toolResultContentByCallId}
-      canActOnSurfaces={canActOnSurfaces}
-    />
+    <div key={renderKeyOf(msg)} data-message-key={renderKeyOf(msg)}>
+      <MessageBubble
+        message={msg}
+        isStreaming={isStreaming && msg.id === lastMessageId}
+        isThinking={isRunning && !isStreaming && msg.id === lastMessageId}
+        avatar={renderAvatar?.(msg)}
+        isOwn={isOwnMessage?.(msg) ?? true}
+        onAction={onAction}
+        onApprovalResolved={onApprovalResolved}
+        pendingToolCallIds={pendingToolCallIds}
+        toolResultContentByCallId={toolResultContentByCallId}
+        canActOnSurfaces={canActOnSurfaces}
+      />
+    </div>
   );
 
   return (
-    <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-6">
-      <div ref={contentRef} className="mx-auto flex max-w-3xl flex-col">
-        {messages.length === 0 && (
-          <animated.div style={emptyStateSpring}>
-            <EmptyState
-              icon={Sparkles}
-              animation="breathe"
-              title={t("app.startAConversation")}
-              description={t("app.askAnythingBuildAnA2uiSurfaceOr")}
-            />
-          </animated.div>
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto scroll-py-6 px-4 py-6"
+      >
+        <div ref={contentRef} className="mx-auto flex max-w-3xl flex-col">
+          {messages.length === 0 && (
+            <animated.div style={emptyStateSpring}>
+              <EmptyState
+                icon={Sparkles}
+                animation="breathe"
+                title={t("app.startAConversation")}
+                description={t("app.askAnythingBuildAnA2uiSurfaceOr")}
+              />
+            </animated.div>
+          )}
+          {runs.map((run) => {
+            // Prefer the task's stable anchorId over the run's leading message id:
+            // messageTasks refreshes independently of messages, so the message
+            // that happens to lead a task's run can change between renders even
+            // though the task itself hasn't — keying on messages[0] there would
+            // remount the whole group (e.g. an in-progress ApprovalControls).
+            const key = run.anchorId ?? renderKeyOf(run.messages[0]);
+            if (!run.taskId) {
+              return <Fragment key={key}>{run.messages.map(renderBubble)}</Fragment>;
+            }
+            return (
+              <WorkflowTaskGroup
+                key={key}
+                task={tasksById?.get(run.taskId)}
+                index={taskIndexById?.get(run.taskId) ?? 0}
+                anchorId={run.anchorId}
+                isHighlighted={highlightedTaskId === run.taskId}
+                onHover={(id) => onHoverTask?.(id)}
+              >
+                {run.messages.map(renderBubble)}
+              </WorkflowTaskGroup>
+            );
+          })}
+          {shouldShowWorkingIndicator(messages, isRunning, isStreaming) && <WorkingIndicator />}
+          <div ref={bottomRef} />
+        </div>
+        <div ref={spacerRef} aria-hidden />
+      </div>
+      <div
+        aria-live="polite"
+        className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center"
+      >
+        {hasUnseenBelow && (
+          <Button
+            variant="secondary"
+            onClick={scrollToEnd}
+            className="pointer-events-auto gap-1.5 animate-message-in"
+          >
+            <ArrowDown className="size-4" aria-hidden />
+            {t("app.newMessagesBelow")}
+          </Button>
         )}
-        {runs.map((run) => {
-          // Prefer the task's stable anchorId over the run's leading message id:
-          // messageTasks refreshes independently of messages, so the message
-          // that happens to lead a task's run can change between renders even
-          // though the task itself hasn't — keying on messages[0] there would
-          // remount the whole group (e.g. an in-progress ApprovalControls).
-          const key = run.anchorId ?? renderKeyOf(run.messages[0]);
-          if (!run.taskId) {
-            return <Fragment key={key}>{run.messages.map(renderBubble)}</Fragment>;
-          }
-          return (
-            <WorkflowTaskGroup
-              key={key}
-              task={tasksById?.get(run.taskId)}
-              index={taskIndexById?.get(run.taskId) ?? 0}
-              anchorId={run.anchorId}
-              isHighlighted={highlightedTaskId === run.taskId}
-              onHover={(id) => onHoverTask?.(id)}
-            >
-              {run.messages.map(renderBubble)}
-            </WorkflowTaskGroup>
-          );
-        })}
-        {shouldShowWorkingIndicator(messages, isRunning, isStreaming) && <WorkingIndicator />}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

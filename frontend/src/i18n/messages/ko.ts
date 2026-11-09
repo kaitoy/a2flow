@@ -351,6 +351,7 @@ export const ko = {
   "app.markAllRead": "모두 읽음으로 표시",
   "app.message": "메시지…",
   "app.messageCtrlEnterToSendEnterFor": "메시지…  (Ctrl/⌘+Enter로 보내기 · Enter로 줄 바꿈)",
+  "app.newMessagesBelow": "아래에 새 메시지가 있습니다",
   "app.newSession": "새 세션",
   "app.noSessions": "세션 없음",
   "app.noTasksToVisualizeYet": "아직 표시할 작업이 없습니다.",

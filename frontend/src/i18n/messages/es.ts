@@ -361,6 +361,7 @@ export const es = {
   "app.message": "Mensaje…",
   "app.messageCtrlEnterToSendEnterFor":
     "Mensaje…  (Ctrl/⌘+Intro para enviar · Intro para nueva línea)",
+  "app.newMessagesBelow": "Hay mensajes nuevos abajo",
   "app.newSession": "Nueva sesión",
   "app.noSessions": "Sin sesiones",
   "app.noTasksToVisualizeYet": "Aún no hay tareas que visualizar.",

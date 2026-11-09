@@ -234,6 +234,214 @@ describe("MessageList", () => {
     }
   });
 
+  describe("run anchoring and the new-messages button", () => {
+    const initial: Message[] = [
+      { id: "m1", role: "assistant", content: "hello" },
+      { id: "m2", role: "user", content: "hi" },
+    ];
+
+    /** Stub the scroll container's layout: `scrollHeight` 1000 and `clientHeight` 500. */
+    const stubLayout = (container: HTMLElement, scrollTop: number) => {
+      const scrollEl = container.querySelector(".overflow-y-auto") as HTMLElement;
+      Object.defineProperty(scrollEl, "scrollHeight", { value: 1000, configurable: true });
+      Object.defineProperty(scrollEl, "clientHeight", { value: 500, configurable: true });
+      scrollEl.scrollTop = scrollTop;
+      fireEvent.scroll(scrollEl);
+      return scrollEl;
+    };
+
+    it("scrolls the latest message to the top and reserves a screenful below it", () => {
+      const { container, rerender } = render(<MessageList messages={initial} />);
+      const scrollEl = stubLayout(container, 500);
+
+      vi.mocked(Element.prototype.scrollIntoView).mockClear();
+      rerender(<MessageList messages={initial} isRunning={true} />);
+
+      const scroll = vi.mocked(Element.prototype.scrollIntoView);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      expect(scroll.mock.contexts[0]).toBe(screen.getByTestId("bubble-m2").parentElement);
+      expect(scroll.mock.calls[0][0]).toMatchObject({ block: "start" });
+      // happy-dom has no layout, so the reserved room is the whole clientHeight.
+      expect((scrollEl.lastElementChild as HTMLElement).style.height).toBe("500px");
+    });
+
+    it("does not follow the reply as it grows", () => {
+      const realResizeObserver = window.ResizeObserver;
+      FakeResizeObserver.instances = [];
+      window.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+      try {
+        const { container, rerender } = render(<MessageList messages={initial} />);
+        stubLayout(container, 500);
+        rerender(<MessageList messages={initial} isRunning={true} />);
+
+        vi.mocked(Element.prototype.scrollIntoView).mockClear();
+        rerender(
+          <MessageList
+            messages={[...initial, { id: "m3", role: "assistant", content: "reply" }]}
+            isRunning={true}
+            isStreaming={true}
+          />
+        );
+        const observer = FakeResizeObserver.instances[0];
+        observer.callback([] as ResizeObserverEntry[], observer as unknown as ResizeObserver);
+
+        expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      } finally {
+        window.ResizeObserver = realResizeObserver;
+      }
+    });
+
+    it("does not catch up to a reply that ran past the screen once the run ends", () => {
+      const { container, rerender } = render(<MessageList messages={initial} />);
+      const scrollEl = stubLayout(container, 500);
+      rerender(<MessageList messages={initial} isRunning={true} />);
+      // The reply grows 800px past the screen with no scroll event.
+      Object.defineProperty(scrollEl, "scrollHeight", { value: 1800, configurable: true });
+      const withReply = [...initial, { id: "m3", role: "assistant", content: "reply" } as Message];
+      rerender(<MessageList messages={withReply} isRunning={true} />);
+
+      vi.mocked(Element.prototype.scrollIntoView).mockClear();
+      rerender(<MessageList messages={withReply} />);
+      rerender(
+        <MessageList messages={[...withReply, { id: "m4", role: "assistant", content: "x" }]} />
+      );
+
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    /** Stub `getBoundingClientRect` to report the given top and bottom edges. */
+    const rect = (top: number, bottom: number) => () => ({ top, bottom }) as DOMRect;
+    const BUTTON = { name: "New messages below" };
+
+    it("shows the new-messages button when the reply finishes past the screen, not while it streams", () => {
+      const realResizeObserver = window.ResizeObserver;
+      FakeResizeObserver.instances = [];
+      window.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+      try {
+        const { container, rerender } = render(<MessageList messages={initial} />);
+        const scrollEl = stubLayout(container, 500);
+        const sentinel = scrollEl.firstElementChild?.lastElementChild as HTMLElement;
+        scrollEl.getBoundingClientRect = rect(0, 500);
+        sentinel.getBoundingClientRect = rect(300, 300);
+        rerender(<MessageList messages={initial} isRunning={true} />);
+        const reply: Message = { id: "m3", role: "assistant", content: "" };
+        rerender(
+          <MessageList messages={[...initial, reply]} isRunning={true} isStreaming={true} />
+        );
+
+        // The reply streams 300px past the screen: no button yet.
+        sentinel.getBoundingClientRect = rect(800, 800);
+        Object.defineProperty(scrollEl, "scrollHeight", { value: 1800, configurable: true });
+        const grown = [...initial, { ...reply, content: "long" } as Message];
+        rerender(<MessageList messages={grown} isRunning={true} isStreaming={true} />);
+        const observer = FakeResizeObserver.instances[0];
+        observer.callback([] as ResizeObserverEntry[], observer as unknown as ResizeObserver);
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        rerender(<MessageList messages={grown} />);
+        expect(screen.getByRole("button", BUTTON)).toBeInTheDocument();
+      } finally {
+        window.ResizeObserver = realResizeObserver;
+      }
+    });
+
+    it("jumps to the end and follows the rest of the run when the button is clicked", () => {
+      const realResizeObserver = window.ResizeObserver;
+      FakeResizeObserver.instances = [];
+      window.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+      try {
+        const { container, rerender } = render(<MessageList messages={initial} />);
+        const scrollEl = stubLayout(container, 500);
+        const sentinel = scrollEl.firstElementChild?.lastElementChild as HTMLElement;
+        scrollEl.getBoundingClientRect = rect(0, 500);
+        sentinel.getBoundingClientRect = rect(800, 800);
+        rerender(<MessageList messages={initial} isRunning={true} />);
+        // A message added mid-run that ends below the screen shows the button.
+        rerender(
+          <MessageList
+            messages={[...initial, { id: "m3", role: "assistant", content: "reply" }]}
+            isRunning={true}
+          />
+        );
+
+        vi.mocked(Element.prototype.scrollIntoView).mockClear();
+        fireEvent.click(screen.getByRole("button", BUTTON));
+        const scroll = vi.mocked(Element.prototype.scrollIntoView);
+        expect(scroll.mock.contexts[0]).toBe(sentinel);
+        expect(scroll.mock.calls[0][0]).toMatchObject({ block: "end" });
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        // The reply keeps growing: the list now follows it.
+        scroll.mockClear();
+        const observer = FakeResizeObserver.instances[0];
+        observer.callback([] as ResizeObserverEntry[], observer as unknown as ResizeObserver);
+        expect(scroll.mock.contexts[0]).toBe(sentinel);
+        expect(scroll.mock.calls[0][0]).toMatchObject({ block: "nearest" });
+      } finally {
+        window.ResizeObserver = realResizeObserver;
+      }
+    });
+
+    it("shows the new-messages button for a message added while scrolled up, not for a resize", () => {
+      const realResizeObserver = window.ResizeObserver;
+      FakeResizeObserver.instances = [];
+      window.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+      try {
+        const { container, rerender } = render(<MessageList messages={initial} />);
+        const scrollEl = stubLayout(container, 0);
+        const sentinel = scrollEl.firstElementChild?.lastElementChild as HTMLElement;
+        scrollEl.getBoundingClientRect = rect(0, 500);
+        sentinel.getBoundingClientRect = rect(900, 900);
+
+        const observer = FakeResizeObserver.instances[0];
+        observer.callback([] as ResizeObserverEntry[], observer as unknown as ResizeObserver);
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+
+        rerender(
+          <MessageList
+            messages={[...initial, { id: "m3", role: "user", content: "from someone" }]}
+          />
+        );
+        expect(screen.getByRole("button", BUTTON)).toBeInTheDocument();
+
+        // Scrolling the end into view dismisses the button.
+        sentinel.getBoundingClientRect = rect(480, 480);
+        fireEvent.scroll(scrollEl);
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+      } finally {
+        window.ResizeObserver = realResizeObserver;
+      }
+    });
+
+    it("does not jump for someone else's message while the viewer is scrolled up into the history", () => {
+      const notMine = () => false;
+      const { container, rerender } = render(
+        <MessageList messages={initial} isOwnMessage={notMine} />
+      );
+      const scrollEl = stubLayout(container, 0);
+
+      vi.mocked(Element.prototype.scrollIntoView).mockClear();
+      rerender(<MessageList messages={initial} isOwnMessage={notMine} isRunning={true} />);
+
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      expect((scrollEl.lastElementChild as HTMLElement).style.height).not.toBe("500px");
+    });
+
+    it("jumps for the viewer's own prompt even when scrolled up, e.g. partway up the last reply", () => {
+      const { container, rerender } = render(<MessageList messages={initial.slice(0, 1)} />);
+      const scrollEl = stubLayout(container, 0);
+
+      vi.mocked(Element.prototype.scrollIntoView).mockClear();
+      // Sending adds the prompt and starts the run in one commit.
+      rerender(<MessageList messages={initial} isRunning={true} />);
+
+      const scroll = vi.mocked(Element.prototype.scrollIntoView);
+      expect(scroll.mock.contexts[0]).toBe(screen.getByTestId("bubble-m2").parentElement);
+      expect(scroll.mock.calls[0][0]).toMatchObject({ block: "start" });
+      expect((scrollEl.lastElementChild as HTMLElement).style.height).toBe("500px");
+    });
+  });
+
   it("shows the working indicator with the live edge while running and not streaming", () => {
     const messages: Message[] = [{ id: "m1", role: "user", content: "hi" }];
     const { container } = render(<MessageList messages={messages} isRunning={true} />);

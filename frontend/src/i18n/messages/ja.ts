@@ -354,6 +354,7 @@ export const ja = {
   "app.markAllRead": "すべて既読にする",
   "app.message": "メッセージ…",
   "app.messageCtrlEnterToSendEnterFor": "メッセージ…  (Ctrl/⌘+Enter で送信 · Enter で改行)",
+  "app.newMessagesBelow": "下に新しいメッセージがあります",
   "app.newSession": "新しいセッション",
   "app.noSessions": "セッションはありません",
   "app.noTasksToVisualizeYet": "表示できるタスクはまだありません。",

@@ -331,6 +331,7 @@ export const zhCN = {
   "app.markAllRead": "全部标为已读",
   "app.message": "消息…",
   "app.messageCtrlEnterToSendEnterFor": "消息…  （Ctrl/⌘+Enter 发送 · Enter 换行）",
+  "app.newMessagesBelow": "下方有新消息",
   "app.newSession": "新建会话",
   "app.noSessions": "没有会话",
   "app.noTasksToVisualizeYet": "暂无可显示的任务。",

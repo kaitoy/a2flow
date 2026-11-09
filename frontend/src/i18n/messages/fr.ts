@@ -361,6 +361,7 @@ export const fr = {
   "app.message": "Message…",
   "app.messageCtrlEnterToSendEnterFor":
     "Message…  (Ctrl/⌘+Entrée pour envoyer · Entrée pour un saut de ligne)",
+  "app.newMessagesBelow": "Nouveaux messages plus bas",
   "app.newSession": "Nouvelle session",
   "app.noSessions": "Aucune session",
   "app.noTasksToVisualizeYet": "Aucune tâche à visualiser pour l'instant.",

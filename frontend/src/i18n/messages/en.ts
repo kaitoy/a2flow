@@ -355,6 +355,7 @@ export const en = {
   "app.markAllRead": "Mark all read",
   "app.message": "Message…",
   "app.messageCtrlEnterToSendEnterFor": "Message…  (Ctrl/⌘+Enter to send · Enter for newline)",
+  "app.newMessagesBelow": "New messages below",
   "app.newSession": "New session",
   "app.noSessions": "No sessions",
   "app.noTasksToVisualizeYet": "No tasks to visualize yet.",
