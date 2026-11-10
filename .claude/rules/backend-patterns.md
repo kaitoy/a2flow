@@ -419,10 +419,11 @@ All JSON responses share a uniform envelope. It is **not** applied by middleware
 
 ### Endpoints without the envelope
 
-Three kinds of endpoint intentionally skip the `ApiResponse` envelope by simply not using it:
+Four kinds of endpoint intentionally skip the `ApiResponse` envelope by simply not using it:
 
 - `POST /agent` and `POST /workflows/{id}/agent` — SSE streams of a browser-driven run (must not be buffered)
 - `GET /workflow-executions/{id}/sessions/{sid}/stream` — SSE stream of a server-run workflow session's turn, read from `session_stream_events` so any replica can serve it (`services/session_stream.py`)
+- `GET /api/v1/auth/oidc/start` and `GET /api/v1/auth/oidc/callback` — the OIDC sign-in browser redirects: both answer `302` (to the identity provider, to `/`, or to `/login?sso_error=<code>`) and are unguarded. They appear in the OpenAPI spec as redirect-only routes. Any failure, expected or not, becomes a redirect with an `sso_error` code, never an error envelope or a 500 page
 - `GET /api/v1/health` — returns `{"status":"ok"}` (200) or `{"status":"unavailable"}` (503), after checking database connectivity; used for both liveness and readiness gating. `routers/health.py` declares it as `/health`, but like every other router it is mounted under `api_router`'s `/api/v1` prefix, so that is the path to probe. Excluded from the uvicorn access log (`infrastructure/logging_context.py`, whose `HEALTH_CHECK_PATH` carries the full path) since it's polled frequently.
 
 A streaming route takes `db: DBSessionDep` and calls `await db.close()` right before returning its `StreamingResponse`: FastAPI closes the request session only after the response is fully sent, so otherwise the authorization reads keep a pooled connection checked out in an open transaction for the stream's whole lifetime (see `infrastructure/database.py::get_session`).

@@ -43,7 +43,7 @@ rather than configuration.
 
 ## Authentication
 
-All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require an authenticated session. Authentication is cookie-based and backed by the `auth_sessions` table.
+All API routes except `POST /api/v1/auth/login`, the two `GET /api/v1/auth/oidc/*` redirects and `GET /api/v1/health` require an authenticated session. Authentication is cookie-based and backed by the `auth_sessions` table.
 
 **Flow**
 
@@ -54,6 +54,13 @@ All API routes except `POST /api/v1/auth/login` and `GET /api/v1/health` require
 3. `GET /api/v1/auth/me` returns the current user; `POST /api/v1/auth/logout` revokes the session and clears the cookies.
 
 A missing or invalid session returns `401 UNAUTHENTICATED`.
+
+**OIDC single sign-on.** A tenant with SSO configured can sign users in through its identity provider. Both routes are unguarded browser redirects (`302`, no envelope), declared in `routers/auth.py` and implemented by `services/oidc_login.py`:
+
+- `GET /api/v1/auth/oidc/start?tenant=<name>` — if the platform's `app_base_url` names another origin (scheme, host, port) than the request's, redirects to the same path and query on that origin first, so the state cookie is set where the provider will call back. Otherwise redirects to the provider's authorization URL and sets `a2flow_oidc_state`: encrypted, `HttpOnly`, `SameSite=Lax`, `Max-Age=600` (`Secure` per `SESSION_COOKIE_SECURE`), with `Path` equal to the callback's mounted path so it is sent nowhere else.
+- `GET /api/v1/auth/oidc/callback?code&state&error` — on success sets the `a2flow_session` and `a2flow_csrf` cookies and redirects to `/`; on any refusal redirects to `/login?sso_error=<code>` with `code` one of `unavailable`, `failed`, `account_disabled`, `not_permitted`. The state cookie is deleted either way. An unexpected exception is logged under the request id and reported as `failed`; `start` reports one as `unavailable`.
+
+Behind a reverse proxy, the origin comparison uses `request.base_url`, so uvicorn's `--proxy-headers` / forwarded-allow-ips settings decide it; the routes do not read `X-Forwarded-*` themselves.
 
 Failed logins are throttled (`services/auth.py`): `Tenant.login_max_failures` failures for one `tenant/username` within `Tenant.login_lockout_minutes` (defaults 5 / 15, also used for platform-scoped accounts and unknown tenants; edited by the tenant's `admin` through `GET`/`PATCH /api/v1/tenant-settings`, which act on `CurrentTenantIdDep`), make `POST /api/v1/auth/login` return `429 TOO_MANY_LOGIN_ATTEMPTS` before the password is checked, until the oldest counted failure leaves that window. Unknown usernames count the same way, so a lockout reveals nothing about existence; a success clears the count. Failures are rows in `login_failures`, shared by every replica and pruned on each insert. There is deliberately no per-client-address limit.
 

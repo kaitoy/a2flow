@@ -1,15 +1,21 @@
-"""Authentication endpoints: login, logout, and current-user lookup.
+"""Authentication endpoints: login, logout, current-user lookup, and OIDC sign-in.
 
 Login establishes a server-side session and sets two cookies: an HttpOnly
 ``a2flow_session`` cookie carrying the opaque session token, and a readable
 ``a2flow_csrf`` cookie carrying the double-submit CSRF token. Both are session
 cookies (no ``Max-Age``/``Expires``), so they are cleared when the browser
 closes; server-side validity is governed by the sliding idle timeout.
+
+The two ``/oidc/*`` routes are browser redirects, not API calls: they answer
+``302`` with no envelope, and report every refusal as ``/login?sso_error=<code>``.
 """
 
+import logging
 from typing import Annotated
+from urllib.parse import quote, urlsplit
 
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -26,10 +32,19 @@ from dependencies.auth import (
 from dependencies.authz import require_actor_roles
 from dependencies.context import ApiMetaDep
 from dependencies.repository import EffectiveRoleRepositoryDep
+from dependencies.service import OidcLoginServiceDep
 from models.constraints import TenantSlug
 from models.response import ApiResponse
 from models.user import Role, User, UserRead
 from repositories.effective_roles import EffectiveRoleRepository
+from services.oidc_login import (
+    STATE_COOKIE_NAME,
+    STATE_TTL_SECONDS,
+    SsoErrorCode,
+    SsoLoginError,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -254,3 +269,124 @@ async def stop_impersonation(
             user=await _to_read(effective_roles, actor), impersonated_by=None
         ),
     )
+
+
+def _origin(url: str) -> tuple[str, str, int | None]:
+    """Return the ``(scheme, host, port)`` of ``url``, with the default port filled in."""
+    parts = urlsplit(url)
+    scheme = parts.scheme.lower()
+    port = parts.port or {"http": 80, "https": 443}.get(scheme)
+    return scheme, (parts.hostname or "").lower(), port
+
+
+def _sso_error(code: SsoErrorCode) -> str:
+    """Return the login-page URL that shows the toast for ``code``."""
+    return f"/login?sso_error={quote(code.value)}"
+
+
+@router.get(
+    "/oidc/start",
+    status_code=302,
+    response_class=RedirectResponse,
+    responses={
+        302: {"description": "Redirect to the identity provider or login page."}
+    },
+)
+async def oidc_start(
+    request: Request, service: OidcLoginServiceDep, tenant: str = ""
+) -> RedirectResponse:
+    """Begin an OpenID Connect sign-in for the tenant named ``tenant``.
+
+    Unguarded browser redirect (no envelope). If the deployment's
+    ``app_base_url`` names another origin than this request's, the browser is
+    first sent to the same path on that origin, so the state cookie is set where
+    the identity provider will call back. Otherwise it is sent to the identity
+    provider with the encrypted state cookie, scoped to the callback path.
+    Every failure -- including an unexpected one -- redirects to the login page
+    with ``sso_error=unavailable``, which never reveals whether a tenant exists.
+
+    Args:
+        request: The incoming request.
+        service: The sign-in service.
+        tenant: The tenant name typed on the login screen.
+    """
+    try:
+        base_url = await service.app_base_url()
+        if base_url and _origin(base_url) != _origin(str(request.base_url)):
+            parts = urlsplit(base_url)
+            target = f"{parts.scheme}://{parts.netloc}{request.url.path}"
+            if request.url.query:
+                target += f"?{request.url.query}"
+            return RedirectResponse(target, status_code=302)
+        begun = await service.start(tenant)
+    except SsoLoginError as exc:
+        return RedirectResponse(_sso_error(exc.code), status_code=302)
+    except Exception:
+        logger.exception("Unexpected error starting an SSO sign-in")
+        return RedirectResponse(_sso_error(SsoErrorCode.unavailable), status_code=302)
+    response = RedirectResponse(begun.authorization_url, status_code=302)
+    response.set_cookie(
+        STATE_COOKIE_NAME,
+        begun.state_cookie,
+        max_age=STATE_TTL_SECONDS,
+        httponly=True,
+        secure=_cookie_secure(),
+        samesite="lax",
+        path=request.url_for("oidc_callback").path,
+    )
+    return response
+
+
+@router.get(
+    "/oidc/callback",
+    status_code=302,
+    response_class=RedirectResponse,
+    responses={302: {"description": "Redirect to the app or login page."}},
+)
+async def oidc_callback(
+    request: Request,
+    service: OidcLoginServiceDep,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+) -> RedirectResponse:
+    """Finish an OpenID Connect sign-in from the identity provider's redirect.
+
+    Unguarded browser redirect (no envelope). On success sets the session and
+    CSRF cookies and redirects to ``/``; on any refusal -- including an
+    unexpected error, logged under the request id -- redirects to
+    ``/login?sso_error=<code>``. The state cookie is always deleted.
+
+    Args:
+        request: The incoming request.
+        service: The sign-in service.
+        code: The authorization code.
+        state: The ``state`` echoed by the identity provider.
+        error: Set when the identity provider refused the sign-in.
+    """
+    try:
+        result = await service.complete(
+            state_cookie=request.cookies.get(STATE_COOKIE_NAME),
+            state=state,
+            code=code,
+            error=error,
+        )
+        response = RedirectResponse("/", status_code=302)
+        _set_auth_cookies(
+            response,
+            session_token=result.session_token,
+            csrf_token=result.csrf_token,
+        )
+    except SsoLoginError as exc:
+        response = RedirectResponse(_sso_error(exc.code), status_code=302)
+    except Exception:
+        logger.exception("Unexpected error completing an SSO sign-in")
+        response = RedirectResponse(_sso_error(SsoErrorCode.failed), status_code=302)
+    response.delete_cookie(
+        STATE_COOKIE_NAME,
+        path=request.url_for("oidc_callback").path,
+        secure=_cookie_secure(),
+        httponly=True,
+        samesite="lax",
+    )
+    return response
