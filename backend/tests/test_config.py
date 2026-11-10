@@ -41,6 +41,16 @@ def test_cors_origins_splits_and_strips_comma_separated_string() -> None:
     ]
 
 
+def test_oidc_allowed_private_hosts_splits_and_lowercases() -> None:
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        oidc_allowed_private_hosts=" Keycloak.internal, idp.local ,",  # type: ignore[arg-type]
+    )
+
+    assert settings.oidc_allowed_private_hosts == ["keycloak.internal", "idp.local"]
+    assert Settings(_env_file=None).oidc_allowed_private_hosts == []  # type: ignore[call-arg]
+
+
 @pytest.mark.parametrize("raw", [None, "", "not-a-number"])
 def test_session_idle_timeout_falls_back_on_missing_or_unparseable(
     raw: str | None,

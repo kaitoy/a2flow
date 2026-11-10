@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
-from sqlalchemy import Text, cast, or_
+from sqlalchemy import Text, cast, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -60,6 +60,8 @@ class UserRepository(Protocol):
     async def delete(self, user_id: str) -> None: ...
 
     async def exists(self, user_id: str) -> bool: ...
+
+    async def clear_oidc_subjects(self, tenant_id: str) -> None: ...
 
 
 class SqlUserRepository:
@@ -262,3 +264,20 @@ class SqlUserRepository:
             user.enabled = False
             self._db.add(user)
             await self._db.commit()
+
+    async def clear_oidc_subjects(self, tenant_id: str) -> None:
+        """Forget every OIDC subject linked to the tenant's users.
+
+        Subjects are only unique per issuer and client, so they must not
+        survive a change of either: each user re-links at their next SSO
+        sign-in.
+
+        Args:
+            tenant_id: Identifier of the tenant whose users are reset.
+        """
+        await self._db.exec(
+            update(User)
+            .where(col(User.tenant_id) == tenant_id)
+            .values(oidc_subject=None)
+        )
+        await self._db.commit()

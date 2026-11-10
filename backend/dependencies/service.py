@@ -300,10 +300,10 @@ OutboundEmailServiceDep = Annotated[
 
 
 def get_tenant_service(
-    repo: TenantRepositoryDep, cipher: SecretCipherDep
+    repo: TenantRepositoryDep, cipher: SecretCipherDep, users: UserRepositoryDep
 ) -> TenantService:
-    """Create a TenantService backed by the request's repository and the cipher."""
-    return TenantService(repo, cipher)
+    """Create a TenantService backed by the request's repositories and the cipher."""
+    return TenantService(repo, cipher, users)
 
 
 TenantServiceDep = Annotated[TenantService, Depends(get_tenant_service)]

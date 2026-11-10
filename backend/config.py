@@ -174,6 +174,9 @@ class Settings(BaseSettings):
         port: Uvicorn bind port, used only by ``main.py``'s ``__main__`` block.
         reload: Whether that same ``__main__`` block enables uvicorn autoreload.
         cors_origins: Allowed CORS origins for the API.
+        oidc_allowed_private_hosts: Hostnames a tenant's OIDC issuer URL may
+            have even though they resolve to a private address (an on-premises
+            identity provider). Comma-separated in the environment, lower-cased.
         db_url: Database URL selecting SQLite (default) or PostgreSQL.
         db_pool_size: Connections each PostgreSQL connection pool keeps open.
             A process has two such pools -- the request engine's and the ADK
@@ -349,6 +352,10 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:3000"]
     )
 
+    oidc_allowed_private_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=list
+    )
+
     db_url: str = "sqlite:///a2flow.db"
     db_pool_size: int = Field(default=5, ge=1)
     db_max_overflow: int = Field(default=10, ge=0)
@@ -437,6 +444,14 @@ class Settings(BaseSettings):
         """Split a comma-separated ``CORS_ORIGINS`` string into a stripped list."""
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",")]
+        return value
+
+    @field_validator("oidc_allowed_private_hosts", mode="before")
+    @classmethod
+    def _split_oidc_allowed_private_hosts(cls, value: Any) -> Any:
+        """Split a comma-separated ``OIDC_ALLOWED_PRIVATE_HOSTS`` into lower-cased hosts."""
+        if isinstance(value, str):
+            return [h.strip().lower() for h in value.split(",") if h.strip()]
         return value
 
     @field_validator("session_idle_timeout_seconds", mode="before")
