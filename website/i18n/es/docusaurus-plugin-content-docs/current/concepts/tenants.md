@@ -16,6 +16,8 @@ Un **tenant** es el límite organizativo de nivel superior de A2Flow. Casi todos
 
 Un [usuario](../guides/users-and-groups.md#users) pertenece **como máximo a un** tenant. Un [grupo de usuarios](../guides/users-and-groups.md#user-groups) pertenece **exactamente a uno**, y por eso un grupo nunca puede conceder `super_admin`, un rol que por definición tiene ámbito de plataforma (consulta [Roles efectivos](./authorization.md#effective-roles)). En el primer arranque se precarga un tenant **Default**, que contiene el usuario `admin` inicial precargado; el usuario `root` precargado tiene ámbito de plataforma y no pertenece a ningún tenant.
 
+Cada tenant también puede conectar su propio proveedor de identidad, de modo que su personal inicie sesión con la cuenta de la empresa en lugar de una contraseña. La conexión pertenece al tenant: el proveedor de identidad de otro tenant nunca puede dar acceso a este. Consulta [Inicio de sesión único](../guides/single-sign-on.md).
+
 ## El límite del tenant {#the-tenant-boundary}
 
 Toda lectura y escritura con ámbito de tenant se resuelve dentro del tenant de quien la hace, y un registro que solo existe en otro tenant se notifica como **HTTP 404, no 403**: el límite oculta la existencia del registro en lugar de anunciarla. Esto vale tanto para un ID de flujo de trabajo escrito en una URL como para un ID pasado a una API, y es la razón por la que una referencia entre tenants nunca confirma que el registro sea real.

@@ -79,6 +79,17 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 
 `*` は起動時に拒否されます。`allow_credentials=True` が常に有効で、ワイルドカードの origin と組み合わせることは CORS の仕様上できないからです。
 
+## シングルサインオン {#single-sign-on}
+
+| 変数 | 既定値 | 役割 |
+|---|---|---|
+| `OIDC_ALLOWED_PRIVATE_HOSTS` | 空 | テナントの[シングルサインオン](../guides/single-sign-on.md)の発行者 URL に使えるホスト名で、`keycloak.internal,localhost` のようにカンマで区切ります。プライベートアドレスに解決されるホストでも許可します。オンプレミスの IdP 用です。これ以外の発行者は、パブリックアドレスに解決される必要があります |
+
+シングルサインオンは、デプロイのベース URL にも依存します。`APP_BASE_URL`([通知メール](#notification-email)を参照)か、[システム設定](../guides/system-settings.md)の**アプリケーションのベース URL**です。どちらもないとシングルサインオンは使えず、**テナント設定**には**リダイレクト URI**の代わりに警告が出ます。要件は 2 つあります。
+
+- **ベース URL はオリジンだけにします。** スキーム、ホスト、必要ならポートまでで、`https://a2flow.example.com` のようにパスは付けません。パスがあると、SSO のログインはすべて失敗します。
+- **バックエンドには公開オリジンが見えるようにします。** リバースプロキシの背後では、元のホストとスキームを `X-Forwarded-Host` ヘッダーと `X-Forwarded-Proto` ヘッダーで渡すようプロキシを設定し、プロキシのアドレスを `FORWARDED_ALLOW_IPS` に書いてバックエンドに信頼させます。そうしないと、SSO のログインのたびにリダイレクトが 1 回余分に起きます。
+
 ## エージェントスキルストア {#agent-skill-store}
 
 | 変数 | 既定値 | 役割 |

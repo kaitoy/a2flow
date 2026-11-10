@@ -79,6 +79,17 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 
 `*` se rechaza al arrancar: `allow_credentials=True` está siempre activado, y combinarlo con un origen comodín no es válido según la especificación de CORS.
 
+## Inicio de sesión único {#single-sign-on}
+
+| Variable | Valor predeterminado | Qué hace |
+|---|---|---|
+| `OIDC_ALLOWED_PRIVATE_HOSTS` | vacío | Nombres de host separados por comas, como `keycloak.internal,localhost`, que la URL del emisor del [inicio de sesión único](../guides/single-sign-on.md) de un tenant puede tener aunque se resuelvan a una dirección privada; sirve para un proveedor de identidad local. Cualquier otro emisor debe resolverse a una dirección pública |
+
+El inicio de sesión único depende también de la URL base del despliegue, que es `APP_BASE_URL` (consulta [Correo de notificación](#notification-email)) o **URL base de la aplicación** en [Configuración del sistema](../guides/system-settings.md). Sin ella, el inicio de sesión único no está disponible y **Configuración del tenant** muestra una advertencia en lugar de la **URI de redirección**. Hay dos requisitos:
+
+- **La URL base es solo el origen**: esquema, host y, opcionalmente, puerto, como `https://a2flow.example.com`, sin ruta. Un valor con ruta hace que todos los inicios de sesión SSO fallen.
+- **El backend debe ver el origen público.** Detrás de un proxy inverso, haz que el proxy pase el host y el esquema originales en las cabeceras `X-Forwarded-Host` y `X-Forwarded-Proto`, y haz que el backend confíe en ellas indicando la dirección del proxy en `FORWARDED_ALLOW_IPS`. Si no, cada inicio de sesión SSO requiere una redirección adicional.
+
 ## Almacén de skills de agente {#agent-skill-store}
 
 | Variable | Valor predeterminado | Qué hace |

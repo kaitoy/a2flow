@@ -27,6 +27,8 @@ Abre **Usuarios** en la barra lateral de administración para gestionar las cuen
 | **Roles** | Una casilla por rol; consulta más abajo. |
 | **Grupos** | Las pertenencias, editables desde cualquiera de los dos lados. |
 
+Una cuenta que ha iniciado sesión mediante [inicio de sesión único](./single-sign-on.md) lleva la insignia **SSO** en la lista y en su página de detalle. Las cuentas creadas así no tienen contraseña hasta que un administrador establece una.
+
 ### Roles {#roles}
 
 El formulario de creación y la página de detalle incluyen un selector de roles, con una casilla por rol, y la lista muestra una columna **Roles**.
@@ -149,6 +151,7 @@ Abre **Grupos de usuarios** en la barra lateral de administración para gestiona
 | **Descripción** | Texto libre. |
 | **Roles concedidos** | Los tienen todos los miembros, además de sus propias concesiones. |
 | **Miembros** | Las cuentas del grupo. |
+| **Grupo del IdP** | Opcional. Vincula el grupo a un grupo del proveedor de identidad del tenant; consulta [Inicio de sesión único](./single-sign-on.md#groups-and-roles). Los miembros de ese grupo los gestiona el IdP y no se pueden editar a mano: **Miembros** es de solo lectura y dice «Gestionado por tu IdP». |
 | **Etiquetas** | Sirven para clasificar grupos y se comparten con las demás secciones que admiten etiquetas. Una etiqueta de control de acceso aquí concede a todos los miembros acceso a los registros que la llevan. |
 
 **Roles concedidos** usa el mismo selector que las páginas de Usuarios, menos **Superadministrador**: un grupo nunca puede concederlo, y la opción está oculta para todos, incluidos los Superadministradores. Como un Superadministrador no pertenece a ningún tenant, tampoco puede ser miembro.
@@ -165,7 +168,7 @@ Escribir en esta sección requiere el rol Administrador. La lectura sigue abiert
 
 Abre **Tenants** en la barra lateral de administración para gestionar los tenants: el límite organizativo de nivel superior para la multitenencia. Lo que ese límite significa para todo lo demás, y cómo un Superadministrador elige el tenant con el que actuar, se explica en [Tenants](../concepts/tenants.md); esta sección trata de los propios registros.
 
-A diferencia de todas las demás secciones de administración, esta es **solo para Superadministradores** (el administrador de un tenant cambia su bloqueo de inicio de sesión y su propio Vault en **Configuración del tenant**). Está oculta en la barra lateral y en la página de bienvenida para todos los demás roles, y las escrituras de cualquier otra persona se rechazan.
+A diferencia de todas las demás secciones de administración, esta es **solo para Superadministradores** (el administrador de un tenant cambia su bloqueo de inicio de sesión, su propio Vault y su [inicio de sesión único](./single-sign-on.md) en **Configuración del tenant**). Está oculta en la barra lateral y en la página de bienvenida para todos los demás roles, y las escrituras de cualquier otra persona se rechazan.
 
 | Campo | Notas |
 |---|---|

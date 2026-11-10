@@ -27,6 +27,8 @@ Open **Users** in the admin sidebar to manage accounts. The list shows one row p
 | **Roles** | Checkbox per role — see below. |
 | **Groups** | Memberships, editable from either side. |
 
+An account that has signed in through [single sign-on](./single-sign-on.md) carries an **SSO** badge in the list and on its detail page. Accounts created that way have no password until an admin sets one.
+
 ### Roles
 
 The create form and the detail page carry a roles picker, one checkbox per role, and the list shows a **Roles** column.
@@ -149,6 +151,7 @@ Open **User Groups** in the admin sidebar to manage groups — named bundles of 
 | **Description** | Free text. |
 | **Roles granted** | Held by every member on top of their own grants. |
 | **Members** | The accounts in the group. |
+| **IdP group** | Optional. Ties the group to a group at the tenant's identity provider — see [Single sign-on](./single-sign-on.md#groups-and-roles). The members of such a group are managed by the IdP and cannot be edited by hand: **Members** is read-only and says "Managed by your IdP". |
 | **Tags** | Labels for classifying groups, shared with the other taggable sections. An access-control tag here grants every member access to the records carrying it. |
 
 **Roles granted** uses the same picker as the Users pages, minus **Super Admin** — a group can never grant it, and the option is hidden from everyone, Super Admins included. Since a Super Admin belongs to no tenant, one can never be a member either.
@@ -165,7 +168,7 @@ Writing to this section requires the `admin` role. Reads stay open, so a viewer 
 
 Open **Tenants** in the admin sidebar to manage tenants — the top-level organizational boundary for multi-tenancy. What that boundary means for everything else, and how a Super Admin picks a tenant to act as, is covered under [Tenants](../concepts/tenants.md); this section is about the records themselves.
 
-Unlike every other admin section, this one is **Super Admin only** (a tenant's own admin changes its sign-in lockout and its own Vault under **Tenant Settings** instead). It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
+Unlike every other admin section, this one is **Super Admin only** (a tenant's own admin changes its sign-in lockout and its own Vault under **Tenant Settings** instead, along with its [single sign-on](./single-sign-on.md)). It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
 
 | Field | Notes |
 |---|---|

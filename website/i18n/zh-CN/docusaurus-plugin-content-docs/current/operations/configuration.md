@@ -79,6 +79,17 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 
 `*` 会在启动时被拒绝：`allow_credentials=True` 始终处于启用状态，而根据 CORS 规范，它不能与通配符源搭配使用。
 
+## 单点登录 {#single-sign-on}
+
+| 变量 | 默认值 | 作用 |
+|---|---|---|
+| `OIDC_ALLOWED_PRIVATE_HOSTS` | 空 | 以逗号分隔的主机名，例如 `keycloak.internal,localhost`。租户的[单点登录](../guides/single-sign-on.md)颁发者 URL 可以使用这些主机，即使它们解析到私有地址，用于本地部署的身份提供商。其他颁发者必须解析到公网地址 |
+
+单点登录还依赖部署的基础 URL，即 `APP_BASE_URL`（请参阅[通知邮件](#notification-email)）或[系统设置](../guides/system-settings.md)中的**应用基础 URL**。没有它，单点登录无法使用，**租户设置**会显示警告来代替**重定向 URI**。有两点要求：
+
+- **基础 URL 只能是源**：协议、主机和可选的端口，例如 `https://a2flow.example.com`，不带路径。带路径的值会让所有 SSO 登录失败。
+- **后端应能看到公开的源。** 在反向代理之后，请让代理通过 `X-Forwarded-Host` 和 `X-Forwarded-Proto` 头传递原始主机和协议，并把代理的地址写入 `FORWARDED_ALLOW_IPS`，让后端信任这些头。否则每次 SSO 登录都会多一次重定向。
+
 ## 代理技能存储库 {#agent-skill-store}
 
 | 变量 | 默认值 | 作用 |

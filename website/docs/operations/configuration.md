@@ -79,6 +79,17 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 
 `*` is rejected at startup — `allow_credentials=True` is always enabled, and pairing it with a wildcard origin is invalid per the CORS spec.
 
+## Single sign-on {#single-sign-on}
+
+| Variable | Default | What it does |
+|---|---|---|
+| `OIDC_ALLOWED_PRIVATE_HOSTS` | empty | Comma-separated host names, such as `keycloak.internal,localhost`, that a tenant's [single sign-on](../guides/single-sign-on.md) issuer URL may have even though they resolve to a private address — for an on-premises identity provider. Every other issuer must resolve to a public address |
+
+Single sign-on also depends on the deployment's base URL, which is `APP_BASE_URL` (see [Notification email](#notification-email)) or **Application Base URL** under [System Settings](../guides/system-settings.md). Without it, single sign-on is unavailable and **Tenant Settings** shows a warning instead of the **Redirect URI**. Two requirements:
+
+- **The base URL is the origin only** — scheme, host and an optional port, such as `https://a2flow.example.com`, with no path. A value with a path makes every SSO sign-in fail.
+- **The backend should see the public origin.** Behind a reverse proxy, have the proxy pass the original host and scheme in the `X-Forwarded-Host` and `X-Forwarded-Proto` headers, and let the backend trust them by listing the proxy's address in `FORWARDED_ALLOW_IPS`. Otherwise every SSO sign-in takes one extra redirect.
+
 ## Agent skill store {#agent-skill-store}
 
 | Variable | Default | What it does |

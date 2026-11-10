@@ -79,6 +79,17 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 
 `*` est rejeté au démarrage : `allow_credentials=True` est toujours activé, et l'associer à une origine générique n'est pas valide selon la spécification CORS.
 
+## Authentification unique {#single-sign-on}
+
+| Variable | Valeur par défaut | Rôle |
+|---|---|---|
+| `OIDC_ALLOWED_PRIVATE_HOSTS` | vide | Noms d'hôte séparés par des virgules, comme `keycloak.internal,localhost`, que l'URL de l'émetteur de l'[authentification unique](../guides/single-sign-on.md) d'un tenant peut avoir même s'ils se résolvent vers une adresse privée, pour un fournisseur d'identité interne. Tout autre émetteur doit se résoudre vers une adresse publique |
+
+L'authentification unique dépend aussi de l'URL de base du déploiement, c'est-à-dire `APP_BASE_URL` (voir [E-mails de notification](#notification-email)) ou **URL de base de l'application** dans les [Paramètres système](../guides/system-settings.md). Sans elle, l'authentification unique est indisponible et **Paramètres du tenant** affiche un avertissement à la place de l'**URI de redirection**. Deux exigences :
+
+- **L'URL de base est l'origine seule** : schéma, hôte et, éventuellement, port, comme `https://a2flow.example.com`, sans chemin. Une valeur avec un chemin fait échouer toutes les connexions SSO.
+- **Le backend doit voir l'origine publique.** Derrière un proxy inverse, faites passer par le proxy l'hôte et le schéma d'origine dans les en-têtes `X-Forwarded-Host` et `X-Forwarded-Proto`, et faites-les approuver par le backend en indiquant l'adresse du proxy dans `FORWARDED_ALLOW_IPS`. Sinon, chaque connexion SSO prend une redirection de plus.
+
 ## Magasin de compétences d'agent {#agent-skill-store}
 
 | Variable | Valeur par défaut | Rôle |
