@@ -547,6 +547,19 @@ class AgentSkillValidationError(ReasonError):
     http_status = 422
 
 
+class UserGroupValidationError(ReasonError):
+    """Raised when a write would change the membership of an IdP-mapped user group.
+
+    A group with an ``idp_group`` mirrors that identity-provider group: its
+    membership belongs to the provider and is synced at SSO sign-in, so admins
+    may not edit it by hand. Carries a human-readable ``reason`` surfaced in the
+    error envelope's ``details`` block when returning HTTP 422.
+    """
+
+    code = "INVALID_USER_GROUP"
+    http_status = 422
+
+
 class AvatarValidationError(ReasonError):
     """Raised when an uploaded avatar image has an unsupported type or exceeds the size limit.
 

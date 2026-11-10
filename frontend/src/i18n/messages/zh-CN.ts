@@ -598,6 +598,7 @@ export const zhCN = {
   "errors.INVALID_SESSION_INPUT": "无法将此输入发送到会话。",
   "errors.INVALID_SYSTEM_SETTINGS": "系统设置无效。",
   "errors.INVALID_TENANT": "租户设置无效。",
+  "errors.INVALID_USER_GROUP": "用户组无效。",
   "errors.INVALID_USER": "用户设置无效。",
   "errors.MCP_UNREACHABLE": "无法连接 MCP 服务器。",
   "errors.NETWORK_ERROR": "无法连接服务器，请检查网络连接后重试。",

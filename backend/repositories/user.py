@@ -241,7 +241,8 @@ class SqlUserRepository:
         records through ``created_by`` / ``updated_by`` (``ondelete=RESTRICT``),
         the database raises an IntegrityError; the user is then soft-deleted by
         setting ``deleted_at`` and disabling the account, so existing references
-        stay valid and the name can still be resolved.
+        stay valid and the name can still be resolved. The soft delete also
+        clears ``oidc_subject``, freeing the subject for a fresh SSO account.
 
         Args:
             user_id: Identifier of the user to delete.
@@ -262,6 +263,9 @@ class SqlUserRepository:
                 raise NotFoundError("User", user_id) from None
             user.deleted_at = datetime.now(UTC)
             user.enabled = False
+            # A soft-deleted row keeps its unique slot otherwise, so the same
+            # person could never be re-provisioned by SSO under that subject.
+            user.oidc_subject = None
             self._db.add(user)
             await self._db.commit()
 

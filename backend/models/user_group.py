@@ -86,7 +86,8 @@ class UserGroupUpdate(SQLModel):
     member_ids: list[str] | None = Field(default=None, max_length=MAX_GROUP_MEMBERS)
     #: Name of the identity-provider group this group mirrors on SSO sign-in;
     #: ``None`` for a group not tied to one. Unique within a tenant.
-    idp_group: str | None = Field(default=None, max_length=255)
+    #: Never empty: an empty string would count as "mapped" yet match no group.
+    idp_group: str | None = Field(default=None, min_length=1, max_length=255)
 
     @field_validator("roles")
     @classmethod

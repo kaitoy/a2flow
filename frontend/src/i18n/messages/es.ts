@@ -638,6 +638,7 @@ export const es = {
   "errors.INVALID_SESSION_INPUT": "No se puede enviar esta entrada a la sesión.",
   "errors.INVALID_SYSTEM_SETTINGS": "La configuración del sistema no es válida.",
   "errors.INVALID_TENANT": "La configuración del tenant no es válida.",
+  "errors.INVALID_USER_GROUP": "El grupo de usuarios no es válido.",
   "errors.INVALID_USER": "La configuración del usuario no es válida.",
   "errors.MCP_UNREACHABLE": "No se puede conectar con el servidor MCP.",
   "errors.NETWORK_ERROR":

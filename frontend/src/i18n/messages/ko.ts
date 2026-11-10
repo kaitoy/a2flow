@@ -621,6 +621,7 @@ export const ko = {
   "errors.INVALID_SESSION_INPUT": "이 입력은 세션으로 보낼 수 없습니다.",
   "errors.INVALID_SYSTEM_SETTINGS": "시스템 설정이 올바르지 않습니다.",
   "errors.INVALID_TENANT": "테넌트 설정이 올바르지 않습니다.",
+  "errors.INVALID_USER_GROUP": "사용자 그룹이 올바르지 않습니다.",
   "errors.INVALID_USER": "사용자 설정이 올바르지 않습니다.",
   "errors.MCP_UNREACHABLE": "MCP 서버에 연결할 수 없습니다.",
   "errors.NETWORK_ERROR": "서버에 연결할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",

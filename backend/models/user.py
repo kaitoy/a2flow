@@ -429,6 +429,9 @@ class UserRead(BaseEntity):
     tenant_id: str | None = None
     #: Language the GUI is shown in, or ``None`` to follow the browser's.
     language: Language | None = None
+    #: Whether the user has signed in through SSO and so is linked to an OIDC
+    #: subject. The subject itself is never serialized.
+    sso_linked: bool = False
 
     @classmethod
     def from_user(
@@ -466,6 +469,7 @@ class UserRead(BaseEntity):
         """
         return cls(
             **user.model_dump(exclude={"password", "oidc_subject"}),
+            sso_linked=user.oidc_subject is not None,
             group_roles=sorted(Role(role) for role in group_roles),
             group_ids=sorted(group_ids),
             group_tag_ids=sorted(group_tag_ids),

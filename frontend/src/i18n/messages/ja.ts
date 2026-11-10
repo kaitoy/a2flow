@@ -626,6 +626,7 @@ export const ja = {
   "errors.INVALID_SESSION_INPUT": "この入力はセッションに送信できません。",
   "errors.INVALID_SYSTEM_SETTINGS": "システム設定が正しくありません。",
   "errors.INVALID_TENANT": "テナントの設定が正しくありません。",
+  "errors.INVALID_USER_GROUP": "ユーザーグループが正しくありません。",
   "errors.INVALID_USER": "ユーザーの設定が正しくありません。",
   "errors.MCP_UNREACHABLE": "MCPサーバーに接続できません。",
   "errors.NETWORK_ERROR": "サーバーに接続できません。接続を確認して、もう一度お試しください。",

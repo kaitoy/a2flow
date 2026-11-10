@@ -638,6 +638,7 @@ export const fr = {
   "errors.INVALID_SESSION_INPUT": "Cette saisie ne peut pas être envoyée à la session.",
   "errors.INVALID_SYSTEM_SETTINGS": "Les paramètres système ne sont pas valides.",
   "errors.INVALID_TENANT": "Les paramètres du tenant ne sont pas valides.",
+  "errors.INVALID_USER_GROUP": "Le groupe d'utilisateurs n'est pas valide.",
   "errors.INVALID_USER": "Les paramètres de l'utilisateur ne sont pas valides.",
   "errors.MCP_UNREACHABLE": "Impossible de joindre le serveur MCP.",
   "errors.NETWORK_ERROR":

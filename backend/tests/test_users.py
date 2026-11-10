@@ -3,10 +3,11 @@ from typing import Any
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_user
-from models.user import SYSTEM_USER_ID
+from models.user import SYSTEM_USER_ID, User
 from models.user_group import MAX_GROUP_FILTERS
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
@@ -15,7 +16,8 @@ from tests.conftest import _install_auth_overrides
 
 
 @pytest_asyncio.fixture()
-async def user_client() -> AsyncGenerator[AsyncClient, None]:
+async def user_env() -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None]:
+    """Yield an API client plus the throwaway engine backing it."""
     from infrastructure.database import get_session
     from main import app
     from models.tenant import Tenant as _Tenant  # noqa: F401 — registers model
@@ -38,10 +40,18 @@ async def user_client() -> AsyncGenerator[AsyncClient, None]:
             base_url="http://test",
             headers={"X-User-Id": SYSTEM_USER_ID},
         ) as ac:
-            yield ac
+            yield ac, mem_engine
     finally:
         app.dependency_overrides.clear()
         await mem_engine.dispose()
+
+
+@pytest_asyncio.fixture()
+async def user_client(
+    user_env: tuple[AsyncClient, AsyncEngine],
+) -> AsyncClient:
+    """Yield just the API client of :func:`user_env`."""
+    return user_env[0]
 
 
 #: Every non-super-admin user must carry a tenantId
@@ -1512,3 +1522,56 @@ async def test_resolve_names_rejects_more_ids_than_the_limit(
         json={"ids": [f"id-{i}" for i in range(MAX_RESOLVE_NAME_IDS + 1)]},
     )
     assert_err(response, "VALIDATION_ERROR", 422)
+
+
+# ---------- OIDC subject ----------
+
+
+async def _set_subject(engine: AsyncEngine, user_id: str, subject: str) -> None:
+    """Link a user to an OIDC subject directly in the database."""
+    async with AsyncSession(engine) as session:
+        user = await session.get(User, user_id)
+        assert user is not None
+        user.oidc_subject = subject
+        session.add(user)
+        await session.commit()
+
+
+async def test_user_read_reports_sso_linked(
+    user_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, engine = user_env
+    created = assert_ok(
+        await client.post("/api/v1/users", json=_CREATE_BODY), status=201
+    )
+    assert created["ssoLinked"] is False
+    await _set_subject(engine, created["id"], "s")
+    fetched = assert_ok(await client.get(f"/api/v1/users/{created['id']}"))
+    assert fetched["ssoLinked"] is True
+    assert "oidcSubject" not in fetched
+    assert "oidc_subject" not in fetched
+
+
+async def test_soft_delete_clears_oidc_subject(
+    user_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, engine = user_env
+    actor_id = await _create_actor(client, "actor")
+    # ``actor`` is referenced via ``dependent.created_by``, so it soft-deletes.
+    assert_ok(
+        await client.post(
+            "/api/v1/users",
+            json={**_CREATE_BODY, "username": "dependent", "email": "dep@x.com"},
+            headers={"X-User-Id": actor_id},
+        ),
+        status=201,
+    )
+    await _set_subject(engine, actor_id, "s")
+
+    await client.delete(f"/api/v1/users/{actor_id}")
+
+    async with AsyncSession(engine) as session:
+        user = await session.get(User, actor_id)
+        assert user is not None
+        assert user.deleted_at is not None
+        assert user.oidc_subject is None

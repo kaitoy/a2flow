@@ -16,7 +16,7 @@ invalidate.
 from collections.abc import Sequence
 
 from models.user_group import UserGroupCreate, UserGroupRead, UserGroupUpdate
-from repositories.exceptions import NotFoundError
+from repositories.exceptions import NotFoundError, UserGroupValidationError
 from repositories.query import FilterSpec, SortSpec
 from repositories.user_group import UserGroupRepository
 
@@ -109,9 +109,16 @@ class UserGroupService:
             The created group.
 
         Raises:
+            UserGroupValidationError: If the group is mapped to an IdP group and
+                also given initial members, which the IdP owns.
             ForeignKeyViolationError: If a member id is not a usable user of
                 the acting tenant.
         """
+        if data.idp_group is not None and data.member_ids:
+            raise UserGroupValidationError(
+                "The members of a group mapped to an identity-provider group "
+                "come from the provider and cannot be set"
+            )
         return await self._repo.create(data, user_id=user_id)
 
     async def update(
@@ -131,9 +138,27 @@ class UserGroupService:
         Raises:
             NotFoundError: If no group exists with the given ID in the acting
                 tenant.
+            UserGroupValidationError: If the request changes the members of a
+                group that is mapped to an IdP group, or maps a group while
+                changing its members. Mapped means the *stored* ``idp_group``;
+                clearing it without touching ``member_ids`` is allowed.
             ForeignKeyViolationError: If a member id is not a usable user of
                 the acting tenant.
         """
+        current = await self.get(group_id)
+        if data.member_ids is not None and set(data.member_ids) != set(
+            current.member_ids
+        ):
+            if current.idp_group is not None:
+                raise UserGroupValidationError(
+                    "The members of a group mapped to an identity-provider "
+                    "group come from the provider and cannot be changed"
+                )
+            if data.idp_group is not None:
+                raise UserGroupValidationError(
+                    "A group cannot be mapped to an identity-provider group "
+                    "while its members are changed in the same request"
+                )
         return await self._repo.update(group_id, data, user_id=user_id)
 
     async def delete(self, group_id: str) -> None:
@@ -178,7 +203,16 @@ class UserGroupService:
             group_ids: Ids of the groups the user should end up in.
 
         Raises:
+            UserGroupValidationError: If the new set adds or drops a group that
+                is mapped to an IdP group, which the IdP owns.
             ForeignKeyViolationError: If the user is not a usable member of the
                 acting tenant, or a group id is not a group of that tenant.
         """
+        mapped = {g.id for g in await self._repo.list_mapped()}
+        current = set(await self._repo.group_ids_for_user(user_id)) & mapped
+        if current != set(group_ids) & mapped:
+            raise UserGroupValidationError(
+                "Membership of a group mapped to an identity-provider group "
+                "comes from the provider and cannot be changed"
+            )
         await self._repo.set_groups_for_user(user_id, group_ids)

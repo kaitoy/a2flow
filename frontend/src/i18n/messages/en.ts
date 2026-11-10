@@ -627,6 +627,7 @@ export const en = {
   "errors.INVALID_SESSION_INPUT": "This input cannot be sent to the session.",
   "errors.INVALID_SYSTEM_SETTINGS": "The system settings are not valid.",
   "errors.INVALID_TENANT": "The tenant settings are not valid.",
+  "errors.INVALID_USER_GROUP": "The user group is not valid.",
   "errors.INVALID_USER": "The user settings are not valid.",
   "errors.MCP_UNREACHABLE": "The MCP server could not be reached.",
   "errors.NETWORK_ERROR": "Unable to reach the server. Please check your connection and try again.",
