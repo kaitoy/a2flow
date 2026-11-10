@@ -14,9 +14,12 @@ from infrastructure.secret_cipher import get_secret_cipher
 from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
+from repositories.exceptions import ForeignKeyViolationError, UniqueViolationError
+from repositories.tenant import SqlTenantRepository
+from repositories.user import SqlUserRepository
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
 _PATH = "/api/v1/tenant-settings"
@@ -352,46 +355,120 @@ async def test_oidc_issuer_private_host_allowed_by_env(
     assert body["oidcIssuer"] == "http://keycloak.internal/realms/a"
 
 
-async def test_changing_issuer_or_client_id_clears_oidc_subjects(
-    settings_client: AsyncClient, settings_engine: AsyncEngine
+async def _link_user(
+    engine: AsyncEngine, user_id: str, tenant_id: str = DEFAULT_TEST_TENANT_ID
 ) -> None:
-    async with AsyncSession(settings_engine) as session:
-        session.add(
-            User(
-                id="linked",
-                username="linked",
+    """Insert (or re-link) a user of ``tenant_id`` holding ``oidc_subject="abc"``."""
+    async with AsyncSession(engine) as session:
+        user = await session.get(User, user_id)
+        if user is None:
+            user = User(
+                id=user_id,
+                username=user_id,
                 first_name="L",
                 last_name="U",
                 password="x",
-                email="linked@example.com",
-                tenant_id=DEFAULT_TEST_TENANT_ID,
-                oidc_subject="abc",
+                email=f"{user_id}@example.com",
+                tenant_id=tenant_id,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )
-        )
-        await session.commit()
-
-    async def subject() -> str | None:
-        async with AsyncSession(settings_engine) as session:
-            user = await session.get(User, "linked")
-            assert user is not None
-            return user.oidc_subject
-
-    assert_ok(await settings_client.patch(_PATH, json={"oidcClientId": "one"}))
-    assert await subject() is None  # first set: changed from None
-
-    async with AsyncSession(settings_engine) as session:
-        user = await session.get(User, "linked")
-        assert user is not None
         user.oidc_subject = "abc"
         session.add(user)
         await session.commit()
 
+
+async def _subject(engine: AsyncEngine, user_id: str) -> str | None:
+    async with AsyncSession(engine) as session:
+        user = await session.get(User, user_id)
+        assert user is not None
+        return user.oidc_subject
+
+
+async def test_changing_issuer_or_client_id_clears_oidc_subjects(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await _link_user(settings_engine, "linked")
+
     assert_ok(await settings_client.patch(_PATH, json={"oidcClientId": "one"}))
-    assert await subject() == "abc"  # same value: no reset
+    assert await _subject(settings_engine, "linked") is None  # None -> "one"
+
+    await _link_user(settings_engine, "linked")
+    assert_ok(await settings_client.patch(_PATH, json={"oidcClientId": "one"}))
+    assert await _subject(settings_engine, "linked") == "abc"  # same value: no reset
     assert_ok(await settings_client.patch(_PATH, json={"oidcClientId": "two"}))
-    assert await subject() is None
+    assert await _subject(settings_engine, "linked") is None
+
+    await _link_user(settings_engine, "linked")
+    assert_ok(
+        await settings_client.patch(_PATH, json={"oidcIssuer": _OIDC["oidcIssuer"]})
+    )
+    assert await _subject(settings_engine, "linked") is None  # issuer changed
+    await _link_user(settings_engine, "linked")
+    assert_ok(
+        await settings_client.patch(_PATH, json={"oidcIssuer": _OIDC["oidcIssuer"]})
+    )
+    assert await _subject(settings_engine, "linked") == "abc"
+
+
+async def test_subject_reset_leaves_other_tenants_alone(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await seed_tenant(settings_engine, "tenant-other")
+    await _link_user(settings_engine, "mine")
+    await _link_user(settings_engine, "theirs", tenant_id="tenant-other")
+
+    assert_ok(await settings_client.patch(_PATH, json={"oidcClientId": "one"}))
+
+    assert await _subject(settings_engine, "mine") is None
+    assert await _subject(settings_engine, "theirs") == "abc"
+
+
+async def test_failed_tenant_write_rolls_the_subject_reset_back(
+    settings_client: AsyncClient,
+    settings_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Never "new provider + old subjects", nor "old provider + cleared subjects"."""
+    await _link_user(settings_engine, "linked")
+
+    async def failing_update(*args: object, **kwargs: object) -> Tenant:
+        raise UniqueViolationError("Tenant", "display_name", "x")
+
+    monkeypatch.setattr(SqlTenantRepository, "update", failing_update)
+    assert_err(
+        await settings_client.patch(_PATH, json={"oidcClientId": "one"}),
+        code="CONFLICT_UNIQUE",
+        status=409,
+    )
+
+    assert (await _tenant(settings_engine)).oidc_client_id is None
+    assert await _subject(settings_engine, "linked") == "abc"
+
+
+async def test_failed_subject_reset_leaves_the_provider_unchanged(
+    settings_client: AsyncClient,
+    settings_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed reset must stay retryable: the same PATCH still sees a change."""
+    await _link_user(settings_engine, "linked")
+
+    async def failing_reset(*args: object, **kwargs: object) -> None:
+        raise ForeignKeyViolationError("User", "x")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(SqlUserRepository, "clear_oidc_subjects", failing_reset)
+        assert_err(
+            await settings_client.patch(_PATH, json={"oidcClientId": "one"}),
+            code="FOREIGN_KEY_VIOLATION",
+            status=422,
+        )
+    assert (await _tenant(settings_engine)).oidc_client_id is None
+    assert await _subject(settings_engine, "linked") == "abc"
+
+    assert_ok(await settings_client.patch(_PATH, json={"oidcClientId": "one"}))
+    assert await _subject(settings_engine, "linked") is None
 
 
 async def test_redirect_uri_follows_app_base_url(

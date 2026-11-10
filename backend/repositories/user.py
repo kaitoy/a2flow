@@ -272,6 +272,10 @@ class SqlUserRepository:
         survive a change of either: each user re-links at their next SSO
         sign-in.
 
+        Does not commit: the caller's next commit (the tenant update that
+        changes the provider) makes the reset permanent, and a rollback
+        discards it, so the two always land together.
+
         Args:
             tenant_id: Identifier of the tenant whose users are reset.
         """
@@ -280,4 +284,3 @@ class SqlUserRepository:
             .where(col(User.tenant_id) == tenant_id)
             .values(oidc_subject=None)
         )
-        await self._db.commit()

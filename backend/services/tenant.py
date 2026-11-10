@@ -214,16 +214,18 @@ class TenantService:
         current = await self.get(tenant_id)
         payload = data.model_dump(exclude_unset=True)
         self._prepare(current, payload)
-        # The repository mutates this same ORM object, so read the old provider first.
-        old_provider = (current.oidc_issuer, current.oidc_client_id)
-        tenant = await self._repo.update(
+        # Stage the reset before the tenant write: ``clear_oidc_subjects`` does
+        # not commit, so the repository's commit lands both together and a
+        # failed write rolls the reset back too. The provider can therefore
+        # never change while old subjects stay linked.
+        if any(
+            field in payload and payload[field] != getattr(current, field)
+            for field in ("oidc_issuer", "oidc_client_id")
+        ):
+            await self._users.clear_oidc_subjects(tenant_id)
+        return await self._repo.update(
             tenant_id, type(data).model_construct(**payload), user_id=user_id
         )
-        if old_provider != (tenant.oidc_issuer, tenant.oidc_client_id):
-            await self._users.clear_oidc_subjects(tenant_id)
-            # The commit expired the tenant; reload it for the caller.
-            return await self.get(tenant_id)
-        return tenant
 
     async def delete(self, tenant_id: str) -> None:
         """Delete a Tenant.
