@@ -18,6 +18,7 @@ Every failure surfaces as :class:`OidcError`, whose message is for the server
 log only.
 """
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -124,10 +125,12 @@ class OidcClient:
         self._jwks: dict[str, tuple[float, dict[str, PyJWK]]] = {}
         self._last_forced_refetch: dict[str, float] = {}
 
-    def _check_url(self, url: str) -> None:
+    async def _check_url(self, url: str) -> None:
         """Raise :class:`OidcError` unless ``url`` may be contacted."""
         try:
-            assert_public_http_url(url, allowed_hosts=self._allowed_hosts)
+            await asyncio.to_thread(
+                assert_public_http_url, url, allowed_hosts=self._allowed_hosts
+            )
         except ValueError as exc:
             raise OidcError(f"refusing to contact {url!r}: {exc}") from exc
 
@@ -140,7 +143,7 @@ class OidcClient:
             OidcError: If the URL is refused, the transport fails, the status
                 is not 2xx, or the body is not a JSON object.
         """
-        self._check_url(url)
+        await self._check_url(url)
         try:
             response = await self._http.request(method, url, **kwargs)
         except httpx.HTTPError as exc:
@@ -188,7 +191,7 @@ class OidcClient:
         endpoints["userinfo_endpoint"] = userinfo or None
         for url in endpoints.values():
             if url is not None:
-                self._check_url(url)
+                await self._check_url(url)
         meta = OidcProviderMetadata(
             issuer=issuer,
             authorization_endpoint=endpoints["authorization_endpoint"] or "",
@@ -289,7 +292,7 @@ class OidcClient:
         document = await self._request_json("GET", meta.jwks_uri)
         try:
             key_set = jwt.PyJWKSet.from_dict(document)
-        except jwt.PyJWTError as exc:
+        except (jwt.PyJWTError, TypeError, ValueError) as exc:
             raise OidcError(f"unusable JWKS: {exc!r}") from exc
         keys = {
             k.key_id: k
@@ -356,7 +359,9 @@ class OidcClient:
                 leeway=_LEEWAY_SECONDS,
                 options={"require": ["exp", "iat", "sub"]},
             )
-        except jwt.PyJWTError as exc:
+        except (jwt.PyJWTError, TypeError, ValueError) as exc:
+            # TypeError/ValueError: PyJWT lets a key/alg mismatch (e.g. an EC key
+            # for an RS256 header) escape as these instead of InvalidKeyError.
             raise OidcError(f"invalid ID token: {exc!r}") from exc
         token_nonce = claims.get("nonce")
         if not isinstance(token_nonce, str) or not secrets.compare_digest(

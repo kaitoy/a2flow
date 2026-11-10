@@ -10,7 +10,8 @@ from urllib.parse import parse_qs, urlsplit
 import httpx
 import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from jwt.algorithms import ECAlgorithm
 
 from infrastructure import oidc_client
 from infrastructure.oidc_client import (
@@ -19,7 +20,7 @@ from infrastructure.oidc_client import (
     OidcProviderMetadata,
     make_pkce_pair,
 )
-from tests._oidc_fake import CLIENT_ID, FakeIdp
+from tests._oidc_fake import CLIENT_ID, FakeIdp, new_rsa_key
 
 NONCE = "nonce-1"
 DISCOVERY = "/.well-known/openid-configuration"
@@ -373,3 +374,28 @@ async def test_peer_guard_hook_skips_allowed_hosts(
     await hook(httpx.Request("GET", "https://Keycloak.internal/x"))
     await hook(httpx.Request("GET", "https://idp.example.com/x"))
     assert calls == ["idp.example.com"]
+
+
+async def test_validate_id_token_key_type_mismatch_is_oidc_error(
+    fake: FakeIdp,
+) -> None:
+    """An RS256-headed token naming an EC key in the JWKS fails cleanly."""
+    ec_key = ec.generate_private_key(ec.SECP256R1())
+    jwk = ECAlgorithm.to_jwk(ec_key.public_key(), as_dict=True)
+    jwks = {"keys": [{**jwk, "kid": "ec-1", "use": "sig"}]}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/jwks":
+            return httpx.Response(200, json=jwks)
+        return httpx.Response(200, json=_doc(fake.issuer))
+
+    c = _client_for(handler)
+    token = jwt.encode(
+        fake.claims(),
+        new_rsa_key(),
+        algorithm="RS256",
+        headers={"kid": "ec-1"},
+    )
+    meta = await c.metadata(fake.issuer)
+    with pytest.raises(OidcError):
+        await c.validate_id_token(meta, token, client_id=CLIENT_ID, nonce=NONCE)
