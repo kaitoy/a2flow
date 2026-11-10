@@ -12,7 +12,7 @@ import { UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import type { z } from "zod";
+import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
@@ -33,7 +33,7 @@ import { Role, useHasRole } from "@/lib/roles";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
-const schema = zUserGroupCreate;
+const schema = zUserGroupCreate.omit({ idpGroup: true }).extend({ idpGroup: z.string().max(255) });
 
 type FormValues = z.input<typeof schema>;
 
@@ -62,7 +62,7 @@ export default function NewUserGroupPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: { name: "", description: "" },
+    defaultValues: { name: "", description: "", idpGroup: "" },
   });
 
   async function onSubmit(values: FormValues) {
@@ -71,6 +71,7 @@ export default function NewUserGroupPage() {
         const created = await createUserGroup({
           name: values.name,
           description: values.description || null,
+          idpGroup: values.idpGroup || null,
           roles,
           memberIds,
         });
@@ -127,6 +128,15 @@ export default function NewUserGroupPage() {
               placeholder={t("userGroups.whatThisGroupIsFor")}
               {...register("description")}
             />
+          </FormField>
+
+          <FormField
+            htmlFor="idpGroup"
+            label={t("userGroups.idpGroup")}
+            error={errors.idpGroup?.message}
+          >
+            <Input id="idpGroup" {...register("idpGroup")} />
+            <p className="text-xs text-on-surface-variant">{t("userGroups.idpGroupHint")}</p>
           </FormField>
 
           {/* A group can never grant super_admin; the backend rejects it with 422. */}

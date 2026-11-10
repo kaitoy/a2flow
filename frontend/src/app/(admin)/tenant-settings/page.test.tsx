@@ -149,4 +149,61 @@ describe("TenantSettingsPage", () => {
       });
     });
   });
+
+  describe("Single sign-on", () => {
+    const OIDC_SETTINGS = {
+      loginMaxFailures: 5,
+      loginLockoutMinutes: 15,
+      oidcEnabled: true,
+      oidcIssuer: "https://idp.acme.example.com",
+      oidcClientId: "a2flow",
+      oidcClientSecretSet: true,
+      oidcGroupsClaim: "groups",
+      oidcTrustEmail: false,
+      oidcRedirectUri: "https://a2flow.example.com/api/v1/auth/oidc/callback",
+    };
+
+    /** Serve `OIDC_SETTINGS` and capture the PATCH body the page sends. */
+    function capturePatch() {
+      const captured: { body: Record<string, unknown> | null } = { body: null };
+      server.use(
+        http.get(`${BASE}/api/v1/tenant-settings`, () => envelope(OIDC_SETTINGS)),
+        http.patch(`${BASE}/api/v1/tenant-settings`, async ({ request }) => {
+          captured.body = (await request.json()) as Record<string, unknown>;
+          return envelope(OIDC_SETTINGS);
+        })
+      );
+      return captured;
+    }
+
+    it("saves an edited issuer and leaves a blank client secret out of the body", async () => {
+      const captured = capturePatch();
+      renderPage();
+      const issuer = await screen.findByLabelText("Issuer URL");
+      expect(issuer).toHaveValue("https://idp.acme.example.com");
+      expect(screen.getByLabelText("Client secret")).toHaveValue("");
+      await userEvent.clear(issuer);
+      await userEvent.type(issuer, "https://login.acme.example.com");
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(captured.body).toMatchObject({
+        oidcEnabled: true,
+        oidcIssuer: "https://login.acme.example.com",
+        oidcClientId: "a2flow",
+        oidcGroupsClaim: "groups",
+        oidcTrustEmail: false,
+      });
+      expect(captured.body).not.toHaveProperty("oidcClientSecret");
+    });
+
+    it("sends a newly typed client secret", async () => {
+      const captured = capturePatch();
+      renderPage();
+      await userEvent.type(await screen.findByLabelText("Client secret"), "s3cret");
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => expect(captured.body).toMatchObject({ oidcClientSecret: "s3cret" }));
+    });
+  });
 });

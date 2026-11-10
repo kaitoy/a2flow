@@ -715,7 +715,13 @@ export const fr = {
     "Laissez vide si vous vous connectez en tant qu'administrateur de la plateforme.",
   "login.signIn": "Se connecter",
   "login.signInToA2flow": "Connectez-vous à A2Flow",
+  "login.signInWithSso": "Se connecter avec SSO",
   "login.signingIn": "Connexion…",
+  "login.ssoError.unavailable": "L'authentification unique n'est pas disponible pour ce tenant.",
+  "login.ssoError.failed": "Échec de l'authentification unique. Veuillez réessayer.",
+  "login.ssoError.account_disabled": "Votre compte est désactivé.",
+  "login.ssoError.not_permitted":
+    "Votre compte auprès du fournisseur d'identité n'est pas autorisé à se connecter à A2Flow.",
   "mcpServers.addServer": "+ Ajouter un serveur",
   "mcpServers.browseRegistry": "Parcourir le registre",
   "mcpServers.deleteMcpServer": "Supprimer le serveur MCP",
@@ -892,6 +898,25 @@ export const fr = {
     "Sélectionnez un tenant dans l'en-tête avant de créer cette étiquette.",
   "tags.tagCreated": "Étiquette créée",
   "tags.tagUpdated": "Étiquette mise à jour",
+  "tenantSettings.oidc.title": "Authentification unique",
+  "tenantSettings.oidc.enable": "Activer l'authentification unique",
+  "tenantSettings.oidc.issuerUrl": "URL de l'émetteur",
+  "tenantSettings.oidc.issuerUrlHint": "L'émetteur OpenID Connect de votre fournisseur d'identité.",
+  "tenantSettings.oidc.clientId": "ID client",
+  "tenantSettings.oidc.clientSecret": "Secret client",
+  "tenantSettings.oidc.groupsClaim": "Claim de groupes",
+  "tenantSettings.oidc.groupsClaimHint":
+    "Le claim du jeton d'ID qui liste les groupes IdP d'un utilisateur. Un utilisateur dont le jeton ne le contient pas quitte tous les groupes associés à un groupe IdP.",
+  "tenantSettings.oidc.trustEmail": "Faire confiance aux adresses e-mail de cet IdP",
+  "tenantSettings.oidc.trustEmailHint":
+    "Associe un compte existant par adresse e-mail, même si l'IdP ne marque pas l'adresse comme vérifiée.",
+  "tenantSettings.oidc.redirectUri": "URI de redirection",
+  "tenantSettings.oidc.redirectUriHint":
+    "Enregistrez cette URL comme URI de redirection auprès de votre IdP.",
+  "tenantSettings.oidc.copy": "Copier",
+  "tenantSettings.oidc.copied": "URI de redirection copiée",
+  "tenantSettings.oidc.baseUrlMissing":
+    "L'URL de base du déploiement n'est pas définie : l'authentification unique ne peut pas encore être utilisée. Demandez à votre opérateur de la définir.",
   "tenantSettings.tenantSettingsUpdated": "Paramètres du tenant mis à jour",
   "tenantSettings.theHashicorpVaultThisTenantsVaultType":
     "Le HashiCorp Vault d'où sont lus les secrets de type Vault de ce tenant. Laissez vide pour utiliser le Vault global configuré par un super administrateur.",
@@ -953,6 +978,10 @@ export const fr = {
     "Supprimer « {name} » ? Ses membres conservent leur compte mais perdent les rôles qu'il accorde.",
   "userGroups.deleteUserGroup": "Supprimer le groupe d'utilisateurs",
   "userGroups.eGDevelopers": "p. ex. Développeurs",
+  "userGroups.idpGroup": "Groupe IdP",
+  "userGroups.idpGroupHint":
+    "Les utilisateurs dont le claim de groupes IdP contient cette valeur rejoignent ce groupe lorsqu'ils se connectent avec SSO, et le quittent lorsqu'il ne la contient plus. La correspondance est exacte et sensible à la casse. Laissez vide pour gérer les membres ici.",
+  "userGroups.managedByIdp": "Géré par votre IdP",
   "userGroups.newUserGroup": "Nouveau groupe d'utilisateurs",
   "userGroups.noUserGroupsCreatedYet": "Aucun groupe d'utilisateurs n'a encore été créé.",
   "userGroups.rolesGranted": "Rôles accordés",
@@ -985,6 +1014,7 @@ export const fr = {
     "Sélectionnez un tenant dans l'en-tête avant de créer cet utilisateur.",
   "users.selectATenantInTheHeaderBefore2":
     "Sélectionnez un tenant dans l'en-tête avant de retirer le rôle de super administrateur de cet utilisateur.",
+  "users.ssoLinked": "SSO",
   "users.superAdmin": "Super administrateur",
   "users.userCreated": "Utilisateur créé",
   "users.userUpdated": "Utilisateur mis à jour",

@@ -698,7 +698,13 @@ export const en = {
   "login.leaveBlankIfYouSignInAs": "Leave blank if you sign in as a platform administrator.",
   "login.signIn": "Sign in",
   "login.signInToA2flow": "Sign in to A2Flow",
+  "login.signInWithSso": "Sign in with SSO",
   "login.signingIn": "Signing in…",
+  "login.ssoError.unavailable": "Single sign-on is not available for this tenant.",
+  "login.ssoError.failed": "Single sign-on failed. Please try again.",
+  "login.ssoError.account_disabled": "Your account is disabled.",
+  "login.ssoError.not_permitted":
+    "Your identity provider account is not allowed to sign in to A2Flow.",
   "mcpServers.addServer": "+ Add server",
   "mcpServers.browseRegistry": "Browse registry",
   "mcpServers.deleteMcpServer": "Delete MCP Server",
@@ -869,6 +875,24 @@ export const en = {
   "tags.selectATenantInTheHeaderBefore": "Select a tenant in the header before creating this tag.",
   "tags.tagCreated": "Tag created",
   "tags.tagUpdated": "Tag updated",
+  "tenantSettings.oidc.title": "Single sign-on",
+  "tenantSettings.oidc.enable": "Enable single sign-on",
+  "tenantSettings.oidc.issuerUrl": "Issuer URL",
+  "tenantSettings.oidc.issuerUrlHint": "The OpenID Connect issuer of your identity provider.",
+  "tenantSettings.oidc.clientId": "Client ID",
+  "tenantSettings.oidc.clientSecret": "Client secret",
+  "tenantSettings.oidc.groupsClaim": "Groups claim",
+  "tenantSettings.oidc.groupsClaimHint":
+    "The ID token claim that lists a user's IdP groups. A user whose token lacks it leaves every group mapped to an IdP group.",
+  "tenantSettings.oidc.trustEmail": "Trust e-mail addresses from this IdP",
+  "tenantSettings.oidc.trustEmailHint":
+    "Link an existing account by e-mail address even when the IdP does not mark the address as verified.",
+  "tenantSettings.oidc.redirectUri": "Redirect URI",
+  "tenantSettings.oidc.redirectUriHint": "Register this URL as the redirect URI at your IdP.",
+  "tenantSettings.oidc.copy": "Copy",
+  "tenantSettings.oidc.copied": "Redirect URI copied",
+  "tenantSettings.oidc.baseUrlMissing":
+    "The deployment's base URL is not set, so single sign-on cannot be used yet. Ask your operator to set it.",
   "tenantSettings.tenantSettingsUpdated": "Tenant settings updated",
   "tenantSettings.theHashicorpVaultThisTenantsVaultType":
     "The HashiCorp Vault this tenant's Vault-type secrets are read from. Leave empty to use the global Vault set up by a super admin instead.",
@@ -929,6 +953,10 @@ export const en = {
     'Delete "{name}"? Its members keep their accounts but lose the roles it grants.',
   "userGroups.deleteUserGroup": "Delete User Group",
   "userGroups.eGDevelopers": "e.g. Developers",
+  "userGroups.idpGroup": "IdP group",
+  "userGroups.idpGroupHint":
+    "Users whose IdP groups claim contains this value join this group when they sign in with SSO, and leave it when it no longer does. The match is exact and case-sensitive. Leave empty to manage members here.",
+  "userGroups.managedByIdp": "Managed by your IdP",
   "userGroups.newUserGroup": "New User Group",
   "userGroups.noUserGroupsCreatedYet": "No user groups created yet.",
   "userGroups.rolesGranted": "Roles granted",
@@ -960,6 +988,7 @@ export const en = {
     "Select a tenant in the header before creating this user.",
   "users.selectATenantInTheHeaderBefore2":
     "Select a tenant in the header before removing this user's Super Admin role.",
+  "users.ssoLinked": "SSO",
   "users.superAdmin": "Super Admin",
   "users.userCreated": "User created",
   "users.userUpdated": "User updated",

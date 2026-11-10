@@ -119,4 +119,42 @@ describe("UserGroupDetailPage", () => {
       expect(screen.getByRole("heading", { name: "Access denied" })).toBeInTheDocument()
     );
   });
+
+  it("saves the IdP group typed into the form", async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.patch(`${BASE}/api/v1/user-groups/:groupId`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return envelope(USER_GROUP_1);
+      })
+    );
+    render(<UserGroupDetailPage />, { preloadedState: ADMIN });
+    await userEvent.type(await screen.findByLabelText("IdP group"), "dev-team");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(body).toMatchObject({ idpGroup: "dev-team" }));
+  });
+
+  it("locks the members of a mapped group and omits them from the save", async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.get(`${BASE}/api/v1/user-groups/:groupId`, () =>
+        envelope({ ...USER_GROUP_1, idpGroup: "dev-team" })
+      ),
+      http.patch(`${BASE}/api/v1/user-groups/:groupId`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return envelope(USER_GROUP_1);
+      })
+    );
+    render(<UserGroupDetailPage />, { preloadedState: ADMIN });
+
+    expect(await screen.findByLabelText("IdP group")).toHaveValue("dev-team");
+    expect(await screen.findByText("Alice Smith (alice)")).toBeInTheDocument();
+    expect(screen.getByText("Managed by your IdP")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Select members…" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({ idpGroup: "dev-team" });
+    expect(body).not.toHaveProperty("memberIds");
+  });
 });

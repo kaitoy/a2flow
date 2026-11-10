@@ -6,7 +6,7 @@ import { UsersRound } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import type { z } from "zod";
+import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AuditMeta, type AuditMetaProps } from "@/components/admin/audit-meta";
@@ -43,7 +43,9 @@ import { showToast } from "@/store/toastSlice";
 
 // roles and memberIds are controlled multi-selects rather than registered
 // inputs, so they are kept out of the form schema and merged at submit.
-const schema = zUserGroupCreate.omit({ roles: true, memberIds: true });
+const schema = zUserGroupCreate
+  .omit({ roles: true, memberIds: true, idpGroup: true })
+  .extend({ idpGroup: z.string().max(255) });
 
 type FormValues = z.input<typeof schema>;
 
@@ -76,6 +78,9 @@ export default function UserGroupDetailPage() {
   const [name, setName] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  // Whether the loaded group is mapped to an IdP group, which makes SSO the
+  // only thing that changes its members (the backend refuses other changes).
+  const [managedByIdp, setManagedByIdp] = useState(false);
   // `savedTagIds` is what the last successful save wrote, so a submit only
   // re-PUTs the tag set when it actually changed.
   const [tagIds, setTagIds] = useState<string[]>([]);
@@ -91,7 +96,7 @@ export default function UserGroupDetailPage() {
   } = useForm({
     resolver: zodResolver(schema),
     mode: "onBlur",
-    defaultValues: { name: "", description: "" },
+    defaultValues: { name: "", description: "", idpGroup: "" },
   });
 
   useEffect(() => {
@@ -100,9 +105,14 @@ export default function UserGroupDetailPage() {
         setName(group.name);
         setRoles(group.roles ?? []);
         setMemberIds(group.memberIds ?? []);
+        setManagedByIdp(Boolean(group.idpGroup));
         setTagIds(group.tagIds ?? []);
         setSavedTagIds(group.tagIds ?? []);
-        reset({ name: group.name, description: group.description ?? "" });
+        reset({
+          name: group.name,
+          description: group.description ?? "",
+          idpGroup: group.idpGroup ?? "",
+        });
         setAudit({
           createdBy: group.createdBy,
           updatedBy: group.updatedBy,
@@ -127,8 +137,11 @@ export default function UserGroupDetailPage() {
         await updateUserGroup(groupId, {
           name: values.name,
           description: values.description || null,
+          idpGroup: values.idpGroup.trim() || null,
           roles,
-          memberIds,
+          // A mapped group's members are SSO's to change; sending them back
+          // would be refused.
+          ...(managedByIdp ? {} : { memberIds }),
         });
         // Tags are a separate sub-resource, written only when the selection
         // actually changed.
@@ -212,6 +225,19 @@ export default function UserGroupDetailPage() {
             )}
           </FormField>
 
+          <FormField
+            htmlFor="idpGroup"
+            label={t("userGroups.idpGroup")}
+            error={errors.idpGroup?.message}
+          >
+            {canEdit ? (
+              <Input id="idpGroup" {...register("idpGroup")} />
+            ) : (
+              <ReadOnlyField>{getValues("idpGroup") || EMPTY_VALUE}</ReadOnlyField>
+            )}
+            <p className="text-xs text-on-surface-variant">{t("userGroups.idpGroupHint")}</p>
+          </FormField>
+
           {/* A group can never grant super_admin; the backend rejects it with 422. */}
           <RolesField
             value={roles}
@@ -221,7 +247,16 @@ export default function UserGroupDetailPage() {
             label={t("userGroups.rolesGranted")}
           />
 
-          <UserPicker value={memberIds} onChange={setMemberIds} readOnly={!canEdit} />
+          <div className="flex flex-col gap-1.5">
+            <UserPicker
+              value={memberIds}
+              onChange={setMemberIds}
+              readOnly={!canEdit || managedByIdp}
+            />
+            {managedByIdp && (
+              <p className="text-xs text-on-surface-variant">{t("userGroups.managedByIdp")}</p>
+            )}
+          </div>
 
           <TagPicker value={tagIds} onChange={setTagIds} readOnly={!canEdit} />
 
