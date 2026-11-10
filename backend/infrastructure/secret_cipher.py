@@ -120,21 +120,23 @@ class SecretCipher:
         """
         return self._fernet.encrypt(plain.encode("utf-8")).decode("ascii")
 
-    def decrypt(self, token: str) -> str:
+    def decrypt(self, token: str, *, ttl: int | None = None) -> str:
         """Decrypt a ciphertext produced by :meth:`encrypt`.
 
         Args:
             token: The Fernet ciphertext.
+            ttl: Maximum age of the ciphertext in seconds; ``None`` accepts
+                any age.
 
         Returns:
             The plaintext secret value.
 
         Raises:
-            ValueError: If the ciphertext is malformed or was encrypted with a
-                different key.
+            ValueError: If the ciphertext is malformed, was encrypted with a
+                different key, or is older than ``ttl``.
         """
         try:
-            return self._fernet.decrypt(token.encode("ascii")).decode("utf-8")
+            return self._fernet.decrypt(token.encode("ascii"), ttl=ttl).decode("utf-8")
         except (InvalidToken, UnicodeEncodeError) as exc:
             raise ValueError("Failed to decrypt stored secret value") from exc
 

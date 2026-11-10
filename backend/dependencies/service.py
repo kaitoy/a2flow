@@ -15,6 +15,7 @@ from infrastructure.secret_resolver import SecretResolver
 from infrastructure.vault_client import TenantVaults
 from repositories.session_file import SessionFileRepository
 from repositories.session_stream import SessionStreamRepository
+from repositories.user_group import SqlUserGroupRepository
 from services.agent_skill import AgentSkillService
 from services.agent_skill_sync import sync_agent_skill
 from services.approval import ApprovalService
@@ -31,6 +32,7 @@ from services.mcp_tool_mock import MCPToolMockService
 from services.metrics import MetricsService
 from services.notification import NotificationService
 from services.notification_dispatch import NotificationDispatcher
+from services.oidc_login import OidcLoginService
 from services.outbound_email import OutboundEmailService
 from services.secret import SecretService
 from services.session_file import SessionFileService, SessionFileStore
@@ -47,7 +49,7 @@ from services.workflow_execution_access import WorkflowExecutionAccessPolicy
 from services.workflow_task import WorkflowTaskService
 from services.workflow_task_template import WorkflowTaskTemplateService
 
-from .auth import CurrentTenantScopeDep
+from .auth import AuthServiceDep, CurrentTenantScopeDep
 from .context import APP_NAME
 from .repository import (
     AgentSkillLookupDep,
@@ -87,6 +89,7 @@ from .repository import (
 )
 from .singletons import (
     AgentRegistryDep,
+    OidcClientDep,
     SecretCipherDep,
     SessionServiceDep,
     SkillManagerDep,
@@ -334,6 +337,37 @@ def get_user_group_service(repo: UserGroupRepositoryDep) -> UserGroupService:
 
 
 UserGroupServiceDep = Annotated[UserGroupService, Depends(get_user_group_service)]
+
+
+def get_oidc_login_service(
+    db: DBSessionDep,
+    tenants: TenantRepositoryDep,
+    users: UserRepositoryDep,
+    auth: AuthServiceDep,
+    oidc: OidcClientDep,
+    cipher: SecretCipherDep,
+    system_settings: SystemSettingsRepositoryDep,
+) -> OidcLoginService:
+    """Create an OidcLoginService for the unauthenticated SSO redirects.
+
+    Nothing here depends on the caller's session: the tenant comes from the
+    request (``start``) or the state cookie (``complete``), so the user-group
+    repository is built per tenant, with no access-tag restriction.
+    """
+    return OidcLoginService(
+        tenants=tenants,
+        users=users,
+        auth=auth,
+        oidc=oidc,
+        cipher=cipher,
+        system_settings=system_settings,
+        groups_for_tenant=lambda tenant_id: SqlUserGroupRepository(
+            db, users, tenant_id=tenant_id
+        ),
+    )
+
+
+OidcLoginServiceDep = Annotated[OidcLoginService, Depends(get_oidc_login_service)]
 
 
 def get_user_avatar_service(repo: UserAvatarRepositoryDep) -> UserAvatarService:

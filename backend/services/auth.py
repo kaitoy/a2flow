@@ -159,7 +159,21 @@ class AuthService:
             )
             raise
         await self._login_failures.clear(account_key)
+        return await self.start_session(user)
 
+    async def start_session(self, user: User) -> LoginResult:
+        """Mint a login session for a user who has already been authenticated.
+
+        Shared by password login and OIDC single sign-on, so both hand out
+        identical sessions. Also deletes sessions already past the idle window.
+
+        Args:
+            user: The user to sign in; the caller has checked they may.
+
+        Returns:
+            A :class:`LoginResult` carrying the user and the freshly minted
+            session and CSRF tokens.
+        """
         session_token = generate_token()
         csrf_token = generate_token()
         await self._sessions.create(
