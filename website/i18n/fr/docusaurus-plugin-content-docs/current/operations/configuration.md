@@ -88,7 +88,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 L'authentification unique dépend aussi de l'URL de base du déploiement, c'est-à-dire `APP_BASE_URL` (voir [E-mails de notification](#notification-email)) ou **URL de base de l'application** dans les [Paramètres système](../guides/system-settings.md). Sans elle, l'authentification unique est indisponible et **Paramètres du tenant** affiche un avertissement à la place de l'**URI de redirection**. Deux exigences :
 
 - **L'URL de base est l'origine seule** : schéma, hôte et, éventuellement, port, comme `https://a2flow.example.com`, sans chemin. Une valeur avec un chemin fait échouer toutes les connexions SSO.
-- **Le backend doit voir l'origine publique.** Derrière un proxy inverse, faites passer par le proxy l'hôte et le schéma d'origine dans les en-têtes `X-Forwarded-Host` et `X-Forwarded-Proto`, et faites-les approuver par le backend en indiquant l'adresse du proxy dans `FORWARDED_ALLOW_IPS`. Sinon, chaque connexion SSO prend une redirection de plus.
+- **Le backend doit voir l'origine publique.** Derrière un proxy inverse, faites conserver au proxy l'en-tête `Host` d'origine lorsqu'il transmet une requête et faites-lui définir `X-Forwarded-Proto` avec le schéma d'origine, puis faites approuver le proxy par le backend en indiquant son adresse dans `FORWARDED_ALLOW_IPS` (par défaut, seul `127.0.0.1` est approuvé). Sinon, chaque connexion SSO prend une redirection de plus.
 
 ## Magasin de compétences d'agent {#agent-skill-store}
 

@@ -88,7 +88,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 El inicio de sesión único depende también de la URL base del despliegue, que es `APP_BASE_URL` (consulta [Correo de notificación](#notification-email)) o **URL base de la aplicación** en [Configuración del sistema](../guides/system-settings.md). Sin ella, el inicio de sesión único no está disponible y **Configuración del tenant** muestra una advertencia en lugar de la **URI de redirección**. Hay dos requisitos:
 
 - **La URL base es solo el origen**: esquema, host y, opcionalmente, puerto, como `https://a2flow.example.com`, sin ruta. Un valor con ruta hace que todos los inicios de sesión SSO fallen.
-- **El backend debe ver el origen público.** Detrás de un proxy inverso, haz que el proxy pase el host y el esquema originales en las cabeceras `X-Forwarded-Host` y `X-Forwarded-Proto`, y haz que el backend confíe en ellas indicando la dirección del proxy en `FORWARDED_ALLOW_IPS`. Si no, cada inicio de sesión SSO requiere una redirección adicional.
+- **El backend debe ver el origen público.** Detrás de un proxy inverso, haz que el proxy conserve la cabecera `Host` original al reenviar una petición y que establezca `X-Forwarded-Proto` con el esquema original, y haz que el backend confíe en el proxy indicando su dirección en `FORWARDED_ALLOW_IPS` (por defecto solo se confía en `127.0.0.1`). Si no, cada inicio de sesión SSO requiere una redirección adicional.
 
 ## Almacén de skills de agente {#agent-skill-store}
 

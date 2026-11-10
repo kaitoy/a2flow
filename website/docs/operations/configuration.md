@@ -88,7 +88,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 Single sign-on also depends on the deployment's base URL, which is `APP_BASE_URL` (see [Notification email](#notification-email)) or **Application Base URL** under [System Settings](../guides/system-settings.md). Without it, single sign-on is unavailable and **Tenant Settings** shows a warning instead of the **Redirect URI**. Two requirements:
 
 - **The base URL is the origin only** — scheme, host and an optional port, such as `https://a2flow.example.com`, with no path. A value with a path makes every SSO sign-in fail.
-- **The backend should see the public origin.** Behind a reverse proxy, have the proxy pass the original host and scheme in the `X-Forwarded-Host` and `X-Forwarded-Proto` headers, and let the backend trust them by listing the proxy's address in `FORWARDED_ALLOW_IPS`. Otherwise every SSO sign-in takes one extra redirect.
+- **The backend should see the public origin.** Behind a reverse proxy, have the proxy keep the original `Host` header when it forwards a request and set `X-Forwarded-Proto` to the original scheme, and let the backend trust the proxy by listing the proxy's address in `FORWARDED_ALLOW_IPS` (by default only `127.0.0.1` is trusted). Otherwise every SSO sign-in takes one extra redirect.
 
 ## Agent skill store {#agent-skill-store}
 

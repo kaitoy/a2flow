@@ -88,7 +88,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 싱글 사인온은 배포의 기본 URL에도 의존합니다. `APP_BASE_URL`([알림 이메일](#notification-email) 참조) 또는 [시스템 설정](../guides/system-settings.md)의 **애플리케이션 기본 URL**입니다. 없으면 싱글 사인온을 사용할 수 없고 **테넌트 설정**에 **리디렉션 URI** 대신 경고가 표시됩니다. 요건은 두 가지입니다.
 
 - **기본 URL은 오리진만 씁니다.** 스킴, 호스트, 필요하면 포트까지이며 `https://a2flow.example.com`처럼 경로는 붙이지 않습니다. 경로가 있으면 모든 SSO 로그인이 실패합니다.
-- **백엔드가 공개 오리진을 볼 수 있어야 합니다.** 리버스 프록시 뒤에서는 프록시가 원래 호스트와 스킴을 `X-Forwarded-Host`, `X-Forwarded-Proto` 헤더로 전달하게 하고, 프록시 주소를 `FORWARDED_ALLOW_IPS`에 적어 백엔드가 이를 신뢰하게 하세요. 그러지 않으면 SSO 로그인마다 리디렉션이 한 번 더 일어납니다.
+- **백엔드가 공개 오리진을 볼 수 있어야 합니다.** 리버스 프록시 뒤에서는 프록시가 요청을 전달할 때 원래의 `Host` 헤더를 유지하고 `X-Forwarded-Proto`를 원래 스킴으로 설정하게 하며, 프록시 주소를 `FORWARDED_ALLOW_IPS`에 적어 백엔드가 프록시를 신뢰하게 하세요(기본값으로는 `127.0.0.1`만 신뢰합니다). 그러지 않으면 SSO 로그인마다 리디렉션이 한 번 더 일어납니다.
 
 ## 에이전트 스킬 스토어 {#agent-skill-store}
 
