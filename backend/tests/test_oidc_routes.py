@@ -105,6 +105,16 @@ async def ctx() -> AsyncGenerator[Ctx, None]:
         await engine.dispose()
 
 
+async def set_app_base_url(c: Ctx, url: str) -> None:
+    """Point the platform's ``app_base_url`` at ``url``."""
+    async with AsyncSession(c.engine) as db:
+        settings = await db.get(SystemSettings, SYSTEM_SETTINGS_ID)
+        assert settings is not None
+        settings.app_base_url = url
+        db.add(settings)
+        await db.commit()
+
+
 def set_cookies(resp: httpx.Response) -> dict[str, Morsel[str]]:
     """Return the cookies a response sets, by name."""
     jar: SimpleCookie = SimpleCookie()
@@ -182,19 +192,25 @@ async def test_start_unknown_tenant_redirects_unavailable(ctx: Ctx) -> None:
 
 @pytest.mark.asyncio
 async def test_start_redirects_to_app_base_url_origin(ctx: Ctx) -> None:
-    async with AsyncSession(ctx.engine) as db:
-        settings = await db.get(SystemSettings, SYSTEM_SETTINGS_ID)
-        assert settings is not None
-        settings.app_base_url = "https://a2.example.com"
-        db.add(settings)
-        await db.commit()
+    await set_app_base_url(ctx, "https://a2.example.com")
     resp = await ctx.client.get("/api/v1/auth/oidc/start", params={"tenant": "acme"})
     assert resp.status_code == 302
     assert resp.headers["location"] == (
-        "https://a2.example.com/api/v1/auth/oidc/start?tenant=acme"
+        "https://a2.example.com/api/v1/auth/oidc/start?tenant=acme&hop=1"
     )
     assert STATE_COOKIE_NAME not in set_cookies(resp)
     assert ctx.fake.requests == []
+
+
+@pytest.mark.asyncio
+async def test_start_hops_to_app_base_url_only_once(ctx: Ctx) -> None:
+    await set_app_base_url(ctx, "https://a2.example.com")
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start", params={"tenant": "acme", "hop": "1"}
+    )
+    assert resp.status_code == 302
+    assert resp.headers["location"].startswith(f"{ISSUER}/authorize?")
+    assert STATE_COOKIE_NAME in set_cookies(resp)
 
 
 @pytest.mark.asyncio

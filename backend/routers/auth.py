@@ -12,7 +12,7 @@ The two ``/oidc/*`` routes are browser redirects, not API calls: they answer
 
 import logging
 from typing import Annotated
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
@@ -293,14 +293,20 @@ def _sso_error(code: SsoErrorCode) -> str:
     },
 )
 async def oidc_start(
-    request: Request, service: OidcLoginServiceDep, tenant: str = ""
+    request: Request,
+    service: OidcLoginServiceDep,
+    tenant: str = "",
+    hop: str | None = None,
 ) -> RedirectResponse:
     """Begin an OpenID Connect sign-in for the tenant named ``tenant``.
 
     Unguarded browser redirect (no envelope). If the deployment's
     ``app_base_url`` names another origin than this request's, the browser is
     first sent to the same path on that origin, so the state cookie is set where
-    the identity provider will call back. Otherwise it is sent to the identity
+    the identity provider will call back. That hop happens at most once: it adds
+    ``hop=1`` to the query, and a request carrying ``hop`` skips the origin
+    comparison, so a backend that never sees the public origin (no trusted proxy
+    headers) costs one extra redirect rather than a redirect loop. Otherwise it is sent to the identity
     provider with the encrypted state cookie, scoped to the callback path.
     Every failure -- including an unexpected one -- redirects to the login page
     with ``sso_error=unavailable``, which never reveals whether a tenant exists.
@@ -309,14 +315,18 @@ async def oidc_start(
         request: The incoming request.
         service: The sign-in service.
         tenant: The tenant name typed on the login screen.
+        hop: Marker set by the origin redirect; its presence disables a second one.
     """
     try:
         base_url = await service.app_base_url()
-        if base_url and _origin(base_url) != _origin(str(request.base_url)):
+        if (
+            hop is None
+            and base_url
+            and _origin(base_url) != _origin(str(request.base_url))
+        ):
             parts = urlsplit(base_url)
-            target = f"{parts.scheme}://{parts.netloc}{request.url.path}"
-            if request.url.query:
-                target += f"?{request.url.query}"
+            query = urlencode([*request.query_params.multi_items(), ("hop", "1")])
+            target = f"{parts.scheme}://{parts.netloc}{request.url.path}?{query}"
             return RedirectResponse(target, status_code=302)
         begun = await service.start(tenant)
     except SsoLoginError as exc:
