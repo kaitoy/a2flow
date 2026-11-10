@@ -362,6 +362,9 @@ export function fitColumnWidths<T>(
  * changed. A sort or filter left pointing at a column that is no longer in
  * `columns` is dropped through `onSortChange`/`onFilterChange`, so the rows on
  * screen are never ordered or narrowed by an invisible criterion.
+ *
+ * Every data row carries `data-testid="data-table-row"`; the e2e suite picks
+ * one out by the text in it.
  */
 export function DataTable<T>({
   columns,
@@ -728,6 +731,7 @@ export function DataTable<T>({
               <tr
                 key={getRowKey(row)}
                 data-row-key={getRowKey(row)}
+                data-testid="data-table-row"
                 className={[
                   "border-divider/60 border-t text-on-surface transition-colors even:bg-glass-strong/15 hover:bg-accent-soft/40",
                   // The zebra stripe is a `:nth-child(even)` rule, so it outranks a

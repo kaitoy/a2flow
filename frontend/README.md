@@ -151,6 +151,21 @@ pnpm test:watch
 pnpm test:coverage
 ```
 
+### Test ids
+
+The end-to-end suite in [e2e/](../e2e/) finds every element by its `data-testid`, so
+changing an id it uses breaks it. When a test needs a new element, add an id:
+
+- Kebab-case `<feature>-<element>`: `login-submit`, `workflow-status`.
+- One fixed id for an element that repeats, such as a table row, and let the test pick
+  one by its text: `data-table-row`, `workflow-task`. Put a value in the id only when it
+  is a stable key, never a label: `run-workflow-mock-<toolName>`.
+- A shared component carries its own fixed id: `confirm-dialog-confirm`,
+  `admin-page-header-add`, `toast`, and every `Dialog` panel's `panelId`.
+  `Button`, `ActionIconButton`, `DeleteIconButton`, `HeaderIconButton`, `Checkbox`,
+  `StatusDot`, `Input`, and `Textarea` pass a `data-testid` prop through to the DOM.
+- Add ids only for elements a test uses. They stay in the production build.
+
 ### Test structure and mocking strategy
 
 Test file placement, the shared `src/test/` infrastructure, and the per-boundary mocking strategy are documented in [.claude/rules/frontend-patterns.md](../.claude/rules/frontend-patterns.md).

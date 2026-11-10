@@ -38,5 +38,11 @@ export function WorkflowExecutionStatusLabel({
 }) {
   const t = useT();
   const value = status ?? "running";
-  return <StatusDot dotClass={STATUS_DOT_CLASS[value]} label={translateStatus(value, t)} />;
+  return (
+    <StatusDot
+      dotClass={STATUS_DOT_CLASS[value]}
+      label={translateStatus(value, t)}
+      data-testid="workflow-execution-status"
+    />
+  );
 }

@@ -52,7 +52,11 @@ const POLL_INTERVAL_MS = 2000;
 function SyncStatus({ skill }: { skill: AgentSkill }) {
   const status = (skill.syncStatus ?? "pending") as SkillSyncStatus;
   const label = (
-    <StatusDot dotClass={SYNC_STATUS_DOT_CLASS[status]} label={formatSyncStatusLabel(status)} />
+    <StatusDot
+      dotClass={SYNC_STATUS_DOT_CLASS[status]}
+      label={formatSyncStatusLabel(status)}
+      data-testid="agent-skill-status"
+    />
   );
   // The failure reason is the whole point of the failed state, but it is a raw
   // git/network message — too long for a cell, so it lives in the tooltip. The
@@ -242,6 +246,7 @@ export default function AgentSkillsPage() {
                 <ActionIconButton
                   icon={Sparkles}
                   label={t("agentSkills.generateWorkflow")}
+                  data-testid="agent-skill-generate"
                   onClick={() => setGenerateTarget({ id: skill.id, name: skill.name })}
                   // A skill can only back a design run once its clone has
                   // published a revision.

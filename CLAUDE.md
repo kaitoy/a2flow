@@ -8,7 +8,8 @@ A chat application that connects a Google ADK agent to a Next.js UI via the AG-U
 a2flow/
 ├── backend/   # FastAPI + Google ADK agent (Python)
 ├── frontend/  # Next.js 16 chat UI (TypeScript)
-└── website/   # The manual site (Docusaurus → GitHub Pages)
+├── website/   # The manual site (Docusaurus → GitHub Pages)
+└── e2e/       # Browser end-to-end tests (e2e, run by GitHub Actions)
 ```
 
 See each directory's README.md for details.
@@ -27,7 +28,7 @@ When bumping a version in `mise.toml`, update the places that pin the same tool 
 |---|---|
 | `python` | `backend/.python-version`, `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
 | `node` | `backend/Dockerfile` (its `mcp-proxy` stage only — the `backend` stage has no Node.js) and `frontend/Dockerfile` base image tags |
-| `pnpm` | `packageManager` in `frontend/package.json` and `website/package.json` (the frontend Docker build installs that version, and pnpm self-switches to it) |
+| `pnpm` | `packageManager` in `frontend/package.json`, `website/package.json`, and `e2e/package.json` (the frontend Docker build installs that version, and pnpm self-switches to it) |
 
 `backend/pyproject.toml` sets `[tool.uv] python-preference = "only-system"` so `uv sync` builds `backend/.venv` from the mise-pinned interpreter on `PATH` instead of downloading its own. `requires-python`, ruff's `target-version`, and mypy's `python_version` stay at the 3.11 support floor and are deliberately not bumped alongside `mise.toml`.
 

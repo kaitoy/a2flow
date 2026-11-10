@@ -79,6 +79,7 @@ export default function LoginPage() {
         <FormField htmlFor="username" label={t("common.username")} required>
           <Input
             id="username"
+            data-testid="login-username"
             name="username"
             autoComplete="username"
             value={username}
@@ -91,6 +92,7 @@ export default function LoginPage() {
         <FormField htmlFor="tenantName" label={t("common.tenant")}>
           <Input
             id="tenantName"
+            data-testid="login-tenant"
             name="tenantName"
             autoComplete="organization"
             value={tenantName}
@@ -105,6 +107,7 @@ export default function LoginPage() {
         <FormField htmlFor="password" label={t("common.password")} required>
           <PasswordInput
             id="password"
+            data-testid="login-password"
             name="password"
             autoComplete="current-password"
             value={password}
@@ -120,6 +123,7 @@ export default function LoginPage() {
           status={signIn.status}
           pendingLabel={t("login.signingIn")}
           className="w-full"
+          data-testid="login-submit"
         >
           {t("login.signIn")}
         </Button>

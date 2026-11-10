@@ -126,6 +126,7 @@ export function GenerateWorkflowDialog({
         >
           <Textarea
             id="generate-workflow-prompt"
+            data-testid="generate-workflow-prompt"
             rows={6}
             placeholder={t("admin.describeTheWorkTheDesignAgentBreaks")}
             {...register("prompt")}
@@ -150,6 +151,7 @@ export function GenerateWorkflowDialog({
             disabled={save.inFlight}
             status={save.status}
             pendingLabel={t("admin.generating")}
+            data-testid="generate-workflow-submit"
           >
             {t("admin.generate")}
           </Button>

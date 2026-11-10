@@ -120,6 +120,7 @@ export default function NewTagPage() {
               disabled={save.inFlight || tenantMissing}
               status={save.status}
               pendingLabel={t("common.saving")}
+              data-testid="tag-save"
             >
               {t("common.save")}
             </Button>

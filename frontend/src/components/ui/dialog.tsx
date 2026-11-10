@@ -33,7 +33,10 @@ export interface DialogProps {
   open: boolean;
   /** Called when the dialog requests to close (backdrop or Escape). */
   onClose: () => void;
-  /** DOM id of the panel; its title element derives `${panelId}-title`. */
+  /**
+   * DOM id of the panel, also its `data-testid` for the e2e suite; its title
+   * element derives `${panelId}-title`.
+   */
   panelId: string;
   /** Heading text, and the panel's accessible name. */
   title: string;
@@ -107,6 +110,7 @@ export function Dialog({
             <div className="relative flex min-h-full items-center justify-center p-4 pointer-events-none">
               <animated.div
                 id={panelId}
+                data-testid={panelId}
                 tabIndex={-1}
                 role="dialog"
                 aria-modal="true"

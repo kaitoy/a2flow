@@ -205,6 +205,7 @@ export default function TagDetailPage() {
                 disabled={save.inFlight}
                 status={save.status}
                 pendingLabel={t("common.saving")}
+                data-testid="tag-save"
               >
                 {t("common.save")}
               </Button>
@@ -218,6 +219,7 @@ export default function TagDetailPage() {
                 variant="danger"
                 onClick={() => setConfirmOpen(true)}
                 className="ml-auto"
+                data-testid="tag-delete"
               >
                 {t("common.delete")}
               </Button>

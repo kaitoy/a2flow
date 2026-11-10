@@ -16,7 +16,8 @@ exception is `website/i18n/`, which holds the manual's translations.
 a2flow/
 ├── backend/   # FastAPI + Google ADK agent
 ├── frontend/  # Next.js 16 chat UI
-└── website/   # The manual site (Docusaurus → GitHub Pages)
+├── website/   # The manual site (Docusaurus → GitHub Pages)
+└── e2e/       # Browser end-to-end tests (e2e → GitHub Actions)
 ```
 
 ## Setting up
@@ -114,7 +115,7 @@ in the same change:
 |---|---|
 | `python` | `backend/.python-version`, `backend/Dockerfile` and `frontend/Dockerfile` base image tags |
 | `node` | `backend/Dockerfile` (its `mcp-proxy` stage, the only one that needs Node.js) and `frontend/Dockerfile` base image tags |
-| `pnpm` | `packageManager` in `frontend/package.json` and `website/package.json` (the frontend Docker build installs that version, and pnpm self-switches to it) |
+| `pnpm` | `packageManager` in `frontend/package.json`, `website/package.json`, and `e2e/package.json` (the frontend Docker build installs that version, and pnpm self-switches to it) |
 
 `backend/pyproject.toml` sets `[tool.uv] python-preference = "only-system"` so `uv sync`
 builds `backend/.venv` from the mise-pinned interpreter on `PATH` instead of downloading
@@ -140,6 +141,48 @@ the A2UI middleware config, the catalog, or `render_approval`, regenerate and co
 ```bash
 cd frontend && UPDATE_CLIENT_CONTRACT=1 pnpm vitest run src/lib/clientContract.test.ts
 ```
+
+### End-to-end tests
+
+[e2e/](e2e/) drives the real app in Chromium with [e2e](https://e2e.com/), a test
+runner built on Playwright. It covers two flows:
+
+| Test | Flow |
+|---|---|
+| `tests/tags.e2e.ts` | An admin creates, edits, and deletes a tag |
+| `tests/aws-walkthrough.e2e.ts` | The manual's AWS walkthrough on its tool-mock path: impersonate `demo-aws-developer`, generate a workflow from the demo skill, run the draft with the seeded mocks, and see it complete |
+
+[e2e.yml](.github/workflows/e2e.yml) runs it on every push and pull request that
+touches `backend/`, `frontend/`, or `e2e/`; a failed run uploads the traces,
+screenshots, and app log as the `e2e-results` artifact. It is not in the git hooks.
+
+No LLM API key is involved. [e2e/start.sh](e2e/start.sh) — which the runner launches —
+starts the backend through [backend/scripts/e2e_server.py](backend/scripts/e2e_server.py)
+with `LLM_MODEL=e2e-fake`. That script registers a scripted model with ADK's model
+registry, so every agent and the summarizer get the same tool calls on every run:
+the design agent registers two task templates, and the execution agent works both
+tasks through to `completed`. No production code knows about it. Change the script
+when a flow under test needs different agent behaviour.
+
+The demo skill is still cloned from GitHub at startup, so the suite needs network
+access. Both servers bind `127.0.0.1` (backend on 8099, frontend on 3099) against a
+throwaway database that `start.sh` deletes on exit.
+
+e2e itself documents Linux, macOS, and WSL. It also runs from Git Bash on native
+Windows, with one catch: when the run ends, the servers `start.sh` launched keep
+running, because stopping Git Bash does not stop its children. Stop the
+`scripts.e2e_server` and `next start` processes by hand before the next run.
+
+```bash
+cd frontend && pnpm build                          # start.sh serves this build
+cd ../e2e && pnpm install
+pnpm exec e2e-web install chromium --with-deps     # once
+pnpm exec e2e run
+```
+
+Tests find elements by `data-testid` only — never by visible text, role names, or CSS
+classes — so a wording, translation, or styling change cannot break them.
+[frontend/README.md](frontend/README.md#test-ids) has the naming convention.
 
 ### Running the backend suite against PostgreSQL
 

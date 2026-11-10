@@ -19,6 +19,7 @@ const AUTO_DISMISS_MS = 3500;
  * toast has no timer and stays until the user clicks its dismiss button. When
  * the same error message recurs, `toast.count` (set by the `toast` slice's
  * merge logic) is shown as a small round badge instead of stacking a new card.
+ * Every card carries `data-testid="toast"` for the e2e suite.
  */
 function ToastCard({ toast }: { toast: Toast }) {
   const t = useT();
@@ -41,6 +42,7 @@ function ToastCard({ toast }: { toast: Toast }) {
       ].join(" ")}
       role="status"
       aria-live="polite"
+      data-testid="toast"
     >
       <span className="flex items-center gap-2.5">
         {isError ? (

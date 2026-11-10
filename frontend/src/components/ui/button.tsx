@@ -24,6 +24,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   pendingLabel?: React.ReactNode;
   /** Label shown while `status` is `done` (e.g. "Saved!"). */
   doneLabel?: React.ReactNode;
+  /** Test id for the e2e suite, set on the `<button>` or, with `href`, the link. */
+  "data-testid"?: string;
 }
 
 const BASE =
@@ -108,7 +110,7 @@ export function Button({
       .filter(Boolean)
       .join(" ");
     return (
-      <Link href={href} className={cls}>
+      <Link href={href} className={cls} data-testid={rest["data-testid"]}>
         {children}
       </Link>
     );

@@ -28,6 +28,8 @@ interface ActionIconButtonProps {
    * meaningful and shouldn't rotate.
    */
   spinAnimation?: "spin" | "rocket-launch" | "spin-y";
+  /** Test id for the e2e suite, set on the rendered `<a>` or `<button>`. */
+  "data-testid"?: string;
 }
 
 /**
@@ -48,6 +50,7 @@ export function ActionIconButton({
   disabled,
   spinning,
   spinAnimation = "spin",
+  "data-testid": testId,
 }: ActionIconButtonProps) {
   const className = [
     "glass-panel flex size-8 shrink-0 items-center justify-center rounded-lg",
@@ -71,13 +74,14 @@ export function ActionIconButton({
   return (
     <Tooltip label={label}>
       {href ? (
-        <Link href={href} aria-label={label} className={className}>
+        <Link href={href} aria-label={label} className={className} data-testid={testId}>
           {iconEl}
         </Link>
       ) : (
         <button
           type="button"
           aria-label={label}
+          data-testid={testId}
           onClick={onClick}
           disabled={disabled}
           className={className}

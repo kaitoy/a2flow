@@ -23,7 +23,10 @@ interface ConfirmDialogProps {
   confirmVariant?: "danger" | "primary" | "secondary";
 }
 
-/** Modal confirmation dialog with focus trap, keyboard navigation, and backdrop. */
+/**
+ * Modal confirmation dialog with focus trap, keyboard navigation, and backdrop.
+ * The confirm button carries `data-testid="confirm-dialog-confirm"` for the e2e suite.
+ */
 export function ConfirmDialog({
   open,
   title,
@@ -47,7 +50,7 @@ export function ConfirmDialog({
           <Button variant="ghost" onClick={onCancel}>
             {t("common.cancel")}
           </Button>
-          <Button variant={confirmVariant} onClick={onConfirm}>
+          <Button variant={confirmVariant} onClick={onConfirm} data-testid="confirm-dialog-confirm">
             {t.maybe(confirmLabel)}
           </Button>
         </>

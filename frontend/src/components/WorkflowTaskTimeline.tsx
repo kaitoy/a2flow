@@ -173,6 +173,7 @@ export function WorkflowTaskTimeline({
                     type="button"
                     onClick={() => onSelectTask(task.id)}
                     aria-current={isActive ? "true" : undefined}
+                    data-testid="workflow-task"
                     className="flex w-full items-start gap-2.5 text-left"
                   >
                     <span
@@ -190,7 +191,10 @@ export function WorkflowTaskTimeline({
                         </span>
                       </Tooltip>
                       {status !== null && (
-                        <span className="block text-xs text-on-surface-variant">
+                        <span
+                          className="block text-xs text-on-surface-variant"
+                          data-testid="workflow-task-status"
+                        >
                           {formatStatusLabel(status)}
                         </span>
                       )}

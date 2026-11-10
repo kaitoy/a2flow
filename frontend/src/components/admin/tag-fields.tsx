@@ -149,6 +149,7 @@ export function TagFields(props: TagFieldsProps) {
       <FormField htmlFor="name" label={t("common.name")} required error={errors.name?.message}>
         <Input
           id="name"
+          data-testid="tag-name"
           placeholder={showPlaceholders ? t("admin.eGProduction") : undefined}
           {...register("name")}
         />
@@ -161,6 +162,7 @@ export function TagFields(props: TagFieldsProps) {
       >
         <Textarea
           id="description"
+          data-testid="tag-description"
           rows={4}
           placeholder={showPlaceholders ? t("admin.whatThisTagMeansOptional") : undefined}
           {...register("description")}

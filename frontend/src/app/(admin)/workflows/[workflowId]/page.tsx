@@ -103,6 +103,7 @@ function StatusLine({ workflow }: { workflow: Workflow }) {
     <StatusDot
       dotClass={WORKFLOW_STATUS_DOT_CLASS[status]}
       label={formatWorkflowStatusLabel(status)}
+      data-testid="workflow-status"
     />
   );
 }
@@ -496,6 +497,7 @@ export default function WorkflowDetailPage() {
                 {canRun && (
                   <HeaderIconButton
                     label={t("workflows.runWorkflow")}
+                    data-testid="workflow-run"
                     onClick={() => setConfirmRunOpen(true)}
                     disabled={
                       generating ||

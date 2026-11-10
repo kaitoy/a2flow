@@ -59,6 +59,7 @@ function buildColumns(
       cell: (tag) => (
         <Link
           href={`/tags/${tag.id}`}
+          data-testid="tag-link"
           className="font-medium text-accent transition-colors hover:underline"
         >
           {tag.name}

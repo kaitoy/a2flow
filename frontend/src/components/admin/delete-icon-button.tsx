@@ -12,6 +12,8 @@ interface DeleteIconButtonProps {
   label?: string;
   /** When true, the button is disabled and does not respond to clicks. */
   disabled?: boolean;
+  /** Test id for the e2e suite, set on the `<button>`. */
+  "data-testid"?: string;
 }
 
 /**
@@ -25,6 +27,7 @@ export function DeleteIconButton({
   onClick,
   label = "common.delete",
   disabled,
+  "data-testid": testId,
 }: DeleteIconButtonProps) {
   const t = useT();
   return (
@@ -32,6 +35,7 @@ export function DeleteIconButton({
       <button
         type="button"
         aria-label={t.maybe(label)}
+        data-testid={testId}
         onClick={onClick}
         disabled={disabled}
         className={[

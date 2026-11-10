@@ -48,7 +48,7 @@ export function AssistantMessageBubble({
     ? "flex justify-start items-end gap-2 mb-3 animate-message-in"
     : "flex justify-start mb-3 animate-message-in";
   return (
-    <div className={rowClass}>
+    <div className={rowClass} data-testid="chat-message-assistant">
       {avatar}
       <div
         className={[

@@ -17,7 +17,12 @@ interface AdminPageHeaderProps {
   title?: string;
   /** Optional accent icon shown to the left of the title; twirls occasionally. */
   icon?: LucideIcon;
+  /**
+   * Target of the primary "Add" button, shown when both this and `addLabel` are
+   * set. The button carries `data-testid="admin-page-header-add"` for the e2e suite.
+   */
   addHref?: string;
+  /** Text of the primary "Add" button. */
   addLabel?: string;
   /** Optional extra action rendered before the "Add" button (e.g. a dialog trigger). */
   secondaryAction?: ReactNode;
@@ -97,7 +102,7 @@ export function AdminPageHeader({
         {columnPicker}
         {secondaryAction}
         {addHref && addLabel && (
-          <Button variant="primary" href={addHref}>
+          <Button variant="primary" href={addHref} data-testid="admin-page-header-add">
             {addLabel}
           </Button>
         )}

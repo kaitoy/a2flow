@@ -183,6 +183,7 @@ export function RunWorkflowDialog({
           <Button
             variant="primary"
             onClick={() => onConfirm({ designSource, toolMockIds: isDraftRun ? selected : [] })}
+            data-testid="run-workflow-submit"
           >
             {t("common.run")}
           </Button>
@@ -245,6 +246,7 @@ export function RunWorkflowDialog({
                     label={mockLabel(mock)}
                     checked={selected.includes(mock.id)}
                     onChange={() => toggle(mock.id)}
+                    data-testid={`run-workflow-mock-${mock.toolName}`}
                   />
                 ))}
               </div>

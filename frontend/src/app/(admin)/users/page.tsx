@@ -269,6 +269,7 @@ export default function UsersPage() {
                   <ActionIconButton
                     icon={UserCog}
                     label={t("users.impersonate")}
+                    data-testid="user-impersonate"
                     onClick={() => handleImpersonate(user.id, user.username)}
                   />
                 )}

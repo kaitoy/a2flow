@@ -14,6 +14,8 @@ export interface StatusDotProps {
   labelClassName?: string;
   /** Extra classes for the wrapping row, for spacing at a given call site. */
   className?: string;
+  /** Test id for the e2e suite, set on the wrapping row. */
+  "data-testid"?: string;
 }
 
 /**
@@ -29,9 +31,13 @@ export function StatusDot({
   label,
   labelClassName = "capitalize",
   className,
+  "data-testid": testId,
 }: StatusDotProps) {
   return (
-    <span className={`flex items-center gap-2${className ? ` ${className}` : ""}`}>
+    <span
+      className={`flex items-center gap-2${className ? ` ${className}` : ""}`}
+      data-testid={testId}
+    >
       <span className={`inline-block size-2 shrink-0 rounded-full ${dotClass}`} aria-hidden />
       <span className={labelClassName}>{label}</span>
     </span>
