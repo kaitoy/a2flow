@@ -29,3 +29,7 @@ def test_verify_password_rejects_overlong_password_instead_of_raising() -> None:
     hashed = hash_password("correct horse battery staple")
 
     assert not verify_password("A" * 100, hashed)
+
+
+def test_verify_password_none_hash_is_false() -> None:
+    assert verify_password("whatever-password", None) is False

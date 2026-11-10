@@ -45,6 +45,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     UniqueConstraint,
+    text,
 )
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
@@ -83,6 +84,9 @@ class UserGroupUpdate(SQLModel):
     #: Ids of the users belonging to this group; ``None`` leaves membership
     #: unchanged on update.
     member_ids: list[str] | None = Field(default=None, max_length=MAX_GROUP_MEMBERS)
+    #: Name of the identity-provider group this group mirrors on SSO sign-in;
+    #: ``None`` for a group not tied to one. Unique within a tenant.
+    idp_group: str | None = Field(default=None, max_length=255)
 
     @field_validator("roles")
     @classmethod
@@ -165,6 +169,14 @@ class UserGroup(TenantScoped, BaseEntity, table=True):
     __table_args__ = (
         UniqueConstraint("tenant_id", "name", name="uq_user_groups_tenant_id_name"),
         Index("ix_user_groups_tenant_id_name", "tenant_id", "name"),
+        Index(
+            "ix_user_groups_tenant_id_idp_group",
+            "tenant_id",
+            "idp_group",
+            unique=True,
+            postgresql_where=text("idp_group IS NOT NULL"),
+            sqlite_where=text("idp_group IS NOT NULL"),
+        ),
         CheckConstraint(
             "CAST(roles AS TEXT) NOT LIKE '%\"super_admin\"%'",
             name="ck_user_groups_no_super_admin",
@@ -173,6 +185,8 @@ class UserGroup(TenantScoped, BaseEntity, table=True):
 
     name: str
     description: str | None = None
+    #: Identity-provider group this group mirrors; see :attr:`UserGroupUpdate.idp_group`.
+    idp_group: str | None = Field(default=None, max_length=255)
     #: Roles granted to every member, stored as a JSON list of :class:`Role`
     #: values — the same representation as ``users.roles``.
     roles: list[str] = Field(
@@ -218,6 +232,8 @@ class UserGroupRead(BaseEntity):
     model_config = _alias_config
     name: str
     description: str | None = None
+    #: Identity-provider group this group mirrors, or ``None``.
+    idp_group: str | None = None
     #: Roles granted to every member of this group.
     roles: list[Role] = []
     #: Ids of the users belonging to this group.

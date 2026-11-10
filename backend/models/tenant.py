@@ -147,6 +147,10 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     without deleting it — and, transitively, without deleting or orphaning
     its users (see ``User.tenant_id``'s ``ON DELETE RESTRICT`` foreign key
     in :mod:`models.user`).
+
+    The ``oidc_*`` columns hold the tenant's OpenID Connect single sign-on
+    configuration. They are plain table columns for now, deliberately absent
+    from the create/update payloads and the read views.
     """
 
     __tablename__ = "tenants"
@@ -163,6 +167,19 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     vault_credential: str | None = None
     #: Fernet ciphertext, like :attr:`vault_credential`.
     global_vault_credential: str | None = None
+    #: Whether members of this tenant may sign in through its OIDC provider.
+    oidc_enabled: bool = False
+    #: Issuer URL of the tenant's OIDC provider (the base of its discovery document).
+    oidc_issuer: str | None = None
+    #: Client id A2Flow is registered under at the provider.
+    oidc_client_id: str | None = None
+    #: Fernet ciphertext of the client secret, never exposed through the API.
+    oidc_client_secret: str | None = None
+    #: Name of the ID-token claim that lists the user's provider groups.
+    oidc_groups_claim: str = "groups"
+    #: Whether the provider's email address is trusted to link an existing
+    #: account that has the same email.
+    oidc_trust_email: bool = False
 
 
 class TenantSettingsUpdate(TenantVaultFields):

@@ -205,6 +205,11 @@ class AuthService:
             # not reveal which accounts exist.
             await asyncio.to_thread(burn_password_check, password)
             raise UnauthorizedError("Invalid username or password")
+        if user.password is None:
+            # An SSO-only account has no hash to check; pay the bcrypt cost
+            # anyway so its existence is not revealed by timing.
+            await asyncio.to_thread(burn_password_check, password)
+            raise UnauthorizedError("Invalid username or password")
         if not await asyncio.to_thread(verify_password, password, user.password):
             raise UnauthorizedError("Invalid username or password")
         return user
