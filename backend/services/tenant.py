@@ -12,6 +12,7 @@ ownership rules to enforce here.
 
 from collections.abc import Sequence
 from typing import Any
+from urllib.parse import urlsplit
 
 from config import get_settings
 from infrastructure.secret_cipher import SecretCipher
@@ -58,9 +59,12 @@ class TenantService:
             payload: The fields the caller set.
 
         Raises:
-            TenantValidationError: If the issuer is not an http(s) URL on a
-                public (or allowlisted) host, or SSO would be enabled without
-                an issuer, a client id and a secret.
+            TenantValidationError: If a changed issuer is not an https URL on a
+                public host (an allowlisted host may also use http, and skips
+                the address check), or SSO would be enabled without an issuer,
+                a client id and a secret. An issuer resent unchanged is not
+                checked again, so a later DNS change cannot block unrelated
+                edits.
         """
         if not any(field.startswith("oidc_") for field in payload):
             return
@@ -78,12 +82,16 @@ class TenantService:
                 payload["oidc_client_secret"] = None
             else:
                 payload["oidc_client_secret"] = self._cipher.encrypt(secret)
-        if payload.get("oidc_issuer"):
+        issuer = payload.get("oidc_issuer")
+        if issuer and issuer != getattr(current, "oidc_issuer", None):
+            allowed = get_settings().oidc_allowed_private_hosts
+            parts = urlsplit(issuer)
             try:
-                assert_public_http_url(
-                    payload["oidc_issuer"],
-                    allowed_hosts=get_settings().oidc_allowed_private_hosts,
-                )
+                if parts.scheme != "https" and (parts.hostname or "").lower() not in (
+                    allowed
+                ):
+                    raise ValueError("the issuer must use https")
+                assert_public_http_url(issuer, allowed_hosts=allowed)
             except ValueError as exc:
                 raise TenantValidationError(
                     f"oidcIssuer is not allowed: {exc}"

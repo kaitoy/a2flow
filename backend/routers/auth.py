@@ -308,6 +308,8 @@ async def oidc_start(
     comparison, so a backend that never sees the public origin (no trusted proxy
     headers) costs one extra redirect rather than a redirect loop. Otherwise it is sent to the identity
     provider with the encrypted state cookie, scoped to the callback path.
+    A request the browser marks ``Sec-Fetch-Site: cross-site`` is refused the
+    same way, so another site cannot sign a visitor in to an account it chose.
     Every failure -- including an unexpected one -- redirects to the login page
     with ``sso_error=unavailable``, which never reveals whether a tenant exists.
 
@@ -317,6 +319,8 @@ async def oidc_start(
         tenant: The tenant name typed on the login screen.
         hop: Marker set by the origin redirect; its presence disables a second one.
     """
+    if request.headers.get("sec-fetch-site") == "cross-site":
+        return RedirectResponse(_sso_error(SsoErrorCode.unavailable), status_code=302)
     try:
         base_url = await service.app_base_url()
         if (

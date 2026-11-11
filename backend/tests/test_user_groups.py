@@ -635,6 +635,21 @@ async def test_empty_idp_group_is_rejected(
     assert_err(response, "VALIDATION_ERROR", 422)
 
 
+async def test_idp_group_is_trimmed_and_blank_rejected(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    group = await _create(client, idpGroup="  eng  ")
+    assert group["idpGroup"] == "eng"
+    for blank in ("   ", "	"):
+        response = await client.patch(
+            f"/api/v1/user-groups/{group['id']}",
+            json={"idpGroup": blank},
+            headers=ADMIN,
+        )
+        assert_err(response, "VALIDATION_ERROR", 422)
+
+
 async def test_mapped_group_members_cannot_change(
     group_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:

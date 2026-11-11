@@ -22,6 +22,7 @@ from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
 from models.user_group import UserGroup, UserGroupMember
 from repositories.auth_session import SqlAuthSessionRepository
+from repositories.exceptions import UnauthorizedError
 from repositories.login_failure import SqlLoginFailureRepository
 from repositories.system_settings import SqlSystemSettingsRepository
 from repositories.tenant import SqlTenantRepository
@@ -276,12 +277,12 @@ async def test_links_existing_user_by_verified_email(ctx: Ctx) -> None:
 @pytest.mark.asyncio
 async def test_unverified_email_not_linked_unless_trusted(ctx: Ctx) -> None:
     alice = await add_user(ctx, "alice", "a@x.com")
-    result = await run_flow(
+    # Untrusted and an account already owns the address: refused, no second account.
+    code = await refused(
         ctx, sub="s1", email="a@x.com", groups=["eng"], preferred_username="alice"
     )
-    assert result.user.id != alice.id
-    assert result.user.username == "alice-2"
-    assert result.user.email_verified is False
+    assert code == SsoErrorCode.failed
+    assert await user_count(ctx) == 1
     assert alice.oidc_subject is None
 
     bob = await add_user(ctx, "bob", "b@x.com")
@@ -293,6 +294,70 @@ async def test_unverified_email_not_linked_unless_trusted(ctx: Ctx) -> None:
     linked = await run_flow(ctx, sub="s2", email="b@x.com", groups=["eng"])
     assert linked.user.id == bob.id
     assert linked.user.oidc_subject == "s2"
+
+
+@pytest.mark.asyncio
+async def test_unusable_email_is_failed_and_creates_nothing(ctx: Ctx) -> None:
+    for bad in ("alice@corp.local", "not-an-address"):
+        code = await refused(ctx, sub="s1", email=bad, groups=["eng"])
+        assert code == SsoErrorCode.failed
+    assert await user_count(ctx) == 0
+
+
+@pytest.mark.asyncio
+async def test_other_tenant_rows_never_match(ctx: Ctx) -> None:
+    ctx.db.add(
+        Tenant(
+            id="t-beta",
+            name="beta",
+            display_name="Beta",
+            enabled=True,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+    )
+    await ctx.db.commit()
+    beta = [
+        User(
+            username=name,
+            first_name="B",
+            last_name="B",
+            password=None,
+            email=email,
+            oidc_subject=subject,
+            tenant_id="t-beta",
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        for name, email, subject in (
+            ("bsub", "other@beta.com", "s1"),
+            ("bmail", "a@x.com", None),
+        )
+    ]
+    ctx.db.add_all(beta)
+    await ctx.db.commit()
+
+    result = await run_flow(
+        ctx, sub="s1", email="a@x.com", email_verified=True, groups=["eng"]
+    )
+    assert result.user.tenant_id == TENANT_ID
+    assert result.user.id not in {u.id for u in beta}
+    for u in beta:
+        await ctx.db.refresh(u)
+    assert [(u.oidc_subject) for u in beta] == ["s1", None]
+    assert await user_count(ctx) == 1
+
+
+@pytest.mark.asyncio
+async def test_password_login_as_sso_only_user_burns_a_check(
+    ctx: Ctx, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await add_user(ctx, "alice", "a@x.com", oidc_subject="s1")
+    burned: list[str] = []
+    monkeypatch.setattr("services.auth.burn_password_check", burned.append)
+    with pytest.raises(UnauthorizedError):
+        await ctx.auth.login("alice", PASSWORD, tenant_name="acme")
+    assert burned == [PASSWORD]
 
 
 @pytest.mark.asyncio

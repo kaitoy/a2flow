@@ -10,9 +10,11 @@ password login does.
 
 Every refusal is a :class:`SsoLoginError` with one of four public codes; the
 reason goes to the server log at ``warning`` only. Every refusal is decided
-before the first write, so none leaves a half-provisioned user behind. ``start``
-answers ``unavailable`` for every reason SSO cannot begin, so it never reveals
-whether a tenant exists.
+before the first write, so none leaves a half-provisioned user behind. That
+includes an e-mail that is not a usable address (the admin UI could never save
+such a user) and a new account whose e-mail an existing account already has.
+``start`` answers ``unavailable`` for every reason SSO cannot begin, so it never
+reveals whether a tenant exists.
 """
 
 import json
@@ -23,6 +25,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
+
+from pydantic import EmailStr, TypeAdapter, ValidationError
 
 from infrastructure.oidc_client import (
     OidcClient,
@@ -51,6 +55,7 @@ _USERNAME_DROP = re.compile(r"[^a-zA-Z0-9._-]")
 _USERNAME_MAX = 64
 _NAME_MAX = 100
 _SUBJECT_MAX = 255
+_EMAIL: TypeAdapter[str] = TypeAdapter(EmailStr)
 
 
 class SsoErrorCode(StrEnum):
@@ -352,6 +357,12 @@ class OidcLoginService:
         email = _text(claims.get("email"))
         if not email:
             raise _refuse(SsoErrorCode.failed, tenant.id, "no e-mail claim")
+        try:
+            _EMAIL.validate_python(email)
+        except ValidationError as exc:
+            raise _refuse(
+                SsoErrorCode.failed, tenant.id, "unusable e-mail claim"
+            ) from exc
         key = email.casefold()
         matches = [
             u
@@ -376,9 +387,11 @@ class OidcLoginService:
         mapped = await groups_repo.list_mapped()
         if not any(g.idp_group in idp_groups for g in mapped):
             raise _refuse(SsoErrorCode.not_permitted, tenant.id, "no mapped group")
-        if len(matches) > len(unlinked):
+        if matches:
+            # Untrusted e-mail, or one already tied to another subject: never
+            # mint a second account for an address the tenant already holds.
             raise _refuse(
-                SsoErrorCode.failed, tenant.id, "e-mail linked to another subject"
+                SsoErrorCode.failed, tenant.id, "e-mail already used by an account"
             )
 
         username = await self._free_username(

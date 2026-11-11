@@ -86,8 +86,30 @@ class UserGroupUpdate(SQLModel):
     member_ids: list[str] | None = Field(default=None, max_length=MAX_GROUP_MEMBERS)
     #: Name of the identity-provider group this group mirrors on SSO sign-in;
     #: ``None`` for a group not tied to one. Unique within a tenant.
-    #: Never empty: an empty string would count as "mapped" yet match no group.
+    #: Never empty or blank: such a value would count as "mapped" yet match no
+    #: group; surrounding whitespace is trimmed.
     idp_group: str | None = Field(default=None, min_length=1, max_length=255)
+
+    @field_validator("idp_group")
+    @classmethod
+    def _strip_idp_group(cls, idp_group: str | None) -> str | None:
+        """Trim surrounding whitespace, so a stray space cannot make a mapping dead.
+
+        Args:
+            idp_group: The submitted IdP group name, or ``None`` for no mapping.
+
+        Returns:
+            The trimmed name, or ``None`` when none was submitted.
+
+        Raises:
+            ValueError: If the name is empty after trimming.
+        """
+        if idp_group is None:
+            return None
+        idp_group = idp_group.strip()
+        if not idp_group:
+            raise ValueError("idp_group must not be blank")
+        return idp_group
 
     @field_validator("roles")
     @classmethod

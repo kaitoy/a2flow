@@ -355,6 +355,41 @@ async def test_oidc_issuer_private_host_allowed_by_env(
     assert body["oidcIssuer"] == "http://keycloak.internal/realms/a"
 
 
+async def test_oidc_issuer_plain_http_needs_allowlisted_host(
+    settings_client: AsyncClient,
+) -> None:
+    assert_err(
+        await settings_client.patch(
+            _PATH, json={"oidcIssuer": "http://idp.example.com/realms/a"}
+        ),
+        code="INVALID_TENANT",
+        status=422,
+    )
+
+
+async def test_oidc_issuer_not_rechecked_when_unchanged(
+    settings_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    issuer = "https://idp.example.com/realms/a"
+    assert_ok(await settings_client.patch(_PATH, json={"oidcIssuer": issuer}))
+    # The stored host now resolves to a private address: resending it unchanged
+    # alongside an unrelated edit must still save, a different one must not.
+    monkeypatch.setattr(url_safety, "resolve_host", lambda host: ["10.0.0.5"])
+    body = assert_ok(
+        await settings_client.patch(
+            _PATH, json={"oidcIssuer": issuer, "oidcClientId": "other"}
+        )
+    )
+    assert body["oidcClientId"] == "other"
+    assert_err(
+        await settings_client.patch(
+            _PATH, json={"oidcIssuer": "https://idp2.example.com/realms/a"}
+        ),
+        code="INVALID_TENANT",
+        status=422,
+    )
+
+
 async def _link_user(
     engine: AsyncEngine, user_id: str, tenant_id: str = DEFAULT_TEST_TENANT_ID
 ) -> None:

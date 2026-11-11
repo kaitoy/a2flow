@@ -203,6 +203,32 @@ async def test_start_redirects_to_app_base_url_origin(ctx: Ctx) -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_refuses_cross_site_navigation(ctx: Ctx) -> None:
+    """A page on another site must not be able to start a sign-in (login CSRF)."""
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start",
+        params={"tenant": "acme"},
+        headers={"Sec-Fetch-Site": "cross-site"},
+    )
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "/login?sso_error=unavailable"
+    assert STATE_COOKIE_NAME not in set_cookies(resp)
+    assert ctx.fake.requests == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("site", ["same-origin", "same-site", "none"])
+async def test_start_allows_same_site_and_user_initiated(ctx: Ctx, site: str) -> None:
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start",
+        params={"tenant": "acme"},
+        headers={"Sec-Fetch-Site": site},
+    )
+    assert resp.headers["location"].startswith(f"{ISSUER}/authorize?")
+    assert STATE_COOKIE_NAME in set_cookies(resp)
+
+
+@pytest.mark.asyncio
 async def test_start_hops_to_app_base_url_only_once(ctx: Ctx) -> None:
     await set_app_base_url(ctx, "https://a2.example.com")
     resp = await ctx.client.get(
