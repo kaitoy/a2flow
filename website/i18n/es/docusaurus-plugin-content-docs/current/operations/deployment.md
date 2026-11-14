@@ -38,6 +38,8 @@ Hay tres ajustes cuyos valores predeterminados solo sirven para el desarrollo lo
 | `CORS_ORIGINS` | El origen de cara al navegador, p. ej. `https://a2flow.example.com` | Solo `http://localhost:3000` puede llamar a la API |
 | `APP_BASE_URL` | El mismo origen | Los correos de notificación se envían sin los enlaces directos a la aplicación; consulta [Correo de notificación](./configuration.md#notification-email) |
 
+La pila de Docker Compose incluye un ejemplo funcional: [Servir por HTTPS](../getting-started/docker-compose.md#https) coloca un proxy que termina TLS delante del servicio `ingress` y define los tres valores.
+
 ## Disposición de procesos {#process-layout}
 
 Junto a la API, un despliegue ejecuta el [proxy MCP](../architecture/mcp-gateway-and-proxy.md#the-sandbox): el proceso que realmente inicia los servidores MCP que un tenant ha registrado o se conecta a ellos. Mantenerlo separado es precisamente el objetivo: es donde se ejecuta código de terceros, así que no tiene acceso a la base de datos, ni clave de cifrado de secretos, ni clave de API del LLM. `compose.yml` lo ejecuta como el contenedor `mcp-proxy`, en una red que solo comparte con la API, por lo que no puede llegar a la base de datos en absoluto; un despliegue que monte sus propios contenedores debería mantener el proxy fuera de la red de la base de datos de la misma forma, y configurarlo en [Proxy MCP](./configuration.md#mcp-sandbox).

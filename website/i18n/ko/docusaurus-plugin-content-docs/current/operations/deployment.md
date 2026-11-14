@@ -38,6 +38,8 @@ SSE 에이전트 라우트(`POST /api/v1/workflow-executions/{id}/agent`와 `POS
 | `CORS_ORIGINS` | 브라우저에서 접근하는 오리진(예: `https://a2flow.example.com`) | `http://localhost:3000`만 API를 호출할 수 있습니다 |
 | `APP_BASE_URL` | 같은 오리진 | 알림 이메일이 앱으로 돌아가는 딥 링크 없이 전송됩니다. [알림 이메일](./configuration.md#notification-email)을 참조하세요 |
 
+Docker Compose 스택에 동작하는 예가 있습니다. [HTTPS로 제공하기](../getting-started/docker-compose.md#https)는 `ingress` 서비스 앞에 TLS를 종료하는 프록시를 두고 세 가지를 모두 설정합니다.
+
 ## 프로세스 구성 {#process-layout}
 
 배포에서는 API와 함께 [MCP 프록시](../architecture/mcp-gateway-and-proxy.md#the-sandbox)를 실행합니다. 테넌트가 등록한 MCP 서버를 실제로 시작하거나 연결하는 프로세스입니다. 분리하는 것이 핵심입니다. 제3자 코드가 실행되는 곳이므로 데이터베이스 접근 권한도, 시크릿 암호화 키도, LLM API 키도 갖지 않습니다. `compose.yml`은 이를 `mcp-proxy` 컨테이너로, API와만 공유하는 네트워크에서 실행하므로 데이터베이스에 아예 접근할 수 없습니다. 컨테이너를 직접 구성하는 배포도 같은 방식으로 프록시를 데이터베이스 네트워크에서 분리하고 [MCP 프록시](./configuration.md#mcp-sandbox)에서 구성해야 합니다.

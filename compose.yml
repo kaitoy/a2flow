@@ -21,7 +21,8 @@
 # /openapi.json to the backend and everything else to the frontend -- one
 # origin, so the auth cookies stay same-origin, and the SSE streams never pass
 # through Node.js. Set APP_PORT in .env to publish the app on a different host
-# port; CORS_ORIGINS below follows it automatically.
+# port; CORS_ORIGINS below follows it automatically. To serve it over HTTPS
+# instead, add the Caddy front in compose.https.yml (see that file).
 #
 # Optional OpenBao (a Vault-compatible secret store) to try the Vault
 # integration against, its data kept in the `db` service below:

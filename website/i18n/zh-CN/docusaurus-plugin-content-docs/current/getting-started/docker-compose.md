@@ -26,11 +26,36 @@ docker compose up --build
 | **mcp-proxy** | 运行您注册的 [MCP 服务器](../guides/mcp-servers.md)，参阅[为什么要单独运行](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |
 | **ingress** | 浏览器访问的入口。把界面请求发送给前端，把 API 请求直接发送给后端 |
 | **frontend** | 您所操作的界面 |
+| **caddy** | 仅在使用 `compose.https.yml` 时启动，参阅[通过 HTTPS 提供服务](#https) |
 | **openbao** | 仅在使用 `--profile openbao` 时启动，参阅[使用 OpenBao 试用 Vault 密钥](#openbao) |
 
-只有 ingress（以及启用该 profile 时 OpenBao 的 UI）可以从外部访问；其余容器通过 Docker 内部网络相互通信。
+只有 ingress（使用 `compose.https.yml` 时改为 Caddy；启用该 profile 时还有 OpenBao 的 UI）可以从外部访问；其余容器通过 Docker 内部网络相互通信。
 
 首次启动比之后的启动耗时更长：需要构建镜像、创建数据库架构，而且 MCP 代理服务器要等后端发给它所需的证书之后才会开始接受请求。
+
+## 通过 HTTPS 提供服务 {#https}
+
+加上 `compose.https.yml` 后，[Caddy](https://caddyserver.com/) 会放在 ingress 前面。它成为唯一的入口，监听 80 和 443 端口，获取证书，并把明文 HTTP 重定向到 HTTPS。后端也会同时切换为 HTTPS 设置：Cookie 带上 Secure，允许的源改为 HTTPS，[系统设置](../guides/system-settings.md)中的 **应用基础 URL** 也改为 HTTPS 地址。[单点登录](../guides/single-sign-on.md)的 **重定向 URI** 就是根据这个值生成的。
+
+```bash
+echo APP_DOMAIN=a2flow.example.com >> .env
+docker compose -f compose.yml -f compose.https.yml up --build
+```
+
+打开 `https://` 加上 `APP_DOMAIN` 的值。之后的行为取决于这个名称：
+
+| `APP_DOMAIN` | 证书 | 开始之前 |
+|---|---|---|
+| 公网主机名 | 从 Let's Encrypt 获取并自动续期 | 将该名称的 DNS 指向本主机，并确保 80 和 443 端口可从互联网访问 |
+| 未设置（`localhost`） | 由 Caddy 自行创建的证书颁发机构签发 | 无需准备，但在信任该颁发机构之前，浏览器会显示证书警告（见下文） |
+
+要让浏览器信任 `https://localhost`，请取出该颁发机构的根证书，并添加到操作系统或浏览器的受信任根证书中：
+
+```bash
+docker compose -f compose.yml -f compose.https.yml cp caddy:/data/caddy/pki/authorities/local/root.crt .
+```
+
+证书和本地颁发机构保存在 `caddy-data` 卷中。请保留它：删除后会重新签发证书，已经信任的根证书也将不再匹配。
 
 ## 使用 OpenBao 试用 Vault 密钥 {#openbao}
 

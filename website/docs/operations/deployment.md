@@ -38,6 +38,8 @@ Three settings default to values that only suit local HTTP development. Change a
 | `CORS_ORIGINS` | The browser-facing origin, e.g. `https://a2flow.example.com` | Only `http://localhost:3000` is allowed to call the API |
 | `APP_BASE_URL` | The same origin | Notification email is sent without the deep links back into the app — see [Notification email](./configuration.md#notification-email) |
 
+The Docker Compose stack has a working example: [Serve over HTTPS](../getting-started/docker-compose.md#https) puts a TLS-terminating proxy in front of the `ingress` service and sets all three.
+
 ## Process layout
 
 Alongside the API, a deployment runs the [MCP proxy](../architecture/mcp-gateway-and-proxy.md#the-sandbox): the process that actually starts or connects to the MCP servers a tenant has registered. Keeping it separate is the point — it is where third-party code runs, so it holds no database access, no secret encryption key and no LLM API key. `compose.yml` runs it as the `mcp-proxy` container, on a network it shares only with the API, so it cannot reach the database at all; a deployment that assembles its own containers should keep the proxy off the database's network the same way, and configure it under [MCP proxy](./configuration.md#mcp-sandbox).

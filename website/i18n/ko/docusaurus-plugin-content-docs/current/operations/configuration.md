@@ -22,6 +22,7 @@ sidebar_position: 2
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | 리버스 프록시가 먼저 `/api/*`를 백엔드로 라우팅하지 않을 때(컨테이너 없이 실행할 때) 프런트엔드가 `/api/*`를 전달하는 대상이며, API 문서 페이지가 로그인한 세션을 확인하는 대상이기도 합니다. 프로세스 시작 시 한 번만 읽습니다. Docker Compose 스택에서는 공개 주소가 아니라 내부 네트워크상의 백엔드 주소입니다 |
 | `APP_PORT` | `3000` | Docker Compose 전용입니다. 앱이 공개되는 호스트 포트, 즉 화면과 API를 모두 제공하는 `ingress` 서비스의 포트입니다. 백엔드의 `CORS_ORIGINS`는 자동으로 이 값을 따릅니다 |
+| `APP_DOMAIN` | `localhost` | `compose.https.yml`을 사용하는 Docker Compose 전용입니다. HTTPS로 앱을 제공하는 호스트 이름입니다. 공개 이름이면 Let's Encrypt에서, `localhost`이면 로컬 인증 기관에서 인증서를 받습니다. 백엔드의 `CORS_ORIGINS`와 `APP_BASE_URL`은 자동으로 이 값을 따르고, `SESSION_COOKIE_SECURE`는 켜집니다. [HTTPS로 제공하기](../getting-started/docker-compose.md#https)를 참조하세요 |
 | `OPENBAO_PORT` | `8200` | `--profile openbao`를 사용하는 Docker Compose 전용입니다. OpenBao UI가 공개되는 호스트 포트입니다. [OpenBao로 Vault 시크릿 사용해 보기](../getting-started/docker-compose.md#openbao)를 참조하세요. A2Flow는 이 값과 관계없이 내부 네트워크로 접근합니다 |
 
 ## 애플리케이션 데이터베이스 {#application-database}

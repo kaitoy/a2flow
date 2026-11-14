@@ -22,6 +22,7 @@ sidebar_position: 2
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | リバースプロキシが先に `/api/*` をバックエンドへ振り分けない構成(コンテナを使わずに動かすとき)で、フロントエンドが `/api/*` を転送する先。API ドキュメントのページがログイン中のセッションを確かめる先でもあります。プロセス起動時に一度だけ読まれます。Docker Compose の構成では、公開アドレスではなく内部ネットワーク上のバックエンドのアドレスです |
 | `APP_PORT` | `3000` | Docker Compose 専用。アプリを公開するホスト側のポートです。画面と API の両方を受け持つ `ingress` サービスのポートで、バックエンドの `CORS_ORIGINS` は自動的にこれに追従します |
+| `APP_DOMAIN` | `localhost` | Docker Compose で `compose.https.yml` を使うときだけ有効です。HTTPS でアプリを公開するホスト名です。公開されたホスト名なら Let's Encrypt から、`localhost` ならローカルの認証局から証明書を取得します。バックエンドの `CORS_ORIGINS` と `APP_BASE_URL` は自動でこの値に合わせられ、`SESSION_COOKIE_SECURE` は有効になります。[HTTPS で公開する](../getting-started/docker-compose.md#https)を参照してください |
 | `OPENBAO_PORT` | `8200` | Docker Compose で `--profile openbao` を付けたときだけ使います。OpenBao の UI を公開するホスト側のポートです。[OpenBao で Vault 型シークレットを試す](../getting-started/docker-compose.md#openbao)を参照してください。A2Flow はこの値に関係なく内部ネットワーク経由でアクセスします |
 
 ## アプリケーションのデータベース {#application-database}

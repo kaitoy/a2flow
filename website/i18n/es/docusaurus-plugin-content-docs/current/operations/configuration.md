@@ -22,6 +22,7 @@ Todos los ajustes siguientes son variables de entorno. El backend las lee de `ba
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | Adónde reenvía el frontend `/api/*` cuando ningún proxy inverso lo dirige antes al backend (al trabajar sin contenedores), y dónde comprueba la sesión iniciada la página de documentación de la API. Se lee una vez al iniciar el proceso. En la pila de Docker Compose es la dirección del backend en la red interna, no una pública |
 | `APP_PORT` | `3000` | Solo para Docker Compose: el puerto del host en el que se publica la aplicación, es decir, el del servicio `ingress`, que sirve tanto las pantallas como la API. `CORS_ORIGINS` del backend lo sigue automáticamente |
+| `APP_DOMAIN` | `localhost` | Solo para Docker Compose, con `compose.https.yml`: el nombre de host en el que se sirve la aplicación por HTTPS. Un nombre público obtiene un certificado de Let's Encrypt; `localhost`, uno de una autoridad de certificación local. `CORS_ORIGINS` y `APP_BASE_URL` del backend lo siguen automáticamente, y `SESSION_COOKIE_SECURE` se activa; consulta [Servir por HTTPS](../getting-started/docker-compose.md#https) |
 | `OPENBAO_PORT` | `8200` | Solo para Docker Compose, con `--profile openbao`: el puerto del host en el que se publica la interfaz de OpenBao; consulta [Probar secretos de Vault con OpenBao](../getting-started/docker-compose.md#openbao). A2Flow accede a él por la red interna en cualquier caso |
 
 ## Base de datos de la aplicación {#application-database}

@@ -38,6 +38,8 @@ SSE のエージェントルート(`POST /api/v1/workflow-executions/{id}/agent`
 | `CORS_ORIGINS` | ブラウザから見える origin(例 `https://a2flow.example.com`) | API を呼べるのは `http://localhost:3000` だけです |
 | `APP_BASE_URL` | 同じ origin | 通知メールがアプリへのリンクなしで送られます。[通知メール](./configuration.md#notification-email)を参照してください |
 
+Docker Compose 構成には動作例があります。[HTTPS で公開する](../getting-started/docker-compose.md#https)の手順では、`ingress` サービスの前に TLS を終端するプロキシを置き、この 3 つをすべて設定します。
+
 ## プロセス構成 {#process-layout}
 
 API と並んで、デプロイでは [MCP プロキシ](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を動かします。テナントが登録した MCP サーバーを実際に起動したり接続したりするプロセスです。分けていること自体が目的で、第三者のコードが動く場所なので、データベースへのアクセスもシークレット暗号鍵も LLM の API キーも持ちません。`compose.yml` では `mcp-proxy` コンテナとして、API とだけ共有するネットワーク上で動くため、データベースにはそもそも接続できません。コンテナを自前で組む場合も同様にプロキシをデータベースのネットワークから外し、[MCP プロキシ](./configuration.md#mcp-sandbox)で設定します。

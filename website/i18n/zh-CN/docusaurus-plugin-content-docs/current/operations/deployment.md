@@ -38,6 +38,8 @@ SSE 代理路由（`POST /api/v1/workflow-executions/{id}/agent` 和 `POST /api/
 | `CORS_ORIGINS` | 面向浏览器的源，例如 `https://a2flow.example.com` | 只有 `http://localhost:3000` 可以调用 API |
 | `APP_BASE_URL` | 同一个源 | 通知邮件发出时不带返回应用的深层链接，请参阅[通知邮件](./configuration.md#notification-email) |
 
+Docker Compose 栈中有一个可用的示例：[通过 HTTPS 提供服务](../getting-started/docker-compose.md#https)在 `ingress` 服务前放置一个终止 TLS 的代理，并设置全部三项。
+
 ## 进程布局 {#process-layout}
 
 除 API 之外，部署还要运行 [MCP 代理服务器](../architecture/mcp-gateway-and-proxy.md#the-sandbox)：这个进程负责实际启动或连接租户注册的 MCP 服务器。将它分离出来正是目的所在：第三方代码在这里运行，因此它没有数据库访问权限，也不持有密钥加密密钥和 LLM API 密钥。`compose.yml` 将它作为 `mcp-proxy` 容器运行，所在网络只与 API 共享，因此根本无法访问数据库；自行组装容器的部署同样应让 MCP 代理服务器远离数据库所在的网络，并在 [MCP 代理服务器](./configuration.md#mcp-sandbox)下进行配置。

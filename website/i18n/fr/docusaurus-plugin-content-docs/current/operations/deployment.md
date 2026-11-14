@@ -38,6 +38,8 @@ Trois paramètres ont des valeurs par défaut qui ne conviennent qu'au développ
 | `CORS_ORIGINS` | L'origine vue par le navigateur, p. ex. `https://a2flow.example.com` | Seul `http://localhost:3000` est autorisé à appeler l'API |
 | `APP_BASE_URL` | La même origine | Les e-mails de notification sont envoyés sans les liens directs vers l'application ; consultez [E-mails de notification](./configuration.md#notification-email) |
 
+La pile Docker Compose en donne un exemple fonctionnel : [Servir en HTTPS](../getting-started/docker-compose.md#https) place un proxy qui termine TLS devant le service `ingress` et définit les trois.
+
 ## Organisation des processus {#process-layout}
 
 En plus de l'API, un déploiement exécute le [proxy MCP](../architecture/mcp-gateway-and-proxy.md#the-sandbox) : le processus qui démarre réellement les serveurs MCP enregistrés par un tenant ou s'y connecte. Cette séparation est tout l'intérêt du dispositif : c'est là que s'exécute le code tiers, si bien que ce processus n'a ni accès à la base de données, ni clé de chiffrement des secrets, ni clé d'API de LLM. `compose.yml` l'exécute dans le conteneur `mcp-proxy`, sur un réseau qu'il ne partage qu'avec l'API, de sorte qu'il ne peut pas du tout atteindre la base de données. Un déploiement qui assemble ses propres conteneurs doit de même tenir le proxy à l'écart du réseau de la base de données, et le configurer sous [Proxy MCP](./configuration.md#mcp-sandbox).

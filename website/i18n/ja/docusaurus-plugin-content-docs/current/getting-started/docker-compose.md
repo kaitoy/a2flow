@@ -26,11 +26,36 @@ docker compose up --build
 | **mcp-proxy** | 登録した [MCP サーバー](../guides/mcp-servers.md)を実行します。分けている理由は[登録したサーバーが動く場所](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を参照してください |
 | **ingress** | ブラウザが話す入口。画面のリクエストはフロントエンドへ、API のリクエストはバックエンドへ直接送ります |
 | **frontend** | 実際に操作する画面 |
+| **caddy** | `compose.https.yml` を使ったときだけ起動します。[HTTPS で公開する](#https)を参照してください |
 | **openbao** | `--profile openbao` を付けたときだけ起動します。[OpenBao で Vault 型シークレットを試す](#openbao)を参照してください |
 
-外から到達できるのは ingress(プロファイル指定時は OpenBao の UI も)だけで、残りは Docker の内部ネットワークでやり取りします。
+外から到達できるのは ingress(`compose.https.yml` を使うときは代わりに Caddy、プロファイル指定時は OpenBao の UI も)だけで、残りは Docker の内部ネットワークでやり取りします。
 
 初回の起動は 2 回目以降より時間がかかります。イメージのビルド、データベースのスキーマ作成に加えて、MCP プロキシがバックエンドから必要な証明書を受け取るまで待ってから受付を始めるためです。
+
+## HTTPS で公開する {#https}
+
+`compose.https.yml` を追加すると、ingress の前に [Caddy](https://caddyserver.com/) が置かれます。Caddy がポート 80 と 443 で唯一の入口になり、証明書を取得して、平文の HTTP を HTTPS にリダイレクトします。同時にバックエンドも HTTPS 用の設定に切り替わります。Cookie に Secure が付き、許可するオリジンが HTTPS になり、[システム設定](../guides/system-settings.md)の **アプリケーションのベース URL** も HTTPS のアドレスになります。[シングルサインオン](../guides/single-sign-on.md)の **リダイレクト URI** はこの値から作られます。
+
+```bash
+echo APP_DOMAIN=a2flow.example.com >> .env
+docker compose -f compose.yml -f compose.https.yml up --build
+```
+
+`https://` に続けて `APP_DOMAIN` の値を開きます。その後の動きは `APP_DOMAIN` によって変わります。
+
+| `APP_DOMAIN` | 証明書 | 始める前に |
+|---|---|---|
+| 公開されたホスト名 | Let's Encrypt から取得し、自動で更新します | そのホスト名の DNS をこのホストに向け、ポート 80 と 443 にインターネットから到達できるようにします |
+| 未設定(`localhost`) | Caddy が自分で作る認証局が発行します | 不要です。ただし、その認証局を信頼するまでブラウザが証明書の警告を出します(下記) |
+
+ブラウザに `https://localhost` を信頼させるには、認証局のルート証明書を取り出して、OS かブラウザの信頼されたルート証明書に追加します。
+
+```bash
+docker compose -f compose.yml -f compose.https.yml cp caddy:/data/caddy/pki/authorities/local/root.crt .
+```
+
+証明書とローカルの認証局は `caddy-data` ボリュームに保存されます。このボリュームは消さないでください。消すと証明書が発行し直され、信頼済みのルート証明書とも合わなくなります。
 
 ## OpenBao で Vault 型シークレットを試す {#openbao}
 

@@ -26,11 +26,36 @@ Define `APP_PORT` en `.env` para publicar la aplicación en otro puerto del host
 | **mcp-proxy** | Ejecuta los [servidores MCP](../guides/mcp-servers.md) que registras; consulta [por qué está separado](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |
 | **ingress** | El punto de entrada con el que se comunica tu navegador. Envía las solicitudes de las pantallas al frontend y las solicitudes de la API directamente al backend |
 | **frontend** | Las pantallas que utilizas |
+| **caddy** | Solo con `compose.https.yml`; consulta [Servir por HTTPS](#https) |
 | **openbao** | Solo con `--profile openbao`; consulta [Probar secretos de Vault con OpenBao](#openbao) |
 
-Solo se puede acceder desde fuera al ingress (y, con el perfil, a la interfaz de OpenBao); el resto se comunica por la red interna de Docker.
+Solo se puede acceder desde fuera al ingress —o a Caddy en su lugar, con `compose.https.yml`— (y, con el perfil, a la interfaz de OpenBao); el resto se comunica por la red interna de Docker.
 
 El primer inicio tarda más que los siguientes: se compilan las imágenes, se crea el esquema de la base de datos y el proxy MCP espera a que el backend le entregue el certificado que necesita antes de aceptar nada.
+
+## Servir por HTTPS {#https}
+
+Al añadir `compose.https.yml`, [Caddy](https://caddyserver.com/) se coloca delante del ingress. Pasa a ser el único punto de entrada, en los puertos 80 y 443, obtiene un certificado y redirige el HTTP sin cifrar a HTTPS. Al mismo tiempo, el backend cambia a la configuración para HTTPS: cookies seguras, el origen HTTPS y la **URL base de la aplicación** de [Configuración del sistema](../guides/system-settings.md), a partir de la cual el [inicio de sesión único](../guides/single-sign-on.md) construye su **URI de redirección**.
+
+```bash
+echo APP_DOMAIN=a2flow.example.com >> .env
+docker compose -f compose.yml -f compose.https.yml up --build
+```
+
+Abre `https://` seguido de tu `APP_DOMAIN`. Lo que ocurre después depende de ese nombre:
+
+| `APP_DOMAIN` | Certificado | Antes de empezar |
+|---|---|---|
+| Un nombre de host público | Se obtiene de Let's Encrypt y se renueva automáticamente | Haz que el DNS del nombre apunte a este host y que los puertos 80 y 443 sean accesibles desde internet |
+| Sin definir (`localhost`) | Lo emite una autoridad de certificación que Caddy crea para sí mismo | Nada, aunque el navegador avisa del certificado hasta que confíes en esa autoridad (ver abajo) |
+
+Para que el navegador confíe en `https://localhost`, copia el certificado raíz de la autoridad y añádelo a los certificados raíz de confianza de tu sistema operativo o navegador:
+
+```bash
+docker compose -f compose.yml -f compose.https.yml cp caddy:/data/caddy/pki/authorities/local/root.crt .
+```
+
+Los certificados y la autoridad local se guardan en el volumen `caddy-data`. Consérvalo: si lo eliminas, se emiten certificados nuevos y el certificado raíz en el que ya confiabas deja de coincidir.
 
 ## Probar secretos de Vault con OpenBao {#openbao}
 

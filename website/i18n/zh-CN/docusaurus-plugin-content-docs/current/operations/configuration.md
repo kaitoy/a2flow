@@ -22,6 +22,7 @@ sidebar_position: 2
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | 没有反向代理先把 `/api/*` 路由到后端时（不使用容器运行），前端转发 `/api/*` 的目标地址；API 文档页面也通过它检查已登录的会话。仅在进程启动时读取一次。在 Docker Compose 部署中，这是后端在内部网络上的地址，而不是公开地址 |
 | `APP_PORT` | `3000` | 仅限 Docker Compose：应用发布到主机上的端口，即同时提供界面和 API 的 `ingress` 服务的端口。后端的 `CORS_ORIGINS` 会自动跟随此值 |
+| `APP_DOMAIN` | `localhost` | 仅限 Docker Compose 且使用 `compose.https.yml` 时：通过 HTTPS 提供应用的主机名。公网名称从 Let's Encrypt 获取证书，`localhost` 则从本地证书颁发机构获取。后端的 `CORS_ORIGINS` 和 `APP_BASE_URL` 会自动跟随此值，`SESSION_COOKIE_SECURE` 会被启用，请参阅[通过 HTTPS 提供服务](../getting-started/docker-compose.md#https) |
 | `OPENBAO_PORT` | `8200` | 仅限 Docker Compose 且使用 `--profile openbao` 时：OpenBao 界面发布到主机上的端口，请参阅[使用 OpenBao 试用 Vault 密钥](../getting-started/docker-compose.md#openbao)。无论此值如何，A2Flow 都通过内部网络访问它 |
 
 ## 应用数据库 {#application-database}
