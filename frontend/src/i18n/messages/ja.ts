@@ -820,7 +820,6 @@ export const ja = {
   "status.sent": "送信済み",
   "status.skipped": "スキップ",
   "status.timeout": "タイムアウト",
-  "systemSettings.applicationBaseUrl": "アプリケーションのベース URL",
   "systemSettings.clear": "クリア",
   "systemSettings.clearSmtpSettings": "SMTP 設定をクリア",
   "systemSettings.clearSmtpSettings2": "SMTP 設定をクリア",
@@ -853,8 +852,6 @@ export const ja = {
     "テストメッセージは {em1} の設定を使い、自分のアドレスに送られます。変更した直後なら先に保存してください。",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "SMTP のホスト、認証情報、送信元アドレスをクリアし、メール配信を無効にします。この操作は取り消せません。",
-  "systemSettings.whereNotificationEmailLinksBackToLeave":
-    "通知メールのリンク先です。空欄にするとリンクなしで送信します。",
   "tagColor.amber": "アンバー",
   "tagColor.cyan": "シアン",
   "tagColor.indigo": "インディゴ",

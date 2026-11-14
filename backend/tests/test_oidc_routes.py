@@ -19,9 +19,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure.oidc_client import OidcClient
 from infrastructure.secret_cipher import SecretCipher
-from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID
 from models.user_group import UserGroup
@@ -44,7 +44,7 @@ class Ctx:
 
 
 @pytest_asyncio.fixture()
-async def ctx() -> AsyncGenerator[Ctx, None]:
+async def ctx(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Ctx, None]:
     """Serve the app over a throwaway DB with tenant ``acme`` set up for SSO."""
     from dependencies.singletons import get_oidc_client, get_secret_cipher
     from infrastructure.database import get_session
@@ -68,10 +68,8 @@ async def ctx() -> AsyncGenerator[Ctx, None]:
                 updated_by=SYSTEM_USER_ID,
             )
         )
-        settings = await db.get(SystemSettings, SYSTEM_SETTINGS_ID)
-        assert settings is not None
-        settings.app_base_url = "http://test"
-        db.add(settings)
+        monkeypatch.setenv("APP_BASE_URL", "http://test")
+        get_settings.cache_clear()
         db.add(
             UserGroup(
                 id="g-eng",
@@ -105,14 +103,10 @@ async def ctx() -> AsyncGenerator[Ctx, None]:
         await engine.dispose()
 
 
-async def set_app_base_url(c: Ctx, url: str) -> None:
-    """Point the platform's ``app_base_url`` at ``url``."""
-    async with AsyncSession(c.engine) as db:
-        settings = await db.get(SystemSettings, SYSTEM_SETTINGS_ID)
-        assert settings is not None
-        settings.app_base_url = url
-        db.add(settings)
-        await db.commit()
+def set_app_base_url(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
+    """Point the deployment's ``APP_BASE_URL`` at ``url``."""
+    monkeypatch.setenv("APP_BASE_URL", url)
+    get_settings.cache_clear()
 
 
 def set_cookies(resp: httpx.Response) -> dict[str, Morsel[str]]:
@@ -191,8 +185,10 @@ async def test_start_unknown_tenant_redirects_unavailable(ctx: Ctx) -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_redirects_to_app_base_url_origin(ctx: Ctx) -> None:
-    await set_app_base_url(ctx, "https://a2.example.com")
+async def test_start_redirects_to_app_base_url_origin(
+    ctx: Ctx, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_app_base_url(monkeypatch, "https://a2.example.com")
     resp = await ctx.client.get("/api/v1/auth/oidc/start", params={"tenant": "acme"})
     assert resp.status_code == 302
     assert resp.headers["location"] == (
@@ -229,8 +225,10 @@ async def test_start_allows_same_site_and_user_initiated(ctx: Ctx, site: str) ->
 
 
 @pytest.mark.asyncio
-async def test_start_hops_to_app_base_url_only_once(ctx: Ctx) -> None:
-    await set_app_base_url(ctx, "https://a2.example.com")
+async def test_start_hops_to_app_base_url_only_once(
+    ctx: Ctx, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_app_base_url(monkeypatch, "https://a2.example.com")
     resp = await ctx.client.get(
         "/api/v1/auth/oidc/start", params={"tenant": "acme", "hop": "1"}
     )

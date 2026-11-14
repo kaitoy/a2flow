@@ -15,14 +15,14 @@ sidebar_position: 2
 | `PORT` | `8000` | 后端绑定的端口 |
 | `RELOAD` | `false` | 用于本地开发的 uvicorn 自动重载。仅在以 `python -m backend.main` 启动后端时读取；无论取值如何，Docker 镜像自身的启动命令都不受影响 |
 | `TIMEZONE` | `UTC` | 部署所在本地时区的 IANA 名称。它决定[运维指标](./metrics.md)中一个自然日从何时开始（影响“今天”的计数以及前置时间趋势的每日分桶）；当任务的时间要求未注明时区时，工作流代理也按此时区解读。无法识别的名称会回退到 `UTC`，而不会导致启动失败，因此拼写错误只会使本地时间出现偏差，不会让应用停止运行 |
+| `APP_BASE_URL` | — | 用户在浏览器中打开此部署的地址：只包含协议、主机和可选的端口，不带路径，例如 `https://a2flow.example.com`。通知邮件中的链接指向它，[单点登录](#single-sign-on)的**重定向 URI** 也由它生成，`CORS_ORIGINS` 和 `SESSION_COOKIE_SECURE` 的默认值也由它决定。其他形式的值会让后端无法启动。未设置时，邮件发出时不带返回应用的链接，单点登录也无法使用 |
 
 ## 前端设置 {#frontend-settings}
 
 | 变量 | 默认值 | 作用 |
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | 没有反向代理先把 `/api/*` 路由到后端时（不使用容器运行），前端转发 `/api/*` 的目标地址；API 文档页面也通过它检查已登录的会话。仅在进程启动时读取一次。在 Docker Compose 部署中，这是后端在内部网络上的地址，而不是公开地址 |
-| `APP_PORT` | `3000` | 仅限 Docker Compose：应用发布到主机上的端口，即同时提供界面和 API 的 `ingress` 服务的端口。后端的 `CORS_ORIGINS` 会自动跟随此值 |
-| `APP_DOMAIN` | `localhost` | 仅限 Docker Compose 且使用 `compose.https.yml` 时：通过 HTTPS 提供应用的主机名。公网名称从 Let's Encrypt 获取证书，`localhost` 则从本地证书颁发机构获取。后端的 `CORS_ORIGINS` 和 `APP_BASE_URL` 会自动跟随此值，`SESSION_COOKIE_SECURE` 会被启用，请参阅[通过 HTTPS 提供服务](../getting-started/docker-compose.md#https) |
+| `APP_PORT` | `3000` | 仅限 Docker Compose：应用发布到主机上的端口，即同时提供界面和 API 的 `ingress` 服务的端口。除非在 `.env` 中设置了 `APP_BASE_URL`，否则会把 `http://localhost:` 加上此端口作为基础 URL 传入 |
 | `OPENBAO_PORT` | `8200` | 仅限 Docker Compose 且使用 `--profile openbao` 时：OpenBao 界面发布到主机上的端口，请参阅[使用 OpenBao 试用 Vault 密钥](../getting-started/docker-compose.md#openbao)。无论此值如何，A2Flow 都通过内部网络访问它 |
 
 ## 应用数据库 {#application-database}
@@ -62,7 +62,7 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 | 变量 | 默认值 | 作用 |
 |---|---|---|
 | `SESSION_IDLE_TIMEOUT_SECONDS` | `28800`（8 小时） | 滑动式空闲超时。已认证的请求会刷新会话的最后活动时间，但最多每 5 分钟刷新一次（如果此值的一半更短，则按其一半），因此会话可能最多提前这么长时间结束；空闲超过此时长的会话会被拒绝并删除 |
-| `SESSION_COOKIE_SECURE` | `false` | 将会话和 CSRF Cookie 标记为 `Secure`（仅限 HTTPS）。凡是位于 HTTPS 之后的部署，都请将其设为 `true` |
+| `SESSION_COOKIE_SECURE` | `APP_BASE_URL` 以 `https://` 开头时为 `true`，否则为 `false` | 为会话和 CSRF Cookie 加上 `Secure`（仅限 HTTPS）。仅在需要覆盖该默认值时设置 |
 
 这些 Cookie 本身是会话 Cookie（没有 `Max-Age`/`Expires`），因此关闭浏览器时也会被清除。浏览器通过与前端相同的源访问后端（`/api/*` 按路径路由到后端，由反向代理或前端自身完成），因此这些 Cookie 属于第一方 Cookie，`SameSite=Lax` 可以正常生效。
 
@@ -70,7 +70,7 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 
 | 变量 | 默认值 | 作用 |
 |---|---|---|
-| `CORS_ORIGINS` | `http://localhost:3000` | 允许调用后端 API 的源，以逗号分隔 |
+| `CORS_ORIGINS` | `APP_BASE_URL`；未设置时为 `http://localhost:3000` | 允许调用后端 API 的源，以逗号分隔 |
 
 添加提供前端的每个源：
 
@@ -86,9 +86,9 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | 空 | 以逗号分隔的主机名，例如 `keycloak.internal,localhost`。租户的[单点登录](../guides/single-sign-on.md)颁发者 URL 可以使用这些主机，即使它们解析到私有地址，用于本地部署的身份提供商。其他颁发者必须解析到公网地址 |
 
-单点登录还依赖部署的基础 URL，即 `APP_BASE_URL`（请参阅[通知邮件](#notification-email)）或[系统设置](../guides/system-settings.md)中的**应用基础 URL**。没有它，单点登录无法使用，**租户设置**会显示警告来代替**重定向 URI**。有两点要求：
+单点登录还依赖部署的基础 URL，即 `APP_BASE_URL`（请参阅[服务器设置](#server-settings)）。没有它，单点登录无法使用，**租户设置**会显示警告来代替**重定向 URI**。有两点要求：
 
-- **基础 URL 只能是源**：协议、主机和可选的端口，例如 `https://a2flow.example.com`，不带路径。带路径的值会让所有 SSO 登录失败。
+- **基础 URL 只能是源**——只包含协议、主机和可选的端口，例如 `https://a2flow.example.com`，不带路径。其他值会让后端无法启动。
 - **后端应能看到公开的源。** 在反向代理之后，请让代理在转发请求时保留原始的 `Host` 头，并把 `X-Forwarded-Proto` 设为原始协议，再把代理的地址写入 `FORWARDED_ALLOW_IPS`，让后端信任该代理（默认只信任 `127.0.0.1`）。否则每次 SSO 登录都会多一次重定向。
 
 ## 代理技能存储库 {#agent-skill-store}
@@ -177,7 +177,6 @@ HashiCorp Vault 没有对应的环境变量：租户自己的 Vault 由其管理
 
 | 变量 | 默认值 | 作用 |
 |---|---|---|
-| `APP_BASE_URL` | — | 用户在浏览器中访问此部署所用的基础 URL，例如 `https://a2flow.example.com`。用于生成外发通知邮件中的深层链接；未设置时，邮件发出时不带返回应用的链接 |
 | `SMTP_ENABLED` | `false` | 邮件投递的总开关。必须显式设为 `true`；绝不会因为设置了其他变量而被推断为启用 |
 | `SMTP_HOST` / `SMTP_PORT` | — / `587` | 接收邮件的中继。这里可以使用内部主机名，因为该值是交给 SMTP 客户端的，不会被用于发起抓取 |
 | `SMTP_SECURITY` | `starttls` | `none`、`starttls` 或 `ssl` |

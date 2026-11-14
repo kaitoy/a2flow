@@ -38,7 +38,7 @@ from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
-from models.constraints import AppBaseUrl, PersonName, ShortText, SmtpHost
+from models.constraints import PersonName, PrivateHttpUrl, ShortText, SmtpHost
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -83,7 +83,6 @@ class SystemSettingsUpdate(SQLModel):
     """
 
     model_config = _alias_config
-    app_base_url: AppBaseUrl | None = None
     smtp_enabled: bool | None = None
     smtp_host: SmtpHost | None = None
     smtp_port: int | None = Field(default=None, ge=1, le=65535)
@@ -93,10 +92,10 @@ class SystemSettingsUpdate(SQLModel):
     smtp_from_email: EmailStr | None = None
     smtp_from_name: PersonName | None = None
     #: Address of the global Vault, used by every tenant that has no Vault of
-    #: its own. Deliberately :data:`~models.constraints.AppBaseUrl`, not
+    #: its own. Deliberately :data:`~models.constraints.PrivateHttpUrl`, not
     #: ``HttpUrl``: only a ``super_admin`` sets it, and a Vault typically lives
     #: on a private address the SSRF guard would refuse.
-    vault_addr: AppBaseUrl | None = None
+    vault_addr: PrivateHttpUrl | None = None
 
 
 class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
@@ -130,7 +129,6 @@ class SystemSettingsRead(BaseEntity):
     """
 
     model_config = _alias_config
-    app_base_url: str | None = None
     smtp_enabled: bool = False
     smtp_host: str | None = None
     smtp_port: int = DEFAULT_SMTP_PORT

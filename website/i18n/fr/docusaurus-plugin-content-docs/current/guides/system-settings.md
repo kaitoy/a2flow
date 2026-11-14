@@ -5,7 +5,7 @@ sidebar_position: 13
 
 # Paramètres système
 
-Les Paramètres système permettent de configurer le serveur de messagerie par lequel passent les [e-mails de notification](./notifications.md#email-delivery), ainsi que le HashiCorp Vault global. Il existe un seul enregistrement de paramètres pour tout le déploiement, initialisé au premier démarrage avec l'envoi d'e-mails **désactivé** : sur une nouvelle installation, les notifications restent donc dans l'application jusqu'à ce qu'un opérateur active l'envoi.
+Les Paramètres système permettent de configurer le serveur de messagerie par lequel passent les [e-mails de notification](./notifications.md#email-delivery), ainsi que le HashiCorp Vault global. Il existe un seul enregistrement de paramètres pour tout le déploiement, initialisé au premier démarrage avec l'envoi d'e-mails **désactivé** : sur une nouvelle installation, les notifications restent donc dans l'application jusqu'à ce qu'un opérateur active l'envoi. L'adresse à laquelle les utilisateurs ouvrent A2Flow ne se configure pas ici : un opérateur la définit au déploiement — voir [Paramètres du serveur](../operations/configuration.md#server-settings).
 
 Ouvrez **Paramètres système** dans la barre latérale d'administration. Comme les [Tenants](./users-and-groups.md#tenants), cette section est réservée au **Super administrateur** : les paramètres s'appliquent à toute la plateforme et non à un tenant, si bien qu'aucune exception n'est prévue pour les administrateurs de tenant, et même leur lecture est refusée à quiconque d'autre.
 
@@ -13,7 +13,6 @@ Ouvrez **Paramètres système** dans la barre latérale d'administration. Comme 
 
 | Champ | Rôle |
 |---|---|
-| **URL de base de l'application** | Destination des liens des e-mails de notification, par exemple `https://a2flow.example.com`. Si ce champ reste vide, les messages sont envoyés sans lien. |
 | **Envoyer les notifications par e-mail** | L'interrupteur général. Tant qu'il est désactivé, les notifications restent dans l'application et rien n'est envoyé. |
 | **Hôte SMTP** / **Port SMTP** | Le relais auquel remettre les messages. |
 | **Sécurité** | **STARTTLS** (par défaut), **SSL/TLS** (TLS implicite) ou **Aucun**. |

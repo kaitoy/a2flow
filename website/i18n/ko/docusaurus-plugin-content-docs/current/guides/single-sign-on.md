@@ -28,7 +28,7 @@ sequenceDiagram
 ## 시작하기 전에 {#before-you-start}
 
 - 테넌트의 관리자 역할이 필요합니다.
-- 슈퍼 관리자가 [시스템 설정](./system-settings.md)의 **애플리케이션 기본 URL**을 입력해 두어야 합니다. 주소만 입력해야 하며, 스킴, 호스트, 필요하면 포트까지입니다. 예를 들어 `https://a2flow.example.com`처럼 쓰고 그 뒤에는 아무것도 붙이지 않습니다. `https://example.com/a2flow`처럼 경로가 있으면 모든 SSO 로그인이 실패합니다. 비어 있는 동안에는 **테넌트 설정**에 **리디렉션 URI** 대신 경고가 표시되고 싱글 사인온을 사용할 수 없습니다.
+- 운영자가 배포할 때 배포의 기본 URL을 설정해 두어야 합니다. [서버 설정](../operations/configuration.md#server-settings)을 참조하세요. 설정되지 않은 동안에는 **테넌트 설정**에 **리디렉션 URI** 대신 경고가 표시되고 싱글 사인온을 사용할 수 없습니다.
 - A2Flow가 공개 주소로 IdP에 접속할 수 있어야 합니다. 사설 네트워크에 있는 IdP는 운영자가 그 호스트를 허용한 뒤에야 쓸 수 있습니다. 설정 레퍼런스의 [싱글 사인온](../operations/configuration.md#single-sign-on)을 참조하세요.
 
 ## 설정하기 {#set-it-up}

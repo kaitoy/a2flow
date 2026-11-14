@@ -15,14 +15,14 @@ sidebar_position: 2
 | `PORT` | `8000` | 백엔드가 바인딩하는 포트 |
 | `RELOAD` | `false` | 로컬 개발용 uvicorn 자동 리로드입니다. 백엔드를 `python -m backend.main`으로 시작할 때만 읽으며, Docker 이미지 자체의 시작 명령은 어느 쪽이든 영향을 받지 않습니다 |
 | `TIMEZONE` | `UTC` | 배포의 현지 시간대를 나타내는 IANA 이름입니다. [운영 메트릭](./metrics.md)에서 달력상의 하루가 시작되는 시점, 즉 "오늘" 집계와 리드 타임 추세의 일별 버킷을 결정하며, 작업의 시간 요구 사항에 시간대가 명시되지 않았을 때 워크플로 에이전트가 그 요구 사항을 해석하는 시간대이기도 합니다. 인식할 수 없는 이름은 시작 실패 대신 `UTC`로 대체되므로, 오타가 있으면 앱이 멈추는 대신 현지 시간이 어긋납니다 |
+| `APP_BASE_URL` | — | 사용자가 브라우저에서 이 배포를 여는 주소입니다. 스킴, 호스트, 필요하면 포트만 쓰고 경로는 붙이지 않습니다(예: `https://a2flow.example.com`). 알림 이메일의 링크가 이 주소를 가리키고, [싱글 사인온](#single-sign-on)의 **리디렉션 URI**도 이 주소로 만들어지며, `CORS_ORIGINS`와 `SESSION_COOKIE_SECURE`의 기본값도 정해집니다. 다른 형태이면 백엔드가 시작되지 않습니다. 없으면 앱으로 돌아가는 링크 없이 메시지가 전송되고 싱글 사인온을 사용할 수 없습니다 |
 
 ## 프런트엔드 설정 {#frontend-settings}
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | 리버스 프록시가 먼저 `/api/*`를 백엔드로 라우팅하지 않을 때(컨테이너 없이 실행할 때) 프런트엔드가 `/api/*`를 전달하는 대상이며, API 문서 페이지가 로그인한 세션을 확인하는 대상이기도 합니다. 프로세스 시작 시 한 번만 읽습니다. Docker Compose 스택에서는 공개 주소가 아니라 내부 네트워크상의 백엔드 주소입니다 |
-| `APP_PORT` | `3000` | Docker Compose 전용입니다. 앱이 공개되는 호스트 포트, 즉 화면과 API를 모두 제공하는 `ingress` 서비스의 포트입니다. 백엔드의 `CORS_ORIGINS`는 자동으로 이 값을 따릅니다 |
-| `APP_DOMAIN` | `localhost` | `compose.https.yml`을 사용하는 Docker Compose 전용입니다. HTTPS로 앱을 제공하는 호스트 이름입니다. 공개 이름이면 Let's Encrypt에서, `localhost`이면 로컬 인증 기관에서 인증서를 받습니다. 백엔드의 `CORS_ORIGINS`와 `APP_BASE_URL`은 자동으로 이 값을 따르고, `SESSION_COOKIE_SECURE`는 켜집니다. [HTTPS로 제공하기](../getting-started/docker-compose.md#https)를 참조하세요 |
+| `APP_PORT` | `3000` | Docker Compose 전용입니다. 앱이 공개되는 호스트 포트, 즉 화면과 API를 모두 제공하는 `ingress` 서비스의 포트입니다. `.env`에서 `APP_BASE_URL`을 설정하지 않으면 `http://localhost:` 뒤에 이 포트를 붙인 값이 기본 URL로 전달됩니다 |
 | `OPENBAO_PORT` | `8200` | `--profile openbao`를 사용하는 Docker Compose 전용입니다. OpenBao UI가 공개되는 호스트 포트입니다. [OpenBao로 Vault 시크릿 사용해 보기](../getting-started/docker-compose.md#openbao)를 참조하세요. A2Flow는 이 값과 관계없이 내부 네트워크로 접근합니다 |
 
 ## 애플리케이션 데이터베이스 {#application-database}
@@ -62,7 +62,7 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `SESSION_IDLE_TIMEOUT_SECONDS` | `28800`(8시간) | 요청마다 연장되는 유휴 타임아웃입니다. 인증된 요청은 세션의 마지막 활동 시각을 갱신하는데, 갱신은 최대 5분에 한 번(이 값의 절반이 더 짧으면 그 간격에 한 번)이므로 세션이 그만큼 일찍 끝날 수 있습니다. 이 시간보다 오래 유휴 상태로 둔 세션은 거부되고 삭제됩니다 |
-| `SESSION_COOKIE_SECURE` | `false` | 세션 쿠키와 CSRF 쿠키에 `Secure`(HTTPS 전용)를 표시합니다. HTTPS 뒤에 있는 모든 배포에서는 `true`로 설정하세요 |
+| `SESSION_COOKIE_SECURE` | `APP_BASE_URL`이 `https://`로 시작하면 `true`, 아니면 `false` | 세션 및 CSRF 쿠키에 `Secure`(HTTPS 전용)를 표시합니다. 그 기본값을 바꿀 때만 설정합니다 |
 
 쿠키 자체는 세션 쿠키(`Max-Age`/`Expires` 없음)이므로 브라우저를 닫을 때도 지워집니다. 브라우저는 프런트엔드와 같은 오리진으로 백엔드에 접근하므로(`/api/*`가 리버스 프록시 또는 프런트엔드 자체에서 경로 기준으로 백엔드로 라우팅됩니다) 쿠키는 퍼스트 파티가 되고 `SameSite=Lax`가 문제없이 적용됩니다.
 
@@ -70,7 +70,7 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `CORS_ORIGINS` | `http://localhost:3000` | 백엔드 API를 호출할 수 있는 오리진의 쉼표로 구분된 목록 |
+| `CORS_ORIGINS` | `APP_BASE_URL`, 없으면 `http://localhost:3000` | 백엔드 API 호출을 허용할 오리진의 쉼표 구분 목록 |
 
 프런트엔드를 제공하는 오리진을 모두 추가하세요.
 
@@ -86,9 +86,9 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | 비어 있음 | 쉼표로 구분한 호스트 이름(예: `keycloak.internal,localhost`). 테넌트의 [싱글 사인온](../guides/single-sign-on.md) 발급자 URL이 사설 주소로 확인되더라도 이 호스트는 쓸 수 있습니다. 온프레미스 IdP용입니다. 그 밖의 발급자는 공개 주소로 확인되어야 합니다 |
 
-싱글 사인온은 배포의 기본 URL에도 의존합니다. `APP_BASE_URL`([알림 이메일](#notification-email) 참조) 또는 [시스템 설정](../guides/system-settings.md)의 **애플리케이션 기본 URL**입니다. 없으면 싱글 사인온을 사용할 수 없고 **테넌트 설정**에 **리디렉션 URI** 대신 경고가 표시됩니다. 요건은 두 가지입니다.
+싱글 사인온은 배포의 기본 URL인 `APP_BASE_URL`에도 의존합니다([서버 설정](#server-settings) 참조). 없으면 싱글 사인온을 사용할 수 없고 **테넌트 설정**에 **리디렉션 URI** 대신 경고가 표시됩니다. 요건은 두 가지입니다.
 
-- **기본 URL은 오리진만 씁니다.** 스킴, 호스트, 필요하면 포트까지이며 `https://a2flow.example.com`처럼 경로는 붙이지 않습니다. 경로가 있으면 모든 SSO 로그인이 실패합니다.
+- **기본 URL은 오리진만** — 스킴, 호스트, 필요하면 포트만 쓰고(예: `https://a2flow.example.com`) 경로는 붙이지 않습니다. 다른 값이면 백엔드가 시작되지 않습니다.
 - **백엔드가 공개 오리진을 볼 수 있어야 합니다.** 리버스 프록시 뒤에서는 프록시가 요청을 전달할 때 원래의 `Host` 헤더를 유지하고 `X-Forwarded-Proto`를 원래 스킴으로 설정하게 하며, 프록시 주소를 `FORWARDED_ALLOW_IPS`에 적어 백엔드가 프록시를 신뢰하게 하세요(기본값으로는 `127.0.0.1`만 신뢰합니다). 그러지 않으면 SSO 로그인마다 리디렉션이 한 번 더 일어납니다.
 
 ## 에이전트 스킬 스토어 {#agent-skill-store}
@@ -177,7 +177,6 @@ HashiCorp Vault용 환경 변수는 없습니다. 테넌트 전용 Vault는 해�
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `APP_BASE_URL` | — | 사용자가 브라우저에서 이 배포에 접근하는 기본 URL입니다(예: `https://a2flow.example.com`). 발신 알림 이메일의 딥 링크를 만드는 데 쓰이며, 없으면 앱으로 돌아가는 링크 없이 메시지가 전송됩니다 |
 | `SMTP_ENABLED` | `false` | 이메일 전송의 마스터 스위치입니다. 명시적으로 `true`여야 하며, 다른 변수가 설정되어 있다고 해서 자동으로 추론되지 않습니다 |
 | `SMTP_HOST` / `SMTP_PORT` | — / `587` | 메시지를 넘겨줄 릴레이입니다. 여기에는 내부 호스트 이름만 써도 됩니다. 이 값은 SMTP 클라이언트에 넘겨질 뿐 가져오기 대상이 아닙니다 |
 | `SMTP_SECURITY` | `starttls` | `none`, `starttls`, `ssl` 중 하나 |

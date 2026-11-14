@@ -28,7 +28,7 @@ sequenceDiagram
 ## Before you start {#before-you-start}
 
 - You need the `admin` role in the tenant.
-- A Super Admin must have filled in **Application Base URL** under [System Settings](./system-settings.md). It must be the address only — scheme, host and an optional port, such as `https://a2flow.example.com`, with nothing after it. A value with a path, such as `https://example.com/a2flow`, makes every SSO sign-in fail. While it is empty, **Tenant Settings** shows a warning in place of the **Redirect URI** and single sign-on stays unavailable.
+- An operator must have set the deployment's base URL when deploying — see [Server settings](../operations/configuration.md#server-settings). While it is not set, **Tenant Settings** shows a warning in place of the **Redirect URI** and single sign-on stays unavailable.
 - Your IdP must be reachable from A2Flow on a public address. An IdP on a private network works only after the operator has allowed its host — see [Single sign-on](../operations/configuration.md#single-sign-on) in the configuration reference.
 
 ## Set it up {#set-it-up}

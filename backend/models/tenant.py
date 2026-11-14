@@ -235,7 +235,7 @@ class TenantSettings(SQLModel):
     ``vault_credential_set`` and ``oidc_client_secret_set`` report only whether
     a credential is stored, so the form can show it as configured without ever
     receiving it. ``oidc_redirect_uri`` is the callback URL the provider must
-    allow, derived from the platform's ``app_base_url``.
+    allow, derived from the deployment's ``APP_BASE_URL``.
     """
 
     model_config = _alias_config

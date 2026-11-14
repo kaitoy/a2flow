@@ -28,7 +28,7 @@ sequenceDiagram
 ## Antes de empezar {#before-you-start}
 
 - Necesitas el rol Administrador en el tenant.
-- Un Superadministrador debe haber rellenado **URL base de la aplicación** en [Configuración del sistema](./system-settings.md). Debe ser solo la dirección: esquema, host y, opcionalmente, el puerto, como `https://a2flow.example.com`, sin nada detrás. Un valor con ruta, como `https://example.com/a2flow`, hace que todos los inicios de sesión SSO fallen. Mientras esté vacío, **Configuración del tenant** muestra una advertencia en lugar de la **URI de redirección** y el inicio de sesión único no está disponible.
+- Un operador debe haber definido la URL base del despliegue al desplegar; consulta [Configuración del servidor](../operations/configuration.md#server-settings). Mientras no esté definida, **Configuración del tenant** muestra un aviso en lugar de la **URI de redirección** y el inicio de sesión único no está disponible.
 - A2Flow debe poder llegar a tu IdP en una dirección pública. Un IdP en una red privada solo funciona cuando el operador ha permitido su host; consulta [Inicio de sesión único](../operations/configuration.md#single-sign-on) en la referencia de configuración.
 
 ## Configurarlo {#set-it-up}

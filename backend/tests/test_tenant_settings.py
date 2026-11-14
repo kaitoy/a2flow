@@ -8,10 +8,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure import url_safety
 from infrastructure.bootstrap import seed_system_settings
 from infrastructure.secret_cipher import get_secret_cipher
-from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
 from repositories.exceptions import ForeignKeyViolationError, UniqueViolationError
@@ -507,15 +507,13 @@ async def test_failed_subject_reset_leaves_the_provider_unchanged(
 
 
 async def test_redirect_uri_follows_app_base_url(
-    settings_client: AsyncClient, settings_engine: AsyncEngine
+    settings_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "")
+    get_settings.cache_clear()
     assert assert_ok(await settings_client.get(_PATH))["oidcRedirectUri"] is None
-    async with AsyncSession(settings_engine) as session:
-        row = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
-        assert row is not None
-        row.app_base_url = "https://a2.example.com/"
-        session.add(row)
-        await session.commit()
+    monkeypatch.setenv("APP_BASE_URL", "https://a2.example.com/")
+    get_settings.cache_clear()
     assert (
         assert_ok(await settings_client.get(_PATH))["oidcRedirectUri"]
         == "https://a2.example.com/api/v1/auth/oidc/callback"

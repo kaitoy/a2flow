@@ -15,14 +15,14 @@ Todos los ajustes siguientes son variables de entorno. El backend las lee de `ba
 | `PORT` | `8000` | Puerto en el que escucha el backend |
 | `RELOAD` | `false` | Recarga automática de uvicorn para el desarrollo local. Solo se lee cuando el backend se inicia con `python -m backend.main`; el comando de inicio de la imagen de Docker no se ve afectado en ningún caso |
 | `TIMEZONE` | `UTC` | Nombre IANA de la zona horaria local del despliegue. Determina dónde empieza un día natural para las [métricas de operaciones](./metrics.md) (los recuentos de «hoy» y los intervalos diarios de la tendencia del tiempo de entrega), y es la zona en la que el agente del flujo de trabajo interpreta el requisito de hora de una tarea cuando este no indica zona horaria. Un nombre no reconocido se sustituye por `UTC` en lugar de impedir el arranque, así que una errata desajusta las horas locales en vez de detener la aplicación |
+| `APP_BASE_URL` | — | La dirección en la que los usuarios abren este despliegue en un navegador: esquema, host y un puerto opcional, sin ruta, p. ej. `https://a2flow.example.com`. Los correos de notificación enlazan a ella, el [inicio de sesión único](#single-sign-on) construye a partir de ella su **URI de redirección** y fija los valores por defecto de `CORS_ORIGINS` y `SESSION_COOKIE_SECURE`. Con cualquier otra forma, el backend no arranca. Sin ella, los mensajes se envían sin enlace de vuelta y el inicio de sesión único no está disponible |
 
 ## Configuración del frontend {#frontend-settings}
 
 | Variable | Valor predeterminado | Qué hace |
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | Adónde reenvía el frontend `/api/*` cuando ningún proxy inverso lo dirige antes al backend (al trabajar sin contenedores), y dónde comprueba la sesión iniciada la página de documentación de la API. Se lee una vez al iniciar el proceso. En la pila de Docker Compose es la dirección del backend en la red interna, no una pública |
-| `APP_PORT` | `3000` | Solo para Docker Compose: el puerto del host en el que se publica la aplicación, es decir, el del servicio `ingress`, que sirve tanto las pantallas como la API. `CORS_ORIGINS` del backend lo sigue automáticamente |
-| `APP_DOMAIN` | `localhost` | Solo para Docker Compose, con `compose.https.yml`: el nombre de host en el que se sirve la aplicación por HTTPS. Un nombre público obtiene un certificado de Let's Encrypt; `localhost`, uno de una autoridad de certificación local. `CORS_ORIGINS` y `APP_BASE_URL` del backend lo siguen automáticamente, y `SESSION_COOKIE_SECURE` se activa; consulta [Servir por HTTPS](../getting-started/docker-compose.md#https) |
+| `APP_PORT` | `3000` | Solo para Docker Compose: el puerto del host en el que se publica la aplicación, es decir, el del servicio `ingress`, que sirve tanto las pantallas como la API. Salvo que `.env` defina `APP_BASE_URL`, la pila pasa como URL base `http://localhost:` seguido de este puerto |
 | `OPENBAO_PORT` | `8200` | Solo para Docker Compose, con `--profile openbao`: el puerto del host en el que se publica la interfaz de OpenBao; consulta [Probar secretos de Vault con OpenBao](../getting-started/docker-compose.md#openbao). A2Flow accede a él por la red interna en cualquier caso |
 
 ## Base de datos de la aplicación {#application-database}
@@ -62,7 +62,7 @@ Si alguna no está definida (o está vacía), se genera una contraseña aleatori
 | Variable | Valor predeterminado | Qué hace |
 |---|---|---|
 | `SESSION_IDLE_TIMEOUT_SECONDS` | `28800` (8 horas) | Tiempo de inactividad deslizante. Las solicitudes autenticadas renuevan la hora de última actividad de la sesión, como máximo una vez cada 5 minutos (o la mitad de este valor, si es menor), por lo que una sesión puede terminar hasta ese tiempo antes; una sesión inactiva durante más tiempo se rechaza y se elimina |
-| `SESSION_COOKIE_SECURE` | `false` | Marca las cookies de sesión y CSRF como `Secure` (solo HTTPS). Establécelo en `true` en cualquier despliegue detrás de HTTPS |
+| `SESSION_COOKIE_SECURE` | `true` si `APP_BASE_URL` empieza por `https://`; si no, `false` | Marca las cookies de sesión y CSRF como `Secure` (solo HTTPS). Defínela solo para cambiar ese valor por defecto |
 
 Las propias cookies son cookies de sesión (sin `Max-Age` ni `Expires`), así que también se borran al cerrar el navegador. El navegador llega al backend en el mismo origen que el frontend (`/api/*` se dirige a él por ruta, ya sea en el proxy inverso o en el propio frontend), de modo que las cookies son de origen propio y `SameSite=Lax` se aplica sin problemas.
 
@@ -70,7 +70,7 @@ Las propias cookies son cookies de sesión (sin `Max-Age` ni `Expires`), así qu
 
 | Variable | Valor predeterminado | Qué hace |
 |---|---|---|
-| `CORS_ORIGINS` | `http://localhost:3000` | Lista de orígenes separados por comas que pueden llamar a la API del backend |
+| `CORS_ORIGINS` | `APP_BASE_URL`, o `http://localhost:3000` sin ella | Lista separada por comas de los orígenes autorizados a llamar a la API del backend |
 
 Añade cada origen desde el que se sirve el frontend:
 
@@ -86,9 +86,9 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | vacío | Nombres de host separados por comas, como `keycloak.internal,localhost`, que la URL del emisor del [inicio de sesión único](../guides/single-sign-on.md) de un tenant puede tener aunque se resuelvan a una dirección privada; sirve para un proveedor de identidad local. Cualquier otro emisor debe resolverse a una dirección pública |
 
-El inicio de sesión único depende también de la URL base del despliegue, que es `APP_BASE_URL` (consulta [Correo de notificación](#notification-email)) o **URL base de la aplicación** en [Configuración del sistema](../guides/system-settings.md). Sin ella, el inicio de sesión único no está disponible y **Configuración del tenant** muestra una advertencia en lugar de la **URI de redirección**. Hay dos requisitos:
+El inicio de sesión único depende también de la URL base del despliegue, `APP_BASE_URL` (consulta [Configuración del servidor](#server-settings)). Sin ella, el inicio de sesión único no está disponible y **Configuración del tenant** muestra un aviso en lugar de la **URI de redirección**. Dos requisitos:
 
-- **La URL base es solo el origen**: esquema, host y, opcionalmente, puerto, como `https://a2flow.example.com`, sin ruta. Un valor con ruta hace que todos los inicios de sesión SSO fallen.
+- **La URL base es solo el origen**: esquema, host y un puerto opcional, como `https://a2flow.example.com`, sin ruta. El backend no arranca con ningún otro valor.
 - **El backend debe ver el origen público.** Detrás de un proxy inverso, haz que el proxy conserve la cabecera `Host` original al reenviar una petición y que establezca `X-Forwarded-Proto` con el esquema original, y haz que el backend confíe en el proxy indicando su dirección en `FORWARDED_ALLOW_IPS` (por defecto solo se confía en `127.0.0.1`). Si no, cada inicio de sesión SSO requiere una redirección adicional.
 
 ## Almacén de skills de agente {#agent-skill-store}
@@ -177,7 +177,6 @@ Son los mismos valores que la interfaz de administración edita en [Configuraci�
 
 | Variable | Valor predeterminado | Qué hace |
 |---|---|---|
-| `APP_BASE_URL` | — | URL base con la que los usuarios acceden a este despliegue en un navegador, p. ej. `https://a2flow.example.com`. Se usa para construir los enlaces directos de los correos de notificación salientes; sin ella, los mensajes se envían sin enlace de vuelta |
 | `SMTP_ENABLED` | `false` | Interruptor general de la entrega de correo. Debe ser explícitamente `true`; nunca se deduce de que las demás variables estén definidas |
 | `SMTP_HOST` / `SMTP_PORT` | — / `587` | El relé al que se entregan los mensajes. Aquí sirve un simple nombre de host interno: se pasa al cliente SMTP, no se accede a él como URL |
 | `SMTP_SECURITY` | `starttls` | `none`, `starttls` o `ssl` |

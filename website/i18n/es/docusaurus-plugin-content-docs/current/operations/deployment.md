@@ -30,15 +30,15 @@ Un despliegue gradual termina a la fuerza cualquier stream SSE que siga abierto 
 
 ## Detrás de HTTPS {#behind-https}
 
-Hay tres ajustes cuyos valores predeterminados solo sirven para el desarrollo local con HTTP. Cámbialos los tres antes de que un despliegue atienda a usuarios reales:
+Un solo ajuste decide lo que necesita un despliegue detrás de HTTPS: define `APP_BASE_URL` con el origen que ve el navegador, como `https://a2flow.example.com`. El resto se deriva de él:
 
-| Variable | Establécela en | Si se deja el valor predeterminado |
+| Qué | Con un `APP_BASE_URL` `https://` | Sin `APP_BASE_URL` |
 |---|---|---|
-| `SESSION_COOKIE_SECURE` | `true` | Las cookies de sesión y CSRF se envían sin `Secure`, de modo que el navegador también las manda por HTTP sin cifrar |
-| `CORS_ORIGINS` | El origen de cara al navegador, p. ej. `https://a2flow.example.com` | Solo `http://localhost:3000` puede llamar a la API |
-| `APP_BASE_URL` | El mismo origen | Los correos de notificación se envían sin los enlaces directos a la aplicación; consulta [Correo de notificación](./configuration.md#notification-email) |
+| Cookies de sesión y CSRF | Marcadas como `Secure`, así que el navegador solo las envía por HTTPS | Sin `Secure`, así que el navegador también las envía por HTTP sin cifrar |
+| Orígenes autorizados a llamar a la API | Ese origen | Solo `http://localhost:3000` |
+| Correo de notificación e inicio de sesión único | Los correos enlazan a la aplicación y el inicio de sesión único se puede usar | Los correos se envían sin enlaces y el inicio de sesión único no está disponible |
 
-La pila de Docker Compose incluye un ejemplo funcional: [Servir por HTTPS](../getting-started/docker-compose.md#https) coloca un proxy que termina TLS delante del servicio `ingress` y define los tres valores.
+`SESSION_COOKIE_SECURE` y `CORS_ORIGINS` aún pueden sustituir los dos primeros; consulta [Referencia de configuración](./configuration.md#server-settings). La pila de Docker Compose incluye un ejemplo funcional: [Servir por HTTPS](../getting-started/docker-compose.md#https) coloca un proxy que termina TLS delante del servicio `ingress` y pasa la dirección al backend.
 
 ## Disposición de procesos {#process-layout}
 

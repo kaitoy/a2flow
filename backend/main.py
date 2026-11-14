@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     before reading it.
 
     Seeds the system, root, and Default-tenant admin users and the singleton
-    system-settings row, applies any ``APP_BASE_URL``/``SMTP_*`` environment
+    system-settings row, applies any ``SMTP_*`` environment
     overrides onto that row, then registers or removes the optional demo
     dataset depending on ``DEMO_DATA``. A demo agent skill registered by this
     run still needs its repository cloned; that runs as a background task

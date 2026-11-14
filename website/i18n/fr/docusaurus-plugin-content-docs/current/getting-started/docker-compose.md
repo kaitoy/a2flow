@@ -14,7 +14,7 @@ docker compose up --build
 
 Ouvrez [http://localhost:3000](http://localhost:3000). Les données de la base sont conservées dans le volume `pgdata` d'un redémarrage à l'autre.
 
-Définissez `APP_PORT` dans `.env` pour publier l'application sur un autre port de l'hôte ; le paramètre `CORS_ORIGINS` du backend s'y aligne automatiquement.
+Définissez `APP_PORT` dans `.env` pour publier l'application sur un autre port de l'hôte ; l'URL de base de l'application le suit automatiquement. Pour que l'application s'ouvre à une autre adresse — un nom d'hôte, par exemple —, définissez plutôt `APP_BASE_URL` dans `.env` avec cette adresse, comme `http://a2flow.internal:3000`. L'application reste publiée sur `APP_PORT` : si cette adresse comporte un port, alignez `APP_PORT` dessus.
 
 ## Ce qui démarre {#what-comes-up}
 
@@ -35,19 +35,19 @@ Le premier démarrage prend plus de temps que les suivants : les images sont co
 
 ## Servir en HTTPS {#https}
 
-Ajouter `compose.https.yml` place [Caddy](https://caddyserver.com/) devant l'ingress. Il devient le seul point d'entrée, sur les ports 80 et 443, obtient un certificat et redirige le HTTP en clair vers HTTPS. Le backend passe en même temps aux réglages HTTPS : cookies sécurisés, origine HTTPS, et **URL de base de l'application** dans les [Paramètres système](../guides/system-settings.md), à partir de laquelle l'[authentification unique](../guides/single-sign-on.md) construit son **URI de redirection**.
+Ajouter `compose.https.yml` place [Caddy](https://caddyserver.com/) devant l'ingress. Il devient le seul point d'entrée, sur les ports 80 et 443, obtient un certificat pour l'adresse de `APP_BASE_URL` et redirige le HTTP en clair vers HTTPS. Une adresse `https://` rend aussi les cookies de connexion sécurisés, et l'[authentification unique](../guides/single-sign-on.md) en dérive son **URI de redirection**.
 
 ```bash
-echo APP_DOMAIN=a2flow.example.com >> .env
+echo APP_BASE_URL=https://a2flow.example.com >> .env
 docker compose -f compose.yml -f compose.https.yml up --build
 ```
 
-Ouvrez `https://` suivi de votre `APP_DOMAIN`. La suite dépend de ce nom :
+Ouvrez l'adresse que vous avez définie. Elle ne doit comporter aucun port : seuls 80 et 443 sont publiés, et Caddy refuse de démarrer sur une adresse qui en comporte un. La suite dépend du nom d'hôte :
 
-| `APP_DOMAIN` | Certificat | Avant de commencer |
+| `APP_BASE_URL` | Certificat | Avant de commencer |
 |---|---|---|
-| Un nom d'hôte public | Obtenu auprès de Let's Encrypt et renouvelé automatiquement | Faites pointer le DNS du nom vers cet hôte et rendez les ports 80 et 443 accessibles depuis Internet |
-| Non défini (`localhost`) | Émis par une autorité de certification que Caddy crée pour lui-même | Rien, mais le navigateur affiche un avertissement de certificat tant que vous ne faites pas confiance à cette autorité (ci-dessous) |
+| Un nom d'hôte public, comme `https://a2flow.example.com` | Obtenu auprès de Let's Encrypt et renouvelé automatiquement | Faites pointer le DNS du nom vers cet hôte et rendez les ports 80 et 443 accessibles depuis Internet |
+| Non défini (`https://localhost`) | Émis par une autorité de certification que Caddy crée pour lui-même | Rien, mais le navigateur affiche un avertissement de certificat tant que vous ne faites pas confiance à cette autorité (ci-dessous) |
 
 Pour que le navigateur fasse confiance à `https://localhost`, copiez le certificat racine de l'autorité et ajoutez-le aux certificats racines de confiance de votre système d'exploitation ou de votre navigateur :
 

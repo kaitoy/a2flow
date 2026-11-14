@@ -28,7 +28,7 @@ sequenceDiagram
 ## Avant de commencer {#before-you-start}
 
 - Il vous faut le rôle Administrateur dans le tenant.
-- Un Super administrateur doit avoir renseigné **URL de base de l'application** dans les [Paramètres système](./system-settings.md). Il doit s'agir de l'adresse seule : schéma, hôte et, éventuellement, port, comme `https://a2flow.example.com`, sans rien derrière. Une valeur avec un chemin, comme `https://example.com/a2flow`, fait échouer toutes les connexions SSO. Tant qu'elle est vide, **Paramètres du tenant** affiche un avertissement à la place de l'**URI de redirection** et l'authentification unique reste indisponible.
+- Un opérateur doit avoir défini l'URL de base du déploiement au déploiement — voir [Paramètres du serveur](../operations/configuration.md#server-settings). Tant qu'elle n'est pas définie, **Paramètres du tenant** affiche un avertissement à la place de l'**URI de redirection** et l'authentification unique reste indisponible.
 - A2Flow doit pouvoir joindre votre IdP à une adresse publique. Un IdP sur un réseau privé ne fonctionne qu'une fois son hôte autorisé par l'opérateur ; voir [Authentification unique](../operations/configuration.md#single-sign-on) dans la référence de configuration.
 
 ## La mettre en place {#set-it-up}

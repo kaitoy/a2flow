@@ -28,6 +28,7 @@ from typing import Any
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
+from config import get_settings
 from infrastructure.oidc_client import (
     OidcClient,
     OidcError,
@@ -38,7 +39,6 @@ from infrastructure.secret_cipher import SecretCipher
 from models.tenant import Tenant, oidc_redirect_uri
 from models.user import User
 from repositories.exceptions import UniqueViolationError
-from repositories.system_settings import SystemSettingsRepository
 from repositories.tenant import TenantRepository
 from repositories.user import UserRepository
 from repositories.user_group import UserGroupRepository
@@ -148,7 +148,6 @@ class OidcLoginService:
         auth: AuthService,
         oidc: OidcClient,
         cipher: SecretCipher,
-        system_settings: SystemSettingsRepository,
         groups_for_tenant: Callable[[str], UserGroupRepository],
     ) -> None:
         """Initialize the service.
@@ -159,7 +158,6 @@ class OidcLoginService:
             auth: Mints the session.
             oidc: Talks to the identity provider.
             cipher: Encrypts the state cookie and decrypts client secrets.
-            system_settings: Supplies ``app_base_url``.
             groups_for_tenant: Builds an unrestricted user-group repository
                 scoped to the given tenant id.
         """
@@ -168,13 +166,11 @@ class OidcLoginService:
         self._auth = auth
         self._oidc = oidc
         self._cipher = cipher
-        self._system_settings = system_settings
         self._groups_for_tenant = groups_for_tenant
 
-    async def app_base_url(self) -> str | None:
-        """Return the deployment's public base URL, or ``None`` when unset."""
-        row = await self._system_settings.get()
-        return row.app_base_url if row is not None else None
+    def app_base_url(self) -> str | None:
+        """Return the deployment's public base URL (``APP_BASE_URL``), or ``None`` when unset."""
+        return get_settings().app_base_url
 
     async def start(self, tenant_name: str) -> SsoStart:
         """Begin a sign-in for the tenant named ``tenant_name``.
@@ -227,7 +223,7 @@ class OidcLoginService:
             and tenant.oidc_client_secret
         ):
             raise _refuse(SsoErrorCode.unavailable, tenant.id, "SSO off or incomplete")
-        redirect_uri = oidc_redirect_uri(await self.app_base_url())
+        redirect_uri = oidc_redirect_uri(self.app_base_url())
         if redirect_uri is None:
             raise _refuse(SsoErrorCode.unavailable, tenant.id, "app_base_url unset")
         try:

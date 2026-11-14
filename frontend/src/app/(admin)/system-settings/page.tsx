@@ -79,7 +79,6 @@ function validateOptional(
 function buildSchema(passwordSet: boolean) {
   return z
     .object({
-      appBaseUrl: z.string(),
       smtpEnabled: z.boolean(),
       smtpHost: z.string(),
       smtpPort: z.string(),
@@ -91,12 +90,6 @@ function buildSchema(passwordSet: boolean) {
       vaultAddr: z.string(),
     })
     .superRefine((values, ctx) => {
-      validateOptional(
-        values.appBaseUrl,
-        zSystemSettingsUpdate.shape.appBaseUrl,
-        ctx,
-        "appBaseUrl"
-      );
       validateOptional(values.smtpHost, zSystemSettingsUpdate.shape.smtpHost, ctx, "smtpHost");
       validateOptional(
         values.smtpUsername,
@@ -176,7 +169,6 @@ const EMPTY_SMTP_VALUES = {
  */
 function toFormValues(settings: Partial<SystemSettings>): FormValues {
   return {
-    appBaseUrl: settings.appBaseUrl ?? "",
     smtpEnabled: settings.smtpEnabled ?? false,
     smtpHost: settings.smtpHost ?? "",
     smtpPort: String(settings.smtpPort ?? 587),
@@ -198,7 +190,6 @@ function toFormValues(settings: Partial<SystemSettings>): FormValues {
  */
 function toBody(values: FormValues): SystemSettingsUpdate {
   const body: SystemSettingsUpdate = {
-    appBaseUrl: values.appBaseUrl || null,
     smtpEnabled: values.smtpEnabled,
     smtpHost: values.smtpHost || null,
     smtpPort: Number(values.smtpPort),
@@ -218,7 +209,7 @@ function toBody(values: FormValues): SystemSettingsUpdate {
  * The PATCH body for "Clear SMTP settings": every SMTP field back to its
  * default, delivery disabled, and the stored password explicitly wiped.
  *
- * `appBaseUrl` is deliberately absent — it isn't an SMTP field, so it is left
+ * `vaultAddr` is deliberately absent — it isn't an SMTP field, so it is left
  * untouched. `smtpPassword: null` only reaches the backend through this
  * dedicated action: a blank form field always omits the key instead (see
  * {@link toBody}), so `null` is unambiguously "clear it" here.
@@ -236,9 +227,8 @@ const CLEARED_SMTP_BODY: SystemSettingsUpdate = {
 
 /**
  * The platform-wide settings: the SMTP relay notification email is delivered
- * through, the base URL those messages link back to, and the address of the
- * global Vault every tenant without a Vault of its own reads from. Reachable only by
- * `super_admin` — `layout.tsx` blocks every other viewer before this page
+ * through and the address of the global Vault every tenant without a Vault of
+ * its own reads from. Reachable only by `super_admin` — `layout.tsx` blocks every other viewer before this page
  * mounts.
  */
 export default function SystemSettingsPage() {
@@ -366,23 +356,6 @@ export default function SystemSettingsPage() {
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
-          <FormField
-            htmlFor="appBaseUrl"
-            label={t("systemSettings.applicationBaseUrl")}
-            error={errors.appBaseUrl?.message}
-          >
-            <Input
-              id="appBaseUrl"
-              placeholder="https://a2flow.example.com"
-              {...register("appBaseUrl")}
-            />
-            <p className="text-xs text-on-surface-variant">
-              {t("systemSettings.whereNotificationEmailLinksBackToLeave")}
-            </p>
-          </FormField>
-
-          <hr className="border-outline-variant" />
-
           <FormField
             htmlFor="vaultAddr"
             label={t("systemSettings.globalVaultAddress")}

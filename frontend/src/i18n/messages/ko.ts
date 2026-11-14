@@ -810,7 +810,6 @@ export const ko = {
   "status.sent": "보냄",
   "status.skipped": "건너뜀",
   "status.timeout": "시간 초과",
-  "systemSettings.applicationBaseUrl": "애플리케이션 기본 URL",
   "systemSettings.clear": "지우기",
   "systemSettings.clearSmtpSettings": "SMTP 설정 지우기",
   "systemSettings.clearSmtpSettings2": "SMTP 설정 지우기",
@@ -844,8 +843,6 @@ export const ko = {
     "테스트 메시지는 {em1} 설정을 사용하며 본인 주소로 전송됩니다. 방금 변경했다면 먼저 저장하세요.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "SMTP 호스트, 자격 증명, 보내는 주소를 지우고 이메일 전송을 사용 중지합니다. 이 작업은 취소할 수 없습니다.",
-  "systemSettings.whereNotificationEmailLinksBackToLeave":
-    "알림 이메일의 링크 대상입니다. 비워 두면 링크 없이 보냅니다.",
   "tagColor.amber": "앰버",
   "tagColor.cyan": "시안",
   "tagColor.indigo": "인디고",

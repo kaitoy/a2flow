@@ -4,12 +4,19 @@
 # Usage:
 #   docker compose -f compose.yml -f compose.https.yml up --build
 #
-# Set APP_DOMAIN in .env to the public host name (its DNS must point at this
-# host, with ports 80 and 443 reachable) and Caddy fetches and renews a Let's
-# Encrypt certificate for it. Left unset, the app is served at
+# APP_BASE_URL in .env is the one setting: the address users open the app at.
+# Caddy serves that address and the backend derives everything else from it
+# (email links, the SSO redirect URI, the CORS origin, and Secure cookies for
+# https). With a public host name, such as https://a2flow.example.com, Caddy
+# fetches and renews a Let's Encrypt certificate (its DNS must point at this
+# host, with ports 80 and 443 reachable). Left unset, the app is served at
 # https://localhost with a certificate from Caddy's own local CA, which a
 # browser trusts only once that CA's root certificate is installed -- see the
 # manual's "Run with Docker Compose" page.
+#
+# The URL must carry no port: only 80 and 443 are published, and Compose
+# cannot take a port back out of a URL to publish it. Caddy refuses to start
+# on one rather than listening where nothing can reach it.
 #
 # SSE needs nothing extra here: reverse_proxy flushes text/event-stream
 # immediately, compresses nothing without an `encode` directive, and has no
@@ -19,20 +26,26 @@ services:
   ingress:
     ports: !reset []
 
-  # The three settings the manual's Deployment page lists under "Behind HTTPS".
-  # APP_BASE_URL is applied to System Settings on every startup, which also
-  # makes the SSO redirect URI an https:// one.
   backend:
     environment:
-      SESSION_COOKIE_SECURE: "true"
-      CORS_ORIGINS: https://${APP_DOMAIN:-localhost}
-      APP_BASE_URL: https://${APP_DOMAIN:-localhost}
+      APP_BASE_URL: ${APP_BASE_URL:-https://localhost}
 
   caddy:
     image: caddy:2.10.2
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL:-https://localhost}
+    command:
+      - sh
+      - -c
+      - |
+        export APP_BASE_URL="$${APP_BASE_URL%/}"
+        case "$${APP_BASE_URL#*://}" in
+          *:*) echo "APP_BASE_URL must not carry a port with compose.https.yml: $$APP_BASE_URL" >&2; exit 1 ;;
+        esac
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     ports:
       - "80:80" # ACME HTTP challenge, and the redirect to https
       - "443:443"
@@ -48,7 +61,7 @@ services:
 configs:
   caddyfile:
     content: |
-      ${APP_DOMAIN:-localhost} {
+      {$$APP_BASE_URL} {
         reverse_proxy ingress:8080
       }
 

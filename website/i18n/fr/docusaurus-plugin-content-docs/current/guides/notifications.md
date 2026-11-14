@@ -47,7 +47,7 @@ Les notifications sont strictement individuelles : vous ne voyez que les vôtre
 
 Dès qu'un super administrateur a configuré un serveur SMTP dans les [Paramètres système](./system-settings.md), les cinq mêmes événements sont **également envoyés par e-mail** au destinataire : une demande d'approbation n'a donc pas à attendre que quelqu'un ouvre l'application.
 
-Le message reprend le titre de la notification comme objet, son corps comme texte, et comporte un lien vers ce qu'elle concerne : l'exécution ou le workflow. Ce lien est construit à partir de l'**URL de base de l'application** configurée ; si aucune n'est définie, le message est envoyé sans lien.
+Le message reprend le titre de la notification comme objet, son corps comme texte, et un lien vers ce qu'elle concerne — l'exécution ou le workflow. Le lien est construit à partir de l'URL de base du déploiement, qu'un opérateur définit au déploiement (voir [Paramètres du serveur](../operations/configuration.md#server-settings)) ; si elle n'est pas définie, le message part sans lien.
 
 Les destinataires injoignables sont écartés avant tout contact avec le relais : l'utilisateur système interne, les comptes désactivés ou supprimés, les comptes dont l'adresse n'est pas vérifiée et tout compte sans adresse. Il n'existe pas de désinscription individuelle : l'envoi d'e-mails est activé ou désactivé pour toute la plateforme.
 

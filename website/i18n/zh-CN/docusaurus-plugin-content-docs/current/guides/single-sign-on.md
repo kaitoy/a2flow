@@ -28,7 +28,7 @@ sequenceDiagram
 ## 开始之前 {#before-you-start}
 
 - 你需要在该租户中拥有管理员角色。
-- 超级管理员必须已在[系统设置](./system-settings.md)中填写**应用基础 URL**。它只能是地址本身：协议、主机和可选的端口，例如 `https://a2flow.example.com`，后面不能再有任何内容。带路径的值（如 `https://example.com/a2flow`）会让所有 SSO 登录失败。它为空时，**租户设置**会显示一条警告来代替**重定向 URI**，单点登录无法使用。
+- 运维人员必须已在部署时设置部署的基础 URL，请参阅[服务器设置](../operations/configuration.md#server-settings)。未设置时，**租户设置**会显示警告来代替**重定向 URI**，单点登录也无法使用。
 - A2Flow 必须能通过公网地址访问你的 IdP。位于私有网络中的 IdP 只有在运维人员允许其主机后才能使用，请参阅配置参考中的[单点登录](../operations/configuration.md#single-sign-on)。
 
 ## 设置步骤 {#set-it-up}

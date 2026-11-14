@@ -5,7 +5,7 @@ sidebar_position: 13
 
 # System Settings
 
-System Settings is where the mail server that [notification email](./notifications.md#email-delivery) goes through, and the global HashiCorp Vault, are configured. There is exactly one settings record for the whole deployment, seeded on first startup with email delivery **off**, so a fresh install keeps notifications in-app until an operator turns it on.
+System Settings is where the mail server that [notification email](./notifications.md#email-delivery) goes through, and the global HashiCorp Vault, are configured. There is exactly one settings record for the whole deployment, seeded on first startup with email delivery **off**, so a fresh install keeps notifications in-app until an operator turns it on. The address users open A2Flow at is not configured here: an operator sets it when deploying — see [Server settings](../operations/configuration.md#server-settings).
 
 Open **System Settings** in the admin sidebar. Like [Tenants](./users-and-groups.md#tenants), this section is restricted to **Super Admin** — the settings are platform-wide rather than tenant-scoped, so there is no tenant-admin carve-out, and even reading them is refused for anyone else.
 
@@ -13,7 +13,6 @@ Open **System Settings** in the admin sidebar. Like [Tenants](./users-and-groups
 
 | Field | Purpose |
 |---|---|
-| **Application Base URL** | Where notification email links back to, e.g. `https://a2flow.example.com`. Left empty, messages are sent without a link. |
 | **Send notifications by email** | The master switch. While it is off, notifications stay in-app and nothing is sent. |
 | **SMTP Host** / **SMTP Port** | The relay to hand messages to. |
 | **Security** | **STARTTLS** (default), **SSL/TLS** (implicit TLS), or **None**. |

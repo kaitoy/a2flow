@@ -30,15 +30,15 @@ SSE 代理路由（`POST /api/v1/workflow-executions/{id}/agent` 和 `POST /api/
 
 ## 位于 HTTPS 之后 {#behind-https}
 
-有三项设置的默认值只适合本地 HTTP 开发。在部署面向真实用户之前，请全部修改：
+部署在 HTTPS 之后所需的设置只有一项：把 `APP_BASE_URL` 设为浏览器看到的源，例如 `https://a2flow.example.com`。其余设置都由它决定：
 
-| 变量 | 设置为 | 保持默认值的后果 |
+| 项目 | `APP_BASE_URL` 为 `https://` 时 | 未设置 `APP_BASE_URL` 时 |
 |---|---|---|
-| `SESSION_COOKIE_SECURE` | `true` | 会话和 CSRF Cookie 发出时不带 `Secure`，因此浏览器也会通过明文 HTTP 发送它们 |
-| `CORS_ORIGINS` | 面向浏览器的源，例如 `https://a2flow.example.com` | 只有 `http://localhost:3000` 可以调用 API |
-| `APP_BASE_URL` | 同一个源 | 通知邮件发出时不带返回应用的深层链接，请参阅[通知邮件](./configuration.md#notification-email) |
+| 会话和 CSRF Cookie | 带有 `Secure`，浏览器只通过 HTTPS 发送 | 不带 `Secure`，浏览器也会通过明文 HTTP 发送 |
+| 允许调用 API 的源 | 该源 | 仅 `http://localhost:3000` |
+| 通知邮件和单点登录 | 邮件带有返回应用的链接，可以使用单点登录 | 邮件不带链接，单点登录无法使用 |
 
-Docker Compose 栈中有一个可用的示例：[通过 HTTPS 提供服务](../getting-started/docker-compose.md#https)在 `ingress` 服务前放置一个终止 TLS 的代理，并设置全部三项。
+前两项仍可用 `SESSION_COOKIE_SECURE` 和 `CORS_ORIGINS` 覆盖，请参阅[配置参考](./configuration.md#server-settings)。Docker Compose 栈中有一个可用的示例：[通过 HTTPS 提供服务](../getting-started/docker-compose.md#https)在 `ingress` 服务前放置一个终止 TLS 的代理，并把地址传给后端。
 
 ## 进程布局 {#process-layout}
 

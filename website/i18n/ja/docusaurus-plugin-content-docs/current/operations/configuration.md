@@ -15,14 +15,14 @@ sidebar_position: 2
 | `PORT` | `8000` | バックエンドがバインドするポート |
 | `RELOAD` | `false` | ローカル開発用の uvicorn オートリロード。バックエンドを `python -m backend.main` で起動したときだけ読まれます。Docker イメージの起動コマンドには、どちらにしても影響しません |
 | `TIMEZONE` | `UTC` | デプロイの現地タイムゾーンを表す IANA の名前。[運用メトリクス](./metrics.md)でカレンダー上の 1 日がどこで始まるか(「今日」の件数と、リードタイムの推移の日別バケット)を決めます。タスクの実行時刻の要件にタイムゾーンが書かれていないとき、ワークフローのエージェントはこのタイムゾーンで時刻を解釈します。認識できない名前は起動を止めず `UTC` にフォールバックします。つまり打ち間違いはアプリを止めるのではなく、現地時刻をずらします |
+| `APP_BASE_URL` | — | 利用者がブラウザでこのデプロイを開くアドレス。スキーム、ホスト、必要ならポートだけで、パスは付けません(例 `https://a2flow.example.com`)。通知メールのリンク先になり、[シングルサインオン](#single-sign-on)の **リダイレクト URI** もここから作られ、`CORS_ORIGINS` と `SESSION_COOKIE_SECURE` の既定値も決まります。これ以外の形だとバックエンドは起動しません。未設定だと、メールはリンクなしで送られ、シングルサインオンは使えません |
 
 ## フロントエンドの設定 {#frontend-settings}
 
 | 変数 | 既定値 | 役割 |
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | リバースプロキシが先に `/api/*` をバックエンドへ振り分けない構成(コンテナを使わずに動かすとき)で、フロントエンドが `/api/*` を転送する先。API ドキュメントのページがログイン中のセッションを確かめる先でもあります。プロセス起動時に一度だけ読まれます。Docker Compose の構成では、公開アドレスではなく内部ネットワーク上のバックエンドのアドレスです |
-| `APP_PORT` | `3000` | Docker Compose 専用。アプリを公開するホスト側のポートです。画面と API の両方を受け持つ `ingress` サービスのポートで、バックエンドの `CORS_ORIGINS` は自動的にこれに追従します |
-| `APP_DOMAIN` | `localhost` | Docker Compose で `compose.https.yml` を使うときだけ有効です。HTTPS でアプリを公開するホスト名です。公開されたホスト名なら Let's Encrypt から、`localhost` ならローカルの認証局から証明書を取得します。バックエンドの `CORS_ORIGINS` と `APP_BASE_URL` は自動でこの値に合わせられ、`SESSION_COOKIE_SECURE` は有効になります。[HTTPS で公開する](../getting-started/docker-compose.md#https)を参照してください |
+| `APP_PORT` | `3000` | Docker Compose 専用。アプリを公開するホスト側のポートです。画面と API の両方を受け持つ `ingress` サービスのポートです。`.env` で `APP_BASE_URL` を設定しない限り、`http://localhost:` にこのポートを続けたものがベース URL として渡されます |
 | `OPENBAO_PORT` | `8200` | Docker Compose で `--profile openbao` を付けたときだけ使います。OpenBao の UI を公開するホスト側のポートです。[OpenBao で Vault 型シークレットを試す](../getting-started/docker-compose.md#openbao)を参照してください。A2Flow はこの値に関係なく内部ネットワーク経由でアクセスします |
 
 ## アプリケーションのデータベース {#application-database}
@@ -62,7 +62,7 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 | 変数 | 既定値 | 役割 |
 |---|---|---|
 | `SESSION_IDLE_TIMEOUT_SECONDS` | `28800`(8 時間) | スライドするアイドルタイムアウト。認証済みリクエストで最終アクティブ時刻が更新されます(更新は最大 5 分に 1 回、この値の半分のほうが短ければその間隔に 1 回なので、セッションはその分だけ早く切れることがあります)。これより長く放置されたセッションは拒否されて削除されます |
-| `SESSION_COOKIE_SECURE` | `false` | セッションと CSRF のクッキーに `Secure`(HTTPS のみ)を付けます。HTTPS の背後に置くデプロイでは `true` にしてください |
+| `SESSION_COOKIE_SECURE` | `APP_BASE_URL` が `https://` で始まれば `true`、それ以外は `false` | セッションと CSRF の Cookie に `Secure`(HTTPS のみ)を付けます。その既定値を変えたいときだけ設定します |
 
 クッキー自体はセッションクッキー(`Max-Age` も `Expires` もなし)なので、ブラウザを閉じたときにも消えます。ブラウザはフロントエンドと同じオリジンでバックエンドに届く(`/api/*` がリバースプロキシかフロントエンド自身によってパスで振り分けられる)ため、クッキーはファーストパーティとなり `SameSite=Lax` がきれいに効きます。
 
@@ -70,7 +70,7 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 
 | 変数 | 既定値 | 役割 |
 |---|---|---|
-| `CORS_ORIGINS` | `http://localhost:3000` | バックエンド API を呼び出せる origin のカンマ区切りリスト |
+| `CORS_ORIGINS` | `APP_BASE_URL`、それがなければ `http://localhost:3000` | バックエンド API の呼び出しを許可する origin のカンマ区切りリスト |
 
 フロントエンドを配信する origin をすべて追加します。
 
@@ -86,9 +86,9 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | 空 | テナントの[シングルサインオン](../guides/single-sign-on.md)の発行者 URL に使えるホスト名で、`keycloak.internal,localhost` のようにカンマで区切ります。プライベートアドレスに解決されるホストでも許可します。オンプレミスの IdP 用です。これ以外の発行者は、パブリックアドレスに解決される必要があります |
 
-シングルサインオンは、デプロイのベース URL にも依存します。`APP_BASE_URL`([通知メール](#notification-email)を参照)か、[システム設定](../guides/system-settings.md)の**アプリケーションのベース URL**です。どちらもないとシングルサインオンは使えず、**テナント設定**には**リダイレクト URI**の代わりに警告が出ます。要件は 2 つあります。
+シングルサインオンは、デプロイのベース URL である `APP_BASE_URL` にも依存します([サーバーの設定](#server-settings)を参照)。ないとシングルサインオンは使えず、**テナント設定**には **リダイレクト URI** の代わりに警告が表示されます。要件は 2 つです。
 
-- **ベース URL はオリジンだけにします。** スキーム、ホスト、必要ならポートまでで、`https://a2flow.example.com` のようにパスは付けません。パスがあると、SSO のログインはすべて失敗します。
+- **ベース URL は origin だけ** — スキーム、ホスト、必要ならポートだけで(例 `https://a2flow.example.com`)、パスは付けません。それ以外の値ではバックエンドが起動しません。
 - **バックエンドには公開オリジンが見えるようにします。** リバースプロキシの背後では、プロキシがリクエストを転送するときに元の `Host` ヘッダーを保ち、`X-Forwarded-Proto` に元のスキームを設定するようにし、プロキシのアドレスを `FORWARDED_ALLOW_IPS` に書いてバックエンドに信頼させます(初期状態で信頼されるのは `127.0.0.1` だけです)。そうしないと、SSO のログインのたびにリダイレクトが 1 回余分に起きます。
 
 ## エージェントスキルストア {#agent-skill-store}
@@ -177,7 +177,6 @@ MCP ツールの呼び出しはどれも、そのタスク向けに発行され�
 
 | 変数 | 既定値 | 役割 |
 |---|---|---|
-| `APP_BASE_URL` | — | 利用者がブラウザでこのデプロイに到達する URL(例 `https://a2flow.example.com`)。通知メールに埋めるリンクの組み立てに使われ、未設定だとリンクなしで送られます |
 | `SMTP_ENABLED` | `false` | メール配信のマスタースイッチ。明示的に `true` にする必要があり、他の変数が設定されていることから推測されることはありません |
 | `SMTP_HOST` / `SMTP_PORT` | — / `587` | メッセージを渡すリレー。ここは内部のホスト名でも構いません。取得しに行く URL ではなく SMTP クライアントに渡す値だからです |
 | `SMTP_SECURITY` | `starttls` | `none`、`starttls`、`ssl` のいずれか |

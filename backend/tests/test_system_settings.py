@@ -356,12 +356,14 @@ async def test_out_of_range_port_is_rejected(settings_client: AsyncClient) -> No
     )
 
 
-async def test_a_private_app_base_url_is_accepted(settings_client: AsyncClient) -> None:
-    """The app's own address is often loopback; the SSRF guard must not apply."""
+async def test_app_base_url_is_not_a_system_setting(
+    settings_client: AsyncClient,
+) -> None:
+    """The base URL comes from ``APP_BASE_URL`` alone, never from this API."""
     body = assert_ok(
         await settings_client.patch(_PATH, json={"appBaseUrl": "http://localhost:3000"})
     )
-    assert body["appBaseUrl"] == "http://localhost:3000"
+    assert "appBaseUrl" not in body
 
 
 # ---------- test send ----------

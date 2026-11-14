@@ -30,15 +30,15 @@ A rolling deploy forcibly ends any SSE stream still open 30 seconds after the co
 
 ## Behind HTTPS
 
-Three settings default to values that only suit local HTTP development. Change all three before a deployment faces real users:
+One setting decides what a deployment behind HTTPS needs: set `APP_BASE_URL` to the browser-facing origin, such as `https://a2flow.example.com`. The rest follows from it:
 
-| Variable | Set it to | Left at the default |
+| What | With an `https://` `APP_BASE_URL` | Without `APP_BASE_URL` |
 |---|---|---|
-| `SESSION_COOKIE_SECURE` | `true` | Session and CSRF cookies go out without `Secure`, so a browser will also send them over plain HTTP |
-| `CORS_ORIGINS` | The browser-facing origin, e.g. `https://a2flow.example.com` | Only `http://localhost:3000` is allowed to call the API |
-| `APP_BASE_URL` | The same origin | Notification email is sent without the deep links back into the app — see [Notification email](./configuration.md#notification-email) |
+| Session and CSRF cookies | Marked `Secure`, so a browser sends them over HTTPS only | Sent without `Secure`, so a browser also sends them over plain HTTP |
+| Origins allowed to call the API | That origin | Only `http://localhost:3000` |
+| Notification email and single sign-on | Email links back into the app, and single sign-on can be used | Email is sent without links, and single sign-on is unavailable |
 
-The Docker Compose stack has a working example: [Serve over HTTPS](../getting-started/docker-compose.md#https) puts a TLS-terminating proxy in front of the `ingress` service and sets all three.
+`SESSION_COOKIE_SECURE` and `CORS_ORIGINS` can still override the first two — see [Configuration reference](./configuration.md#server-settings). The Docker Compose stack has a working example: [Serve over HTTPS](../getting-started/docker-compose.md#https) puts a TLS-terminating proxy in front of the `ingress` service and passes the address to the backend.
 
 ## Process layout
 

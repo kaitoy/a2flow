@@ -346,7 +346,6 @@ def get_oidc_login_service(
     auth: AuthServiceDep,
     oidc: OidcClientDep,
     cipher: SecretCipherDep,
-    system_settings: SystemSettingsRepositoryDep,
 ) -> OidcLoginService:
     """Create an OidcLoginService for the unauthenticated SSO redirects.
 
@@ -360,7 +359,6 @@ def get_oidc_login_service(
         auth=auth,
         oidc=oidc,
         cipher=cipher,
-        system_settings=system_settings,
         groups_for_tenant=lambda tenant_id: SqlUserGroupRepository(
             db, users, tenant_id=tenant_id
         ),

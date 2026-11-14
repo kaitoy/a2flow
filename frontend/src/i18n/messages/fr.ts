@@ -840,7 +840,6 @@ export const fr = {
   "status.sent": "envoyé",
   "status.skipped": "ignoré",
   "status.timeout": "délai dépassé",
-  "systemSettings.applicationBaseUrl": "URL de base de l'application",
   "systemSettings.clear": "Effacer",
   "systemSettings.clearSmtpSettings": "Effacer les paramètres SMTP",
   "systemSettings.clearSmtpSettings2": "Effacer les paramètres SMTP",
@@ -877,8 +876,6 @@ export const fr = {
     "Le message de test utilise les paramètres {em1} et est envoyé à votre propre adresse. Enregistrez d'abord si vous venez de modifier quelque chose.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "Cela efface l'hôte SMTP, les identifiants et l'adresse de l'expéditeur, et désactive l'envoi d'e-mails. Cette action est irréversible.",
-  "systemSettings.whereNotificationEmailLinksBackToLeave":
-    "Destination des liens des e-mails de notification. Laissez vide pour envoyer les messages sans lien.",
   "tagColor.amber": "Ambre",
   "tagColor.cyan": "Cyan",
   "tagColor.indigo": "Indigo",

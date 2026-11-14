@@ -30,15 +30,15 @@ SSE 에이전트 라우트(`POST /api/v1/workflow-executions/{id}/agent`와 `POS
 
 ## HTTPS 뒤에서 운영하기 {#behind-https}
 
-세 가지 설정의 기본값은 로컬 HTTP 개발에만 적합합니다. 실제 사용자에게 공개하기 전에 세 가지 모두 변경하세요.
+HTTPS 뒤에 두는 배포에 필요한 설정은 하나입니다. `APP_BASE_URL`에 브라우저가 보는 오리진(예: `https://a2flow.example.com`)을 설정합니다. 나머지는 여기서 정해집니다.
 
-| 변수 | 설정 값 | 기본값으로 두면 |
+| 대상 | `APP_BASE_URL`이 `https://`일 때 | `APP_BASE_URL`이 없을 때 |
 |---|---|---|
-| `SESSION_COOKIE_SECURE` | `true` | 세션 쿠키와 CSRF 쿠키가 `Secure` 없이 전송되므로 브라우저가 일반 HTTP로도 보냅니다 |
-| `CORS_ORIGINS` | 브라우저에서 접근하는 오리진(예: `https://a2flow.example.com`) | `http://localhost:3000`만 API를 호출할 수 있습니다 |
-| `APP_BASE_URL` | 같은 오리진 | 알림 이메일이 앱으로 돌아가는 딥 링크 없이 전송됩니다. [알림 이메일](./configuration.md#notification-email)을 참조하세요 |
+| 세션 및 CSRF 쿠키 | `Secure`가 붙어 브라우저가 HTTPS로만 보냅니다 | `Secure`가 붙지 않아 브라우저가 평문 HTTP로도 보냅니다 |
+| API 호출을 허용하는 오리진 | 그 오리진 | `http://localhost:3000`만 |
+| 알림 이메일과 싱글 사인온 | 이메일에 앱으로 돌아가는 링크가 붙고 싱글 사인온을 사용할 수 있습니다 | 이메일이 링크 없이 전송되고 싱글 사인온을 사용할 수 없습니다 |
 
-Docker Compose 스택에 동작하는 예가 있습니다. [HTTPS로 제공하기](../getting-started/docker-compose.md#https)는 `ingress` 서비스 앞에 TLS를 종료하는 프록시를 두고 세 가지를 모두 설정합니다.
+앞의 두 가지는 `SESSION_COOKIE_SECURE`와 `CORS_ORIGINS`로 덮어쓸 수도 있습니다. [구성 참조](./configuration.md#server-settings)를 참조하세요. Docker Compose 스택에 동작하는 예가 있습니다. [HTTPS로 제공하기](../getting-started/docker-compose.md#https)는 `ingress` 서비스 앞에 TLS를 종료하는 프록시를 두고 주소를 백엔드에 전달합니다.
 
 ## 프로세스 구성 {#process-layout}
 

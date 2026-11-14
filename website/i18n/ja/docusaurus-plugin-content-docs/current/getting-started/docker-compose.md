@@ -14,7 +14,7 @@ docker compose up --build
 
 [http://localhost:3000](http://localhost:3000) を開きます。データベースの中身は `pgdata` ボリュームに残るので、再起動しても消えません。
 
-アプリをホスト側の別のポートで公開したい場合は、`.env` に `APP_PORT` を設定します。バックエンドの `CORS_ORIGINS` は自動的にそれに追従します。
+`.env` の `APP_PORT` を設定すると、アプリを別のホスト側ポートで公開します。アプリのベース URL も自動でそれに合わせられます。ホスト名など別のアドレスでアプリを開かせたいときは、代わりに `.env` の `APP_BASE_URL` にそのアドレス(例 `http://a2flow.internal:3000`)を設定します。アプリが公開されるのは引き続き `APP_PORT` なので、アドレスにポートを書くときは `APP_PORT` も同じ値にしてください。
 
 ## 起動するコンテナ {#what-comes-up}
 
@@ -35,19 +35,19 @@ docker compose up --build
 
 ## HTTPS で公開する {#https}
 
-`compose.https.yml` を追加すると、ingress の前に [Caddy](https://caddyserver.com/) が置かれます。Caddy がポート 80 と 443 で唯一の入口になり、証明書を取得して、平文の HTTP を HTTPS にリダイレクトします。同時にバックエンドも HTTPS 用の設定に切り替わります。Cookie に Secure が付き、許可するオリジンが HTTPS になり、[システム設定](../guides/system-settings.md)の **アプリケーションのベース URL** も HTTPS のアドレスになります。[シングルサインオン](../guides/single-sign-on.md)の **リダイレクト URI** はこの値から作られます。
+`compose.https.yml` を追加すると、ingress の前に [Caddy](https://caddyserver.com/) が置かれます。Caddy がポート 80 と 443 で唯一の入口になり、`APP_BASE_URL` のアドレスの証明書を取得して、平文の HTTP を HTTPS にリダイレクトします。アドレスが `https://` なら、サインインの Cookie も Secure になり、[シングルサインオン](../guides/single-sign-on.md)の **リダイレクト URI** もこのアドレスから作られます。
 
 ```bash
-echo APP_DOMAIN=a2flow.example.com >> .env
+echo APP_BASE_URL=https://a2flow.example.com >> .env
 docker compose -f compose.yml -f compose.https.yml up --build
 ```
 
-`https://` に続けて `APP_DOMAIN` の値を開きます。その後の動きは `APP_DOMAIN` によって変わります。
+設定したアドレスを開きます。アドレスにポートは書けません。公開されるのは 80 と 443 だけで、ポート付きのアドレスでは Caddy が起動しません。その後の動きはホスト名によって変わります。
 
-| `APP_DOMAIN` | 証明書 | 始める前に |
+| `APP_BASE_URL` | 証明書 | 始める前に |
 |---|---|---|
-| 公開されたホスト名 | Let's Encrypt から取得し、自動で更新します | そのホスト名の DNS をこのホストに向け、ポート 80 と 443 にインターネットから到達できるようにします |
-| 未設定(`localhost`) | Caddy が自分で作る認証局が発行します | 不要です。ただし、その認証局を信頼するまでブラウザが証明書の警告を出します(下記) |
+| 公開されたホスト名(例 `https://a2flow.example.com`) | Let's Encrypt から取得し、自動で更新します | そのホスト名の DNS をこのホストに向け、ポート 80 と 443 にインターネットから到達できるようにします |
+| 未設定(`https://localhost`) | Caddy が自分で作る認証局が発行します | 不要です。ただし、その認証局を信頼するまでブラウザが証明書の警告を出します(下記) |
 
 ブラウザに `https://localhost` を信頼させるには、認証局のルート証明書を取り出して、OS かブラウザの信頼されたルート証明書に追加します。
 

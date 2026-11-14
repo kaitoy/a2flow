@@ -14,7 +14,7 @@ docker compose up --build
 
 [http://localhost:3000](http://localhost:3000)을 엽니다. 데이터베이스의 데이터는 `pgdata` 볼륨에 저장되므로 다시 시작해도 유지됩니다.
 
-앱을 다른 호스트 포트로 공개하려면 `.env`에 `APP_PORT`를 설정하세요. 백엔드의 `CORS_ORIGINS`는 이 값에 자동으로 맞춰집니다.
+`.env`에 `APP_PORT`를 설정하면 앱을 다른 호스트 포트로 공개합니다. 앱의 기본 URL도 자동으로 이를 따릅니다. 호스트 이름 등 다른 주소로 앱을 열게 하려면, 대신 `.env`의 `APP_BASE_URL`에 그 주소(예: `http://a2flow.internal:3000`)를 설정합니다. 앱은 계속 `APP_PORT`로 공개되므로, 주소에 포트를 쓸 때는 `APP_PORT`도 같은 값으로 맞추세요.
 
 ## 시작되는 컨테이너 {#what-comes-up}
 
@@ -35,19 +35,19 @@ docker compose up --build
 
 ## HTTPS로 제공하기 {#https}
 
-`compose.https.yml`을 추가하면 ingress 앞에 [Caddy](https://caddyserver.com/)가 놓입니다. Caddy가 포트 80과 443에서 유일한 진입점이 되어 인증서를 받고, 평문 HTTP를 HTTPS로 리디렉션합니다. 동시에 백엔드도 HTTPS용 설정으로 바뀝니다. 쿠키에 Secure가 붙고, 허용 오리진이 HTTPS가 되며, [시스템 설정](../guides/system-settings.md)의 **애플리케이션 기본 URL**도 HTTPS 주소가 됩니다. [싱글 사인온](../guides/single-sign-on.md)의 **리디렉션 URI**는 이 값으로 만들어집니다.
+`compose.https.yml`을 추가하면 ingress 앞에 [Caddy](https://caddyserver.com/)가 놓입니다. Caddy가 포트 80과 443에서 유일한 진입점이 되어 `APP_BASE_URL` 주소의 인증서를 받고, 평문 HTTP를 HTTPS로 리디렉션합니다. 주소가 `https://`이면 로그인 쿠키에도 Secure가 붙고, [싱글 사인온](../guides/single-sign-on.md)의 **리디렉션 URI**도 이 주소로 만들어집니다.
 
 ```bash
-echo APP_DOMAIN=a2flow.example.com >> .env
+echo APP_BASE_URL=https://a2flow.example.com >> .env
 docker compose -f compose.yml -f compose.https.yml up --build
 ```
 
-`https://` 뒤에 `APP_DOMAIN` 값을 붙여 엽니다. 그다음 동작은 그 이름에 따라 달라집니다.
+설정한 주소를 엽니다. 주소에 포트는 쓸 수 없습니다. 공개되는 포트는 80과 443뿐이며, 포트가 붙은 주소로는 Caddy가 시작되지 않습니다. 그다음 동작은 호스트 이름에 따라 달라집니다.
 
-| `APP_DOMAIN` | 인증서 | 시작하기 전에 |
+| `APP_BASE_URL` | 인증서 | 시작하기 전에 |
 |---|---|---|
-| 공개 호스트 이름 | Let's Encrypt에서 받고 자동으로 갱신합니다 | 이름의 DNS가 이 호스트를 가리키게 하고, 인터넷에서 포트 80과 443에 접근할 수 있게 합니다 |
-| 설정하지 않음(`localhost`) | Caddy가 직접 만든 인증 기관이 발급합니다 | 필요 없습니다. 다만 그 인증 기관을 신뢰하기 전까지 브라우저가 인증서 경고를 표시합니다(아래 참조) |
+| 공개 호스트 이름(예: `https://a2flow.example.com`) | Let's Encrypt에서 받고 자동으로 갱신합니다 | 이름의 DNS가 이 호스트를 가리키게 하고, 인터넷에서 포트 80과 443에 접근할 수 있게 합니다 |
+| 설정하지 않음(`https://localhost`) | Caddy가 직접 만든 인증 기관이 발급합니다 | 필요 없습니다. 다만 그 인증 기관을 신뢰하기 전까지 브라우저가 인증서 경고를 표시합니다(아래 참조) |
 
 브라우저가 `https://localhost`를 신뢰하게 하려면 인증 기관의 루트 인증서를 꺼내 운영 체제나 브라우저의 신뢰할 수 있는 루트 인증서에 추가합니다.
 

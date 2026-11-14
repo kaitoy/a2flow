@@ -39,6 +39,7 @@ import logging
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure.secret_cipher import get_secret_cipher
 from models.notification import Notification, NotificationCreate, NotificationType
 from models.outbound_email import OutboundEmailCreate
@@ -137,13 +138,14 @@ class NotificationDispatcher:
             recipient = await self._resolve_recipient(notification.user_id)
             if recipient is None:
                 return
-            settings = await self._settings.get()
             self._emails.stage(
                 OutboundEmailCreate(
                     notification_id=notification.id,
                     to_email=recipient,
                     subject=notification.title,
-                    body=_build_body(notification, base_url=settings.app_base_url),
+                    body=_build_body(
+                        notification, base_url=get_settings().app_base_url
+                    ),
                 ),
                 user_id=user_id,
             )

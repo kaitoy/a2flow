@@ -488,7 +488,7 @@ async def _settings_row(engine: AsyncEngine) -> SystemSettings:
 
 @pytest.fixture(autouse=True)
 def _blank_system_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force every ``APP_BASE_URL``/``SMTP_*`` env var blank before each test below.
+    """Force every ``SMTP_*`` env var blank before each test below.
 
     ``config.get_settings`` always reads real ``os.environ`` regardless of
     the conftest-level ``_reset_settings_cache`` fixture blocking
@@ -505,7 +505,6 @@ def _blank_system_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
     fields it cares about.
     """
     for name in (
-        "APP_BASE_URL",
         "SMTP_ENABLED",
         "SMTP_HOST",
         "SMTP_PORT",
@@ -524,40 +523,9 @@ async def test_apply_system_settings_env_overrides_does_nothing_when_unset(
     async with AsyncSession(settings_engine) as session:
         await apply_system_settings_env_overrides(session)
     row = await _settings_row(settings_engine)
-    assert row.app_base_url is None
     assert row.smtp_enabled is False
     assert row.smtp_host is None
     assert row.smtp_port == 587
-
-
-async def test_apply_system_settings_env_overrides_applies_app_base_url(
-    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("APP_BASE_URL", "https://a2flow.example.com")
-
-    async with AsyncSession(settings_engine) as session:
-        await apply_system_settings_env_overrides(session)
-
-    row = await _settings_row(settings_engine)
-    assert row.app_base_url == "https://a2flow.example.com"
-    # Applied independently of SMTP — no enable flag gates it.
-    assert row.smtp_enabled is False
-
-
-async def test_apply_system_settings_env_overrides_skips_on_invalid_app_base_url(
-    settings_engine: AsyncEngine,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    monkeypatch.setenv("APP_BASE_URL", "not-a-url")
-    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
-        async with AsyncSession(settings_engine) as session:
-            await apply_system_settings_env_overrides(session)
-    row = await _settings_row(settings_engine)
-    assert row.app_base_url is None
-    bootstrap_records = [r for r in caplog.records if r.name == _BOOTSTRAP_LOGGER]
-    assert len(bootstrap_records) == 1
-    assert "app_base_url" in bootstrap_records[0].getMessage()
 
 
 async def test_apply_system_settings_env_overrides_applies_a_full_valid_configuration(

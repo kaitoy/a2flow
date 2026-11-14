@@ -821,7 +821,6 @@ export const en = {
   "status.sent": "sent",
   "status.skipped": "skipped",
   "status.timeout": "timeout",
-  "systemSettings.applicationBaseUrl": "Application Base URL",
   "systemSettings.clear": "Clear",
   "systemSettings.clearSmtpSettings": "Clear SMTP settings",
   "systemSettings.clearSmtpSettings2": "Clear SMTP Settings",
@@ -855,8 +854,6 @@ export const en = {
     "The test message uses the {em1} settings and goes to your own address. Save first if you have just changed something.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "This clears the SMTP host, credentials, and sender address, and disables email delivery. This cannot be undone.",
-  "systemSettings.whereNotificationEmailLinksBackToLeave":
-    "Where notification email links back to. Leave empty to send messages without a link.",
   "tagColor.amber": "Amber",
   "tagColor.cyan": "Cyan",
   "tagColor.indigo": "Indigo",

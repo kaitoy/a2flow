@@ -784,7 +784,6 @@ export const zhCN = {
   "status.sent": "已发送",
   "status.skipped": "已跳过",
   "status.timeout": "超时",
-  "systemSettings.applicationBaseUrl": "应用基础 URL",
   "systemSettings.clear": "清除",
   "systemSettings.clearSmtpSettings": "清除 SMTP 设置",
   "systemSettings.clearSmtpSettings2": "清除 SMTP 设置",
@@ -815,8 +814,6 @@ export const zhCN = {
     "测试邮件使用 {em1} 设置，并发送到您自己的地址。如果刚做过更改，请先保存。",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "这会清除 SMTP 主机、凭据和发件人地址，并停用邮件投递。此操作无法撤销。",
-  "systemSettings.whereNotificationEmailLinksBackToLeave":
-    "通知邮件的链接目标。留空则发送不含链接的邮件。",
   "tagColor.amber": "琥珀",
   "tagColor.cyan": "青蓝",
   "tagColor.indigo": "靛蓝",

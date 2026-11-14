@@ -322,7 +322,7 @@ async def oidc_start(
     if request.headers.get("sec-fetch-site") == "cross-site":
         return RedirectResponse(_sso_error(SsoErrorCode.unavailable), status_code=302)
     try:
-        base_url = await service.app_base_url()
+        base_url = service.app_base_url()
         if (
             hop is None
             and base_url

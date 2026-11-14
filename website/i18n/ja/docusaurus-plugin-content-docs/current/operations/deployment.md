@@ -30,15 +30,15 @@ SSE のエージェントルート(`POST /api/v1/workflow-executions/{id}/agent`
 
 ## HTTPS の背後に置く {#behind-https}
 
-次の 3 つの既定値は、ローカルの HTTP 開発にしか合いません。実利用者の前に出す前に 3 つとも変えてください。
+HTTPS の背後に置くデプロイで必要な設定は 1 つです。`APP_BASE_URL` にブラウザから見た origin(例 `https://a2flow.example.com`)を設定します。残りはそこから決まります。
 
-| 変数 | 設定する値 | 既定のままだと |
+| 対象 | `APP_BASE_URL` が `https://` のとき | `APP_BASE_URL` がないとき |
 |---|---|---|
-| `SESSION_COOKIE_SECURE` | `true` | セッションと CSRF のクッキーに `Secure` が付かず、ブラウザは平文の HTTP にもそれを送ります |
-| `CORS_ORIGINS` | ブラウザから見える origin(例 `https://a2flow.example.com`) | API を呼べるのは `http://localhost:3000` だけです |
-| `APP_BASE_URL` | 同じ origin | 通知メールがアプリへのリンクなしで送られます。[通知メール](./configuration.md#notification-email)を参照してください |
+| セッションと CSRF の Cookie | `Secure` が付き、ブラウザは HTTPS でしか送りません | `Secure` が付かず、ブラウザは平文の HTTP でも送ります |
+| API の呼び出しを許可する origin | その origin | `http://localhost:3000` だけ |
+| 通知メールとシングルサインオン | メールにアプリへのリンクが付き、シングルサインオンが使えます | メールはリンクなしで送られ、シングルサインオンは使えません |
 
-Docker Compose 構成には動作例があります。[HTTPS で公開する](../getting-started/docker-compose.md#https)の手順では、`ingress` サービスの前に TLS を終端するプロキシを置き、この 3 つをすべて設定します。
+最初の 2 つは、`SESSION_COOKIE_SECURE` と `CORS_ORIGINS` で上書きもできます([設定リファレンス](./configuration.md#server-settings)を参照)。Docker Compose 構成には動作例があります。[HTTPS で公開する](../getting-started/docker-compose.md#https)の手順では、`ingress` サービスの前に TLS を終端するプロキシを置き、アドレスをバックエンドに渡します。
 
 ## プロセス構成 {#process-layout}
 

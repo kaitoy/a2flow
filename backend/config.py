@@ -3,7 +3,7 @@
 Collects every environment variable the running application reads (server
 bind settings, CORS, database, agent skill store, LLM selection, admin
 bootstrap, demo data, secret encryption, MCP registry,
-platform SMTP bootstrap, and session auth) into a single :class:`Settings`
+platform SMTP bootstrap, the public base URL, and session auth) into a single :class:`Settings`
 model instead of scattered ``os.getenv`` calls. Values with side-effecting
 fallback behavior (random admin password generation, Fernet key
 generation/persistence) are left to the modules that own that behavior; this
@@ -25,10 +25,11 @@ their own env vars in the test body; going through this module's
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 #: Fallback sliding idle timeout (8 hours) used when
@@ -173,7 +174,8 @@ class Settings(BaseSettings):
         host: Uvicorn bind host, used only by ``main.py``'s ``__main__`` block.
         port: Uvicorn bind port, used only by ``main.py``'s ``__main__`` block.
         reload: Whether that same ``__main__`` block enables uvicorn autoreload.
-        cors_origins: Allowed CORS origins for the API.
+        cors_origins: Allowed CORS origins for the API. Left unset, it is
+            ``app_base_url`` when that is set, else ``http://localhost:3000``.
         oidc_allowed_private_hosts: Hostnames a tenant's OIDC issuer URL may
             have even though they resolve to a private address (an on-premises
             identity provider). Comma-separated in the environment, lower-cased.
@@ -276,23 +278,29 @@ class Settings(BaseSettings):
         mcp_transport_cert_validity_days: Validity of the TLS material above.
             Reissued automatically once less than 30 days remain.
         session_cookie_secure: Whether auth/CSRF cookies carry the ``Secure``
-            attribute.
+            attribute. Left unset, it follows ``app_base_url``'s scheme: on
+            for ``https``, off otherwise (including when that is unset).
         session_idle_timeout_seconds: Sliding idle timeout, in seconds, for a
             login session.
         timezone: IANA name of the deployment's local timezone: where a
             calendar day starts for the operations metrics, and the zone a
             workflow task's time requirement without an offset is read in.
-        app_base_url: Base URL at which users reach this deployment in a
-            browser, used to build the deep links embedded in outgoing
-            notification email. Applied to the ``system_settings`` row on
-            every startup by
+        app_base_url: Origin at which users reach this deployment in a
+            browser -- scheme, host and an optional port, normalized without a
+            trailing slash. The deep links in outgoing notification email and
+            the OIDC redirect URI are built from it, an SSO sign-in hops to it
+            before leaving for the identity provider, and it supplies the
+            defaults of ``cors_origins`` and ``session_cookie_secure``. Set
+            only from the environment; a value that is not a bare http(s)
+            origin stops the application at startup, since every one of those
+            uses would otherwise fail later and quietly. Unset, email links and
+            single sign-on are off.
+        smtp_enabled: Whether outbound notification email is enabled. Applied
+            to the ``system_settings`` row on every startup by
             ``infrastructure.bootstrap.apply_system_settings_env_overrides``;
             left unset, the stored value is untouched. See that function's
             docstring for the full env-loading contract covering this and the
-            ``smtp_*`` fields below.
-        smtp_enabled: Whether outbound notification email is enabled. Applied
-            to the ``system_settings`` row the same way as ``app_base_url``
-            above; left unset, the stored value is untouched.
+            other ``smtp_*`` fields below.
         smtp_host: SMTP relay hostname or IP.
         smtp_port: SMTP relay submission port.
         smtp_security: How the connection to the relay is secured (``none``,
@@ -516,8 +524,57 @@ class Settings(BaseSettings):
             return default
         return parsed if parsed > 0 else default
 
+    @field_validator("app_base_url", mode="before")
+    @classmethod
+    def _normalize_app_base_url(cls, value: Any) -> Any:
+        """Accept a bare http(s) origin, drop a trailing slash, treat blank as unset.
+
+        Blank is unset for the same reason as
+        :meth:`_blank_system_settings_env_is_unset`. Anything else that is not
+        ``scheme://host[:port]`` -- a path, a query, credentials, another
+        scheme -- raises, so a mistyped value stops startup instead of
+        producing broken email links and an SSO redirect URI no identity
+        provider accepts.
+        """
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str):
+            return value
+        parts = urlsplit(value.strip())
+        try:
+            parts.port  # noqa: B018 -- raises ValueError on a malformed port
+        except ValueError:
+            parts = urlsplit("")
+        if (
+            parts.scheme not in ("http", "https")
+            or not parts.hostname
+            or parts.username is not None
+            or parts.path not in ("", "/")
+            or parts.query
+            or parts.fragment
+        ):
+            raise ValueError(
+                "APP_BASE_URL must be an http(s) origin with no path, "
+                "such as https://a2flow.example.com"
+            )
+        return f"{parts.scheme}://{parts.netloc}"
+
+    @model_validator(mode="after")
+    def _derive_from_app_base_url(self) -> Self:
+        """Default ``session_cookie_secure`` and ``cors_origins`` from ``app_base_url``.
+
+        Either one set explicitly is kept as it is, so a deployment can still
+        allow extra origins or force the cookie flag.
+        """
+        if "session_cookie_secure" not in self.model_fields_set:
+            self.session_cookie_secure = bool(
+                self.app_base_url and self.app_base_url.startswith("https://")
+            )
+        if "cors_origins" not in self.model_fields_set and self.app_base_url:
+            self.cors_origins = [self.app_base_url]
+        return self
+
     @field_validator(
-        "app_base_url",
         "smtp_enabled",
         "smtp_host",
         "smtp_port",
@@ -530,7 +587,7 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _blank_system_settings_env_is_unset(cls, value: Any) -> Any:
-        """Treat an empty ``APP_BASE_URL``/``SMTP_*`` value as unset, not a parse/shape error.
+        """Treat an empty ``SMTP_*`` value as unset, not a parse/shape error.
 
         A deploy template (docker-compose, a Kubernetes ConfigMap) commonly
         emits every declared env var, blank, when a feature exists but isn't
@@ -539,7 +596,7 @@ class Settings(BaseSettings):
         whole application at startup — before
         ``infrastructure.bootstrap.apply_system_settings_env_overrides`` ever
         gets a chance to log a warning and skip just the offending env load —
-        and a blank ``SMTP_HOST`` or ``APP_BASE_URL`` would be treated as
+        and a blank ``SMTP_HOST`` would be treated as
         "explicitly set to an invalid empty value" instead of "not
         configured". Mirrors :meth:`_fallback_idle_timeout`'s reasoning for
         the same class of problem.

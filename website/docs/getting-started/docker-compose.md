@@ -14,7 +14,7 @@ docker compose up --build
 
 Open [http://localhost:3000](http://localhost:3000). Database data persists in the `pgdata` volume across restarts.
 
-Set `APP_PORT` in `.env` to publish the app on a different host port; the backend's `CORS_ORIGINS` follows it automatically.
+Set `APP_PORT` in `.env` to publish the app on a different host port; the app's base URL follows it automatically. To have the app address itself differently — by a host name, say — set `APP_BASE_URL` in `.env` to that address instead, such as `http://a2flow.internal:3000`. The app is still published on `APP_PORT`, so when that address carries a port, set `APP_PORT` to match.
 
 ## What comes up
 
@@ -35,19 +35,19 @@ The first start takes longer than later ones: the images are built, the database
 
 ## Serve over HTTPS {#https}
 
-Adding `compose.https.yml` puts [Caddy](https://caddyserver.com/) in front of the ingress. It takes over as the only entry point, on ports 80 and 443, obtains a certificate, and redirects plain HTTP to HTTPS. The backend is switched to HTTPS settings at the same time — secure cookies, the HTTPS origin, and the **Application Base URL** under [System Settings](../guides/system-settings.md), which [single sign-on](../guides/single-sign-on.md) builds its **Redirect URI** from.
+Adding `compose.https.yml` puts [Caddy](https://caddyserver.com/) in front of the ingress. It takes over as the only entry point, on ports 80 and 443, obtains a certificate for the address in `APP_BASE_URL`, and redirects plain HTTP to HTTPS. An `https://` address also makes the sign-in cookies secure, and [single sign-on](../guides/single-sign-on.md) builds its **Redirect URI** from it.
 
 ```bash
-echo APP_DOMAIN=a2flow.example.com >> .env
+echo APP_BASE_URL=https://a2flow.example.com >> .env
 docker compose -f compose.yml -f compose.https.yml up --build
 ```
 
-Open `https://` followed by your `APP_DOMAIN`. What happens next depends on that name:
+Open the address you set. It must carry no port — only 80 and 443 are published, and Caddy refuses to start on an address with one. What happens next depends on the host name:
 
-| `APP_DOMAIN` | Certificate | Before you start |
+| `APP_BASE_URL` | Certificate | Before you start |
 |---|---|---|
-| A public host name | Obtained from Let's Encrypt and renewed automatically | Point the name's DNS at this host and make ports 80 and 443 reachable from the internet |
-| Not set (`localhost`) | Issued by a certificate authority Caddy creates for itself | Nothing — but the browser warns about the certificate until you trust that authority (below) |
+| A public host name, such as `https://a2flow.example.com` | Obtained from Let's Encrypt and renewed automatically | Point the name's DNS at this host and make ports 80 and 443 reachable from the internet |
+| Not set (`https://localhost`) | Issued by a certificate authority Caddy creates for itself | Nothing — but the browser warns about the certificate until you trust that authority (below) |
 
 To make the browser trust `https://localhost`, copy out the authority's root certificate and add it to your operating system's or browser's trusted root certificates:
 

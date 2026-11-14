@@ -21,8 +21,12 @@
 # /openapi.json to the backend and everything else to the frontend -- one
 # origin, so the auth cookies stay same-origin, and the SSE streams never pass
 # through Node.js. Set APP_PORT in .env to publish the app on a different host
-# port; CORS_ORIGINS below follows it automatically. To serve it over HTTPS
-# instead, add the Caddy front in compose.https.yml (see that file).
+# port. APP_BASE_URL below -- the address users open the app at, from which
+# the backend builds email links and the SSO redirect URI and derives its CORS
+# origin -- follows it unless .env sets APP_BASE_URL itself; Compose cannot
+# take the port back out of a URL, so a URL with another port needs APP_PORT
+# changed to match. To serve it over HTTPS instead, add the Caddy front in
+# compose.https.yml (see that file).
 #
 # Optional OpenBao (a Vault-compatible secret store) to try the Vault
 # integration against, its data kept in the `db` service below:
@@ -83,7 +87,7 @@ services:
       DEMO_AZURE_TENANT_ID: ${DEMO_AZURE_TENANT_ID:-}
       DEMO_AZURE_CLIENT_ID: ${DEMO_AZURE_CLIENT_ID:-}
       DEMO_AZURE_CLIENT_SECRET: ${DEMO_AZURE_CLIENT_SECRET:-}
-      CORS_ORIGINS: http://localhost:${APP_PORT:-3000}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:${APP_PORT:-3000}}
       # Store of cloned skill repositories, one directory per published
       # revision. Durable state, not a cache: a workflow execution pins the
       # revision it started with. Scaling the backend past one replica requires

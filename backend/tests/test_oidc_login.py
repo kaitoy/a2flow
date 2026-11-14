@@ -14,17 +14,16 @@ from cryptography.fernet import Fernet
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure.oidc_client import OidcClient
 from infrastructure.password import hash_password
 from infrastructure.secret_cipher import SecretCipher
-from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
 from models.user_group import UserGroup, UserGroupMember
 from repositories.auth_session import SqlAuthSessionRepository
 from repositories.exceptions import UnauthorizedError
 from repositories.login_failure import SqlLoginFailureRepository
-from repositories.system_settings import SqlSystemSettingsRepository
 from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from repositories.user_group import SqlUserGroupRepository
@@ -57,7 +56,7 @@ class Ctx:
 
 
 @pytest_asyncio.fixture()
-async def ctx() -> AsyncGenerator[Ctx, None]:
+async def ctx(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Ctx, None]:
     """Seed tenant ``acme`` with SSO on and a mapped group ``Eng``; build the service."""
     engine = await make_test_engine()
     await seed_users(engine, ids=())
@@ -78,10 +77,8 @@ async def ctx() -> AsyncGenerator[Ctx, None]:
                 updated_by=SYSTEM_USER_ID,
             )
         )
-        settings = await db.get(SystemSettings, SYSTEM_SETTINGS_ID)
-        assert settings is not None
-        settings.app_base_url = BASE_URL
-        db.add(settings)
+        monkeypatch.setenv("APP_BASE_URL", BASE_URL)
+        get_settings.cache_clear()
         db.add(
             UserGroup(
                 id="g-eng",
@@ -111,7 +108,6 @@ async def ctx() -> AsyncGenerator[Ctx, None]:
                 httpx.AsyncClient(transport=fake.transport), allowed_hosts=()
             ),
             cipher=cipher,
-            system_settings=SqlSystemSettingsRepository(db),
             groups_for_tenant=lambda t: SqlUserGroupRepository(
                 db, SqlUserRepository(db), tenant_id=t
             ),
@@ -496,15 +492,16 @@ async def test_userinfo_not_called_when_token_has_everything(ctx: Ctx) -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_unavailable_is_uniform(ctx: Ctx) -> None:
+async def test_start_unavailable_is_uniform(
+    ctx: Ctx, monkeypatch: pytest.MonkeyPatch
+) -> None:
     async def code_for(name: str) -> SsoErrorCode:
         with pytest.raises(SsoLoginError) as info:
             await ctx.svc.start(name)
         return info.value.code
 
     tenant = await ctx.db.get(Tenant, TENANT_ID)
-    settings = await ctx.db.get(SystemSettings, SYSTEM_SETTINGS_ID)
-    assert tenant is not None and settings is not None
+    assert tenant is not None
 
     async def save(*rows: Any) -> None:
         for row in rows:
@@ -528,13 +525,14 @@ async def test_start_unavailable_is_uniform(ctx: Ctx) -> None:
     assert await code_for("acme") == SsoErrorCode.unavailable
     tenant.oidc_client_secret = SecretCipher(ctx.key).encrypt("s3cret")
 
-    settings.app_base_url = None
-    await save(tenant, settings)
+    monkeypatch.setenv("APP_BASE_URL", "")
+    get_settings.cache_clear()
     assert await code_for("acme") == SsoErrorCode.unavailable
-    settings.app_base_url = BASE_URL
+    monkeypatch.setenv("APP_BASE_URL", BASE_URL)
+    get_settings.cache_clear()
 
     tenant.oidc_issuer = "https://elsewhere.example.com"
-    await save(tenant, settings)
+    await save(tenant)
     assert await code_for("acme") == SsoErrorCode.unavailable
 
 

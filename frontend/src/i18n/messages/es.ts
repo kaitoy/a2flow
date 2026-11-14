@@ -841,7 +841,6 @@ export const es = {
   "status.sent": "enviado",
   "status.skipped": "omitido",
   "status.timeout": "tiempo de espera agotado",
-  "systemSettings.applicationBaseUrl": "URL base de la aplicación",
   "systemSettings.clear": "Borrar",
   "systemSettings.clearSmtpSettings": "Borrar la configuración SMTP",
   "systemSettings.clearSmtpSettings2": "Borrar la configuración SMTP",
@@ -878,8 +877,6 @@ export const es = {
     "El mensaje de prueba usa la configuración {em1} y se envía a tu propia dirección. Guarda primero si acabas de cambiar algo.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "Esto borra el host SMTP, las credenciales y la dirección del remitente, y deshabilita la entrega de correo. Esta acción no se puede deshacer.",
-  "systemSettings.whereNotificationEmailLinksBackToLeave":
-    "A dónde enlazan los correos de notificación. Déjalo vacío para enviar mensajes sin enlace.",
   "tagColor.amber": "Ámbar",
   "tagColor.cyan": "Cian",
   "tagColor.indigo": "Índigo",

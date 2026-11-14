@@ -47,7 +47,7 @@ Las notificaciones son siempre individuales: solo ves las tuyas, y cada una desa
 
 Cuando un superadministrador ha configurado un servidor SMTP en [Configuración del sistema](./system-settings.md), los mismos cinco eventos **también se envían por correo electrónico** al destinatario, para que una solicitud de aprobación no tenga que esperar a que alguien abra la aplicación.
 
-El mensaje lleva como asunto el título de la notificación, como texto su cuerpo y un enlace a aquello a lo que se refiere: la ejecución o el flujo de trabajo. El enlace se construye a partir de la **URL base de la aplicación** configurada; si no hay ninguna, el mensaje se envía sin enlace.
+El mensaje lleva el título de la notificación como asunto, su cuerpo como texto y un enlace a aquello de lo que trata: la ejecución o el flujo de trabajo. El enlace se construye a partir de la URL base del despliegue, que define un operador al desplegar (consulta [Configuración del servidor](../operations/configuration.md#server-settings)); si no está definida, el mensaje se envía sin enlace.
 
 Los destinatarios a los que no se puede llegar se descartan antes de contactar con ningún relé: el usuario interno del sistema, las cuentas deshabilitadas o eliminadas, las cuentas con la dirección sin verificar y las cuentas sin dirección. No existe la opción de darse de baja por usuario: la entrega de correo está activada o desactivada para toda la plataforma.
 

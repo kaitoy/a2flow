@@ -14,7 +14,7 @@ docker compose up --build
 
 打开 [http://localhost:3000](http://localhost:3000)。数据库数据保存在 `pgdata` 卷中，重启后依然存在。
 
-要在其他主机端口上发布应用，请在 `.env` 中设置 `APP_PORT`；后端的 `CORS_ORIGINS` 会自动随之变化。
+在 `.env` 中设置 `APP_PORT`，即可把应用发布到主机上的其他端口；应用的基础 URL 会自动跟随此值。若要让应用以其他地址（例如某个主机名）打开，请改为在 `.env` 中把 `APP_BASE_URL` 设为该地址，例如 `http://a2flow.internal:3000`。应用仍发布在 `APP_PORT` 上，因此地址中带有端口时，请把 `APP_PORT` 设为相同的值。
 
 ## 启动的容器 {#what-comes-up}
 
@@ -35,19 +35,19 @@ docker compose up --build
 
 ## 通过 HTTPS 提供服务 {#https}
 
-加上 `compose.https.yml` 后，[Caddy](https://caddyserver.com/) 会放在 ingress 前面。它成为唯一的入口，监听 80 和 443 端口，获取证书，并把明文 HTTP 重定向到 HTTPS。后端也会同时切换为 HTTPS 设置：Cookie 带上 Secure，允许的源改为 HTTPS，[系统设置](../guides/system-settings.md)中的 **应用基础 URL** 也改为 HTTPS 地址。[单点登录](../guides/single-sign-on.md)的 **重定向 URI** 就是根据这个值生成的。
+加上 `compose.https.yml` 后，[Caddy](https://caddyserver.com/) 会放在 ingress 前面。它成为唯一的入口，监听 80 和 443 端口，为 `APP_BASE_URL` 中的地址获取证书，并把明文 HTTP 重定向到 HTTPS。地址为 `https://` 时，登录用的 Cookie 也会带上 Secure，[单点登录](../guides/single-sign-on.md)的**重定向 URI** 也由它生成。
 
 ```bash
-echo APP_DOMAIN=a2flow.example.com >> .env
+echo APP_BASE_URL=https://a2flow.example.com >> .env
 docker compose -f compose.yml -f compose.https.yml up --build
 ```
 
-打开 `https://` 加上 `APP_DOMAIN` 的值。之后的行为取决于这个名称：
+打开你设置的地址。地址中不能带端口：只发布了 80 和 443，地址带端口时 Caddy 不会启动。之后的行为取决于主机名：
 
-| `APP_DOMAIN` | 证书 | 开始之前 |
+| `APP_BASE_URL` | 证书 | 开始之前 |
 |---|---|---|
-| 公网主机名 | 从 Let's Encrypt 获取并自动续期 | 将该名称的 DNS 指向本主机，并确保 80 和 443 端口可从互联网访问 |
-| 未设置（`localhost`） | 由 Caddy 自行创建的证书颁发机构签发 | 无需准备，但在信任该颁发机构之前，浏览器会显示证书警告（见下文） |
+| 公网主机名，例如 `https://a2flow.example.com` | 从 Let's Encrypt 获取并自动续期 | 将该名称的 DNS 指向本主机，并确保 80 和 443 端口可从互联网访问 |
+| 未设置（`https://localhost`） | 由 Caddy 自行创建的证书颁发机构签发 | 无需准备，但在信任该颁发机构之前，浏览器会显示证书警告（见下文） |
 
 要让浏览器信任 `https://localhost`，请取出该颁发机构的根证书，并添加到操作系统或浏览器的受信任根证书中：
 

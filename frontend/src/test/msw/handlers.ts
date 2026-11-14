@@ -65,7 +65,6 @@ const TENANT_1 = {
 
 const SYSTEM_SETTINGS = {
   id: "00000000-0000-0000-0000-000000000001",
-  appBaseUrl: null,
   smtpEnabled: false,
   smtpHost: null,
   smtpPort: 587,
