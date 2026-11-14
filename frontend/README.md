@@ -54,7 +54,7 @@ pnpm build
 pnpm start
 ```
 
-`pnpm dev` and `pnpm build` automatically run `scripts/download-a2ui-schema.mjs` first, which downloads the A2UI Basic Catalog schema from `https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json` into `src/generated/basic_catalog.json`, verifying its SHA-256 against a pinned constant in the script and failing the build on mismatch.
+`pnpm dev` and `pnpm build` automatically run `scripts/generate-a2ui-catalog.mjs` first, which writes the A2UI Basic Catalog schema into `src/generated/basic_catalog.json` from the installed `@a2ui/web_core` (`basicCatalog.toJson()`) rather than downloading it from a2ui.org, so the catalog the agent is shown always matches the schemas the renderer validates against.
 
 Open [http://localhost:3000](http://localhost:3000).
 

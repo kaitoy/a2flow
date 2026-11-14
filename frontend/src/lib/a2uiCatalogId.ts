@@ -4,7 +4,7 @@
  * Kept in a dependency-free module so the Redux store and API layer can
  * reference it without importing the `@a2ui/*` renderer stack. Must match the
  * id the `tailwindCatalog` is registered under (`src/components/a2uiCatalog.tsx`)
- * and the URL `scripts/download-a2ui-schema.mjs` downloads: the A2UI message
+ * and the `$id` of the catalog `scripts/generate-a2ui-catalog.mjs` writes: the A2UI message
  * processor resolves each `createSurface.catalogId` strictly against the
  * registered catalog ids, so every path that fabricates or defaults a
  * `catalogId` has to agree on this value.
