@@ -16,6 +16,7 @@ import pytest_asyncio
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
 from infrastructure.secret_cipher import get_secret_cipher
 from models.notification import (
@@ -106,6 +107,13 @@ async def _seed_execution(session: AsyncSession, *, execution_id: str = "run-1")
     return execution.id
 
 
+@pytest.fixture(autouse=True)
+def _app_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give every test the deployment base URL the deep links are built from."""
+    monkeypatch.setenv("APP_BASE_URL", "http://localhost:3000")
+    get_settings.cache_clear()
+
+
 async def _enable_smtp(session: AsyncSession, **overrides: Any) -> None:
     """Switch email delivery on with a complete configuration."""
     settings = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
@@ -115,7 +123,6 @@ async def _enable_smtp(session: AsyncSession, **overrides: Any) -> None:
     settings.smtp_port = 2525
     settings.smtp_security = SmtpSecurity.none
     settings.smtp_from_email = "a2flow@example.com"
-    settings.app_base_url = "http://localhost:3000"
     for key, value in overrides.items():
         setattr(settings, key, value)
     session.add(settings)
@@ -304,10 +311,12 @@ def test_deep_link_falls_back_to_the_notification_centre_without_a_link() -> Non
 
 
 async def test_body_omits_the_link_when_no_base_url_is_configured(
-    session: AsyncSession,
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "")
+    get_settings.cache_clear()
     await _seed(session)
-    await _enable_smtp(session, app_base_url=None)
+    await _enable_smtp(session)
     await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
     assert "http" not in (await _queued(session))[0].body
 

@@ -8,16 +8,18 @@ A2UI rendering is handled entirely on the frontend by [`@ag-ui/a2ui-middleware`]
 
 ---
 
-## 1. Build time — schema download
+## 1. Build time — catalog generation
 
-Before `pnpm dev` or `pnpm build` starts, a prebuild script downloads the A2UI Basic Catalog schema:
+Before `pnpm dev` or `pnpm build` starts, a prebuild script writes the A2UI Basic Catalog schema:
 
 ```
 pnpm dev / pnpm build
-  └─ scripts/download-a2ui-schema.mjs (predev / prebuild hook)
-       └─ GET https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json
+  └─ scripts/generate-a2ui-catalog.mjs (predev / prebuild hook)
+       └─ basicCatalog.toJson()  (installed @a2ui/web_core)
             → src/generated/basic_catalog.json  (gitignored)
 ```
+
+It is generated from the renderer rather than downloaded from a2ui.org because the renderer rejects any component property its own schemas do not declare: the published document can be ahead of the installed renderer, and an agent following it would send surfaces that fail to render.
 
 The schema is used by `A2UIMiddleware` as context for the backend agent.
 

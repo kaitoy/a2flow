@@ -170,3 +170,28 @@ def test_upgrade_head_matches_model_metadata(migration_db: str) -> None:
             str(ix.name) for ix in SQLModel.metadata.tables[table].indexes
         }
         assert actual_indexes[table] == expected_indexes, table
+
+
+async def _users_password_nullable(url: str) -> bool:
+    """Report whether the migrated ``users.password`` column accepts NULL.
+
+    Args:
+        url: The migrated database.
+
+    Returns:
+        ``True`` if the column is nullable.
+    """
+    engine = create_async_engine(to_async_url(url))
+    try:
+        async with engine.connect() as conn:
+            columns = await conn.run_sync(lambda c: inspect(c).get_columns("users"))
+    finally:
+        await engine.dispose()
+    return next(c["nullable"] for c in columns if c["name"] == "password")
+
+
+def test_upgrade_head_makes_user_password_nullable(migration_db: str) -> None:
+    """An SSO-only user has no password, so the migrated column must allow NULL."""
+    command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
+
+    assert asyncio.run(_users_password_nullable(migration_db)) is True

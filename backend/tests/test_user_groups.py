@@ -20,6 +20,8 @@ from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
 from models.workflow_execution import WorkflowExecution
 from repositories.effective_roles import SqlEffectiveRoleRepository
+from repositories.user import SqlUserRepository
+from repositories.user_group import SqlUserGroupRepository
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
@@ -604,3 +606,179 @@ async def test_delete_is_refused_while_an_approval_is_addressed_to_the_group(
     )
     async with AsyncSession(engine) as session:
         assert await session.get(UserGroup, created["id"]) is not None
+
+
+# ---------- IdP-mapped groups ----------
+
+
+async def test_idp_group_unique_within_tenant(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    await _create(client, idpGroup="eng")
+    response = await client.post(
+        "/api/v1/user-groups",
+        json={"name": "Other", "idpGroup": "eng"},
+        headers=ADMIN,
+    )
+    error = assert_err(response, "CONFLICT_UNIQUE", 409)
+    assert error["details"] == {"field": "idpGroup", "value": "eng"}
+
+
+async def test_empty_idp_group_is_rejected(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    response = await client.post(
+        "/api/v1/user-groups", json={"name": "G", "idpGroup": ""}, headers=ADMIN
+    )
+    assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_idp_group_is_trimmed_and_blank_rejected(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    group = await _create(client, idpGroup="  eng  ")
+    assert group["idpGroup"] == "eng"
+    for blank in ("   ", "	"):
+        response = await client.patch(
+            f"/api/v1/user-groups/{group['id']}",
+            json={"idpGroup": blank},
+            headers=ADMIN,
+        )
+        assert_err(response, "VALIDATION_ERROR", 422)
+
+
+async def test_mapped_group_members_cannot_change(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    group = await _create(client, idpGroup="eng")
+    url = f"/api/v1/user-groups/{group['id']}"
+    assert_err(
+        await client.patch(url, json={"memberIds": ["alice"]}, headers=ADMIN),
+        "INVALID_USER_GROUP",
+        422,
+    )
+    renamed = assert_ok(
+        await client.patch(url, json={"name": "Renamed"}, headers=ADMIN)
+    )
+    assert renamed["name"] == "Renamed"
+    assert_err(
+        await client.post(
+            "/api/v1/user-groups",
+            json={"name": "New", "idpGroup": "ops", "memberIds": ["alice"]},
+            headers=ADMIN,
+        ),
+        "INVALID_USER_GROUP",
+        422,
+    )
+
+
+async def test_mapping_a_group_and_changing_members_together_is_refused(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    group = await _create(client, memberIds=["alice"])
+    url = f"/api/v1/user-groups/{group['id']}"
+    assert_err(
+        await client.patch(
+            url, json={"idpGroup": "eng", "memberIds": ["bob"]}, headers=ADMIN
+        ),
+        "INVALID_USER_GROUP",
+        422,
+    )
+
+
+async def test_unmapping_a_group_makes_its_members_editable(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    group = await _create(client, idpGroup="eng")
+    url = f"/api/v1/user-groups/{group['id']}"
+    cleared = assert_ok(await client.patch(url, json={"idpGroup": None}, headers=ADMIN))
+    assert cleared["idpGroup"] is None
+    updated = assert_ok(
+        await client.patch(url, json={"memberIds": ["alice"]}, headers=ADMIN)
+    )
+    assert updated["memberIds"] == ["alice"]
+
+
+async def test_patch_unknown_group_is_still_404_with_member_ids(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, _ = group_env
+    assert_err(
+        await client.patch(
+            "/api/v1/user-groups/nope", json={"memberIds": ["alice"]}, headers=ADMIN
+        ),
+        "NOT_FOUND",
+        404,
+    )
+
+
+async def test_put_user_groups_cannot_touch_mapped_group(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    client, engine = group_env
+    mapped = await _create(client, name="Mapped", idpGroup="eng")
+    plain = await _create(client, name="Plain", roles=[])
+    other = await _create(client, name="Other", roles=[])
+    url = "/api/v1/users/alice/groups"
+    # Adding a mapped group is refused.
+    assert_err(
+        await client.put(url, json={"groupIds": [mapped["id"]]}, headers=ADMIN),
+        "INVALID_USER_GROUP",
+        422,
+    )
+    # Put alice in the mapped group the way a sign-in sync would.
+    async with AsyncSession(engine) as session:
+        session.add(UserGroupMember(group_id=mapped["id"], user_id="alice"))
+        await session.commit()
+    # Dropping it is refused too.
+    assert_err(
+        await client.put(url, json={"groupIds": [plain["id"]]}, headers=ADMIN),
+        "INVALID_USER_GROUP",
+        422,
+    )
+    # Changing only unmapped groups while keeping the mapped one is fine.
+    assert_ok(
+        await client.put(
+            url, json={"groupIds": [mapped["id"], plain["id"]]}, headers=ADMIN
+        )
+    )
+    assert_ok(
+        await client.put(
+            url, json={"groupIds": [mapped["id"], other["id"]]}, headers=ADMIN
+        )
+    )
+
+
+async def test_sync_mapped_membership_leaves_unmapped_groups(
+    group_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    _, engine = group_env
+    async with AsyncSession(engine) as session:
+        for gid, idp in (("g0", None), ("g1", "a"), ("g2", "b")):
+            session.add(
+                UserGroup(
+                    id=gid,
+                    name=gid,
+                    idp_group=idp,
+                    tenant_id=DEFAULT_TEST_TENANT_ID,
+                    created_by="alice",
+                    updated_by="alice",
+                )
+            )
+        await session.commit()
+        session.add(UserGroupMember(group_id="g0", user_id="alice"))
+        session.add(UserGroupMember(group_id="g1", user_id="alice"))
+        await session.commit()
+
+        repo = SqlUserGroupRepository(
+            session, SqlUserRepository(session), tenant_id=DEFAULT_TEST_TENANT_ID
+        )
+        assert {g.id for g in await repo.list_mapped()} == {"g1", "g2"}
+        await repo.sync_mapped_membership("alice", ["b"])
+        assert await repo.group_ids_for_user("alice") == ["g0", "g2"]

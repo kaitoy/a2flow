@@ -646,4 +646,15 @@ describe("UserDetailPage group membership", () => {
     await waitFor(() => screen.getByDisplayValue("Root"));
     expect(screen.queryByText("Groups")).not.toBeInTheDocument();
   });
+
+  it("shows an SSO badge when the account is linked to an identity provider", async () => {
+    setup();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users/:userId", () =>
+        envelope({ ...FULL_USER, ssoLinked: true })
+      )
+    );
+    renderPage();
+    expect(await screen.findByText("SSO")).toBeInTheDocument();
+  });
 });

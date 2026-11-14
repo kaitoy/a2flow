@@ -5,7 +5,7 @@ sidebar_position: 13
 
 # Configuración del sistema
 
-En Configuración del sistema se definen el servidor de correo por el que sale el [correo de notificación](./notifications.md#email-delivery) y el HashiCorp Vault global. Hay exactamente un registro de configuración para todo el despliegue, que se crea en el primer inicio con la entrega de correo **desactivada**, de modo que en una instalación nueva las notificaciones se quedan dentro de la aplicación hasta que un operador la active.
+En Configuración del sistema se definen el servidor de correo por el que sale el [correo de notificación](./notifications.md#email-delivery) y el HashiCorp Vault global. Hay exactamente un registro de configuración para todo el despliegue, que se crea en el primer inicio con la entrega de correo **desactivada**, de modo que en una instalación nueva las notificaciones se quedan dentro de la aplicación hasta que un operador la active. La dirección en la que los usuarios abren A2Flow no se configura aquí: la define un operador al desplegar; consulta [Configuración del servidor](../operations/configuration.md#server-settings).
 
 Abre **Configuración del sistema** en la barra lateral de administración. Igual que [Tenants](./users-and-groups.md#tenants), esta sección está reservada al **Superadministrador**: la configuración afecta a toda la plataforma y no a un tenant, así que no hay ninguna excepción para los administradores de tenant, e incluso su lectura se rechaza para cualquier otra persona.
 
@@ -13,7 +13,6 @@ Abre **Configuración del sistema** en la barra lateral de administración. Igua
 
 | Campo | Para qué sirve |
 |---|---|
-| **URL base de la aplicación** | A dónde apuntan los enlaces del correo de notificación, por ejemplo `https://a2flow.example.com`. Si se deja vacía, los mensajes se envían sin enlace. |
 | **Enviar notificaciones por correo electrónico** | El interruptor general. Mientras está desactivado, las notificaciones se quedan dentro de la aplicación y no se envía nada. |
 | **Host SMTP** / **Puerto SMTP** | El relé al que se entregan los mensajes. |
 | **Seguridad** | **STARTTLS** (predeterminado), **SSL/TLS** (TLS implícito) o **Ninguno**. |

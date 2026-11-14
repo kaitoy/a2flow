@@ -107,6 +107,26 @@ class TenantGlobalVaultFields(SQLModel):
     global_vault_credential: str | None = Field(default=None, max_length=4096)
 
 
+class TenantOidcFields(SQLModel):
+    """The tenant's OpenID Connect single sign-on settings, as its ``admin`` submits them.
+
+    ``oidc_client_secret`` is write-only: a non-empty value is stored as Fernet
+    ciphertext, an **empty string** clears the stored secret, and omitting the
+    field leaves it unchanged. The enable rule (an issuer, a client id and a
+    secret must all be present when ``oidc_enabled`` is true) and the issuer's
+    URL safety are checked against the merged result by
+    :class:`services.tenant.TenantService`.
+    """
+
+    model_config = _alias_config
+    oidc_enabled: bool | None = None
+    oidc_issuer: str | None = Field(default=None, max_length=2048)
+    oidc_client_id: str | None = Field(default=None, max_length=255)
+    oidc_client_secret: str | None = Field(default=None, max_length=4096)
+    oidc_groups_claim: str | None = Field(default=None, min_length=1, max_length=255)
+    oidc_trust_email: bool | None = None
+
+
 class TenantUpdate(TenantGlobalVaultFields):
     """Partial update payload for a Tenant — all fields are optional.
 
@@ -147,6 +167,10 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     without deleting it — and, transitively, without deleting or orphaning
     its users (see ``User.tenant_id``'s ``ON DELETE RESTRICT`` foreign key
     in :mod:`models.user`).
+
+    The ``oidc_*`` columns hold the tenant's OpenID Connect single sign-on
+    configuration. They are plain table columns for now, deliberately absent
+    from the create/update payloads and the read views.
     """
 
     __tablename__ = "tenants"
@@ -163,24 +187,55 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     vault_credential: str | None = None
     #: Fernet ciphertext, like :attr:`vault_credential`.
     global_vault_credential: str | None = None
+    #: Whether members of this tenant may sign in through its OIDC provider.
+    oidc_enabled: bool = False
+    #: Issuer URL of the tenant's OIDC provider (the base of its discovery document).
+    oidc_issuer: str | None = None
+    #: Client id A2Flow is registered under at the provider.
+    oidc_client_id: str | None = None
+    #: Fernet ciphertext of the client secret, never exposed through the API.
+    oidc_client_secret: str | None = None
+    #: Name of the ID-token claim that lists the user's provider groups.
+    oidc_groups_claim: str = "groups"
+    #: Whether the provider's email address is trusted to link an existing
+    #: account that has the same email.
+    oidc_trust_email: bool = False
 
 
-class TenantSettingsUpdate(TenantVaultFields):
+class TenantSettingsUpdate(TenantVaultFields, TenantOidcFields):
     """Partial update of the settings a tenant's own ``admin`` may change.
 
     Exposed on ``PATCH /tenant-settings``, which acts on the caller's tenant
-    rather than on a tenant id: sign-in throttling and the tenant's own Vault.
+    rather than on a tenant id: sign-in throttling, the tenant's own Vault and
+    its OIDC single sign-on.
     """
 
     login_max_failures: LoginMaxFailures | None = None
     login_lockout_minutes: LoginLockoutMinutes | None = None
 
 
+def oidc_redirect_uri(app_base_url: str | None) -> str | None:
+    """Return the OIDC callback URL to register at the identity provider.
+
+    Args:
+        app_base_url: The platform's public base URL, or ``None`` when unset.
+
+    Returns:
+        ``None`` when no base URL is set, else the base URL (without a trailing
+        slash) followed by the callback path.
+    """
+    if not app_base_url:
+        return None
+    return f"{app_base_url.rstrip('/')}/api/v1/auth/oidc/callback"
+
+
 class TenantSettings(SQLModel):
     """Read view of the settings a tenant's own ``admin`` may change.
 
-    ``vault_credential_set`` reports only whether a Vault credential is stored,
-    so the form can show it as configured without ever receiving it.
+    ``vault_credential_set`` and ``oidc_client_secret_set`` report only whether
+    a credential is stored, so the form can show it as configured without ever
+    receiving it. ``oidc_redirect_uri`` is the callback URL the provider must
+    allow, derived from the deployment's ``APP_BASE_URL``.
     """
 
     model_config = _alias_config
@@ -192,17 +247,30 @@ class TenantSettings(SQLModel):
     vault_approle_mount: str | None = None
     #: Whether a Vault credential is stored. The credential is never serialized.
     vault_credential_set: bool = False
+    oidc_enabled: bool = False
+    oidc_issuer: str | None = None
+    oidc_client_id: str | None = None
+    #: Whether an OIDC client secret is stored. The secret is never serialized.
+    oidc_client_secret_set: bool = False
+    oidc_groups_claim: str = "groups"
+    oidc_trust_email: bool = False
+    oidc_redirect_uri: str | None = None
 
     @classmethod
-    def from_tenant(cls, tenant: Tenant) -> "TenantSettings":
+    def from_tenant(
+        cls, tenant: Tenant, *, oidc_redirect_uri: str | None
+    ) -> "TenantSettings":
         """Project a tenant into its admin-managed settings.
 
         Args:
             tenant: The persisted tenant row.
+            oidc_redirect_uri: The OIDC callback URL (see
+                :func:`oidc_redirect_uri`), or ``None`` when the platform has
+                no base URL.
 
         Returns:
-            The settings, with ``vault_credential_set`` in place of the
-            credential.
+            The settings, with ``vault_credential_set`` and
+            ``oidc_client_secret_set`` in place of the credentials.
         """
         return cls(
             login_max_failures=tenant.login_max_failures,
@@ -212,6 +280,13 @@ class TenantSettings(SQLModel):
             vault_role_id=tenant.vault_role_id,
             vault_approle_mount=tenant.vault_approle_mount,
             vault_credential_set=bool(tenant.vault_credential),
+            oidc_enabled=tenant.oidc_enabled,
+            oidc_issuer=tenant.oidc_issuer,
+            oidc_client_id=tenant.oidc_client_id,
+            oidc_client_secret_set=bool(tenant.oidc_client_secret),
+            oidc_groups_claim=tenant.oidc_groups_claim,
+            oidc_trust_email=tenant.oidc_trust_email,
+            oidc_redirect_uri=oidc_redirect_uri,
         )
 
 

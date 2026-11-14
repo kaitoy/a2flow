@@ -31,7 +31,7 @@ COPY --from=openapi /backend/openapi.yaml /app/backend/openapi.yaml
 
 # Run the prebuild steps explicitly: `pnpm exec` bypasses the package.json
 # `prebuild` hook, which would shell out to `uv` (unavailable in this stage).
-RUN node --use-system-ca scripts/download-a2ui-schema.mjs \
+RUN node scripts/generate-a2ui-catalog.mjs \
     && pnpm exec openapi-ts \
     && pnpm exec next build
 

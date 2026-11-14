@@ -12,7 +12,6 @@ const BASE = "http://localhost:8000";
 
 const CONFIGURED = {
   id: "00000000-0000-0000-0000-000000000001",
-  appBaseUrl: "https://a2flow.example.com",
   smtpEnabled: true,
   smtpHost: "smtp.example.com",
   smtpPort: 2525,
@@ -21,6 +20,7 @@ const CONFIGURED = {
   smtpFromEmail: "a2flow@example.com",
   smtpFromName: "A2Flow",
   smtpPasswordSet: true,
+  vaultAddr: "https://vault.example.com:8200",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
   createdBy: "",
@@ -49,7 +49,7 @@ describe("SystemSettingsPage", () => {
     expect(screen.getByDisplayValue("2525")).toBeInTheDocument();
     expect(screen.getByDisplayValue("mailer")).toBeInTheDocument();
     expect(screen.getByDisplayValue("a2flow@example.com")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("https://a2flow.example.com")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/application base url/i)).toBeNull();
   });
 
   it("leaves the password field blank and marks it as already saved", async () => {
@@ -261,7 +261,7 @@ describe("SystemSettingsPage", () => {
     expect(patchSpy).not.toHaveBeenCalled();
   });
 
-  it("clears every SMTP field and disables delivery on confirm, leaving the base URL alone", async () => {
+  it("clears every SMTP field and disables delivery on confirm, leaving the Vault address alone", async () => {
     serveConfigured();
     let body: Record<string, unknown> | undefined;
     server.use(
@@ -300,7 +300,7 @@ describe("SystemSettingsPage", () => {
     });
 
     await waitFor(() => expect(screen.queryByDisplayValue("smtp.example.com")).toBeNull());
-    expect(screen.getByDisplayValue("https://a2flow.example.com")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("https://vault.example.com:8200")).toBeInTheDocument();
     const passwordField = screen.getByLabelText(/smtp password/i);
     expect(passwordField).not.toHaveAttribute("placeholder", expect.stringContaining("Saved"));
     await waitFor(() =>

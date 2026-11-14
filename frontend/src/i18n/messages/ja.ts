@@ -626,6 +626,7 @@ export const ja = {
   "errors.INVALID_SESSION_INPUT": "この入力はセッションに送信できません。",
   "errors.INVALID_SYSTEM_SETTINGS": "システム設定が正しくありません。",
   "errors.INVALID_TENANT": "テナントの設定が正しくありません。",
+  "errors.INVALID_USER_GROUP": "ユーザーグループが正しくありません。",
   "errors.INVALID_USER": "ユーザーの設定が正しくありません。",
   "errors.MCP_UNREACHABLE": "MCPサーバーに接続できません。",
   "errors.NETWORK_ERROR": "サーバーに接続できません。接続を確認して、もう一度お試しください。",
@@ -696,7 +697,13 @@ export const ja = {
     "プラットフォーム管理者としてログインする場合は空欄にしてください。",
   "login.signIn": "ログイン",
   "login.signInToA2flow": "A2Flow にログイン",
+  "login.signInWithSso": "SSO でログイン",
   "login.signingIn": "ログイン中…",
+  "login.ssoError.unavailable": "このテナントではシングルサインオンを利用できません。",
+  "login.ssoError.failed": "シングルサインオンに失敗しました。もう一度お試しください。",
+  "login.ssoError.account_disabled": "アカウントが無効です。",
+  "login.ssoError.not_permitted":
+    "お使いの IdP アカウントは A2Flow へのログインが許可されていません。",
   "mcpServers.addServer": "+ サーバーを追加",
   "mcpServers.browseRegistry": "レジストリを参照",
   "mcpServers.deleteMcpServer": "MCP サーバーを削除",
@@ -813,7 +820,6 @@ export const ja = {
   "status.sent": "送信済み",
   "status.skipped": "スキップ",
   "status.timeout": "タイムアウト",
-  "systemSettings.applicationBaseUrl": "アプリケーションのベース URL",
   "systemSettings.clear": "クリア",
   "systemSettings.clearSmtpSettings": "SMTP 設定をクリア",
   "systemSettings.clearSmtpSettings2": "SMTP 設定をクリア",
@@ -846,8 +852,6 @@ export const ja = {
     "テストメッセージは {em1} の設定を使い、自分のアドレスに送られます。変更した直後なら先に保存してください。",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "SMTP のホスト、認証情報、送信元アドレスをクリアし、メール配信を無効にします。この操作は取り消せません。",
-  "systemSettings.whereNotificationEmailLinksBackToLeave":
-    "通知メールのリンク先です。空欄にするとリンクなしで送信します。",
   "tagColor.amber": "アンバー",
   "tagColor.cyan": "シアン",
   "tagColor.indigo": "インディゴ",
@@ -867,6 +871,25 @@ export const ja = {
     "このタグを作成する前に、ヘッダーでテナントを選択してください。",
   "tags.tagCreated": "タグを作成しました",
   "tags.tagUpdated": "タグを更新しました",
+  "tenantSettings.oidc.title": "シングルサインオン",
+  "tenantSettings.oidc.enable": "シングルサインオンを有効にする",
+  "tenantSettings.oidc.issuerUrl": "発行者 URL",
+  "tenantSettings.oidc.issuerUrlHint": "IdP の OpenID Connect 発行者です。",
+  "tenantSettings.oidc.clientId": "クライアント ID",
+  "tenantSettings.oidc.clientSecret": "クライアントシークレット",
+  "tenantSettings.oidc.groupsClaim": "グループクレーム",
+  "tenantSettings.oidc.groupsClaimHint":
+    "ユーザーの IdP グループを列挙する ID トークンのクレームです。トークンにこのクレームがないユーザーは、IdP グループに対応付けられたすべてのグループから外れます。",
+  "tenantSettings.oidc.trustEmail": "この IdP のメールアドレスを信頼する",
+  "tenantSettings.oidc.trustEmailHint":
+    "IdP がメールアドレスを確認済みとしていない場合でも、メールアドレスで既存のアカウントを紐付けます。",
+  "tenantSettings.oidc.redirectUri": "リダイレクト URI",
+  "tenantSettings.oidc.redirectUriHint":
+    "この URL を IdP のリダイレクト URI として登録してください。",
+  "tenantSettings.oidc.copy": "コピー",
+  "tenantSettings.oidc.copied": "リダイレクト URI をコピーしました",
+  "tenantSettings.oidc.baseUrlMissing":
+    "デプロイのベース URL が設定されていないため、シングルサインオンはまだ利用できません。運用担当者に設定を依頼してください。",
   "tenantSettings.tenantSettingsUpdated": "テナント設定を更新しました",
   "tenantSettings.theHashicorpVaultThisTenantsVaultType":
     "このテナントの Vault タイプのシークレットを読み取る HashiCorp Vault です。空欄にすると、上位管理者が設定したグローバル Vault を使います。",
@@ -927,6 +950,10 @@ export const ja = {
     "「{name}」を削除しますか?メンバーのアカウントは残りますが、このグループが付与するロールは失います。",
   "userGroups.deleteUserGroup": "ユーザーグループを削除",
   "userGroups.eGDevelopers": "例: 開発者",
+  "userGroups.idpGroup": "IdP グループ",
+  "userGroups.idpGroupHint":
+    "IdP のグループクレームにこの値を含むユーザーは、SSO でログインするとこのグループに加わり、含まなくなると外れます。一致は完全一致で、大文字と小文字を区別します。メンバーをここで管理する場合は空欄にしてください。",
+  "userGroups.managedByIdp": "IdP が管理しています",
   "userGroups.newUserGroup": "新しいユーザーグループ",
   "userGroups.noUserGroupsCreatedYet": "ユーザーグループはまだ作成されていません。",
   "userGroups.rolesGranted": "付与するロール",
@@ -958,6 +985,7 @@ export const ja = {
     "このユーザーを作成する前に、ヘッダーでテナントを選択してください。",
   "users.selectATenantInTheHeaderBefore2":
     "このユーザーの上位管理者ロールを外す前に、ヘッダーでテナントを選択してください。",
+  "users.ssoLinked": "SSO",
   "users.superAdmin": "上位管理者",
   "users.userCreated": "ユーザーを作成しました",
   "users.userUpdated": "ユーザーを更新しました",

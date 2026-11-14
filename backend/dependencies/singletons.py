@@ -20,6 +20,8 @@ from infrastructure.agent import AgentRegistry
 from infrastructure.database import ASYNC_DB_URL, DB_URL, is_sqlite_url, pool_kwargs
 from infrastructure.email_sender import SmtpEmailSender
 from infrastructure.email_sender import get_email_sender as get_email_sender
+from infrastructure.oidc_client import OidcClient
+from infrastructure.oidc_client import get_oidc_client as get_oidc_client
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.secret_cipher import get_secret_cipher as get_secret_cipher
 from infrastructure.skill_manager import SkillManager
@@ -57,4 +59,5 @@ AgentRegistryDep = Annotated[AgentRegistry, Depends(get_agent_registry)]
 SkillManagerDep = Annotated[SkillManager, Depends(get_skill_manager)]
 SecretCipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 EmailSenderDep = Annotated[SmtpEmailSender, Depends(get_email_sender)]
+OidcClientDep = Annotated[OidcClient, Depends(get_oidc_client)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]

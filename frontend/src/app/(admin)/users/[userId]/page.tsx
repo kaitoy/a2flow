@@ -111,6 +111,8 @@ export default function UserDetailPage() {
   // matches their avatar elsewhere in the app.
   const [avatarUpdatedAt, setAvatarUpdatedAt] = useState<string | null>(null);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
+  // Whether the account is linked to an identity provider (SSO).
+  const [ssoLinked, setSsoLinked] = useState(false);
   // Roles live outside the form state: the picker is a controlled multi-select
   // rather than a registered input.
   const [roles, setRoles] = useState<Role[]>([]);
@@ -190,6 +192,7 @@ export default function UserDetailPage() {
         setUsername(user.username);
         setAvatarUpdatedAt(user.avatarUpdatedAt ?? null);
         setAvatarConfig(user.avatarConfig ?? null);
+        setSsoLinked(user.ssoLinked ?? false);
         setRoles(user.roles ?? []);
         setGroupRoles(user.groupRoles ?? []);
         setGroupTagIds(user.groupTagIds ?? []);
@@ -364,6 +367,7 @@ export default function UserDetailPage() {
                 size={96}
               />
               {targetIsSuperAdmin && <Badge>{t("users.superAdmin")}</Badge>}
+              {ssoLinked && <Badge>{t("users.ssoLinked")}</Badge>}
             </div>
           </div>
 

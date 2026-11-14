@@ -392,6 +392,24 @@ describe("UsersPage", () => {
       expect(screen.getByRole("link", { name: "alice" })).toBeInTheDocument();
     });
   });
+  it("shows an SSO badge for a user linked to an identity provider", async () => {
+    routerMock();
+    server.use(
+      http.get("http://localhost:8000/api/v1/users", () =>
+        envelope([{ ...USER_WITH_TENANT("tenant-1"), ssoLinked: true }])
+      )
+    );
+    render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByText("alice"));
+    expect(screen.getByText("SSO")).toBeInTheDocument();
+  });
+
+  it("shows no SSO badge for a user without a linked identity", async () => {
+    routerMock();
+    render(<UsersPage />, { preloadedState: SUPER_ADMIN_STATE });
+    await waitFor(() => screen.getByText("alice"));
+    expect(screen.queryByText("SSO")).not.toBeInTheDocument();
+  });
 });
 
 /** A user row with a `tenantId`, for the admin-viewer eligibility tests. */

@@ -124,3 +124,22 @@ def test_resolve_host_rejects_empty_result(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [])
     with pytest.raises(UnsafeUrlError, match="did not resolve"):
         _real_resolve_host("empty.invalid")
+
+
+def test_allowed_host_skips_address_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(url_safety, "resolve_host", lambda host: ["10.1.2.3"])
+    assert_public_http_url(
+        "http://keycloak.internal/x", allowed_hosts=["keycloak.internal"]
+    )
+    assert_public_http_url("http://127.0.0.1/x", allowed_hosts=["127.0.0.1"])
+    with pytest.raises(UnsafeUrlError, match="disallowed address"):
+        assert_public_http_url(
+            "http://other.internal/x", allowed_hosts=["keycloak.internal"]
+        )
+
+
+def test_allowed_host_still_needs_http_scheme() -> None:
+    with pytest.raises(UnsafeUrlError, match="http or https"):
+        assert_public_http_url(
+            "ftp://keycloak.internal/x", allowed_hosts=["keycloak.internal"]
+        )

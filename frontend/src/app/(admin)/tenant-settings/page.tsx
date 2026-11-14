@@ -1,7 +1,7 @@
 /**
  * @module TenantSettingsPage — Admin page for the settings a tenant's own
- * `admin` manages: how failed sign-ins lock the tenant's accounts, and the
- * tenant's own HashiCorp Vault.
+ * `admin` manages: how failed sign-ins lock the tenant's accounts, the
+ * tenant's own HashiCorp Vault, and its OpenID Connect single sign-on.
  */
 "use client";
 
@@ -15,6 +15,12 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import {
+  OidcSettingsFields,
+  oidcShape,
+  toOidcBody,
+  toOidcFormValues,
+} from "@/components/admin/oidc-settings-fields";
 import {
   SignInLockoutFields,
   signInLockoutShape,
@@ -48,7 +54,7 @@ import { showToast } from "@/store/toastSlice";
  */
 function buildSchema(savedMethod: VaultAuthMethod | null) {
   return z
-    .object({ ...signInLockoutShape, ...vaultConnectionShape })
+    .object({ ...signInLockoutShape, ...vaultConnectionShape, ...oidcShape })
     .superRefine((values, ctx) => refineVaultConnection(values, ctx, savedMethod));
 }
 
@@ -56,7 +62,11 @@ type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 
 /** Convert the stored settings into form values. */
 function toFormValues(settings: Partial<TenantSettings>): FormValues {
-  return { ...toSignInLockoutFormValues(settings), ...toVaultConnectionFormValues(settings) };
+  return {
+    ...toSignInLockoutFormValues(settings),
+    ...toVaultConnectionFormValues(settings),
+    ...toOidcFormValues(settings),
+  };
 }
 
 /**
@@ -74,6 +84,10 @@ export default function TenantSettingsPage() {
   // The auth method whose credential is stored, or null when none is. Drives
   // the credential placeholder and whether leaving it blank is acceptable.
   const [savedMethod, setSavedMethod] = useState<VaultAuthMethod | null>(null);
+  // Whether an OIDC client secret is stored, and the callback URL the IdP must
+  // allow (null while the deployment's base URL is unset). Both are read-only.
+  const [secretSaved, setSecretSaved] = useState(false);
+  const [redirectUri, setRedirectUri] = useState<string | null>(null);
   const schema = useMemo(() => buildSchema(savedMethod), [savedMethod]);
   const save = useAsyncAction({ showDone: false });
   const {
@@ -93,6 +107,8 @@ export default function TenantSettingsPage() {
     getTenantSettings(SUPPRESS_FORBIDDEN_TOAST)
       .then((settings) => {
         setSavedMethod(savedVaultMethod(settings));
+        setSecretSaved(settings.oidcClientSecretSet ?? false);
+        setRedirectUri(settings.oidcRedirectUri ?? null);
         reset(toFormValues(settings));
       })
       .catch(() => setDenied(true))
@@ -105,8 +121,11 @@ export default function TenantSettingsPage() {
         const saved = await updateTenantSettings({
           ...toSignInLockoutBody(values),
           ...toVaultConnectionBody(values),
+          ...toOidcBody(values),
         });
         setSavedMethod(savedVaultMethod(saved));
+        setSecretSaved(saved.oidcClientSecretSet ?? false);
+        setRedirectUri(saved.oidcRedirectUri ?? null);
         reset(toFormValues(saved));
         dispatch(showToast({ message: t("tenantSettings.tenantSettingsUpdated") }));
       });
@@ -126,7 +145,7 @@ export default function TenantSettingsPage() {
       <AdminPageContainer>
         <Breadcrumbs items={breadcrumbItems} />
         <FormLayout header={header}>
-          <FormSkeleton fields={5} />
+          <FormSkeleton fields={8} />
         </FormLayout>
       </AdminPageContainer>
     );
@@ -179,6 +198,19 @@ export default function TenantSettingsPage() {
               vaultApproleMount: errors.vaultApproleMount?.message,
               vaultCredential: errors.vaultCredential?.message,
             }}
+          />
+
+          <hr className="border-outline-variant" />
+
+          <OidcSettingsFields
+            enabled={register("oidcEnabled")}
+            issuer={register("oidcIssuer")}
+            clientId={register("oidcClientId")}
+            clientSecret={register("oidcClientSecret")}
+            groupsClaim={register("oidcGroupsClaim")}
+            trustEmail={register("oidcTrustEmail")}
+            secretSaved={secretSaved}
+            redirectUri={redirectUri}
           />
 
           <div className="flex gap-2">

@@ -11,7 +11,7 @@ Conventions for organizing and testing the Next.js frontend. Paths below are rel
 
 ```
 scripts/
-└── download-a2ui-schema.mjs   # Downloads basic_catalog.json at build time (predev/prebuild)
+└── generate-a2ui-catalog.mjs  # Writes basic_catalog.json from @a2ui/web_core at build time (predev/prebuild)
 src/
 ├── app/
 │   ├── layout.tsx        # Root layout — wraps tree in StoreProvider
@@ -24,7 +24,7 @@ src/
 │   ├── A2uiRenderer.tsx  # A2UI surface renderer
 │   └── ChatInput.tsx     # Textarea with Enter-to-send
 ├── generated/
-│   └── basic_catalog.json     # Downloaded at build time (gitignored)
+│   └── basic_catalog.json     # Generated at build time (gitignored)
 ├── hooks/
 │   └── useChat.ts        # Session init + SSE streaming logic
 ├── store/

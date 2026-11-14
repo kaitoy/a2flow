@@ -23,6 +23,7 @@ connection classes for dulwich's urllib3.
 
 import ipaddress
 import socket
+from collections.abc import Collection
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Any
@@ -121,11 +122,14 @@ def _is_unsafe_address(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> b
     return any(not a.is_global or a.is_multicast for a in candidates)
 
 
-def assert_public_http_url(url: str) -> None:
+def assert_public_http_url(url: str, *, allowed_hosts: Collection[str] = ()) -> None:
     """Reject ``url`` unless it is http(s) and every resolved address is public.
 
     Args:
         url: The candidate URL.
+        allowed_hosts: Lower-case hostnames exempt from the address checks (an
+            operator's explicit allowlist); the scheme and host checks still
+            apply.
 
     Raises:
         UnsafeUrlError: If the scheme isn't http/https, the host is missing,
@@ -138,6 +142,8 @@ def assert_public_http_url(url: str) -> None:
     host = parsed.hostname
     if not host:
         raise UnsafeUrlError(f"URL {url!r} has no hostname")
+    if host.lower() in allowed_hosts:
+        return
 
     try:
         literal = ipaddress.ip_address(host)

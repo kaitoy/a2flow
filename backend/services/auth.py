@@ -159,7 +159,21 @@ class AuthService:
             )
             raise
         await self._login_failures.clear(account_key)
+        return await self.start_session(user)
 
+    async def start_session(self, user: User) -> LoginResult:
+        """Mint a login session for a user who has already been authenticated.
+
+        Shared by password login and OIDC single sign-on, so both hand out
+        identical sessions. Also deletes sessions already past the idle window.
+
+        Args:
+            user: The user to sign in; the caller has checked they may.
+
+        Returns:
+            A :class:`LoginResult` carrying the user and the freshly minted
+            session and CSRF tokens.
+        """
         session_token = generate_token()
         csrf_token = generate_token()
         await self._sessions.create(
@@ -203,6 +217,11 @@ class AuthService:
         if user is None or not user.enabled or user.deleted_at is not None:
             # Pay the same bcrypt cost as a wrong password, so timing does
             # not reveal which accounts exist.
+            await asyncio.to_thread(burn_password_check, password)
+            raise UnauthorizedError("Invalid username or password")
+        if user.password is None:
+            # An SSO-only account has no hash to check; pay the bcrypt cost
+            # anyway so its existence is not revealed by timing.
             await asyncio.to_thread(burn_password_check, password)
             raise UnauthorizedError("Invalid username or password")
         if not await asyncio.to_thread(verify_password, password, user.password):

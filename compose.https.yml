@@ -1,0 +1,70 @@
+# HTTPS front for compose.yml: Caddy terminates TLS and forwards everything to
+# the `ingress` service, which keeps routing /api/* and the rest as before.
+#
+# Usage:
+#   docker compose -f compose.yml -f compose.https.yml up --build
+#
+# APP_BASE_URL in .env is the one setting: the address users open the app at.
+# Caddy serves that address and the backend derives everything else from it
+# (email links, the SSO redirect URI, the CORS origin, and Secure cookies for
+# https). With a public host name, such as https://a2flow.example.com, Caddy
+# fetches and renews a Let's Encrypt certificate (its DNS must point at this
+# host, with ports 80 and 443 reachable). Left unset, the app is served at
+# https://localhost with a certificate from Caddy's own local CA, which a
+# browser trusts only once that CA's root certificate is installed -- see the
+# manual's "Run with Docker Compose" page.
+#
+# The URL must carry no port: only 80 and 443 are published, and Compose
+# cannot take a port back out of a URL to publish it. Caddy refuses to start
+# on one rather than listening where nothing can reach it.
+#
+# SSE needs nothing extra here: reverse_proxy flushes text/event-stream
+# immediately, compresses nothing without an `encode` directive, and has no
+# read timeout by default.
+services:
+  # Caddy is the only published entry point now.
+  ingress:
+    ports: !reset []
+
+  backend:
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL:-https://localhost}
+
+  caddy:
+    image: caddy:2.10.2
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL:-https://localhost}
+    command:
+      - sh
+      - -c
+      - |
+        export APP_BASE_URL="$${APP_BASE_URL%/}"
+        case "$${APP_BASE_URL#*://}" in
+          *:*) echo "APP_BASE_URL must not carry a port with compose.https.yml: $$APP_BASE_URL" >&2; exit 1 ;;
+        esac
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    ports:
+      - "80:80" # ACME HTTP challenge, and the redirect to https
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      # Certificates and the local CA. Keep it: losing it re-issues every
+      # certificate and invalidates a local CA root already trusted.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - ingress
+
+configs:
+  caddyfile:
+    content: |
+      {$$APP_BASE_URL} {
+        reverse_proxy ingress:8080
+      }
+
+volumes:
+  caddy-data:
+  caddy-config:

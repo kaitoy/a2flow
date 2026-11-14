@@ -271,6 +271,13 @@ class User(UserCreate, BaseEntity, table=True):
     that a ``super_admin`` never holds any other role — see
     :func:`services.user._reject_super_admin_role_combination` for the
     matching application-layer guard.
+
+    ``password`` is nullable on the table: a user provisioned through OIDC
+    single sign-on has no password and cannot log in with one (see
+    :func:`infrastructure.password.verify_password`). ``oidc_subject`` is the
+    provider's stable identifier for that user, unique within a tenant
+    (``ix_users_tenant_id_oidc_subject``, partial over non-null values) and never
+    serialized by :class:`UserRead`.
     """
 
     __tablename__ = "users"
@@ -283,6 +290,14 @@ class User(UserCreate, BaseEntity, table=True):
             unique=True,
             postgresql_where=text("tenant_id IS NULL"),
             sqlite_where=text("tenant_id IS NULL"),
+        ),
+        Index(
+            "ix_users_tenant_id_oidc_subject",
+            "tenant_id",
+            "oidc_subject",
+            unique=True,
+            postgresql_where=text("oidc_subject IS NOT NULL"),
+            sqlite_where=text("oidc_subject IS NOT NULL"),
         ),
         ForeignKeyConstraint(
             ["tenant_id"],
@@ -306,6 +321,14 @@ class User(UserCreate, BaseEntity, table=True):
         ),
     )
 
+    #: bcrypt hash; ``None`` for an SSO-only account. Overrides the required
+    #: :data:`~models.constraints.Password` inherited from :class:`UserCreate`,
+    #: which validates the plaintext clients send.
+    password: str | None = None  # type: ignore[assignment]
+    #: The OIDC provider's ``sub`` for this user, or ``None`` when never signed in via SSO.
+    oidc_subject: str | None = Field(
+        default=None, sa_column=Column(String(255), nullable=True)
+    )
     deleted_at: datetime | None = Field(default=None, sa_type=TZDateTime)
     #: Set when the user has a custom uploaded avatar (see :class:`~models.user_avatar.UserAvatar`)
     #: and cleared when it is removed. Acts as a presence marker plus cache-busting
@@ -406,6 +429,9 @@ class UserRead(BaseEntity):
     tenant_id: str | None = None
     #: Language the GUI is shown in, or ``None`` to follow the browser's.
     language: Language | None = None
+    #: Whether the user has signed in through SSO and so is linked to an OIDC
+    #: subject. The subject itself is never serialized.
+    sso_linked: bool = False
 
     @classmethod
     def from_user(
@@ -442,7 +468,8 @@ class UserRead(BaseEntity):
             and never the password hash.
         """
         return cls(
-            **user.model_dump(exclude={"password"}),
+            **user.model_dump(exclude={"password", "oidc_subject"}),
+            sso_linked=user.oidc_subject is not None,
             group_roles=sorted(Role(role) for role in group_roles),
             group_ids=sorted(group_ids),
             group_tag_ids=sorted(group_tag_ids),

@@ -14,7 +14,7 @@ docker compose up --build
 
 打开 [http://localhost:3000](http://localhost:3000)。数据库数据保存在 `pgdata` 卷中，重启后依然存在。
 
-要在其他主机端口上发布应用，请在 `.env` 中设置 `APP_PORT`；后端的 `CORS_ORIGINS` 会自动随之变化。
+在 `.env` 中设置 `APP_PORT`，即可把应用发布到主机上的其他端口；应用的基础 URL 会自动跟随此值。若要让应用以其他地址（例如某个主机名）打开，请改为在 `.env` 中把 `APP_BASE_URL` 设为该地址，例如 `http://a2flow.internal:3000`。应用仍发布在 `APP_PORT` 上，因此地址中带有端口时，请把 `APP_PORT` 设为相同的值。
 
 ## 启动的容器 {#what-comes-up}
 
@@ -26,11 +26,37 @@ docker compose up --build
 | **mcp-proxy** | 运行您注册的 [MCP 服务器](../guides/mcp-servers.md)，参阅[为什么要单独运行](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |
 | **ingress** | 浏览器访问的入口。把界面请求发送给前端，把 API 请求直接发送给后端 |
 | **frontend** | 您所操作的界面 |
+| **caddy** | 仅在使用 `compose.https.yml` 时启动，参阅[通过 HTTPS 提供服务](#https) |
 | **openbao** | 仅在使用 `--profile openbao` 时启动，参阅[使用 OpenBao 试用 Vault 密钥](#openbao) |
+| **keycloak** | 仅在使用 `--profile keycloak` 时启动，参阅[使用 Keycloak 试用单点登录](#keycloak) |
 
-只有 ingress（以及启用该 profile 时 OpenBao 的 UI）可以从外部访问；其余容器通过 Docker 内部网络相互通信。
+只有 ingress（使用 `compose.https.yml` 时改为 Caddy；启用相应 profile 时还有 OpenBao 的 UI 和 Keycloak）可以从外部访问；其余容器通过 Docker 内部网络相互通信。
 
 首次启动比之后的启动耗时更长：需要构建镜像、创建数据库架构，而且 MCP 代理服务器要等后端发给它所需的证书之后才会开始接受请求。
+
+## 通过 HTTPS 提供服务 {#https}
+
+加上 `compose.https.yml` 后，[Caddy](https://caddyserver.com/) 会放在 ingress 前面。它成为唯一的入口，监听 80 和 443 端口，为 `APP_BASE_URL` 中的地址获取证书，并把明文 HTTP 重定向到 HTTPS。地址为 `https://` 时，登录用的 Cookie 也会带上 Secure，[单点登录](../guides/single-sign-on.md)的**重定向 URI** 也由它生成。
+
+```bash
+echo APP_BASE_URL=https://a2flow.example.com >> .env
+docker compose -f compose.yml -f compose.https.yml up --build
+```
+
+打开你设置的地址。地址中不能带端口：只发布了 80 和 443，地址带端口时 Caddy 不会启动。之后的行为取决于主机名：
+
+| `APP_BASE_URL` | 证书 | 开始之前 |
+|---|---|---|
+| 公网主机名，例如 `https://a2flow.example.com` | 从 Let's Encrypt 获取并自动续期 | 将该名称的 DNS 指向本主机，并确保 80 和 443 端口可从互联网访问 |
+| 未设置（`https://localhost`） | 由 Caddy 自行创建的证书颁发机构签发 | 无需准备，但在信任该颁发机构之前，浏览器会显示证书警告（见下文） |
+
+要让浏览器信任 `https://localhost`，请取出该颁发机构的根证书，并添加到操作系统或浏览器的受信任根证书中：
+
+```bash
+docker compose -f compose.yml -f compose.https.yml cp caddy:/data/caddy/pki/authorities/local/root.crt .
+```
+
+证书和本地颁发机构保存在 `caddy-data` 卷中。请保留它：删除后会重新签发证书，已经信任的根证书也将不再匹配。
 
 ## 使用 OpenBao 试用 Vault 密钥 {#openbao}
 
@@ -81,3 +107,39 @@ docker compose exec -e BAO_TOKEN=<root-token> openbao sh -c '
 可以像引用其他密钥一样引用它，例如在 [MCP 服务器](../guides/mcp-servers.md)的环境变量中写成 `${secret:<名称>/password}`。无论在哪里选择该密钥，都会列出它的键 `username` 和 `password`；这些键是当场从 OpenBao 读取的，由此可以确认连接正常。
 
 要在 8200 以外的主机端口上发布 OpenBao 的 UI，请在 `.env` 中设置 `OPENBAO_PORT`。A2Flow 本身始终通过内部网络上的 `http://openbao:8200` 访问它。
+
+## 使用 Keycloak 试用单点登录 {#keycloak}
+
+[Keycloak](https://www.keycloak.org/) 是开源的身份提供者。这套服务可以在 A2Flow 旁边启动一个已为 A2Flow 配置好的 Keycloak，因此即使没有自己的 IdP，也能试用[单点登录](../guides/single-sign-on.md)。
+
+```bash
+docker compose --profile keycloak up --build
+```
+
+Keycloak 发布在 [http://keycloak.localhost:8180](http://keycloak.localhost:8180)，其管理控制台使用 `admin` / `admin` 登录（在 `.env` 中设置 `KEYCLOAK_ADMIN_PASSWORD` 可更改密码）。Chrome、Edge 和 Firefox 能自行找到 `keycloak.localhost`；使用其他浏览器时，请先在 hosts 文件中添加一行 `127.0.0.1 keycloak.localhost`。重新创建容器后 Keycloak 不会保留任何内容，而是从下面的设置重新开始，因此在其控制台中所做的更改会丢失。
+
+启动时以下内容已经就绪：
+
+| 项目 | 值 |
+|---|---|
+| Realm | `a2flow` |
+| 颁发者 URL | `http://keycloak.localhost:8180/realms/a2flow` |
+| 客户端 ID | `a2flow` |
+| 客户端密钥 | `a2flow-dev-secret` |
+| 重定向 URI | `http://localhost:3000`（或你的 `APP_BASE_URL`）和 `https://localhost`，后面各自接 A2Flow 的回调路径 |
+| 组声明 | `groups` |
+| 用户 | `alice` 属于组 `a2flow-admins`，`bob` 属于组 `a2flow-users`。两人的密码都是 `password` |
+
+### 1. 连接 A2Flow {#1-connect-a2flow}
+
+1. 以 `admin` 身份登录 A2Flow，打开管理侧边栏的**租户设置**。
+2. 在**单点登录**部分，用上表的值填写**颁发者 URL**、**客户端 ID** 和**客户端密钥**，勾选**启用单点登录**并保存。
+3. 打开**用户组**，打开（或新建）一个带有所需角色的组，在 **IdP 组**中输入 `a2flow-admins` 并保存。
+
+### 2. 登录 {#2-sign-in}
+
+1. 退出登录。在登录界面的**租户**中输入 `default`，点击**使用 SSO 登录**。
+2. 在 Keycloak 的登录页面以 `alice` / `password` 登录。你会以 Alice 的身份回到 A2Flow 并处于已登录状态，并且是第 1 步中那个组的成员。
+3. 也试试 `bob`：他唯一的组 `a2flow-users` 没有映射到任何用户组，因此登录会被拒绝，直到你把它映射到某个用户组为止。
+
+Keycloak 也支持 SAML，但 A2Flow 只通过 OpenID Connect 登录。

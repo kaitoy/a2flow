@@ -16,6 +16,8 @@ A **tenant** is A2Flow's top-level organizational boundary. Nearly every record 
 
 A [user](../guides/users-and-groups.md#users) belongs to **at most one** tenant. A [user group](../guides/users-and-groups.md#user-groups) belongs to **exactly one** — which is why a group can never grant `super_admin`, a platform-scoped role by definition (see [Effective roles](./authorization.md#effective-roles)). A **Default** tenant is seeded on first startup and holds the initial seeded `admin` user; the seeded `root` user is platform-scoped and has no tenant at all.
 
+Each tenant can also connect its own identity provider, so its staff sign in with their company account instead of a password. The connection belongs to the tenant: another tenant's identity provider can never sign anyone in to this one. See [Single sign-on](../guides/single-sign-on.md).
+
 ## The tenant boundary
 
 Every tenant-scoped read and write resolves within the caller's tenant, and a record that exists only in another tenant is reported as **HTTP 404, not 403** — the boundary hides existence rather than announcing it. That applies to a workflow id typed into a URL as much as to an id passed to an API, and it is why a cross-tenant reference never confirms that the record is real.

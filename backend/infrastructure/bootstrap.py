@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 #: may apply, exactly as SystemSettingsUpdate's fields expect (snake_case;
 #: populate_by_name=True accepts these directly without the camelCase alias).
 _SYSTEM_SETTINGS_ENV_FIELDS = (
-    "app_base_url",
     "smtp_enabled",
     "smtp_host",
     "smtp_port",
@@ -67,10 +66,10 @@ async def seed_system_settings(session: AsyncSession) -> None:
 
 
 async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
-    """Apply whichever ``APP_BASE_URL``/``SMTP_*`` env vars are set onto the settings row.
+    """Apply whichever ``SMTP_*`` env vars are set onto the settings row.
 
     Runs on every startup, not just the first: an operator may add or rotate
-    ``APP_BASE_URL`` or a ``SMTP_*`` variable on a later deploy (e.g. changing
+    a ``SMTP_*`` variable on a later deploy (e.g. changing
     ``SMTP_PASSWORD``), and that should reach the database without a manual
     admin-UI edit. Only fields whose environment variable is actually set are
     touched — this is built by constructing a real
@@ -92,13 +91,11 @@ async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
     only requires a host and sender address once the *merged* ``smtp_enabled``
     ends up true, so staging a relay's host/username/password ahead of
     flipping the flag on is harmless — it lets "configure the relay" and
-    "turn delivery on" ship as two separate deploys. ``APP_BASE_URL`` has no
-    such enable flag; when set, it is applied unconditionally.
+    "turn delivery on" ship as two separate deploys.
 
     A malformed value — a pydantic field-level failure (an out-of-range
     ``SMTP_PORT``, a malformed ``SMTP_FROM_EMAIL``, an unrecognized
-    ``SMTP_SECURITY``, an ``APP_BASE_URL`` not starting with
-    ``http://``/``https://``) or the service's business-rule check (e.g.
+    ``SMTP_SECURITY``) or the service's business-rule check (e.g.
     ``SMTP_ENABLED=true`` with no ``SMTP_HOST``) — is logged as a
     ``WARNING`` (naming only the offending field(s), never their value, so a
     bad ``SMTP_PASSWORD`` is never written to the log) and the entire apply
@@ -134,7 +131,7 @@ async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
             )
         )
         logger.warning(
-            "Invalid APP_BASE_URL/SMTP_* environment configuration for "
+            "Invalid SMTP_* environment configuration for "
             "field(s) %s; leaving the stored system settings unchanged. "
             "(Values are never logged here, including SMTP_PASSWORD.)",
             bad_fields,

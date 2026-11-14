@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
-from sqlalchemy import Text, cast, or_
+from sqlalchemy import Text, cast, func, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,6 +27,9 @@ from repositories.query import FilterSpec, SortSpec, apply_filters, apply_sort
 #: here, because it works identically on SQLite's plain ``JSON`` and
 #: PostgreSQL's ``jsonb``, unlike a native JSON "contains" operator.
 _IS_SUPER_ADMIN = cast(col(User.roles), Text).like('%"super_admin"%')
+
+#: Alias usable inside the classes below, whose ``list`` method shadows the builtin.
+_UserList = list[User]
 
 
 class UserRepository(Protocol):
@@ -60,6 +63,28 @@ class UserRepository(Protocol):
     async def delete(self, user_id: str) -> None: ...
 
     async def exists(self, user_id: str) -> bool: ...
+
+    async def clear_oidc_subjects(self, tenant_id: str) -> None: ...
+
+    async def get_by_oidc_subject(
+        self, tenant_id: str, subject: str
+    ) -> User | None: ...
+
+    async def list_by_email(self, tenant_id: str, email: str) -> _UserList: ...
+
+    async def set_oidc_subject(self, user_id: str, subject: str) -> User: ...
+
+    async def create_sso_user(
+        self,
+        *,
+        tenant_id: str,
+        username: str,
+        first_name: str,
+        last_name: str,
+        email: str,
+        email_verified: bool,
+        oidc_subject: str,
+    ) -> User: ...
 
 
 class SqlUserRepository:
@@ -239,7 +264,8 @@ class SqlUserRepository:
         records through ``created_by`` / ``updated_by`` (``ondelete=RESTRICT``),
         the database raises an IntegrityError; the user is then soft-deleted by
         setting ``deleted_at`` and disabling the account, so existing references
-        stay valid and the name can still be resolved.
+        stay valid and the name can still be resolved. The soft delete also
+        clears ``oidc_subject``, freeing the subject for a fresh SSO account.
 
         Args:
             user_id: Identifier of the user to delete.
@@ -260,5 +286,146 @@ class SqlUserRepository:
                 raise NotFoundError("User", user_id) from None
             user.deleted_at = datetime.now(UTC)
             user.enabled = False
+            # A soft-deleted row keeps its unique slot otherwise, so the same
+            # person could never be re-provisioned by SSO under that subject.
+            user.oidc_subject = None
             self._db.add(user)
             await self._db.commit()
+
+    async def clear_oidc_subjects(self, tenant_id: str) -> None:
+        """Forget every OIDC subject linked to the tenant's users.
+
+        Subjects are only unique per issuer and client, so they must not
+        survive a change of either: each user re-links at their next SSO
+        sign-in.
+
+        Does not commit: the caller's next commit (the tenant update that
+        changes the provider) makes the reset permanent, and a rollback
+        discards it, so the two always land together.
+
+        Args:
+            tenant_id: Identifier of the tenant whose users are reset.
+        """
+        await self._db.exec(
+            update(User)
+            .where(col(User.tenant_id) == tenant_id)
+            .values(oidc_subject=None)
+        )
+
+    async def get_by_oidc_subject(self, tenant_id: str, subject: str) -> User | None:
+        """Return the tenant's user linked to the OIDC subject ``subject``.
+
+        Disabled and soft-deleted users are included, so the caller can refuse
+        them explicitly.
+
+        Args:
+            tenant_id: The tenant to search.
+            subject: The provider's ``sub`` claim.
+
+        Returns:
+            The linked user, or ``None``.
+        """
+        stmt = select(User).where(
+            col(User.tenant_id) == tenant_id, col(User.oidc_subject) == subject
+        )
+        return (await self._db.exec(stmt)).first()
+
+    async def list_by_email(self, tenant_id: str, email: str) -> _UserList:
+        """Return the tenant's non-deleted users whose e-mail matches ``email``.
+
+        The match ignores case and surrounding whitespace on both sides.
+
+        Args:
+            tenant_id: The tenant to search.
+            email: The e-mail address to match.
+
+        Returns:
+            Every matching user, linked to an OIDC subject or not.
+        """
+        stmt = select(User).where(
+            col(User.tenant_id) == tenant_id,
+            col(User.deleted_at).is_(None),
+            func.lower(func.trim(col(User.email))) == email.strip().lower(),
+        )
+        return list((await self._db.exec(stmt)).all())
+
+    async def set_oidc_subject(self, user_id: str, subject: str) -> User:
+        """Link a user to an OIDC subject and commit.
+
+        Args:
+            user_id: The user to link.
+            subject: The provider's ``sub`` claim.
+
+        Returns:
+            The updated user.
+
+        Raises:
+            NotFoundError: If the user does not exist.
+            UniqueViolationError: If another user of the tenant already holds
+                ``subject``.
+        """
+        user = await self._db.get(User, user_id)
+        if user is None:
+            raise NotFoundError("User", user_id)
+        user.oidc_subject = subject
+        self._db.add(user)
+        try:
+            await self._db.commit()
+        except IntegrityError as e:
+            await self._db.rollback()
+            raise UniqueViolationError("User", "oidc_subject", subject) from e
+        await self._db.refresh(user)
+        return user
+
+    async def create_sso_user(
+        self,
+        *,
+        tenant_id: str,
+        username: str,
+        first_name: str,
+        last_name: str,
+        email: str,
+        email_verified: bool,
+        oidc_subject: str,
+    ) -> User:
+        """Create a password-less user provisioned by OIDC single sign-on.
+
+        The user has no direct roles and is owned by the system user.
+
+        Args:
+            tenant_id: The tenant the user belongs to.
+            username: A free, already-normalised username.
+            first_name: Given name.
+            last_name: Family name.
+            email: E-mail address.
+            email_verified: Whether the identity provider vouched for ``email``.
+            oidc_subject: The provider's ``sub`` claim.
+
+        Returns:
+            The created user.
+
+        Raises:
+            UniqueViolationError: If the username or subject was taken
+                concurrently.
+        """
+        user = User(
+            tenant_id=tenant_id,
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            email_verified=email_verified,
+            oidc_subject=oidc_subject,
+            password=None,
+            roles=[],
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+        self._db.add(user)
+        try:
+            await self._db.commit()
+        except IntegrityError as e:
+            await self._db.rollback()
+            raise UniqueViolationError("User", "username", username) from e
+        await self._db.refresh(user)
+        return user

@@ -5,8 +5,8 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@12.15.0",
   "scripts": {
-    "predev": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",
-    "prebuild": "node --use-system-ca scripts/download-a2ui-schema.mjs && pnpm generate:api",
+    "predev": "node scripts/generate-a2ui-catalog.mjs && pnpm generate:api",
+    "prebuild": "node scripts/generate-a2ui-catalog.mjs && pnpm generate:api",
     "generate:openapi": "cd ../backend && uv run python -m scripts.export_openapi",
     "generate:api": "pnpm generate:openapi && openapi-ts",
     "dev": "next dev",

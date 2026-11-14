@@ -45,6 +45,8 @@ dependencies = [
     # here because it is imported directly.
     "google-auth>=2.62.0",
     "cryptography>=50.0.2",
+    # Verifies OIDC ID tokens (RS256/ES256 need the [crypto] extra).
+    "pyjwt[crypto]>=2.15.1",
     "python-multipart>=0.0.32",
     "alembic>=1.20.1",
     "prometheus-client>=0.21",

@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import logo from "@/../assets/logo.png";
 import { FormField } from "@/components/admin/form-field";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -12,15 +12,21 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useT } from "@/i18n/provider";
-import { login } from "@/lib/api";
+import { API_BASE, login } from "@/lib/api";
 import { persistImpersonatedUserId } from "@/lib/impersonation";
 import { clearImpersonation, setUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
+import { showToast } from "@/store/toastSlice";
+
+/** The failure codes the backend puts in `/login?sso_error=`. */
+const SSO_ERRORS = ["unavailable", "failed", "account_disabled", "not_permitted"] as const;
 
 /**
  * Public sign-in page. On success the backend sets the session and CSRF cookies,
  * the current user is stored in the auth slice, and the user is sent to the
- * welcome page at `/`.
+ * welcome page at `/`. The SSO button hands the typed tenant to the backend's
+ * OpenID Connect sign-in; when that fails the backend returns here with an
+ * `sso_error` code, shown as a toast.
  */
 export default function LoginPage() {
   const t = useT();
@@ -32,6 +38,16 @@ export default function LoginPage() {
   // No `done` stage: a successful sign-in navigates away immediately, so the
   // success color/checkmark/wiggle would only flash before the page unmounts.
   const signIn = useAsyncAction({ showDone: false });
+
+  // Read from `window` rather than `useSearchParams`, which would force a
+  // Suspense boundary around the whole form.
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("sso_error");
+    if (raw === null) return;
+    const code = SSO_ERRORS.find((c) => c === raw) ?? "failed";
+    dispatch(showToast({ message: t(`login.ssoError.${code}`), variant: "error" }));
+    router.replace("/login");
+  }, [dispatch, router, t]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -126,6 +142,21 @@ export default function LoginPage() {
           data-testid="login-submit"
         >
           {t("login.signIn")}
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={tenantName.trim() === ""}
+          className="w-full"
+          data-testid="login-sso"
+          onClick={() =>
+            window.location.assign(
+              `${API_BASE}/api/v1/auth/oidc/start?tenant=${encodeURIComponent(tenantName.trim())}`
+            )
+          }
+        >
+          {t("login.signInWithSso")}
         </Button>
       </form>
     </main>

@@ -52,12 +52,13 @@ def hash_password(plain: str) -> str:
     )
 
 
-def verify_password(plain: str, hashed: str) -> bool:
+def verify_password(plain: str, hashed: str | None) -> bool:
     """Check a plaintext password against a stored bcrypt hash.
 
     Args:
         plain: The plaintext password to verify.
-        hashed: The previously stored bcrypt hash.
+        hashed: The previously stored bcrypt hash, or ``None`` for an account
+            that has no password (one that signs in through SSO only).
 
     A password bcrypt refuses to check -- bcrypt 5 raises ``ValueError`` for
     one longer than 72 bytes -- simply does not match. Letting the error
@@ -65,8 +66,11 @@ def verify_password(plain: str, hashed: str) -> bool:
     telling an attacker which usernames are real.
 
     Returns:
-        ``True`` if the password matches the hash, ``False`` otherwise.
+        ``True`` if the password matches the hash, ``False`` otherwise --
+        always ``False`` when ``hashed`` is ``None``.
     """
+    if hashed is None:
+        return False
     try:
         return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     except ValueError:

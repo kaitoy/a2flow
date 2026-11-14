@@ -36,6 +36,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'guides/admin-ui',
         'guides/users-and-groups',
+        'guides/single-sign-on',
         'guides/workflows',
         'guides/workflow-executions',
         'guides/approvals',

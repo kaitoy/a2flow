@@ -7,6 +7,7 @@ from config import Settings, get_settings
 
 def test_defaults_with_no_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     for var in (
+        "APP_BASE_URL",
         "CORS_ORIGINS",
         "DB_URL",
         "LLM_MODEL",
@@ -39,6 +40,16 @@ def test_cors_origins_splits_and_strips_comma_separated_string() -> None:
         "http://b.example.com",
         "http://c.example.com",
     ]
+
+
+def test_oidc_allowed_private_hosts_splits_and_lowercases() -> None:
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        oidc_allowed_private_hosts=" Keycloak.internal, idp.local ,",  # type: ignore[arg-type]
+    )
+
+    assert settings.oidc_allowed_private_hosts == ["keycloak.internal", "idp.local"]
+    assert Settings(_env_file=None).oidc_allowed_private_hosts == []  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("raw", [None, "", "not-a-number"])
@@ -117,3 +128,76 @@ def test_app_base_url_and_smtp_env_vars_default_to_none(
     assert settings.smtp_password is None
     assert settings.smtp_from_email is None
     assert settings.smtp_from_name is None
+
+
+def _settings_with(monkeypatch: pytest.MonkeyPatch, **env: str) -> Settings:
+    """Build Settings from exactly ``env`` for the base-URL-related variables."""
+    for var in ("APP_BASE_URL", "CORS_ORIGINS", "SESSION_COOKIE_SECURE"):
+        monkeypatch.delenv(var, raising=False)
+    for var, value in env.items():
+        monkeypatch.setenv(var, value)
+    return Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    ("raw", "normalized"),
+    [
+        ("https://a2flow.example.com", "https://a2flow.example.com"),
+        ("https://a2flow.example.com/", "https://a2flow.example.com"),
+        ("http://localhost:3000", "http://localhost:3000"),
+    ],
+)
+def test_app_base_url_is_normalized_to_an_origin(
+    monkeypatch: pytest.MonkeyPatch, raw: str, normalized: str
+) -> None:
+    assert _settings_with(monkeypatch, APP_BASE_URL=raw).app_base_url == normalized
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "https://a2flow.example.com/app",
+        "https://a2flow.example.com?x=1",
+        "https://user:pw@a2flow.example.com",
+        "https://a2flow.example.com:99999",
+        "ftp://a2flow.example.com",
+        "a2flow.example.com",
+    ],
+)
+def test_app_base_url_that_is_not_an_origin_stops_startup(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    with pytest.raises(ValueError, match="APP_BASE_URL"):
+        _settings_with(monkeypatch, APP_BASE_URL=raw)
+
+
+def test_https_app_base_url_defaults_cors_and_secure_cookies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings_with(monkeypatch, APP_BASE_URL="https://a2flow.example.com")
+
+    assert settings.cors_origins == ["https://a2flow.example.com"]
+    assert settings.session_cookie_secure is True
+
+
+def test_http_app_base_url_keeps_cookies_insecure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings_with(monkeypatch, APP_BASE_URL="http://localhost:3000")
+
+    assert settings.cors_origins == ["http://localhost:3000"]
+    assert settings.session_cookie_secure is False
+
+
+def test_explicit_cors_and_cookie_settings_win_over_app_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings_with(
+        monkeypatch,
+        APP_BASE_URL="https://a2flow.example.com",
+        CORS_ORIGINS="https://a.example.com,https://b.example.com",
+        SESSION_COOKIE_SECURE="false",
+    )
+
+    assert settings.cors_origins == ["https://a.example.com", "https://b.example.com"]
+    assert settings.session_cookie_secure is False

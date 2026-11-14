@@ -18,7 +18,7 @@ Tags are attached through :class:`~models.tag.UserGroupTag` and delegated to
 repository composes; every read view this module builds carries them.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Protocol
 
 from sqlalchemy.exc import IntegrityError
@@ -52,6 +52,7 @@ from repositories.user import UserRepository
 #: :mod:`repositories.workflow_task_template` uses.
 _StrList = list[str]
 _GroupList = list[UserGroupRead]
+_RowList = list[UserGroup]
 
 
 class UserGroupRepository(Protocol):
@@ -78,6 +79,12 @@ class UserGroupRepository(Protocol):
     async def delete(self, group_id: str) -> None: ...
 
     async def exists(self, group_id: str) -> bool: ...
+
+    async def list_mapped(self) -> _RowList: ...
+
+    async def sync_mapped_membership(
+        self, user_id: str, idp_groups: Collection[str]
+    ) -> None: ...
 
     async def set_tags(
         self, group_id: str, tag_ids: Sequence[str]
@@ -176,7 +183,7 @@ class SqlUserGroupRepository(TenantScopedRepository[UserGroup]):
         self._db.add(group)
         for member_id in member_ids:
             self._db.add(UserGroupMember(group_id=group.id, user_id=member_id))
-        await self._commit(user_id=user_id, name=data.name)
+        await self._commit(user_id=user_id, name=data.name, idp_group=data.idp_group)
         await self._db.refresh(group)
         return UserGroupRead.from_group(
             group, member_ids=sorted(member_ids), tag_ids=[]
@@ -213,7 +220,11 @@ class SqlUserGroupRepository(TenantScopedRepository[UserGroup]):
         if data.member_ids is not None:
             await self._validate_members(data.member_ids)
             await self._replace_members(group_id, data.member_ids)
-        await self._commit(user_id=user_id, name=data.name or group.name)
+        await self._commit(
+            user_id=user_id,
+            name=data.name or group.name,
+            idp_group=group.idp_group,
+        )
         await self._db.refresh(group)
         return UserGroupRead.from_group(
             group,
@@ -281,21 +292,26 @@ class SqlUserGroupRepository(TenantScopedRepository[UserGroup]):
             tag_ids=await self._tags.for_one(group_id),
         )
 
-    async def _commit(self, *, user_id: str, name: str) -> None:
-        """Commit, translating the two constraint failures a group write can hit.
+    async def _commit(self, *, user_id: str, name: str, idp_group: str | None) -> None:
+        """Commit, translating the constraint failures a group write can hit.
 
         An acting user who does not exist fails the ``created_by`` /
         ``updated_by`` foreign key; a name already taken in this tenant fails
-        ``uq_user_groups_tenant_id_name``. Everything else propagates.
+        ``uq_user_groups_tenant_id_name``; an IdP group already mapped by another
+        group of this tenant fails ``ix_user_groups_tenant_id_idp_group``.
+        Everything else propagates.
 
         Args:
             user_id: The acting user id recorded on the row.
             name: The group name the write was attempting to store, echoed back
                 in the conflict error.
+            idp_group: The IdP group the write was attempting to map, echoed back
+                in the conflict error when that mapping is the clash.
 
         Raises:
             ForeignKeyViolationError: If the acting user does not exist.
-            UniqueViolationError: If the name is already used in this tenant.
+            UniqueViolationError: If the name or the IdP group is already used
+                in this tenant.
         """
         try:
             await self._db.commit()
@@ -303,6 +319,8 @@ class SqlUserGroupRepository(TenantScopedRepository[UserGroup]):
             await self._db.rollback()
             if is_foreign_key_error(e):
                 raise ForeignKeyViolationError("User", user_id) from e
+            if idp_group is not None and "idp_group" in str(e.orig):
+                raise UniqueViolationError("UserGroup", "idpGroup", idp_group) from e
             raise UniqueViolationError("UserGroup", "name", name) from e
 
     # -- membership from the user side ---------------------------------------
@@ -386,6 +404,50 @@ class SqlUserGroupRepository(TenantScopedRepository[UserGroup]):
             await self._db.delete(row)
         await self._db.flush()
         for group_id in group_ids:
+            self._db.add(UserGroupMember(group_id=group_id, user_id=user_id))
+        await self._db.commit()
+
+    async def list_mapped(self) -> _RowList:
+        """Return this tenant's groups that are mapped to an IdP group.
+
+        Returns:
+            The groups whose ``idp_group`` is set, in no particular order.
+        """
+        stmt = self._scoped(select(UserGroup)).where(
+            col(UserGroup.idp_group).is_not(None)
+        )
+        return list((await self._db.exec(stmt)).all())
+
+    async def sync_mapped_membership(
+        self, user_id: str, idp_groups: Collection[str]
+    ) -> None:
+        """Make ``user_id`` a member of exactly the mapped groups named by the IdP.
+
+        Only this tenant's mapped groups are touched: a membership row is added
+        for every one whose ``idp_group`` is in ``idp_groups`` and removed from
+        every other, while unmapped groups keep whatever membership they have.
+        Commits once.
+
+        Args:
+            user_id: Identifier of the user whose mapped memberships to sync.
+            idp_groups: Group names the identity provider reported for the user.
+        """
+        self._require_tenant()
+        mapped = await self.list_mapped()
+        wanted = {g.id for g in mapped if g.idp_group in idp_groups}
+        rows = await self._db.exec(
+            select(UserGroupMember).where(
+                col(UserGroupMember.user_id) == user_id,
+                col(UserGroupMember.group_id).in_([g.id for g in mapped]),
+            )
+        )
+        present = set()
+        for row in rows.all():
+            if row.group_id in wanted:
+                present.add(row.group_id)
+            else:
+                await self._db.delete(row)
+        for group_id in wanted - present:
             self._db.add(UserGroupMember(group_id=group_id, user_id=user_id))
         await self._db.commit()
 

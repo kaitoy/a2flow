@@ -113,7 +113,7 @@ import { A2UI_CATALOG_ID } from "./a2uiCatalogId";
  * cookies same-origin. Override with `NEXT_PUBLIC_API_BASE` only for setups
  * that bypass the proxy.
  */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 /** Name of the readable CSRF cookie set by the backend at login. */
 const CSRF_COOKIE_NAME = "a2flow_csrf";

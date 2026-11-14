@@ -30,13 +30,15 @@ Un déploiement progressif met fin de force à tout flux SSE encore ouvert 30 se
 
 ## Derrière HTTPS {#behind-https}
 
-Trois paramètres ont des valeurs par défaut qui ne conviennent qu'au développement local en HTTP. Modifiez-les tous les trois avant d'exposer un déploiement à de vrais utilisateurs :
+Un seul réglage décide de ce dont un déploiement derrière HTTPS a besoin : définissez `APP_BASE_URL` avec l'origine vue par le navigateur, comme `https://a2flow.example.com`. Le reste en découle :
 
-| Variable | Valeur à définir | Si la valeur par défaut est conservée |
+| Quoi | Avec une `APP_BASE_URL` en `https://` | Sans `APP_BASE_URL` |
 |---|---|---|
-| `SESSION_COOKIE_SECURE` | `true` | Les cookies de session et CSRF partent sans `Secure` : un navigateur les envoie donc aussi en HTTP non chiffré |
-| `CORS_ORIGINS` | L'origine vue par le navigateur, p. ex. `https://a2flow.example.com` | Seul `http://localhost:3000` est autorisé à appeler l'API |
-| `APP_BASE_URL` | La même origine | Les e-mails de notification sont envoyés sans les liens directs vers l'application ; consultez [E-mails de notification](./configuration.md#notification-email) |
+| Cookies de session et CSRF | Marqués `Secure` : le navigateur ne les envoie qu'en HTTPS | Sans `Secure` : le navigateur les envoie aussi en HTTP en clair |
+| Origines autorisées à appeler l'API | Cette origine | Uniquement `http://localhost:3000` |
+| E-mails de notification et authentification unique | Les e-mails renvoient vers l'application, et l'authentification unique est utilisable | Les e-mails partent sans lien, et l'authentification unique est indisponible |
+
+`SESSION_COOKIE_SECURE` et `CORS_ORIGINS` peuvent toujours remplacer les deux premiers — voir la [Référence de configuration](./configuration.md#server-settings). La pile Docker Compose en donne un exemple fonctionnel : [Servir en HTTPS](../getting-started/docker-compose.md#https) place un proxy qui termine TLS devant le service `ingress` et transmet l'adresse au backend.
 
 ## Organisation des processus {#process-layout}
 

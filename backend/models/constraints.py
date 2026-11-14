@@ -339,12 +339,11 @@ SmtpHost = Annotated[
     StringConstraints(min_length=1, max_length=255, pattern=r"^[^\s\x00-\x1f\x7f]+$"),
 ]
 
-#: Base URL at which users reach this A2Flow deployment in a browser, used to
-#: build the deep links embedded in outgoing notification email. Also
-#: deliberately not :data:`HttpUrl`, for the same reason as :data:`SmtpHost`:
-#: the app's own address is ``http://localhost:3000`` in development and often a
-#: private hostname on an internal deployment, and the server never fetches it.
-AppBaseUrl = Annotated[
+#: An http(s) URL that may name a private or loopback host, such as the global
+#: Vault's address. Deliberately not :data:`HttpUrl`, for the same reason as
+#: :data:`SmtpHost`: only a ``super_admin`` sets it, and the service it points
+#: at typically lives on an internal address the SSRF guard would refuse.
+PrivateHttpUrl = Annotated[
     str, StringConstraints(min_length=1, max_length=2048, pattern=r"^https?://.+")
 ]
 

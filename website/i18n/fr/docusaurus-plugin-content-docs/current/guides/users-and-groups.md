@@ -27,6 +27,8 @@ Ouvrez **Utilisateurs** dans la barre latérale d'administration pour gérer les
 | **Rôles** | Une case à cocher par rôle : voir ci-dessous. |
 | **Groupes** | Appartenances aux groupes, modifiables depuis l'un ou l'autre côté. |
 
+Un compte qui s'est connecté par [authentification unique](./single-sign-on.md) porte le badge **SSO** dans la liste et sur sa page de détail. Les comptes créés ainsi n'ont pas de mot de passe tant qu'un administrateur n'en définit pas un.
+
 ### Rôles {#roles}
 
 Le formulaire de création et la page de détail comportent un sélecteur de rôles, avec une case à cocher par rôle, et la liste affiche une colonne **Rôles**.
@@ -149,6 +151,7 @@ Ouvrez **Groupes d'utilisateurs** dans la barre latérale d'administration pour 
 | **Description** | Texte libre. |
 | **Rôles accordés** | Détenus par chaque membre, en plus de ses propres attributions. |
 | **Membres** | Les comptes du groupe. |
+| **Groupe IdP** | Facultatif. Associe le groupe à un groupe du fournisseur d'identité du tenant ; voir [Authentification unique](./single-sign-on.md#groups-and-roles). Les membres d'un tel groupe sont gérés par l'IdP et ne peuvent pas être modifiés à la main : **Membres** est en lecture seule et indique « Géré par votre IdP ». |
 | **Étiquettes** | Libellés servant à classer les groupes, partagés avec les autres sections dotées d'étiquettes. Ici, une étiquette de contrôle d'accès donne à chaque membre l'accès aux enregistrements qui la portent. |
 
 **Rôles accordés** utilise le même sélecteur que les pages Utilisateurs, sans **Super administrateur** : un groupe ne peut jamais l'accorder, et l'option est masquée pour tout le monde, Super administrateurs compris. Comme un Super administrateur n'appartient à aucun tenant, il ne peut pas non plus être membre.
@@ -165,7 +168,7 @@ L'écriture dans cette section requiert le rôle Administrateur. La lecture rest
 
 Ouvrez **Tenants** dans la barre latérale d'administration pour gérer les tenants, la frontière organisationnelle de plus haut niveau du fonctionnement multi-tenant. Ce que cette frontière implique pour tout le reste, et la façon dont un Super administrateur choisit le tenant à utiliser, sont traités dans [Tenants](../concepts/tenants.md) ; cette section porte sur les enregistrements eux-mêmes.
 
-Contrairement à toutes les autres sections d'administration, celle-ci est **réservée au Super administrateur** (l'administrateur d'un tenant change le verrouillage de connexion et le Vault propre de celui-ci dans **Paramètres du tenant**). Elle est masquée de la barre latérale et de la page de bienvenue pour tous les autres rôles, et les écritures venant de quiconque d'autre sont refusées.
+Contrairement à toutes les autres sections d'administration, celle-ci est **réservée au Super administrateur** (l'administrateur d'un tenant change le verrouillage de connexion, le Vault propre de celui-ci et son [authentification unique](./single-sign-on.md) dans **Paramètres du tenant**). Elle est masquée de la barre latérale et de la page de bienvenue pour tous les autres rôles, et les écritures venant de quiconque d'autre sont refusées.
 
 | Champ | Remarques |
 |---|---|

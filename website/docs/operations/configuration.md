@@ -15,13 +15,14 @@ Every setting below is an environment variable. The backend reads them from `bac
 | `PORT` | `8000` | Port the backend binds to |
 | `RELOAD` | `false` | uvicorn autoreload for local development. Only read when the backend is started as `python -m backend.main`; the Docker image's own start command is unaffected either way |
 | `TIMEZONE` | `UTC` | IANA name of the deployment's local time zone. It decides where a calendar day starts for the [operations metrics](./metrics.md) — the "today" counts and the daily buckets of the lead-time trend — and is the zone the workflow agent reads a task's time requirement in when the requirement names no time zone. An unrecognized name falls back to `UTC` rather than failing startup, so a typo skews local times instead of stopping the app |
+| `APP_BASE_URL` | — | The address users open this deployment at in a browser — scheme, host and an optional port, with no path, e.g. `https://a2flow.example.com`. Notification email links back to it, [single sign-on](#single-sign-on) builds its **Redirect URI** from it, and it sets the defaults of `CORS_ORIGINS` and `SESSION_COOKIE_SECURE`. Any other shape stops the backend at startup. Without it, messages go out with no link back and single sign-on is unavailable |
 
 ## Frontend settings
 
 | Variable | Default | What it does |
 |---|---|---|
 | `BACKEND_BASE_URL` | `http://localhost:8000` | Where the frontend forwards `/api/*` when no reverse proxy routes it to the backend first (a run without containers), and where the API documentation page checks the signed-in session. Read once at process start. In the Docker Compose stack this is the backend's address on the internal network, not a public one |
-| `APP_PORT` | `3000` | Docker Compose only: the host port the app is published on — the port of the `ingress` service, which serves both the screens and the API. The backend's `CORS_ORIGINS` follows this automatically |
+| `APP_PORT` | `3000` | Docker Compose only: the host port the app is published on — the port of the `ingress` service, which serves both the screens and the API. Unless `.env` sets `APP_BASE_URL`, the stack passes `http://localhost:` followed by this port as the base URL |
 | `OPENBAO_PORT` | `8200` | Docker Compose only, with `--profile openbao`: the host port OpenBao's UI is published on — see [Try Vault secrets with OpenBao](../getting-started/docker-compose.md#openbao). A2Flow reaches it on the internal network regardless |
 
 ## Application database
@@ -61,7 +62,7 @@ If either is unset (or empty), a random password is generated instead and logged
 | Variable | Default | What it does |
 |---|---|---|
 | `SESSION_IDLE_TIMEOUT_SECONDS` | `28800` (8 hours) | Sliding idle timeout. Authenticated requests refresh the session's last-active time, at most once every 5 minutes (or half this value, if shorter), so a session may end up to that much early; a session left idle longer than this is rejected and deleted |
-| `SESSION_COOKIE_SECURE` | `false` | Marks the session and CSRF cookies `Secure` (HTTPS only). Set it to `true` for any deployment behind HTTPS |
+| `SESSION_COOKIE_SECURE` | `true` when `APP_BASE_URL` starts with `https://`, else `false` | Marks the session and CSRF cookies `Secure` (HTTPS only). Set it only to override that default |
 
 The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are also cleared when the browser closes. The browser reaches the backend on the same origin as the frontend — `/api/*` is routed to it by path, either at the reverse proxy or by the frontend itself — so the cookies are first-party and `SameSite=Lax` applies cleanly.
 
@@ -69,7 +70,7 @@ The cookies themselves are session cookies (no `Max-Age`/`Expires`), so they are
 
 | Variable | Default | What it does |
 |---|---|---|
-| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated list of origins allowed to call the backend API |
+| `CORS_ORIGINS` | `APP_BASE_URL`, or `http://localhost:3000` without it | Comma-separated list of origins allowed to call the backend API |
 
 Add each origin the frontend is served from:
 
@@ -78,6 +79,17 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 ```
 
 `*` is rejected at startup — `allow_credentials=True` is always enabled, and pairing it with a wildcard origin is invalid per the CORS spec.
+
+## Single sign-on {#single-sign-on}
+
+| Variable | Default | What it does |
+|---|---|---|
+| `OIDC_ALLOWED_PRIVATE_HOSTS` | empty | Comma-separated host names, such as `keycloak.internal,localhost`, that a tenant's [single sign-on](../guides/single-sign-on.md) issuer URL may have even though they resolve to a private address — for an on-premises identity provider. Every other issuer must resolve to a public address |
+
+Single sign-on also depends on the deployment's base URL, `APP_BASE_URL` (see [Server settings](#server-settings)). Without it, single sign-on is unavailable and **Tenant Settings** shows a warning instead of the **Redirect URI**. Two requirements:
+
+- **The base URL is the origin only** — scheme, host and an optional port, such as `https://a2flow.example.com`, with no path. The backend refuses to start with any other value.
+- **The backend should see the public origin.** Behind a reverse proxy, have the proxy keep the original `Host` header when it forwards a request and set `X-Forwarded-Proto` to the original scheme, and let the backend trust the proxy by listing the proxy's address in `FORWARDED_ALLOW_IPS` (by default only `127.0.0.1` is trusted). Otherwise every SSO sign-in takes one extra redirect.
 
 ## Agent skill store {#agent-skill-store}
 
@@ -165,7 +177,6 @@ These are the same values the admin UI edits under [System Settings](../guides/s
 
 | Variable | Default | What it does |
 |---|---|---|
-| `APP_BASE_URL` | — | Base URL at which users reach this deployment in a browser, e.g. `https://a2flow.example.com`. Used to build the deep links in outgoing notification email; without it, messages go out with no link back |
 | `SMTP_ENABLED` | `false` | Master switch for email delivery. Must be explicitly `true`; it is never inferred from the other variables being set |
 | `SMTP_HOST` / `SMTP_PORT` | — / `587` | The relay to hand messages to. A bare internal hostname is fine here — this is handed to the SMTP client, not fetched |
 | `SMTP_SECURITY` | `starttls` | `none`, `starttls`, or `ssl` |

@@ -109,13 +109,17 @@ function buildColumns(
       sortField: "username",
       filterField: "username",
       visibility: "always",
+      noTruncate: true,
       cell: (u) => (
-        <Link
-          href={`/users/${u.id}`}
-          className="font-medium text-accent transition-colors hover:underline"
-        >
-          {u.username}
-        </Link>
+        <span className="inline-flex items-center gap-1.5">
+          <Link
+            href={`/users/${u.id}`}
+            className="font-medium text-accent transition-colors hover:underline"
+          >
+            {u.username}
+          </Link>
+          {u.ssoLinked && <Badge>{t("users.ssoLinked")}</Badge>}
+        </span>
       ),
     },
     ...USER_SHARED_COLUMNS,
