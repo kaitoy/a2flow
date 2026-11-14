@@ -31,40 +31,30 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 const BASE =
   "inline-flex items-center justify-center cursor-pointer rounded-xl " +
   "text-sm font-medium tracking-tight " +
-  "transition-[transform,translate,scale,box-shadow,background-color,color,opacity] " +
+  "transition-[transform,translate,scale,box-shadow,background-color,border-color,color,opacity,filter] " +
   "duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] " +
   "motion-safe:active:scale-[0.97] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 " +
-  "disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:translate-y-0";
+  "disabled:cursor-not-allowed disabled:active:scale-100";
 
 /**
- * Vivid success treatment for the `done` stage. Overrides the active variant's
- * fill with a solid success-green (clearing any gradient via `bg-none`), adds a
- * matching glow, and plays a one-shot celebratory wiggle. `disabled:!opacity-100`
- * keeps the button bright even though it is held non-interactive while "Saved!"
- * is shown. Motion is gated by `motion-safe`, so reduced-motion users still get
- * the color/checkmark without the shake.
+ * Success treatment for the `done` stage. Overrides the active variant's fill
+ * with a solid success-green; `disabled:!opacity-100` keeps the button bright
+ * even though it is held non-interactive while "Saved!" is shown. The color
+ * and the checkmark are the whole message — nothing moves.
  */
 const DONE =
-  "!bg-success !bg-none !text-on-primary !border-transparent " +
-  "shadow-[0_4px_20px_-2px_var(--color-success)] " +
-  "disabled:!opacity-100 disabled:cursor-default " +
-  "motion-safe:animate-wiggle";
+  "!bg-success !text-on-primary !border-transparent !brightness-100 " +
+  "disabled:!opacity-100 disabled:cursor-default";
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary:
-    "px-4 py-2 text-on-primary bg-gradient-to-br from-accent to-secondary " +
-    "shadow-[0_4px_16px_-4px_var(--color-accent-soft),inset_0_1px_0_var(--inner-top-highlight)] " +
-    "hover:shadow-glow motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0",
-  secondary:
-    "px-4 py-2 glass-panel text-on-surface hover:text-accent hover:shadow-glow " +
-    "motion-safe:hover:-translate-y-0.5",
-  ghost:
-    "px-3 py-2 text-on-surface-variant bg-transparent hover:bg-glass hover:text-accent " +
-    "motion-safe:hover:-translate-y-0.5",
-  danger:
-    "px-4 py-2 glass-panel text-error hover:border-error/40 hover:bg-error/10 " +
-    "hover:shadow-[0_0_20px_-4px_var(--color-error)] motion-safe:hover:-translate-y-0.5",
+    "px-4 py-2 text-on-primary bg-accent " +
+    "shadow-[inset_0_1px_0_var(--inner-top-highlight)] " +
+    "hover:brightness-110 active:brightness-95",
+  secondary: "px-4 py-2 glass-panel text-on-surface hover:border-accent/50 hover:text-accent",
+  ghost: "px-3 py-2 text-on-surface-variant bg-transparent hover:bg-glass hover:text-accent",
+  danger: "px-4 py-2 glass-panel text-error hover:border-error/40 hover:bg-error/10",
 };
 
 /**
@@ -89,7 +79,7 @@ function doneContent(doneLabel: React.ReactNode): React.ReactNode {
  * reflows (no flicker) as the status changes.
  *
  * The `done` stage is emphasized: the button turns solid success-green with a
- * leading checkmark and a one-shot celebratory wiggle (see {@link DONE}), and is
+ * leading checkmark (see {@link DONE}), and is
  * held non-interactive (rendered `disabled`) for as long as "Saved!" is shown so
  * it cannot be re-triggered. The `pending` stage is likewise non-interactive but
  * keeps the standard dimmed `disabled` look.

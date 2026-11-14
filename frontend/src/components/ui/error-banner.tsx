@@ -37,7 +37,7 @@ export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
         <button
           type="button"
           onClick={onDismiss}
-          className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-[transform,translate,scale,background-color,color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] hover:bg-error/15 hover:text-on-error-container motion-safe:hover:scale-110"
+          className="cursor-pointer rounded-full px-2 leading-none text-on-error-container/70 transition-[transform,translate,scale,background-color,color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] hover:bg-error/15 hover:text-on-error-container"
           aria-label={t("ui.dismissError")}
         >
           ✕

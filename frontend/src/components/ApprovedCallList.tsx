@@ -89,7 +89,7 @@ export function ApprovedCallList({ calls }: ApprovedCallListProps) {
 
   return (
     <section className="mt-3">
-      <h4 className="text-label-caps text-on-surface-variant">{t("app.thisAuthorizes")}</h4>
+      <h4 className="text-label text-on-surface-variant">{t("app.thisAuthorizes")}</h4>
       <ul className="mt-2 flex flex-col gap-2">
         {calls.map((call) => {
           const args = Object.entries((call.arguments ?? {}) as Record<string, Constraint>);

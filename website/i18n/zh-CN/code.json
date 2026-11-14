@@ -5,18 +5,6 @@
   "home.meta.description": {
     "message": "A2Flow 是一款由聊天驱动的工作流引擎。它以 AI 代理为核心重构 ITSM 式工作流：把工作规划成任务图，在必须由人审批的环节暂停等待，其余部分自行执行。计划会保存为工作流，下次运行时遵循相同的步骤。"
   },
-  "home.nav.concept": {
-    "message": "理念"
-  },
-  "home.nav.how": {
-    "message": "工作原理"
-  },
-  "home.nav.features": {
-    "message": "功能"
-  },
-  "home.nav.architecture": {
-    "message": "架构"
-  },
   "home.hero.eyebrow": {
     "message": "Agent as Workflow"
   },
@@ -37,9 +25,6 @@
   },
   "home.hero.demoCaption": {
     "message": "两个聊天，一个工作流：先与代理一起设计，再在专属会话中运行，表单和审批都在其中。"
-  },
-  "home.concept.eyebrow": {
-    "message": "理念"
   },
   "home.concept.title": {
     "message": "{reimagined} ITSM 工作流"
@@ -146,9 +131,6 @@
   "home.concept.note.skill": {
     "message": "代理技能，即 Git 仓库中的 {file} 文件"
   },
-  "home.how.eyebrow": {
-    "message": "工作原理"
-  },
   "home.how.title": {
     "message": "规划。批准。{execute}"
   },
@@ -158,17 +140,11 @@
   "home.how.lead": {
     "message": "每次运行都要通过同样的两道门禁：在有人发布设计之前，什么都不会运行；在指定审批人同意之前，任何会更改内容的工具调用都无法通过。"
   },
-  "home.how.step1.label": {
-    "message": "第 1 步——规划"
-  },
   "home.how.step1.title": {
     "message": "代理把意图转化为任务图"
   },
   "home.how.step1.body": {
     "message": "在设计会话中，它读取代理技能，将您的提示词拆分为依赖关系明确的任务模板，并通过一次调用注册整个 DAG，同时完成循环检测。您可以通过聊天或手动调整，此时还不会运行任何内容。"
-  },
-  "home.how.step2.label": {
-    "message": "第 2 步——批准"
   },
   "home.how.step2.title": {
     "message": "关键环节由人把关"
@@ -179,17 +155,11 @@
   "home.how.step2.body.approver": {
     "message": "指定审批人"
   },
-  "home.how.step3.label": {
-    "message": "第 3 步——执行"
-  },
   "home.how.step3.title": {
     "message": "代理沿着图逐步推进"
   },
   "home.how.step3.body": {
     "message": "按下运行，代理立即在此次运行专属的工作流会话中开始工作。任务按依赖顺序依次经历 {statuses}，只调用绑定到当前任务的 MCP 工具；代理需要询问时，则通过直接绘制在聊天中的表单提问。"
-  },
-  "home.teams.eyebrow": {
-    "message": "为团队而生"
   },
   "home.teams.title": {
     "message": "三种角色，{conversation}"
@@ -229,9 +199,6 @@
   },
   "home.teams.trust.audit.body": {
     "message": "谁批准的、写了什么、具体何时——都保存在审批记录中，可在管理界面中查看。"
-  },
-  "home.features.eyebrow": {
-    "message": "功能"
   },
   "home.features.title": {
     "message": "工作流所需的一切，{nothing}"
@@ -275,9 +242,6 @@
   "home.features.llm.body": {
     "message": "默认使用 Gemini，也可通过 LiteLLM 使用 OpenAI 和 Anthropic 的模型。更换提供商只需修改一个环境变量。"
   },
-  "home.architecture.eyebrow": {
-    "message": "技术内幕"
-  },
   "home.architecture.title": {
     "message": "基于开放协议的{stack}"
   },
@@ -286,9 +250,6 @@
   },
   "home.architecture.lead": {
     "message": "聊天界面从 FastAPI 后端接收 AG-UI 事件流，代理则把 A2UI 界面绘制到聊天中。代理技能来自 Git，工具来自 MCP 服务器，所有数据都保存在同一个关系型数据库中。"
-  },
-  "home.cta.eyebrow": {
-    "message": "开始使用"
   },
   "home.cta.title": {
     "message": "{machine}运行"

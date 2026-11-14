@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Archivo, Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,15 +11,15 @@ import { NO_FLASH_THEME_SCRIPT } from "@/lib/no-flash-theme-script";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
-const spaceGrotesk = Space_Grotesk({
+// Variable on both axes: headings are set wider than the default width.
+const archivo = Archivo({
   subsets: ["latin"],
-  variable: "--font-space-grotesk",
-  weight: ["400", "500", "600", "700"],
+  variable: "--font-archivo",
+  axes: ["wdth"],
 });
-const jetbrainsMono = JetBrains_Mono({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
-  weight: ["400", "700"],
+  variable: "--font-geist-mono",
 });
 
 /**
@@ -122,7 +122,7 @@ export default function GlobalError({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      className={`${archivo.variable} ${geistMono.variable}`}
     >
       <body className={inter.className}>
         <Script

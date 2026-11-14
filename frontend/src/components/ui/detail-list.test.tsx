@@ -71,7 +71,7 @@ describe("DetailItem", () => {
   it("renders the value in a heavier weight than the label", () => {
     render(<DetailItem label="Username" value="alice" />);
 
-    expect(screen.getByText("Username")).toHaveClass("text-label-caps");
+    expect(screen.getByText("Username")).toHaveClass("text-label");
     expect(screen.getByText("alice")).toHaveClass("font-medium");
   });
 

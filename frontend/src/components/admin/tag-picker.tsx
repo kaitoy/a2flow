@@ -97,7 +97,7 @@ export function TagPicker({
   if (readOnly) {
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps">{t.maybe(label)}</span>
+        <span className="text-label">{t.maybe(label)}</span>
         {chips}
       </div>
     );
@@ -105,7 +105,7 @@ export function TagPicker({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{t.maybe(label)}</span>
+      <span className="text-label">{t.maybe(label)}</span>
       {chips}
       {loading ? (
         <Skeleton className="h-9 w-40 rounded-xl" />

@@ -18,7 +18,7 @@ export default function NotificationsPage() {
   const t = useT();
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-8">
-      <h1 className="font-display text-3xl font-semibold tracking-tight text-gradient-accent">
+      <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface">
         {t("common.notifications")}
       </h1>
       <NotificationList />

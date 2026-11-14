@@ -367,18 +367,6 @@
   "home.meta.description": {
     "message": "A2Flow は、チャットで進めるワークフローエンジン（Chat-Driven Workflow）です。ITSM 型のワークフローを AI エージェントを軸に組み直し、仕事をタスクグラフとして計画し、承認が要る場面では人を待ち、それ以外は自分で実行します。その計画はワークフローとして保存され、次の実行も同じ手順をたどります。"
   },
-  "home.nav.concept": {
-    "message": "コンセプト"
-  },
-  "home.nav.how": {
-    "message": "仕組み"
-  },
-  "home.nav.features": {
-    "message": "機能"
-  },
-  "home.nav.architecture": {
-    "message": "アーキテクチャ"
-  },
   "home.hero.eyebrow": {
     "message": "Agent as Workflow"
   },
@@ -399,9 +387,6 @@
   },
   "home.hero.demoCaption": {
     "message": "1 つのワークフローに 2 つのチャット。エージェントと設計し、実行は専用のセッションで。フォームも承認もその中に出ます。"
-  },
-  "home.concept.eyebrow": {
-    "message": "コンセプト"
   },
   "home.concept.title": {
     "message": "ITSM のワークフローを、{reimagined}"
@@ -508,9 +493,6 @@
   "home.concept.note.skill": {
     "message": "エージェントスキル、つまり Git リポジトリの {file} ファイル"
   },
-  "home.how.eyebrow": {
-    "message": "仕組み"
-  },
   "home.how.title": {
     "message": "計画する。承認する。{execute}"
   },
@@ -520,17 +502,11 @@
   "home.how.lead": {
     "message": "どの実行も同じ 2 つのゲートを通ります。人が設計を公開するまで何も動かず、指名された承認者が同意するまで、何かを変えるツール呼び出しは通りません。"
   },
-  "home.how.step1.label": {
-    "message": "STEP 1 — 計画"
-  },
   "home.how.step1.title": {
     "message": "エージェントが意図をタスクグラフに変える"
   },
   "home.how.step1.body": {
     "message": "設計セッションでエージェントスキルを読み、プロンプトを依存関係の明示されたタスクテンプレートに分解し、DAG 全体を 1 回の呼び出しで登録します。循環の検出もそこで行います。チャットでも手作業でも直せます。この時点ではまだ何も動きません。"
-  },
-  "home.how.step2.label": {
-    "message": "STEP 2 — 承認"
   },
   "home.how.step2.title": {
     "message": "要所では人がゲートになる"
@@ -541,17 +517,11 @@
   "home.how.step2.body.approver": {
     "message": "指名された承認者"
   },
-  "home.how.step3.label": {
-    "message": "STEP 3 — 実行"
-  },
   "home.how.step3.title": {
     "message": "エージェントがグラフをたどる"
   },
   "home.how.step3.body": {
     "message": "実行を押すと、エージェントはその実行専用のワークフローセッションですぐに動き始めます。タスクは依存順に {statuses} と進み、そのとき動いているタスクに割り当てられた MCP ツールだけを呼びます。聞きたいことは、チャットの中に描いたフォームで尋ねます。"
-  },
-  "home.teams.eyebrow": {
-    "message": "チームのために"
   },
   "home.teams.title": {
     "message": "3 つの役割が、{conversation}"
@@ -591,9 +561,6 @@
   },
   "home.teams.trust.audit.body": {
     "message": "誰が承認し、何を書き、いつだったのか。承認のレコードに残り、管理画面から辿れます。"
-  },
-  "home.features.eyebrow": {
-    "message": "機能"
   },
   "home.features.title": {
     "message": "ワークフローに必要なものすべてを、{nothing}"
@@ -637,9 +604,6 @@
   "home.features.llm.body": {
     "message": "既定は Gemini。OpenAI と Anthropic のモデルは LiteLLM 経由で使えます。プロバイダの切り替えは環境変数 1 つです。"
   },
-  "home.architecture.eyebrow": {
-    "message": "内側"
-  },
   "home.architecture.title": {
     "message": "オープンプロトコルの{stack}"
   },
@@ -648,9 +612,6 @@
   },
   "home.architecture.lead": {
     "message": "チャット UI は FastAPI のバックエンドから AG-UI のイベントを受け取り、エージェントは A2UI のサーフェスをチャットに描きます。Agent Skills は Git から、ツールは MCP サーバーから来て、1 つのリレーショナルデータベースがすべてを保持します。"
-  },
-  "home.cta.eyebrow": {
-    "message": "はじめる"
   },
   "home.cta.title": {
     "message": "{machine}動かす"

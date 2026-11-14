@@ -103,18 +103,8 @@ export function SessionList({
       className={`relative flex h-full w-64 shrink-0 flex-col border-r border-glass-border glass-chrome ${className ?? ""}`}
     >
       <div className="shrink-0 px-3 py-4">
-        <Button
-          variant="primary"
-          onClick={onNew}
-          disabled={disabled}
-          className="group w-full gap-2"
-        >
-          <SquarePen
-            size={16}
-            strokeWidth={1.8}
-            aria-hidden="true"
-            className="transition-transform duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)] motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:rotate-[-8deg] group-disabled:!translate-y-0 group-disabled:!rotate-0"
-          />
+        <Button variant="primary" onClick={onNew} disabled={disabled} className="w-full gap-2">
+          <SquarePen size={16} strokeWidth={1.8} aria-hidden="true" />
           {t("app.newSession")}
         </Button>
       </div>
@@ -136,7 +126,6 @@ export function SessionList({
         {!loading && sessions.length === 0 && (
           <EmptyState
             icon={MessagesSquare}
-            animation="bob"
             description={t("app.noSessions")}
             compact
             className="px-3 py-8"
@@ -194,8 +183,8 @@ export function SessionList({
                   // Hover-revealed on desktop; always visible (and wider) on touch devices
                   "text-on-surface-variant opacity-0 pointer-coarse:opacity-100 pointer-coarse:w-10",
                   "transition-[opacity,background-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
-                  "group-hover:opacity-100 hover:bg-error/10 hover:text-error motion-safe:hover:scale-110",
-                  "focus-visible:opacity-100 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
+                  "group-hover:opacity-100 hover:bg-error/10 hover:text-error",
+                  "focus-visible:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",
                 ].join(" ")}
               >
                 <span aria-hidden="true" className="text-[14px] leading-none">

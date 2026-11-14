@@ -4,71 +4,12 @@
  * Everything is scoped under `.a2f-intro` — this file is loaded globally by the
  * component module, exactly like homepage.css, which scopes itself under
  * `.a2flow-home`. The palette is the `--a2f-*` token set custom.css defines for
- * both themes, so the only dark-mode override below is the one hairline colour
- * the token set has no equivalent for.
+ * both themes, so nothing here needs a dark-mode override. Like the rest of
+ * the site it is still: opaque panels on hairlines, and nothing that moves.
  */
 
 .a2f-intro {
-  --intro-radius: 1rem;
-  /* `--a2f-glass-border` is a white highlight meant to sit on top of a glass
-   * pane; on the bare page background it disappears. Anything outside a pane
-   * uses this hairline instead, which is the one place a dark override is
-   * needed since it is drawn in ink rather than in light. */
-  --intro-hairline: rgba(71, 85, 105, 0.3);
-}
-
-[data-theme="dark"] .a2f-intro {
-  --intro-hairline: rgba(148, 163, 184, 0.28);
-}
-
-/* Entrance: staggered, CSS-only, and off entirely under reduced motion. */
-@keyframes intro-rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.a2f-intro .intro-hero,
-.a2f-intro .intro-contrast,
-.a2f-intro .intro-acts,
-.a2f-intro .intro-closing,
-.a2f-intro .intro-next {
-  animation: intro-rise 360ms cubic-bezier(0.3, 0, 0, 1) both;
-}
-
-.a2f-intro .intro-contrast {
-  animation-delay: 0.1s;
-}
-
-.a2f-intro .intro-acts {
-  animation-delay: 0.18s;
-}
-
-.a2f-intro .intro-closing {
-  animation-delay: 0.26s;
-}
-
-.a2f-intro .intro-next {
-  animation-delay: 0.32s;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .a2f-intro .intro-hero,
-  .a2f-intro .intro-contrast,
-  .a2f-intro .intro-acts,
-  .a2f-intro .intro-closing,
-  .a2f-intro .intro-next {
-    animation: none;
-  }
-
-  .a2f-intro .intro-act {
-    transition: none;
-  }
+  --intro-radius: 0.75rem;
 }
 
 /* ------------------------------------------------------------------- hero */
@@ -93,10 +34,8 @@
 .a2f-intro .intro-eyebrow {
   display: inline-block;
   margin-bottom: 1rem;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.875rem;
+  font-weight: 600;
   color: var(--a2f-accent);
 }
 
@@ -104,20 +43,20 @@
   margin: 0 0 1.25rem;
   max-width: 20ch;
   font-family: var(--a2f-font-display);
+  font-stretch: 125%;
   font-size: clamp(2rem, 5.2vw, 3.25rem);
-  font-weight: 700;
-  line-height: 1.12;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
   /* Japanese wraps anywhere by default, which breaks the headline mid-word;
    * browsers that don't know this value simply keep the default behaviour. */
   word-break: auto-phrase;
 }
 
+/* The emphasized phrase stays marked up for the translations, but the
+   typeface carries the headline now — it is not painted differently. */
 .a2f-intro .grad {
-  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: inherit;
 }
 
 .a2f-intro .intro-lead {
@@ -144,29 +83,24 @@
   overflow: hidden;
   padding: 1.5rem;
   border-radius: var(--intro-radius);
-  border: 1px solid var(--a2f-glass-border);
-  background: var(--a2f-glass);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  box-shadow: var(--a2f-shadow-glass);
+  border: 1px solid var(--a2f-hairline);
+  background: var(--a2f-panel);
+  box-shadow: var(--a2f-shadow-panel);
 }
 
-/* The old way is drawn quieter: dashed edge, no glass, muted ink. */
+/* The old way is drawn quieter: dashed edge, no panel, muted ink. */
 .a2f-intro .intro-panel-past {
   border-style: dashed;
-  border-color: var(--intro-hairline);
   background: transparent;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .a2f-intro .intro-panel-next::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: 3px;
-  background: linear-gradient(90deg, var(--a2f-accent), var(--a2f-secondary));
+  height: 2px;
+  background: var(--a2f-accent);
 }
 
 .a2f-intro .intro-mark {
@@ -208,6 +142,7 @@
 .a2f-intro .intro-panel-title {
   margin: 0 0 0.625rem;
   font-family: var(--a2f-font-display);
+  font-stretch: 112%;
   font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -239,17 +174,9 @@
   position: relative;
   padding: 1.5rem;
   border-radius: var(--intro-radius);
-  border: 1px solid var(--a2f-glass-border);
-  background: var(--a2f-glass);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  box-shadow: var(--a2f-shadow-glass);
-  transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), box-shadow 240ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-.a2f-intro .intro-act:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--a2f-shadow-glass-lg);
+  border: 1px solid var(--a2f-hairline);
+  background: var(--a2f-panel);
+  box-shadow: var(--a2f-shadow-panel);
 }
 
 /* A chevron in the gutter, so the three cards read as one sequence. */
@@ -280,16 +207,15 @@
 }
 
 .a2f-intro .intro-act-step {
+  font-family: var(--a2f-font-mono);
   font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: var(--a2f-muted);
 }
 
 .a2f-intro .intro-act-title {
   margin: 0 0 0.625rem;
   font-family: var(--a2f-font-display);
+  font-stretch: 112%;
   font-size: 1.0625rem;
   font-weight: 700;
   line-height: 1.4;
@@ -314,20 +240,17 @@
   padding: 2.5rem 1.5rem;
   text-align: center;
   border-radius: var(--intro-radius);
-  border: 1px solid var(--a2f-glass-border);
-  background: linear-gradient(135deg, rgba(var(--a2f-accent-rgb), 0.1), color-mix(in srgb, var(--a2f-secondary) 8%, transparent));
+  border: 1px solid var(--a2f-hairline);
+  background: var(--a2f-accent-soft);
 }
 
 .a2f-intro .intro-closing-headline {
   margin: 0 0 0.75rem;
   font-family: var(--a2f-font-display);
   font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-stretch: 112%;
   font-weight: 700;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
 .a2f-intro .intro-closing-body {
@@ -346,6 +269,7 @@
 .a2f-intro .intro-next-title {
   margin: 0 0 1.25rem;
   font-family: var(--a2f-font-display);
+  font-stretch: 112%;
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -362,18 +286,17 @@
 
 .a2f-intro .intro-next li {
   padding: 1rem 1.125rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--a2f-glass-border);
-  background: var(--a2f-glass);
+  border-radius: 0.5rem;
+  border: 1px solid var(--a2f-hairline);
+  background: var(--a2f-panel);
   font-size: 0.9375rem;
   line-height: 1.65;
   color: var(--a2f-muted);
-  transition: border-color 240ms cubic-bezier(0.2, 0, 0, 1), transform 240ms cubic-bezier(0.2, 0, 0, 1);
+  transition: border-color 150ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .a2f-intro .intro-next li:hover {
   border-color: var(--a2f-accent);
-  transform: translateY(-2px);
 }
 
 .a2f-intro .intro-next a {

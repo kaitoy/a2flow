@@ -11,7 +11,10 @@
   cursor: zoom-in;
 }
 
-.dialog {
+/* `[open]` matters: an unconditional `display` here overrides the browser's
+   `dialog:not([open]) { display: none }`, leaving every closed dialog laid out
+   100vw wide in the page — one horizontal scrollbar per image. */
+.dialog[open] {
   width: 100vw;
   height: 100vh;
   max-width: 100vw;

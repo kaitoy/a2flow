@@ -9,7 +9,7 @@ const VARIANT_CLASS: Record<string, string> = {
   h4: "text-[14px] leading-[22px] font-semibold text-on-surface",
   h5: "text-[13px] leading-[20px] font-semibold text-on-surface",
   body: "text-[14px] leading-[22px] font-normal text-on-surface",
-  caption: "text-label-caps",
+  caption: "text-label",
 };
 
 /** A2UI Text implementation that renders markdown and applies typography variant classes. */

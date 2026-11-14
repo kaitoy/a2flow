@@ -1,132 +1,136 @@
 /**
- * Landing-page styles, carried over from the standalone homepage/index.html.
+ * Landing-page styles.
  *
  * Every rule is scoped under `.a2flow-home` so the page keeps its own reset and
  * typography without reaching the documentation pages, which use Infima. The
  * color tokens it reads (`--a2f-*`) are defined in custom.css.
+ *
+ * The page follows the application's rule (DESIGN.md): opaque panels on
+ * hairlines, ink-colored headings in a wide display face, one teal accent —
+ * and nothing that moves except the hero's demo, whose window carries the live
+ * edge while the agent has the turn.
  */
 
 /* ---------------------------------------------------------------- base */
-.a2flow-home, .a2flow-home * { box-sizing: border-box; margin: 0; padding: 0;
+.a2flow-home,
+.a2flow-home * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 .a2flow-home {
+  /* The viewer's own chat bubble, as in the app: the accent in light, a deep
+     teal in dark, where the luminous accent is too loud for a paragraph. */
+  --a2f-bubble: var(--a2f-accent);
+  --a2f-on-bubble: var(--a2f-on-primary);
+
+  position: relative;
+  /* Its own stacking context, so the canvas light below sits behind the
+     content but above the page background. */
+  isolation: isolate;
+  min-height: 100dvh;
   font-family: var(--a2f-font-body);
   font-size: 1rem;
-  line-height: 1.65;
+  line-height: 1.6;
   color: var(--a2f-ink);
   background: var(--a2f-surface);
-  /* clip, not hidden: hidden would make this a scroll container, and the
-     sticky section nav would then anchor to it instead of the viewport. */
   overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Aurora canvas (layer 0), the app's own: a single diagonal ribbon — mint head,
-   violet body, soft-cyan tail — plus a faint counter-glow in the opposite
-   corner, drifting slowly along its own flow direction. */
+[data-theme="dark"] .a2flow-home {
+  --a2f-bubble: oklch(0.4 0.075 184);
+  --a2f-on-bubble: oklch(0.96 0.02 180);
+}
+
+/* The canvas's light: two still washes behind the hero, mint on the left and a
+   paler cyan on the right. They stay with the hero rather than following the
+   scroll, and they do not move. */
 .a2flow-home::before {
   content: "";
-  position: fixed;
-  inset: -12%;
-  z-index: -2;
-  background:
-    radial-gradient(56rem 22rem at 24% 18%, var(--a2f-aurora-1) 0%, transparent 65%),
-    radial-gradient(64rem 24rem at 58% 36%, var(--a2f-aurora-2) 0%, transparent 65%),
-    radial-gradient(48rem 20rem at 88% 54%, var(--a2f-aurora-3) 0%, transparent 70%),
-    radial-gradient(40rem 26rem at 8% 90%, var(--a2f-aurora-3) 0%, transparent 65%);
-  filter: saturate(115%);
-  animation: aurora-drift 36s ease-in-out infinite;
-}
-
-/* Film-grain overlay. */
-.a2flow-home::after {
-  content: "";
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  inset: 0 0 auto;
+  height: 48rem;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.35;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
-}
-
-@keyframes aurora-drift {
-0%, 100% { transform: translate3d(0, 0, 0) scale(1);
-}
-
-50% { transform: translate3d(2%, -1.5%, 0) scale(1.05);
-}
-
+  background:
+    radial-gradient(60rem 30rem at 6% -10%, var(--a2f-aurora-1) 0%, transparent 70%),
+    radial-gradient(46rem 26rem at 96% -6%, var(--a2f-aurora-2) 0%, transparent 70%);
 }
 
 .a2flow-home h1,
 .a2flow-home h2,
-.a2flow-home h3 { font-family: var(--a2f-font-display); letter-spacing: -0.02em; line-height: 1.15;
+.a2flow-home h3 {
+  font-family: var(--a2f-font-display);
+  font-stretch: 112%;
+  letter-spacing: -0.02em;
+  line-height: 1.14;
+  text-wrap: balance;
 }
 
-.a2flow-home a { color: inherit;
+/* Han, Kana and Hangul come from system faces: no width axis to stretch, and
+   negative tracking only makes the glyphs collide. */
+.a2flow-home:is(:lang(ja), :lang(zh), :lang(ko)) :is(h1, h2, h3) {
+  letter-spacing: normal;
+  line-height: 1.3;
+  word-break: auto-phrase;
 }
 
-.a2flow-home img { max-width: 100%; display: block;
+.a2flow-home a {
+  color: inherit;
 }
 
-.a2flow-home code { font-family: var(--a2f-font-mono); font-size: 0.92em;
+.a2flow-home img {
+  max-width: 100%;
+  display: block;
 }
 
-.a2flow-home :focus-visible { outline: 2px solid rgba(var(--a2f-accent-rgb), 0.5); outline-offset: 2px; border-radius: 4px;
+.a2flow-home code {
+  font-family: var(--a2f-font-mono);
+  font-size: 0.875em;
+  background: var(--a2f-wash);
+  border: 0;
+  border-radius: 0.3125rem;
+  padding: 0.0625rem 0.375rem;
 }
 
-.a2flow-home .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem;
+.a2flow-home :focus-visible {
+  outline: 2px solid rgba(var(--a2f-accent-rgb), 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* ---------------------------------------------------------------- glass */
-.a2flow-home .glass,
-.a2flow-home .glass-strong {
-  border: 1px solid var(--a2f-glass-border);
-  box-shadow: var(--a2f-shadow-glass);
+.a2flow-home .wrap {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
 }
 
-.a2flow-home .glass {
-  background: var(--a2f-glass);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-}
-
-.a2flow-home .glass-strong {
-  background: var(--a2f-glass-strong);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  box-shadow: var(--a2f-shadow-glass-lg);
-}
-
-.a2flow-home .eyebrow {
-  display: inline-block;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--a2f-accent);
-  margin-bottom: 0.875rem;
-}
-
+/* A headline's emphasized phrase is still marked up (the translations nest it),
+   but it is no longer painted differently: the typeface carries the headline. */
 .a2flow-home .grad-text {
-  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: inherit;
 }
 
-.a2flow-home .section { padding: 6.5rem 0 0;
+.a2flow-home .section {
+  padding: 7.5rem 0 0;
 }
 
-.a2flow-home .section-head { max-width: 44rem; margin-bottom: 3rem;
+.a2flow-home .section-head {
+  max-width: 46rem;
+  margin-bottom: 3rem;
 }
 
-.a2flow-home .section-head h2 { font-size: clamp(1.75rem, 3.4vw, 2.5rem); font-weight: 700; margin-bottom: 1rem;
+.a2flow-home .section-head h2 {
+  font-size: clamp(1.875rem, 3.6vw, 2.75rem);
+  font-weight: 700;
+  margin-bottom: 1.125rem;
 }
 
-.a2flow-home .section-head p { color: var(--a2f-muted); font-size: 1.0625rem;
+.a2flow-home .section-head p {
+  color: var(--a2f-muted);
+  font-size: 1.0625rem;
 }
 
 /* ---------------------------------------------------------------- buttons */
@@ -135,92 +139,140 @@
   align-items: center;
   gap: 0.5rem;
   font: 600 0.9375rem/1 var(--a2f-font-body);
-  padding: 0.8125rem 1.375rem;
-  border-radius: 0.75rem;
+  padding: 0.8125rem 1.25rem;
+  border-radius: 0.5rem;
   text-decoration: none;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), box-shadow 240ms cubic-bezier(0.2, 0, 0, 1);
+  transition:
+    background-color 150ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 150ms cubic-bezier(0.2, 0, 0, 1),
+    color 150ms cubic-bezier(0.2, 0, 0, 1),
+    filter 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.a2flow-home .btn:active {
+  transform: scale(0.97);
+}
+
+.a2flow-home .btn-primary,
+.a2flow-home .btn-primary:hover {
+  color: var(--a2f-on-primary);
 }
 
 .a2flow-home .btn-primary {
-  color: var(--a2f-on-primary);
-  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
-  box-shadow: 0 4px 16px -4px rgba(var(--a2f-accent-rgb), 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  background: var(--a2f-accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
-.a2flow-home .btn-primary:hover { box-shadow: var(--a2f-shadow-glow); transform: translateY(-2px);
-}
-
-.a2flow-home .btn-primary:active { transform: scale(0.97);
+.a2flow-home .btn-primary:hover {
+  filter: brightness(1.1);
 }
 
 .a2flow-home .btn-ghost {
   color: var(--a2f-ink);
-  background: var(--a2f-glass);
-  border-color: var(--a2f-glass-border);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  background: var(--a2f-panel);
+  border-color: var(--a2f-hairline);
+  box-shadow: var(--a2f-shadow-panel);
 }
 
-.a2flow-home .btn-ghost:hover { box-shadow: var(--a2f-shadow-glow); transform: translateY(-2px);
+.a2flow-home .btn-ghost:hover {
+  color: var(--a2f-accent);
+  border-color: var(--a2f-accent);
 }
 
-.a2flow-home .btn svg { width: 1.05rem; height: 1.05rem;
+.a2flow-home .btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
-.a2flow-home .header-actions { display: flex; align-items: center; gap: 0.625rem;
+/* ------------------------------------------------------------------- hero */
+.a2flow-home .a2f-hero {
+  padding: 5.5rem 0 1rem;
 }
 
-.a2flow-home #themeToggle .moon { display: none;
+.a2flow-home .tagline {
+  display: block;
+  margin-bottom: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--a2f-accent);
 }
 
-/* ----------------------------------------------------------------.a2f-hero */
-.a2flow-home .a2f-hero { padding: 9.5rem 0 1rem;
+/* The page's one loud thing: Archivo at its widest, as large as the line
+   allows. Everything under it is set quietly so it can be. */
+.a2flow-home .a2f-hero h1 {
+  font-stretch: 125%;
+  font-weight: 800;
+  font-size: clamp(2.125rem, 6.1vw, 5rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  margin-bottom: 3rem;
+}
+
+.a2flow-home:is(:lang(ja), :lang(zh), :lang(ko)) .a2f-hero h1 {
+  font-size: clamp(2rem, 5.2vw, 4.25rem);
+  line-height: 1.2;
 }
 
 .a2flow-home .hero-grid {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   gap: 3.5rem;
-  align-items: center;
+  align-items: start;
 }
 
-.a2flow-home .a2f-hero h1 {
-  font-size: clamp(2.375rem, 5.2vw, 3.75rem);
-  font-weight: 700;
-  margin-bottom: 1.375rem;
+.a2flow-home .hero-sub {
+  color: var(--a2f-muted);
+  font-size: 1.0625rem;
+  margin-bottom: 2rem;
 }
 
-.a2flow-home .hero-sub { color: var(--a2f-muted); font-size: 1.125rem; max-width: 34rem; margin-bottom: 2rem;
+.a2flow-home .hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2.25rem;
 }
 
-.a2flow-home .hero-cta { display: flex; flex-wrap: wrap; gap: 0.875rem; margin-bottom: 2rem;
-}
-
-.a2flow-home .hero-tags { display: flex; flex-wrap: wrap; gap: 0.5rem;
+.a2flow-home .hero-tags,
+.a2flow-home .stack-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
 }
 
 .a2flow-home .tag {
+  font-family: var(--a2f-font-mono);
   font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.3125rem 0.8125rem;
-  border-radius: 9999px;
-  border: 1px solid var(--a2f-glass-border);
-  background: var(--a2f-glass);
+  padding: 0.1875rem 0.5625rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--a2f-hairline);
   color: var(--a2f-muted);
 }
 
-@media (max-width: 60rem) {
-.a2flow-home .a2f-hero { padding-top: 8rem;
+@media (max-width: 62rem) {
+  .a2flow-home .a2f-hero {
+    padding-top: 4rem;
+  }
+
+  .a2flow-home .a2f-hero h1 {
+    margin-bottom: 2rem;
+  }
+
+  /* The authored break suits a wide line; on a narrow one it strands a word,
+     so the headline is left to balance itself. */
+  .a2flow-home .a2f-hero h1 br {
+    display: none;
+  }
+
+  .a2flow-home .hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3rem;
+  }
 }
 
-.a2flow-home .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 3rem;
-}
-
-}
-
-/* ------------------------------------------------------------.a2f-hero demo */
+/* -------------------------------------------------------------- hero demo */
 /*
  * Two acts in one window, switched by `data-act` on .demo: "design" is the
  * design session (act-1 messages, status-less templates in the rail) and
@@ -229,31 +281,89 @@
  */
 .a2flow-home .demo {
   position: relative;
-  border-radius: 1rem;
+  border-radius: 0.875rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: var(--a2f-panel);
+  border: 1px solid var(--a2f-hairline);
+  box-shadow: var(--a2f-shadow-raised);
+}
+
+/* The application's live edge: a comet of accent light circling the window's
+   border, lit only while the agent has the turn (`.working`). The ring is a
+   conic gradient masked down to the border's width. */
+@property --a2f-live-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes a2f-live-sweep {
+  to {
+    --a2f-live-angle: 360deg;
+  }
+}
+
+.a2flow-home .demo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--a2f-live-angle),
+    transparent 0deg,
+    transparent 230deg,
+    var(--a2f-accent-bright) 320deg,
+    color-mix(in oklab, var(--a2f-accent-bright) 55%, white) 340deg,
+    var(--a2f-accent-bright) 352deg,
+    transparent 360deg
+  );
+  /* Prefixed pair first: Chrome aliases -webkit-mask to the standard mask
+     shorthand, which resets mask-composite. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 360ms cubic-bezier(0.2, 0, 0, 1);
+  animation: a2f-live-sweep 2.4s linear infinite paused;
+}
+
+.a2flow-home .demo.working::after {
+  opacity: 1;
+  animation-play-state: running;
 }
 
 /* Run navigates to another screen: the whole window slides out, then back in. */
 .a2flow-home .demo.leaving .demo-titlebar,
-.a2flow-home .demo.leaving .demo-main { animation: screen-out 600ms cubic-bezier(0.3, 0, 0, 1) both;
+.a2flow-home .demo.leaving .demo-main {
+  animation: screen-out 600ms cubic-bezier(0.3, 0, 0, 1) both;
 }
 
 .a2flow-home .demo.entering .demo-titlebar,
-.a2flow-home .demo.entering .demo-main { animation: screen-in 700ms cubic-bezier(0.3, 0, 0, 1) both;
+.a2flow-home .demo.entering .demo-main {
+  animation: screen-in 700ms cubic-bezier(0.3, 0, 0, 1) both;
 }
 
 @keyframes screen-out {
-to { opacity: 0; transform: translateX(-8%);
-}
-
+  to {
+    opacity: 0;
+    transform: translateX(-8%);
+  }
 }
 
 @keyframes screen-in {
-from { opacity: 0; transform: translateX(8%);
-}
-
+  from {
+    opacity: 0;
+    transform: translateX(8%);
+  }
 }
 
 .a2flow-home .demo-switch {
@@ -268,13 +378,16 @@ from { opacity: 0; transform: translateX(8%);
   color: var(--a2f-muted);
 }
 
-.a2flow-home .demo.leaving .demo-switch { display: flex; animation: message-in 360ms 400ms cubic-bezier(0.3, 0, 0, 1) both;
+.a2flow-home .demo.leaving .demo-switch {
+  display: flex;
+  animation: message-in 360ms 400ms cubic-bezier(0.3, 0, 0, 1) both;
 }
 
 .a2flow-home .spin {
-  width: 0.75rem; height: 0.75rem;
+  width: 0.75rem;
+  height: 0.75rem;
   border-radius: 50%;
-  border: 2px solid var(--a2f-glass-border);
+  border: 2px solid var(--a2f-hairline);
   border-top-color: var(--a2f-accent);
   animation: spin 800ms linear infinite;
 }
@@ -283,8 +396,8 @@ from { opacity: 0; transform: translateX(8%);
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  padding: 0.8125rem 1.125rem;
-  border-bottom: 1px solid var(--a2f-glass-border);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--a2f-hairline);
   font-size: 0.8125rem;
   font-weight: 600;
 }
@@ -298,49 +411,61 @@ from { opacity: 0; transform: translateX(8%);
 }
 
 .a2flow-home .demo[data-act="design"] .demo-title.design,
-.a2flow-home .demo[data-act="run"] .demo-title.run { display: block;
+.a2flow-home .demo[data-act="run"] .demo-title.run {
+  display: block;
 }
 
+/* The lamp in the title bar: steady while the session is idle, breathing while
+   the agent works. */
 .a2flow-home .demo-titlebar .live {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--a2f-accent);
 }
 
 .a2flow-home .demo-titlebar .live::before {
   content: "";
-  width: 0.5rem; height: 0.5rem;
+  width: 0.4375rem;
+  height: 0.4375rem;
   border-radius: 50%;
   background: var(--a2f-accent-bright);
+}
+
+.a2flow-home .demo.working .demo-titlebar .live::before {
   box-shadow: 0 0 8px rgba(var(--a2f-accent-rgb), 0.8);
-  animation: breathe 2.4s ease-in-out infinite;
+  animation: breathe 1.6s ease-in-out infinite;
 }
 
 @keyframes breathe {
-0%, 100% { opacity: 1;
-}
+  0%,
+  100% {
+    opacity: 1;
+  }
 
-50% { opacity: 0.35;
-}
-
+  50% {
+    opacity: 0.35;
+  }
 }
 
 @keyframes spin {
-to { transform: rotate(360deg);
+  to {
+    transform: rotate(360deg);
+  }
 }
 
+.a2flow-home .demo-mark {
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 0.375rem;
 }
 
-.a2flow-home .demo-mark { width: 1.375rem; height: 1.375rem; border-radius: 0.375rem;
-}
-
-.a2flow-home .demo-main { display: grid; grid-template-columns: 8.5rem 1fr;
+.a2flow-home .demo-main {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr;
 }
 
 /* the task timeline down the left, as in both session screens */
@@ -348,21 +473,24 @@ to { transform: rotate(360deg);
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  padding: 0.875rem 0.625rem;
-  border-right: 1px solid var(--a2f-glass-border);
+  gap: 0.75rem;
+  padding: 0.875rem 0.75rem;
+  border-right: 1px solid var(--a2f-hairline);
 }
 
 .a2flow-home .rail-head {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--a2f-muted);
-  padding: 0 0.25rem;
+  padding: 0 0.125rem;
 }
 
-.a2flow-home .demo-rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem;
+.a2flow-home .demo-rail ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.625rem;
 }
 
 .a2flow-home .rail-task {
@@ -373,7 +501,8 @@ to { transform: rotate(360deg);
   color: var(--a2f-muted);
 }
 
-.a2flow-home .demo.live .rail-task { opacity: 0;
+.a2flow-home .demo.live .rail-task {
+  opacity: 0;
 }
 
 .a2flow-home .demo.live .rail-task.on {
@@ -381,24 +510,29 @@ to { transform: rotate(360deg);
   animation: message-in 360ms cubic-bezier(0.3, 0, 0, 1) both;
 }
 
-.a2flow-home .demo.live .rail-task.on:nth-child(2) { animation-delay: 120ms;
+.a2flow-home .demo.live .rail-task.on:nth-child(2) {
+  animation-delay: 120ms;
 }
 
-.a2flow-home .demo.live .rail-task.on:nth-child(3) { animation-delay: 240ms;
+.a2flow-home .demo.live .rail-task.on:nth-child(3) {
+  animation-delay: 240ms;
 }
 
-.a2flow-home .demo.live .rail-task.on:nth-child(4) { animation-delay: 360ms;
+.a2flow-home .demo.live .rail-task.on:nth-child(4) {
+  animation-delay: 360ms;
 }
 
 .a2flow-home .rail-n {
   flex: none;
-  width: 1.25rem; height: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
-  border: 2px solid var(--a2f-muted);
+  border: 1.5px solid var(--a2f-muted);
   opacity: 0.6;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--a2f-font-mono);
   font-size: 0.625rem;
   font-weight: 700;
   color: var(--a2f-ink);
@@ -412,11 +546,14 @@ to { transform: rotate(360deg);
   animation: breathe 1.6s ease-in-out infinite;
 }
 
-.a2flow-home .rail-task.done .rail-n { border-color: var(--a2f-success); opacity: 1;
+.a2flow-home .rail-task.done .rail-n {
+  border-color: var(--a2f-success);
+  opacity: 1;
 }
 
 .a2flow-home .rail-task.doing,
-.a2flow-home .rail-task.done { color: var(--a2f-ink);
+.a2flow-home .rail-task.done {
+  color: var(--a2f-ink);
 }
 
 .a2flow-home .rail-body {
@@ -427,39 +564,50 @@ to { transform: rotate(360deg);
   gap: 0.125rem;
 }
 
-.a2flow-home .rail-title { display: block; font-weight: 600; line-height: 1.3;
+.a2flow-home .rail-title {
+  display: block;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 /* Statuses belong to a run: templates in the design session have none. */
 .a2flow-home .demo[data-act="run"] .rail-title::after {
   content: "pending";
   display: block;
+  font-family: var(--a2f-font-mono);
   font-size: 0.625rem;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--a2f-muted);
 }
 
-.a2flow-home .demo[data-act="run"] .rail-task.doing .rail-title::after { content: "in progress"; color: var(--a2f-accent-bright);
+.a2flow-home .demo[data-act="run"] .rail-task.doing .rail-title::after {
+  content: "in progress";
+  color: var(--a2f-accent);
 }
 
-.a2flow-home .demo[data-act="run"] .rail-task.done .rail-title::after { content: "completed"; color: var(--a2f-success);
+.a2flow-home .demo[data-act="run"] .rail-task.done .rail-title::after {
+  content: "completed";
+  color: var(--a2f-success);
 }
 
 .a2flow-home .rail-tools {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
+  font-family: var(--a2f-font-mono);
   font-size: 0.625rem;
   padding: 0.0625rem 0.375rem;
   border-radius: 9999px;
-  border: 1px solid var(--a2f-glass-border);
-  background: var(--a2f-glass);
+  border: 1px solid var(--a2f-hairline);
   color: var(--a2f-muted);
 }
 
-.a2flow-home .rail-tools svg { width: 0.625rem; height: 0.625rem;
+.a2flow-home .rail-tools svg {
+  width: 0.625rem;
+  height: 0.625rem;
 }
 
+/* The chat sits on the canvas color, so the panels in it read as in the app. */
 .a2flow-home .demo-body {
   min-width: 0;
   padding: 1.125rem;
@@ -469,15 +617,21 @@ to { transform: rotate(360deg);
   height: 29rem;
   overflow: hidden;
   justify-content: flex-end;
+  background: var(--a2f-surface);
 }
 
-.a2flow-home .dmsg { display: flex; gap: 0.625rem; align-items: flex-end;
+.a2flow-home .dmsg {
+  display: flex;
+  gap: 0.625rem;
+  align-items: flex-end;
 }
 
-.a2flow-home .dmsg.from-user { justify-content: flex-end;
+.a2flow-home .dmsg.from-user {
+  justify-content: flex-end;
 }
 
-.a2flow-home .demo.live .dmsg { display: none;
+.a2flow-home .demo.live .dmsg {
+  display: none;
 }
 
 .a2flow-home .demo.live .dmsg.on {
@@ -486,21 +640,26 @@ to { transform: rotate(360deg);
 }
 
 /* Act 1 leaves with the design session; without scripting the run is the still. */
-.a2flow-home .demo[data-act="run"] .dmsg.act-design { display: none;
+.a2flow-home .demo[data-act="run"] .dmsg.act-design {
+  display: none;
 }
 
 @keyframes message-in {
-from { opacity: 0; transform: translateY(10px) scale(0.98);
-}
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
 
-to { opacity: 1; transform: none;
-}
-
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .a2flow-home .a2f-avatar {
   flex: none;
-  width: 1.875rem; height: 1.875rem;
+  width: 1.875rem;
+  height: 1.875rem;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -508,47 +667,54 @@ to { opacity: 1; transform: none;
   font-size: 0.75rem;
   font-weight: 700;
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.a2flow-home .a2f-avatar.mika { background: linear-gradient(135deg, #0e8a7c, #16bfa9);
+/* The applicant in teal, the approver in violet — violet is the color of "the
+   other person" here, as it is in the app — and the agent in the accent. */
+.a2flow-home .a2f-avatar.mika {
+  background: #0e8a7c;
 }
 
-.a2flow-home .a2f-avatar.sam { background: linear-gradient(135deg, #7f62d5, #16bfa9);
+.a2flow-home .a2f-avatar.sam {
+  background: #7f62d5;
 }
 
 .a2flow-home .a2f-avatar.bot {
-  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+  background: var(--a2f-accent);
   color: var(--a2f-on-primary);
 }
 
 .a2flow-home .bubble {
   max-width: 78%;
   padding: 0.6875rem 0.9375rem;
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   font-size: 0.875rem;
   line-height: 1.5;
 }
 
 .a2flow-home .bubble.user {
-  border-bottom-right-radius: 0.375rem;
-  color: var(--a2f-on-primary);
-  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
-  box-shadow: 0 8px 24px -12px rgba(var(--a2f-accent-rgb), 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-bottom-right-radius: 0.25rem;
+  color: var(--a2f-on-bubble);
+  background: var(--a2f-bubble);
+}
+
+.a2flow-home .bubble.agent,
+.a2flow-home .a2ui,
+.a2flow-home .approval,
+.a2flow-home .toolpill {
+  background: var(--a2f-panel);
+  border: 1px solid var(--a2f-hairline);
+  box-shadow: var(--a2f-shadow-panel);
 }
 
 .a2flow-home .bubble.agent {
-  border-top-left-radius: 0.375rem;
-  background: var(--a2f-glass);
-  border: 1px solid var(--a2f-glass-border);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-top-left-radius: 0.25rem;
 }
 
 .a2flow-home .bubble .who {
   display: block;
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--a2f-muted);
   margin-bottom: 0.25rem;
 }
@@ -560,44 +726,55 @@ to { opacity: 1; transform: none;
   gap: 0.5rem;
   padding: 0.375rem 0.75rem;
   border-radius: 9999px;
-  border: 1px solid var(--a2f-glass-border);
-  background: var(--a2f-glass);
   font-size: 0.75rem;
   color: var(--a2f-muted);
   transition: border-color 360ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-.a2flow-home .toolpill code { font-size: 0.75rem; font-weight: 500; color: var(--a2f-ink);
+.a2flow-home .toolpill code {
+  font-size: 0.75rem;
+  color: var(--a2f-ink);
+  background: none;
+  padding: 0;
 }
 
-.a2flow-home .toolpill .ok { color: var(--a2f-accent); font-weight: 700;
+.a2flow-home .toolpill .ok {
+  color: var(--a2f-accent);
+  font-weight: 700;
 }
 
-.a2flow-home .toolpill .spin { display: none;
+.a2flow-home .toolpill .spin {
+  display: none;
 }
 
-.a2flow-home .toolpill::after { content: "done";
+.a2flow-home .toolpill::after {
+  content: "done";
 }
 
-.a2flow-home .toolpill.running { border-color: color-mix(in srgb, var(--a2f-accent) 45%, transparent);
+.a2flow-home .toolpill.running {
+  border-color: color-mix(in srgb, var(--a2f-accent) 55%, transparent);
 }
 
-.a2flow-home .toolpill.running .ok { display: none;
+.a2flow-home .toolpill.running .ok {
+  display: none;
 }
 
-.a2flow-home .toolpill.running .spin { display: inline-block;
+.a2flow-home .toolpill.running .spin {
+  display: inline-block;
 }
 
-.a2flow-home .toolpill.running::after { content: "running…";
+.a2flow-home .toolpill.running::after {
+  content: "running…";
 }
 
 .a2flow-home .toolpill .badge {
+  font-family: var(--a2f-font-mono);
   font-size: 0.625rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
   padding: 0.0625rem 0.375rem;
-  border-radius: 0.25rem;
-  border: 1px solid var(--a2f-glass-border);
+  border-radius: 9999px;
+  background: var(--a2f-accent-soft);
+  color: var(--a2f-accent);
 }
 
 .a2flow-home .chip {
@@ -605,15 +782,16 @@ to { opacity: 1; transform: none;
   align-items: center;
   gap: 0.375rem;
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   padding: 0.25rem 0.6875rem;
   border-radius: 9999px;
-  border: 1px solid var(--a2f-glass-border);
-  background: var(--a2f-glass);
+  border: 1px solid var(--a2f-hairline);
   color: var(--a2f-muted);
 }
 
-.a2flow-home .chip.ok { color: var(--a2f-success); border-color: color-mix(in srgb, var(--a2f-success) 40%, transparent);
+.a2flow-home .chip.ok {
+  color: var(--a2f-success);
+  border-color: color-mix(in srgb, var(--a2f-success) 40%, transparent);
 }
 
 .a2flow-home .demo-sys {
@@ -622,21 +800,21 @@ to { opacity: 1; transform: none;
   color: var(--a2f-muted);
 }
 
-.a2flow-home .demo-sys b { color: var(--a2f-ink); font-weight: 600;
+.a2flow-home .demo-sys b {
+  color: var(--a2f-ink);
+  font-weight: 600;
 }
 
 /* the cards the agent draws into the chat: an A2UI surface and an approval */
 .a2flow-home .a2ui,
 .a2flow-home .approval {
-  border: 1px solid var(--a2f-glass-border);
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   padding: 0.8125rem 0.9375rem;
-  background: var(--a2f-glass);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
   max-width: 78%;
   font-size: 0.8125rem;
-  transition: border-color 360ms cubic-bezier(0.2, 0, 0, 1), opacity 360ms cubic-bezier(0.2, 0, 0, 1);
+  transition:
+    border-color 360ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 360ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .a2flow-home .a2ui .ttl,
@@ -650,31 +828,48 @@ to { opacity: 1; transform: none;
   color: var(--a2f-ink);
 }
 
-.a2flow-home .a2ui .choices { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 0.625rem;
+.a2flow-home .a2ui .choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.625rem;
 }
 
-.a2flow-home .a2ui.resolved { opacity: 0.7;
+.a2flow-home .a2ui.resolved {
+  opacity: 0.7;
 }
 
-.a2flow-home .a2ui.resolved .chip:not(.sel) { opacity: 0.45;
+.a2flow-home .a2ui.resolved .chip:not(.sel) {
+  opacity: 0.45;
 }
 
-.a2flow-home .a2ui.resolved .chip.sel { color: var(--a2f-accent); border-color: color-mix(in srgb, var(--a2f-accent) 55%, transparent);
+.a2flow-home .a2ui.resolved .chip.sel {
+  color: var(--a2f-accent);
+  border-color: color-mix(in srgb, var(--a2f-accent) 55%, transparent);
 }
 
-.a2flow-home .a2ui.resolved .acts { display: none;
+.a2flow-home .a2ui.resolved .acts {
+  display: none;
 }
 
-.a2flow-home .approval { border-color: color-mix(in srgb, var(--a2f-accent) 45%, transparent);
+.a2flow-home .approval {
+  border-color: color-mix(in srgb, var(--a2f-accent) 45%, transparent);
 }
 
-.a2flow-home .approval .ttl { color: var(--a2f-accent);
+.a2flow-home .approval .ttl {
+  color: var(--a2f-accent);
 }
 
-.a2flow-home .approval .ttl svg { width: 1rem; height: 1rem; flex: none;
+.a2flow-home .approval .ttl svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
 }
 
-.a2flow-home .approval p { color: var(--a2f-muted); font-size: 0.8125rem; margin-bottom: 0.625rem;
+.a2flow-home .approval p {
+  color: var(--a2f-muted);
+  font-size: 0.8125rem;
+  margin-bottom: 0.625rem;
 }
 
 .a2flow-home .approval .auth {
@@ -686,34 +881,46 @@ to { opacity: 1; transform: none;
 }
 
 .a2flow-home .approval .auth-head {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.6875rem;
+  font-weight: 500;
   color: var(--a2f-muted);
 }
 
-.a2flow-home .approval .arg { display: flex; gap: 0.5rem; padding-left: 0.25rem; font-size: 0.75rem; color: var(--a2f-muted);
+.a2flow-home .approval .arg {
+  display: flex;
+  gap: 0.5rem;
+  padding-left: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--a2f-muted);
 }
 
-.a2flow-home .approval .arg code { font-size: 0.75rem; color: var(--a2f-ink);
+.a2flow-home .approval .arg code {
+  font-size: 0.75rem;
+  color: var(--a2f-ink);
 }
 
 .a2flow-home .a2ui .acts,
-.a2flow-home .approval .acts { display: flex; gap: 0.5rem; align-items: center;
+.a2flow-home .approval .acts {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .a2flow-home .fbtn {
   font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.375rem 0.9375rem;
-  border-radius: 0.5rem;
+  font-weight: 600;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.375rem;
 }
 
-.a2flow-home .fbtn.yes { color: var(--a2f-on-primary); background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
+.a2flow-home .fbtn.yes {
+  color: var(--a2f-on-primary);
+  background: var(--a2f-accent);
 }
 
-.a2flow-home .fbtn.no { border: 1px solid var(--a2f-glass-border); color: var(--a2f-muted);
+.a2flow-home .fbtn.no {
+  border: 1px solid var(--a2f-hairline);
+  color: var(--a2f-muted);
 }
 
 .a2flow-home .approval .decided {
@@ -725,23 +932,32 @@ to { opacity: 1; transform: none;
   color: var(--a2f-muted);
 }
 
-.a2flow-home .approval .decided b { display: inline-flex; align-items: center; gap: 0.4375rem; font-weight: 700; color: var(--a2f-success);
+.a2flow-home .approval .decided b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  font-weight: 700;
+  color: var(--a2f-success);
 }
 
-.a2flow-home .approval .decided svg { width: 1rem; height: 1rem;
+.a2flow-home .approval .decided svg {
+  width: 1rem;
+  height: 1rem;
 }
 
-.a2flow-home .approval.approved { border-color: color-mix(in srgb, var(--a2f-success) 55%, transparent);
+.a2flow-home .approval.approved {
+  border-color: color-mix(in srgb, var(--a2f-success) 55%, transparent);
 }
 
-.a2flow-home .approval.approved .acts { display: none;
+.a2flow-home .approval.approved .acts {
+  display: none;
 }
 
-.a2flow-home .approval.approved .decided { display: flex;
+.a2flow-home .approval.approved .decided {
+  display: flex;
 }
 
 .a2flow-home .demo-caption {
-  text-align: center;
   font-size: 0.8125rem;
   color: var(--a2f-muted);
   margin-top: 0.875rem;
@@ -749,140 +965,247 @@ to { opacity: 1; transform: none;
 
 /* The real app folds the timeline into a drawer on phones; here it just goes. */
 @media (max-width: 30rem) {
-.a2flow-home .demo-main { grid-template-columns: 1fr;
-}
+  .a2flow-home .demo-main {
+    grid-template-columns: 1fr;
+  }
 
-.a2flow-home .demo-rail { display: none;
-}
-
+  .a2flow-home .demo-rail {
+    display: none;
+  }
 }
 
 /* ---------------------------------------------------------------- concept */
-.a2flow-home .contrast { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem;
+/*
+ * Three ways of working side by side. The two that came before are drawn flat
+ * — a rule above, muted ink — and only A2Flow's column is a panel, raised a
+ * little above their baseline: the structure makes the comparison, not three
+ * identical cards.
+ */
+.a2flow-home .contrast {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.12fr;
+  align-items: start;
 }
 
-.a2flow-home .contrast-card { border-radius: 1rem; padding: 2rem;
+.a2flow-home .contrast-card {
+  padding: 1.875rem 1.75rem 2rem;
 }
 
-.a2flow-home .contrast-card h3 { font-size: 1.1875rem; margin-bottom: 0.375rem;
+.a2flow-home .contrast-card.past {
+  border-top: 1px solid var(--a2f-hairline);
+  align-self: stretch;
 }
 
-.a2flow-home .contrast-card .sub { font-size: 0.875rem; color: var(--a2f-muted); margin-bottom: 1.375rem;
+.a2flow-home .contrast-card.past:first-child {
+  padding-left: 0;
 }
 
-.a2flow-home .contrast-card.past { opacity: 0.92;
+.a2flow-home .contrast-card.past + .contrast-card.past {
+  border-left: 1px solid var(--a2f-hairline);
 }
 
-.a2flow-home .contrast-card.past h3 { color: var(--a2f-muted);
+.a2flow-home .contrast-card.next {
+  margin-top: -1rem;
+  background: var(--a2f-panel);
+  border: 1px solid var(--a2f-hairline);
+  border-top: 2px solid var(--a2f-accent);
+  border-radius: 0.75rem;
+  box-shadow: var(--a2f-shadow-raised);
 }
 
-.a2flow-home .contrast-card.next { border-color: color-mix(in srgb, var(--a2f-accent-bright) 45%, var(--a2f-glass-border));
+.a2flow-home .contrast-card h3 {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
 }
 
-.a2flow-home .flow-steps { list-style: none; display: grid; gap: 0.9375rem;
+.a2flow-home .contrast-card .sub {
+  font-size: 0.875rem;
+  color: var(--a2f-muted);
+  margin-bottom: 1.5rem;
 }
 
-.a2flow-home .flow-steps li { display: flex; gap: 0.75rem; font-size: 0.9375rem;
+.a2flow-home .contrast-card.past h3 {
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .flow-steps {
+  list-style: none;
+  display: grid;
+  gap: 1rem;
+}
+
+.a2flow-home .flow-steps li {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
 }
 
 .a2flow-home .flow-steps .dot {
   flex: none;
-  width: 1.625rem; height: 1.625rem;
-  border-radius: 50%;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 0.0625rem;
 }
 
-.a2flow-home .flow-steps .dot svg { width: 0.875rem; height: 0.875rem;
+.a2flow-home .flow-steps .dot svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
 }
 
-.a2flow-home .past .dot { background: color-mix(in srgb, var(--a2f-muted) 14%, transparent); color: var(--a2f-muted);
+.a2flow-home .past .dot {
+  background: var(--a2f-wash);
+  color: var(--a2f-muted);
 }
 
 .a2flow-home .next .dot {
-  background: linear-gradient(135deg, var(--a2f-accent), var(--a2f-secondary));
-  color: var(--a2f-on-primary);
+  background: var(--a2f-accent-soft);
+  color: var(--a2f-accent);
 }
 
-.a2flow-home .flow-steps b { font-weight: 600;
+.a2flow-home .flow-steps b {
+  font-weight: 600;
 }
 
-.a2flow-home .flow-steps span.note { display: block; font-size: 0.8125rem; color: var(--a2f-muted);
+.a2flow-home .past .flow-steps b {
+  color: var(--a2f-muted);
+}
+
+.a2flow-home .flow-steps span.note {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--a2f-muted);
 }
 
 .a2flow-home .concept-note {
-  margin-top: 1.5rem;
-  border-radius: 1rem;
-  padding: 1.375rem 1.75rem;
+  margin-top: 2.5rem;
+  max-width: 52rem;
+  padding-left: 1.125rem;
+  border-left: 2px solid var(--a2f-accent);
   display: flex;
-  gap: 0.875rem;
+  gap: 0.75rem;
   align-items: flex-start;
   font-size: 0.9375rem;
   color: var(--a2f-muted);
 }
 
-.a2flow-home .concept-note svg { flex: none; width: 1.25rem; height: 1.25rem; color: var(--a2f-accent); margin-top: 0.125rem;
+.a2flow-home .concept-note svg {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--a2f-accent);
+  margin-top: 0.125rem;
 }
 
-.a2flow-home .concept-note b { color: var(--a2f-ink); font-weight: 600;
+.a2flow-home .concept-note b {
+  color: var(--a2f-ink);
+  font-weight: 600;
 }
 
 @media (max-width: 64rem) {
-.a2flow-home .contrast { grid-template-columns: 1fr;
+  .a2flow-home .contrast {
+    grid-template-columns: 1fr;
+  }
+
+  .a2flow-home .contrast-card.past,
+  .a2flow-home .contrast-card.past:first-child {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .a2flow-home .contrast-card.past + .contrast-card.past {
+    border-left: 0;
+  }
+
+  .a2flow-home .contrast-card.next {
+    margin-top: 0;
+  }
 }
 
+/* -------------------------------------------------------------------- how */
+.a2flow-home .how-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3.5rem;
+  align-items: center;
 }
 
-/* ---------------------------------------------------------------- how */
-.a2flow-home .how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;
+/* The three steps are a real sequence, so they are numbered and threaded on
+   one line — a run's own shape, drawn rather than boxed. */
+.a2flow-home .steps {
+  position: relative;
+  display: grid;
+  gap: 2.25rem;
+  padding-left: 3.25rem;
+  counter-reset: step;
 }
 
-.a2flow-home .steps { display: grid; gap: 1.25rem; counter-reset: step;
+.a2flow-home .steps::before {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  bottom: 1rem;
+  left: 0.9375rem;
+  width: 1px;
+  background: var(--a2f-hairline);
 }
 
-.a2flow-home .step { border-radius: 1rem; padding: 1.625rem 1.75rem; position: relative;
+.a2flow-home .step {
+  position: relative;
+  counter-increment: step;
 }
 
-.a2flow-home .step .n {
-  font-family: var(--a2f-font-display);
+.a2flow-home .step::before {
+  content: counter(step);
+  position: absolute;
+  top: -0.125rem;
+  left: -3.25rem;
+  width: 1.9375rem;
+  height: 1.9375rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--a2f-font-mono);
+  font-size: 0.8125rem;
   font-weight: 700;
-  font-size: 0.8125rem;
-  letter-spacing: 0.06em;
   color: var(--a2f-accent);
-  margin-bottom: 0.375rem;
-  display: block;
+  background: var(--a2f-panel);
+  border: 1px solid color-mix(in srgb, var(--a2f-accent) 45%, transparent);
 }
 
-.a2flow-home .step h3 { font-size: 1.1875rem; margin-bottom: 0.5rem;
+.a2flow-home .step h3 {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
 }
 
-.a2flow-home .step p { font-size: 0.9375rem; color: var(--a2f-muted);
+.a2flow-home .step p {
+  font-size: 0.9375rem;
+  color: var(--a2f-muted);
 }
 
-.a2flow-home .step p code {
-  background: color-mix(in srgb, var(--a2f-ink) 8%, transparent);
-  padding: 0.0625rem 0.375rem;
-  border-radius: 0.3125rem;
-  font-size: 0.8125rem;
-}
-
-.a2flow-home .dag-panel { border-radius: 1rem; padding: 1.75rem;
+.a2flow-home .dag-panel {
+  border-radius: 0.75rem;
+  padding: 1.5rem 1.75rem 1.75rem;
+  background: var(--a2f-panel);
+  border: 1px solid var(--a2f-hairline);
+  box-shadow: var(--a2f-shadow-raised);
 }
 
 .a2flow-home .dag-panel .panel-title {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--a2f-muted);
   display: flex;
   justify-content: space-between;
   margin-bottom: 1rem;
 }
 
-.a2flow-home .dag-panel .panel-title .views span { opacity: 0.5;
+.a2flow-home .dag-panel .panel-title .views span {
+  opacity: 0.55;
 }
 
 .a2flow-home .dag-panel .panel-title .views .cur {
@@ -890,143 +1213,226 @@ to { opacity: 1; transform: none;
   color: var(--a2f-accent);
 }
 
-.a2flow-home .dag-svg { width: 100%; height: auto; display: block;
+.a2flow-home .dag-svg {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
-.a2flow-home .dag-svg .node-box { fill: var(--a2f-glass); stroke: var(--a2f-glass-border);
+.a2flow-home .dag-svg .node-box {
+  fill: var(--a2f-surface);
+  stroke: var(--a2f-hairline);
 }
 
-.a2flow-home .dag-svg .node-label { font: 600 11px var(--a2f-font-body); fill: var(--a2f-ink);
+.a2flow-home .dag-svg .node-label {
+  font: 600 11px var(--a2f-font-body);
+  fill: var(--a2f-ink);
 }
 
-.a2flow-home .dag-svg .node-sub { font: 700 8px var(--a2f-font-body); letter-spacing: 0.08em;
+.a2flow-home .dag-svg .node-sub {
+  font: 500 8.5px var(--a2f-font-mono);
 }
 
-.a2flow-home .dag-svg .edge { stroke: color-mix(in srgb, var(--a2f-muted) 45%, transparent); stroke-width: 1.5; fill: none;
+.a2flow-home .dag-svg .edge {
+  stroke: color-mix(in srgb, var(--a2f-muted) 45%, transparent);
+  stroke-width: 1.5;
+  fill: none;
 }
 
-.a2flow-home .dag-svg .done-box { stroke: color-mix(in srgb, var(--a2f-success) 60%, transparent);
+.a2flow-home .dag-svg .done-box {
+  stroke: color-mix(in srgb, var(--a2f-success) 60%, transparent);
 }
 
-.a2flow-home .dag-svg .doing-box { stroke: var(--a2f-accent-bright);
+.a2flow-home .dag-svg .doing-box {
+  stroke: var(--a2f-accent-bright);
 }
 
-.a2flow-home .dag-svg .doing-ring { animation: breathe 1.8s ease-in-out infinite;
+.a2flow-home .dag-svg .doing-ring {
+  animation: breathe 1.8s ease-in-out infinite;
 }
 
-.a2flow-home .dag-svg .gate-box { stroke: url(#a2f-gate);
+/* A gate waits on a person, so it is drawn in the color of the other person. */
+.a2flow-home .dag-svg .gate-box {
+  stroke: var(--a2f-secondary);
 }
 
-.a2flow-home .dag-svg .pend-box { stroke-dasharray: 4 3;
+.a2flow-home .dag-svg .pend-box {
+  stroke-dasharray: 4 3;
 }
 
-.a2flow-home .dag-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; font-size: 0.75rem; color: var(--a2f-muted);
+.a2flow-home .dag-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: var(--a2f-muted);
 }
 
 .a2flow-home .dag-legend i {
   display: inline-block;
-  width: 0.5625rem; height: 0.5625rem;
+  width: 0.5625rem;
+  height: 0.5625rem;
   border-radius: 50%;
   margin-right: 0.375rem;
 }
 
-@media (max-width: 56rem) {
-.a2flow-home .how-grid { grid-template-columns: 1fr;
+@media (max-width: 58rem) {
+  .a2flow-home .how-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
+/* ------------------------------------------------------------------ roles */
+/* One panel, three columns ruled apart: three roles in one conversation. */
+.a2flow-home .roles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--a2f-panel);
+  border: 1px solid var(--a2f-hairline);
+  border-radius: 0.75rem;
+  box-shadow: var(--a2f-shadow-panel);
 }
 
-/* ---------------------------------------------------------------- roles */
-.a2flow-home .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+.a2flow-home .role-card {
+  padding: 1.875rem;
 }
 
-.a2flow-home .role-card { border-radius: 1rem; padding: 1.875rem;
+.a2flow-home .role-card + .role-card {
+  border-left: 1px solid var(--a2f-hairline);
 }
 
-.a2flow-home .role-card .a2f-avatar { width: 2.5rem; height: 2.5rem; font-size: 0.9375rem; margin-bottom: 1.125rem;
+.a2flow-home .role-card .a2f-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 0.9375rem;
+  margin-bottom: 1.125rem;
 }
 
-.a2flow-home .role-card h3 { font-size: 1.125rem; margin-bottom: 0.5rem;
+.a2flow-home .role-card h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
 }
 
-.a2flow-home .role-card p { font-size: 0.9375rem; color: var(--a2f-muted);
+.a2flow-home .role-card p {
+  font-size: 0.9375rem;
+  color: var(--a2f-muted);
 }
 
-.a2flow-home .trust-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;
+.a2flow-home .trust-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
+  margin-top: 2.25rem;
+  padding: 0 1.875rem;
 }
 
-.a2flow-home .trust-card { border-radius: 1rem; padding: 1.5rem 1.75rem; display: flex; gap: 1rem; align-items: flex-start;
+.a2flow-home .trust-card {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
 }
 
-.a2flow-home .trust-card svg { flex: none; width: 1.375rem; height: 1.375rem; color: var(--a2f-accent); margin-top: 0.125rem;
+.a2flow-home .trust-card svg {
+  flex: none;
+  width: 1.375rem;
+  height: 1.375rem;
+  color: var(--a2f-accent);
+  margin-top: 0.125rem;
 }
 
-.a2flow-home .trust-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; font-family: var(--a2f-font-body); letter-spacing: 0;
+.a2flow-home .trust-card h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  font-family: var(--a2f-font-body);
+  letter-spacing: 0;
 }
 
-.a2flow-home .trust-card p { font-size: 0.875rem; color: var(--a2f-muted);
+.a2flow-home .trust-card p {
+  font-size: 0.875rem;
+  color: var(--a2f-muted);
 }
 
-@media (max-width: 56rem) {
-.a2flow-home .roles { grid-template-columns: 1fr;
+@media (max-width: 58rem) {
+  .a2flow-home .roles {
+    grid-template-columns: 1fr;
+  }
+
+  .a2flow-home .role-card + .role-card {
+    border-left: 0;
+    border-top: 1px solid var(--a2f-hairline);
+  }
+
+  .a2flow-home .trust-row {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 0;
+  }
 }
 
-.a2flow-home .trust-row { grid-template-columns: 1fr;
+/* --------------------------------------------------------------- features */
+/* A ruled grid in one panel: the 1px gaps show the hairline color beneath. */
+.a2flow-home .features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--a2f-hairline);
+  border: 1px solid var(--a2f-hairline);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: var(--a2f-shadow-panel);
 }
 
-}
-
-/* ---------------------------------------------------------------- features */
-.a2flow-home .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
-}
-
-.a2flow-home .feature { border-radius: 1rem; padding: 1.875rem; transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), box-shadow 240ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-.a2flow-home .feature:hover { transform: translateY(-4px); box-shadow: var(--a2f-shadow-glow);
+/* The cells are opaque, laid over the ruled background, so the two layers of
+   translucent hairline never stack. */
+.a2flow-home .feature {
+  padding: 1.875rem;
+  background: var(--a2f-panel);
 }
 
 .a2flow-home .feature .fic {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.625rem; height: 2.625rem;
-  border-radius: 0.75rem;
-  background: linear-gradient(135deg, rgba(var(--a2f-accent-rgb), 0.18), color-mix(in srgb, var(--a2f-secondary) 18%, transparent));
   color: var(--a2f-accent);
-  margin-bottom: 1.125rem;
+  margin-bottom: 1rem;
 }
 
-.a2flow-home .feature .fic svg { width: 1.25rem; height: 1.25rem;
+.a2flow-home .feature .fic svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
-.a2flow-home .feature h3 { font-size: 1.0625rem; margin-bottom: 0.5rem;
+.a2flow-home .feature h3 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
 }
 
-.a2flow-home .feature p { font-size: 0.875rem; color: var(--a2f-muted);
+.a2flow-home .feature p {
+  font-size: 0.875rem;
+  color: var(--a2f-muted);
 }
 
-.a2flow-home .feature p code {
-  background: color-mix(in srgb, var(--a2f-ink) 8%, transparent);
-  padding: 0.0625rem 0.3125rem;
-  border-radius: 0.3125rem;
-  font-size: 0.78em;
+@media (max-width: 44rem) {
+  .a2flow-home .features {
+    grid-template-columns: 1fr;
+  }
 }
 
-@media (max-width: 56rem) {
-.a2flow-home .features { grid-template-columns: 1fr;
+@media (min-width: 44rem) and (max-width: 64rem) {
+  .a2flow-home .features {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
-}
-
-@media (min-width: 56rem) and (max-width: 72rem) {
-.a2flow-home .features { grid-template-columns: repeat(2, 1fr);
-}
-
-}
-
-/* ---------------------------------------------------------------- architecture */
-.a2flow-home .arch { border-radius: 1rem; padding: 2.5rem 2rem;
+/* ----------------------------------------------------------- architecture */
+.a2flow-home .arch {
+  border-radius: 0.75rem;
+  padding: 2.5rem 2rem;
+  background: var(--a2f-panel);
+  border: 1px solid var(--a2f-hairline);
+  box-shadow: var(--a2f-shadow-panel);
 }
 
 .a2flow-home .arch-flow {
@@ -1038,19 +1444,28 @@ to { opacity: 1; transform: none;
 }
 
 .a2flow-home .arch-node {
-  border-radius: 1rem;
+  border-radius: 0.5rem;
   padding: 1rem 1.375rem;
   text-align: center;
   min-width: 11rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  background: var(--a2f-surface);
+  border: 1px solid var(--a2f-hairline);
 }
 
-.a2flow-home .arch-node b { font-family: var(--a2f-font-display); font-size: 0.9375rem; letter-spacing: -0.01em;
+.a2flow-home .arch-node b {
+  font-family: var(--a2f-font-display);
+  font-stretch: 112%;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
 }
 
-.a2flow-home .arch-node span { font-size: 0.75rem; color: var(--a2f-muted);
+.a2flow-home .arch-node span {
+  font-family: var(--a2f-font-mono);
+  font-size: 0.6875rem;
+  color: var(--a2f-muted);
 }
 
 .a2flow-home .arch-link {
@@ -1060,161 +1475,157 @@ to { opacity: 1; transform: none;
   justify-content: center;
   gap: 0.125rem;
   color: var(--a2f-muted);
+  font-family: var(--a2f-font-mono);
   font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
   min-width: 5.5rem;
 }
 
-.a2flow-home .arch-link svg { width: 1.5rem; height: 1.5rem; color: var(--a2f-accent);
+.a2flow-home .arch-link svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--a2f-accent);
 }
 
-.a2flow-home .arch-side { display: flex; flex-direction: column; gap: 0.75rem;
+.a2flow-home .arch-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.a2flow-home .arch-side .arch-node { min-width: 10rem; padding: 0.75rem 1.125rem;
+.a2flow-home .arch-side .arch-node {
+  min-width: 10rem;
+  padding: 0.75rem 1.125rem;
 }
 
-.a2flow-home .stack-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 2rem;
+.a2flow-home .stack-chips {
+  justify-content: center;
+  margin-top: 2rem;
 }
 
-@media (max-width: 56rem) {
-.a2flow-home .arch-flow { flex-direction: column; align-items: center;
+@media (max-width: 58rem) {
+  .a2flow-home .arch-flow {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .a2flow-home .arch-link {
+    transform: rotate(90deg);
+    min-width: 3rem;
+    min-height: 3rem;
+  }
+
+  .a2flow-home .arch-side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 
-.a2flow-home .arch-link { transform: rotate(90deg); min-width: 3rem; min-height: 3rem;
+/* ------------------------------------------------------------------ close */
+.a2flow-home .cta-final {
+  padding: 7.5rem 0 6.5rem;
 }
 
-.a2flow-home .arch-side { flex-direction: row; flex-wrap: wrap; justify-content: center;
+.a2flow-home .cta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 3.5rem;
+  align-items: center;
 }
 
+.a2flow-home .cta-copy h2 {
+  font-size: clamp(1.875rem, 3.6vw, 2.75rem);
+  font-weight: 700;
+  margin-bottom: 1.125rem;
 }
 
-/* ---------------------------------------------------------------- footer */
-.a2flow-home .cta-final { text-align: center; padding: 6.5rem 0 5rem;
+.a2flow-home .cta-copy p {
+  color: var(--a2f-muted);
+  font-size: 1.0625rem;
+  margin-bottom: 2rem;
 }
 
-.a2flow-home .cta-final h2 { font-size: clamp(1.875rem, 4vw, 2.75rem); margin-bottom: 1rem;
-}
-
-.a2flow-home .cta-final > .wrap > p { color: var(--a2f-muted); max-width: 36rem; margin: 0 auto 2.25rem;
-}
-
+/* The terminal is ink in both themes: it is a picture of a terminal. */
 .a2flow-home .terminal {
-  max-width: 38rem;
-  margin: 0 auto 2.25rem;
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   overflow: hidden;
-  text-align: left;
-  border: 1px solid var(--a2f-glass-border);
-  box-shadow: var(--a2f-shadow-glass-lg);
+  background: var(--a2f-code-bg);
+  border: 1px solid var(--a2f-hairline);
+  box-shadow: var(--a2f-shadow-raised);
 }
 
 .a2flow-home .terminal-bar {
   display: flex;
   gap: 0.375rem;
   padding: 0.75rem 1rem;
-  background: var(--a2f-glass);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  border-bottom: 1px solid var(--a2f-glass-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.a2flow-home .terminal-bar i { width: 0.6875rem; height: 0.6875rem; border-radius: 50%; background: color-mix(in srgb, var(--a2f-muted) 35%, transparent);
+.a2flow-home .terminal-bar i {
+  width: 0.6875rem;
+  height: 0.6875rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .a2flow-home .terminal pre {
-  background: var(--a2f-code-bg);
+  background: transparent;
   color: var(--a2f-code-ink);
-  padding: 1.375rem 1.5rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  border-radius: 0;
   font-family: var(--a2f-font-mono);
   font-size: 0.8438rem;
   line-height: 1.9;
   overflow-x: auto;
 }
 
-.a2flow-home .terminal .p { color: var(--a2f-accent-bright); user-select: none;
+.a2flow-home .terminal pre code {
+  display: block;
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
 }
 
-.a2flow-home .terminal .c { opacity: 0.5;
+/* One command per line, each its own block: nothing depends on the line
+   breaks in the source surviving the JSX compiler. */
+.a2flow-home .terminal .line {
+  display: block;
+  white-space: pre;
 }
 
-/* ---------------------------------------------------------------- reveal */
-.a2flow-home.is-js .reveal { opacity: 0; transform: translateY(14px); transition: opacity 600ms cubic-bezier(0.3, 0, 0, 1), transform 600ms cubic-bezier(0.3, 0, 0, 1);
+.a2flow-home .terminal .p {
+  color: oklch(0.8 0.14 176);
+  user-select: none;
 }
 
-.a2flow-home.is-js .reveal.in { opacity: 1; transform: none;
+.a2flow-home .terminal .c {
+  opacity: 0.55;
 }
 
-/* ---------------------------------------------------------------- motion */
+@media (max-width: 58rem) {
+  .a2flow-home .cta-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
+  }
+}
+
+/* ----------------------------------------------------------------- motion */
 @media (prefers-reduced-motion: reduce) {
-.a2flow-home, .a2flow-home *,
-.a2flow-home *::before,
-.a2flow-home *::after {
+  .a2flow-home,
+  .a2flow-home *,
+  .a2flow-home *::before,
+  .a2flow-home *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-}
-
-.a2flow-home.is-js .reveal { opacity: 1; transform: none;
-}
-
+  }
 }
 
 /* ------------------------------------------- Docusaurus layout integration */
-/*
- * The aurora and the film grain hung off <body> in the standalone page, where
- * the root stacking context let their negative z-index sit behind the content
- * but above the page background. Inside the Docusaurus layout the landing
- * container has to become that stacking context itself, or the two fixed
- * layers would sink behind the body background and disappear.
- */
-.a2flow-home {
-  isolation: isolate;
-  min-height: 100dvh;
-}
-
-/* The standalone page used html { scroll-padding-top }; here the sticky navbar
-   is what the section anchors have to clear. */
+/* The sticky navbar is what the section anchors have to clear. */
 .a2flow-home .a2f-hero,
 .a2flow-home .section,
 .a2flow-home .cta-final {
-  scroll-margin-top: calc(var(--ifm-navbar-height) + 4rem);
-}
-
-/* The section links the standalone page carried in its sticky header. The
-   Docusaurus navbar took that header's place, so they ride with the page. */
-.a2flow-home .page-nav {
-  position: sticky;
-  top: var(--ifm-navbar-height);
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.5rem;
-  padding: 0.7rem 1rem;
-  /* Opaque, and painted in the navbar's own color: it sticks directly under
-     an already-opaque navbar, and a translucent second bar just left the page
-     content legible through it. */
-  background: var(--ifm-navbar-background-color);
-  border-bottom: 1px solid var(--ifm-toc-border-color);
-}
-
-.a2flow-home .page-nav a {
-  color: var(--a2f-muted);
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: color 150ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-.a2flow-home .page-nav a:hover {
-  color: var(--a2f-accent);
-}
-
-@media (max-width: 30rem) {
-  .a2flow-home .page-nav {
-    gap: 1rem;
-    font-size: 0.85rem;
-  }
+  scroll-margin-top: calc(var(--ifm-navbar-height) + 1rem);
 }

@@ -5,18 +5,6 @@
   "home.meta.description": {
     "message": "A2Flow es un motor de flujos de trabajo guiado por chat. Reconstruye los flujos de trabajo de tipo ITSM en torno a un agente de IA: planifica el trabajo como un grafo de tareas, espera a las personas que deben dar su aprobación y ejecuta el resto. El plan se conserva como flujo de trabajo, de modo que la siguiente ejecución sigue los mismos pasos."
   },
-  "home.nav.concept": {
-    "message": "Concepto"
-  },
-  "home.nav.how": {
-    "message": "Cómo funciona"
-  },
-  "home.nav.features": {
-    "message": "Funciones"
-  },
-  "home.nav.architecture": {
-    "message": "Arquitectura"
-  },
   "home.hero.eyebrow": {
     "message": "Agent as Workflow"
   },
@@ -37,9 +25,6 @@
   },
   "home.hero.demoCaption": {
     "message": "Dos chats, un flujo de trabajo: se diseña con el agente y luego se ejecuta en su propia sesión, con formularios y aprobaciones incluidos."
-  },
-  "home.concept.eyebrow": {
-    "message": "El concepto"
   },
   "home.concept.title": {
     "message": "Los flujos de trabajo ITSM, {reimagined}"
@@ -146,9 +131,6 @@
   "home.concept.note.skill": {
     "message": "skill de agente, un archivo {file} en un repositorio Git"
   },
-  "home.how.eyebrow": {
-    "message": "Cómo funciona"
-  },
   "home.how.title": {
     "message": "Planificar. Aprobar. {execute}"
   },
@@ -158,17 +140,11 @@
   "home.how.lead": {
     "message": "Cada ejecución pasa por las mismas dos barreras: nada se ejecuta hasta que una persona publica el diseño, y ninguna llamada a herramienta que cambie algo se realiza hasta que el aprobador designado da su conformidad."
   },
-  "home.how.step1.label": {
-    "message": "PASO 1 — PLANIFICAR"
-  },
   "home.how.step1.title": {
     "message": "El agente convierte la intención en un grafo de tareas"
   },
   "home.how.step1.body": {
     "message": "En una sesión de diseño lee la skill de agente, divide tu prompt en plantillas de tarea con dependencias explícitas y registra todo el DAG en una sola llamada, con detección de ciclos incluida. Puedes ajustarlo por chat o a mano; todavía no se ejecuta nada."
-  },
-  "home.how.step2.label": {
-    "message": "PASO 2 — APROBAR"
   },
   "home.how.step2.title": {
     "message": "Las personas controlan los momentos clave"
@@ -179,17 +155,11 @@
   "home.how.step2.body.approver": {
     "message": "aprobador designado"
   },
-  "home.how.step3.label": {
-    "message": "PASO 3 — EJECUTAR"
-  },
   "home.how.step3.title": {
     "message": "El agente recorre el grafo"
   },
   "home.how.step3.body": {
     "message": "Haz clic en Ejecutar y el agente arranca de inmediato en la sesión del flujo de trabajo propia de esa ejecución. Las tareas pasan por {statuses} en orden de dependencia, llaman solo a las herramientas MCP vinculadas a la tarea en curso, y el agente hace sus preguntas mediante formularios que dibuja en el propio chat."
-  },
-  "home.teams.eyebrow": {
-    "message": "Pensado para equipos"
   },
   "home.teams.title": {
     "message": "Tres roles, {conversation}"
@@ -229,9 +199,6 @@
   },
   "home.teams.trust.audit.body": {
     "message": "Quién aprobó, qué escribió y cuándo exactamente: queda guardado en el registro de la aprobación y se puede consultar en la consola de administración."
-  },
-  "home.features.eyebrow": {
-    "message": "Funciones"
   },
   "home.features.title": {
     "message": "Todo lo que un flujo de trabajo necesita, {nothing}"
@@ -275,9 +242,6 @@
   "home.features.llm.body": {
     "message": "Gemini de forma predeterminada; modelos de OpenAI y Anthropic a través de LiteLLM. Cambiar de proveedor es cuestión de una variable de entorno."
   },
-  "home.architecture.eyebrow": {
-    "message": "Bajo el capó"
-  },
   "home.architecture.title": {
     "message": "Una {stack} de protocolos abiertos"
   },
@@ -286,9 +250,6 @@
   },
   "home.architecture.lead": {
     "message": "La interfaz de chat recibe en streaming eventos AG-UI de un backend FastAPI, y el agente dibuja superficies A2UI en el chat. Las skills de agente vienen de Git; las herramientas, de servidores MCP, y una sola base de datos relacional lo guarda todo."
-  },
-  "home.cta.eyebrow": {
-    "message": "Empezar"
   },
   "home.cta.title": {
     "message": "Ejecútalo {machine}"

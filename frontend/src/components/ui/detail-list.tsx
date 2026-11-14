@@ -51,7 +51,7 @@ export interface DetailItemProps {
 
 /**
  * A single labelled cell of a {@link DetailList}. Labels use the shared
- * `text-label-caps` treatment so they read identically to form field labels,
+ * `text-label` treatment so they read identically to form field labels,
  * and the value sits on a **recessed field surface** below it — the same
  * `outline-variant` border + `surface-dim/40` fill + inset shadow the
  * `SegmentedControl` track uses.
@@ -71,7 +71,7 @@ export interface DetailItemProps {
 export function DetailItem({ label, value }: DetailItemProps) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <dt className="text-label-caps">{label}</dt>
+      <dt className="text-label">{label}</dt>
       <dd className="min-h-9 break-words rounded-xl border border-outline-variant bg-surface-dim/40 px-3 py-2 text-sm font-medium text-on-surface shadow-[inset_0_1px_2px_var(--inner-track-shadow)]">
         {value}
       </dd>

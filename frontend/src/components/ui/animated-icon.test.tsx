@@ -12,10 +12,15 @@ describe("AnimatedIcon", () => {
   });
 
   it("applies the motion-safe animation class for the chosen animation", () => {
-    const { container } = render(<AnimatedIcon icon={Sparkles} animation="breathe" />);
+    const { container } = render(<AnimatedIcon icon={Sparkles} animation="wiggle" />);
     expect(container.querySelector("svg")?.getAttribute("class")).toContain(
-      "motion-safe:animate-breathe"
+      "motion-safe:animate-wiggle"
     );
+  });
+
+  it("is static by default", () => {
+    const { container } = render(<AnimatedIcon icon={Sparkles} />);
+    expect(container.querySelector("svg")?.getAttribute("class") ?? "").not.toContain("animate-");
   });
 
   it("omits the animation class when animation is none", () => {

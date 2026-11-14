@@ -79,7 +79,7 @@ export const customChoicePicker = createComponentImplementation(
 
     return (
       <div className="flex flex-col gap-2 w-full">
-        {props.label && <strong className="text-label-caps">{String(props.label)}</strong>}
+        {props.label && <strong className="text-label">{String(props.label)}</strong>}
         {props.filterable && (
           <input
             type="text"
@@ -110,10 +110,10 @@ export const customChoicePicker = createComponentImplementation(
                     disabled={resolved}
                     onClick={() => onToggle(String(opt.value))}
                     className={[
-                      "cursor-pointer rounded-full px-3.5 py-1.5 text-sm tracking-tight transition-all duration-150 motion-safe:hover:scale-[1.03]",
-                      "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100",
+                      "cursor-pointer rounded-full px-3.5 py-1.5 text-sm tracking-tight transition-all duration-150",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
                       isSelected
-                        ? "bg-gradient-to-br from-accent to-secondary text-on-primary shadow-[inset_0_1px_0_var(--inner-top-highlight)]"
+                        ? "bg-accent text-on-primary shadow-[inset_0_1px_0_var(--inner-top-highlight)]"
                         : "glass-panel text-on-surface hover:text-accent",
                     ].join(" ")}
                   >

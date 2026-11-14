@@ -15,7 +15,7 @@ interface AgentAvatarProps {
  * Circular avatar representing the workflow agent beside its messages.
  *
  * Unlike {@link Avatar}, the agent is not a user and has no uploaded or
- * generated image; instead a sparkles glyph on the accent gradient (shared with
+ * generated image; instead a sparkles glyph on the accent fill (shared with
  * the user message bubble) marks the message as machine-authored. Pair it with a
  * {@link Tooltip} carrying the workflow or skill name to identify which agent is
  * speaking.
@@ -23,8 +23,8 @@ interface AgentAvatarProps {
 export function AgentAvatar({ size = 28, className }: AgentAvatarProps) {
   const cls = [
     "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full",
-    "bg-gradient-to-br from-accent to-secondary text-on-primary",
-    "shadow-[0_8px_24px_-12px_var(--color-accent-soft),inset_0_1px_0_var(--inner-top-highlight)]",
+    "bg-accent text-on-primary",
+    "shadow-[inset_0_1px_0_var(--inner-top-highlight)]",
     className,
   ]
     .filter(Boolean)

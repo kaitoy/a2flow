@@ -26,7 +26,7 @@ export function FormField({ htmlFor, label, required, error, action, children }:
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex min-h-5 items-center justify-between gap-2">
-        <label id={`${htmlFor}-label`} htmlFor={htmlFor} className="text-label-caps">
+        <label id={`${htmlFor}-label`} htmlFor={htmlFor} className="text-label">
           {label} {required && <span className="text-accent">*</span>}
         </label>
         {action}

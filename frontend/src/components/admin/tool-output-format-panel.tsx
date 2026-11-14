@@ -87,7 +87,7 @@ export function ToolOutputFormatPanel({
         aria-expanded={expanded}
         aria-controls={panelId}
         onClick={() => setExpanded((open) => !open)}
-        className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg py-1 text-label-caps text-on-surface-variant transition-colors hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg py-1 text-label text-on-surface-variant transition-colors hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         <ChevronDown
           size={14}

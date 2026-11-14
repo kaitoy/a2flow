@@ -120,7 +120,7 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
               opacity: style.opacity,
               transform: style.y.to((y) => `translateY(${y}px)`),
               zIndex: 9999,
-              boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
+              boxShadow: "var(--s-overlay)",
             }}
             className="glass-panel-overlay rounded-xl p-2 text-on-surface"
           >

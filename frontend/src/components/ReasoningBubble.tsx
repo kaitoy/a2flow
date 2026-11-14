@@ -32,7 +32,7 @@ export function ReasoningBubble({
           .filter(Boolean)
           .join(" ")}
       >
-        <div className="mb-1 flex items-center gap-1.5 text-[11px] not-italic tracking-wide uppercase">
+        <div className="mb-1 flex items-center gap-1.5 text-xs not-italic font-medium">
           <span aria-hidden>💭</span>
           <span>{t("app.thinking")}</span>
         </div>

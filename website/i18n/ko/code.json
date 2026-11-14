@@ -5,18 +5,6 @@
   "home.meta.description": {
     "message": "A2Flow는 채팅으로 진행하는 워크플로 엔진입니다. ITSM 방식의 워크플로를 AI 에이전트 중심으로 재구성하여, 업무를 작업 그래프로 계획하고, 승인해야 할 사람을 기다리며, 나머지는 직접 실행합니다. 계획은 워크플로로 보존되므로 다음 실행도 같은 단계를 따릅니다."
   },
-  "home.nav.concept": {
-    "message": "개념"
-  },
-  "home.nav.how": {
-    "message": "작동 방식"
-  },
-  "home.nav.features": {
-    "message": "기능"
-  },
-  "home.nav.architecture": {
-    "message": "아키텍처"
-  },
   "home.hero.eyebrow": {
     "message": "Agent as Workflow"
   },
@@ -37,9 +25,6 @@
   },
   "home.hero.demoCaption": {
     "message": "채팅은 둘, 워크플로는 하나. 에이전트와 함께 설계하고 전용 세션에서 실행합니다. 양식과 승인도 그 안에서 이루어집니다."
-  },
-  "home.concept.eyebrow": {
-    "message": "개념"
   },
   "home.concept.title": {
     "message": "ITSM 워크플로를 {reimagined}"
@@ -146,9 +131,6 @@
   "home.concept.note.skill": {
     "message": "에이전트 스킬, 즉 Git 저장소의 {file} 파일"
   },
-  "home.how.eyebrow": {
-    "message": "작동 방식"
-  },
   "home.how.title": {
     "message": "계획. 승인. {execute}"
   },
@@ -158,17 +140,11 @@
   "home.how.lead": {
     "message": "모든 실행은 같은 두 관문을 거칩니다. 사람이 설계를 게시하기 전에는 아무것도 실행되지 않으며, 지정된 승인자가 승인하기 전에는 무언가를 변경하는 도구 호출이 통과하지 못합니다."
   },
-  "home.how.step1.label": {
-    "message": "1단계 — 계획"
-  },
   "home.how.step1.title": {
     "message": "에이전트가 의도를 작업 그래프로 바꿉니다"
   },
   "home.how.step1.body": {
     "message": "디자인 세션에서 에이전트 스킬을 읽고, 프롬프트를 종속 관계가 명시된 작업 템플릿으로 나눈 뒤, 순환 감지까지 포함해 DAG 전체를 한 번의 호출로 등록합니다. 채팅이나 직접 편집으로 조정할 수 있으며, 이 시점에는 아직 아무것도 실행되지 않습니다."
-  },
-  "home.how.step2.label": {
-    "message": "2단계 — 승인"
   },
   "home.how.step2.title": {
     "message": "중요한 순간은 사람이 통제합니다"
@@ -179,17 +155,11 @@
   "home.how.step2.body.approver": {
     "message": "지정된 승인자"
   },
-  "home.how.step3.label": {
-    "message": "3단계 — 실행"
-  },
   "home.how.step3.title": {
     "message": "에이전트가 그래프를 따라 진행합니다"
   },
   "home.how.step3.body": {
     "message": "실행을 누르면 에이전트가 해당 실행 전용 워크플로 세션에서 바로 시작합니다. 작업은 종속 순서에 따라 {statuses}로 진행되며 현재 작업에 연결된 MCP 도구만 호출하고, 에이전트는 채팅 안에 바로 그린 양식으로 질문합니다."
-  },
-  "home.teams.eyebrow": {
-    "message": "팀을 위한 도구"
   },
   "home.teams.title": {
     "message": "세 가지 역할, {conversation}"
@@ -229,9 +199,6 @@
   },
   "home.teams.trust.audit.body": {
     "message": "누가 승인했고, 무엇을 적었으며, 정확히 언제였는지. 승인 기록에 저장되어 관리 콘솔에서 찾아볼 수 있습니다."
-  },
-  "home.features.eyebrow": {
-    "message": "기능"
   },
   "home.features.title": {
     "message": "워크플로에 필요한 것은 모두, {nothing}"
@@ -275,9 +242,6 @@
   "home.features.llm.body": {
     "message": "기본값은 Gemini이며, OpenAI와 Anthropic 모델은 LiteLLM을 통해 사용합니다. 제공자 전환은 환경 변수 하나면 됩니다."
   },
-  "home.architecture.eyebrow": {
-    "message": "내부 구조"
-  },
   "home.architecture.title": {
     "message": "개방형 프로토콜 {stack}"
   },
@@ -286,9 +250,6 @@
   },
   "home.architecture.lead": {
     "message": "채팅 UI는 FastAPI 백엔드에서 AG-UI 이벤트를 스트리밍으로 받고, 에이전트는 A2UI 서피스를 채팅에 그립니다. 에이전트 스킬은 Git에서, 도구는 MCP 서버에서 가져오며, 하나의 관계형 데이터베이스가 모두 보관합니다."
-  },
-  "home.cta.eyebrow": {
-    "message": "시작하기"
   },
   "home.cta.title": {
     "message": "{machine} 실행해 보세요"

@@ -21,14 +21,14 @@ export interface ProfileHeroProps {
 }
 
 /**
- * The profile page's identity card: an aurora banner, the user's avatar sitting
+ * The profile page's identity card: an accent-washed banner, the user's avatar sitting
  * across its lower edge, and the name, handle, roles, and account status beside
  * it.
  *
  * This carries the page's `h1`, and the heading is the **user's own name**
  * rather than the word "Profile" — the same rule DESIGN.md sets for admin detail
  * pages, which title themselves with the record they show. "Profile" survives as
- * a `text-label-caps` eyebrow above it, so the page still says what it is
+ * a `text-label` eyebrow above it, so the page still says what it is
  * without spending the largest type on a word every visitor already knows.
  *
  * The avatar is the editor's only trigger: it is a real button that opens the
@@ -46,14 +46,14 @@ export function ProfileHero({ user, onEditAvatar }: ProfileHeroProps) {
 
   return (
     <section className="relative overflow-hidden rounded-2xl glass-panel-strong">
-      {/* The one gradient DESIGN.md sanctions — accent into aurora violet —
-          fading out to the right, and masked away downward so the band ends in
+      {/* A wash of the accent, fading out to the right and masked away
+          downward so the band ends in
           light rather than in a hard rule. A hairline edge here would land
           across the name (the text block is taller than any banner that still
           reads as a banner) and be mistaken for an underline. */}
       <span
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-accent/40 via-secondary/28 to-transparent mask-b-from-30%"
+        className="absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-accent/25 to-transparent mask-b-from-30%"
       />
 
       <div className="relative flex flex-col items-center gap-4 px-6 pt-14 pb-6 text-center sm:flex-row sm:items-end sm:gap-6 sm:text-left">
@@ -90,7 +90,7 @@ export function ProfileHero({ user, onEditAvatar }: ProfileHeroProps) {
                 size without covering the avatar. */}
             <span
               aria-hidden="true"
-              className="absolute right-1 bottom-1 flex h-8 w-8 items-center justify-center rounded-full glass-panel-strong text-accent shadow-glow"
+              className="absolute right-1 bottom-1 flex h-8 w-8 items-center justify-center rounded-full glass-panel-strong text-accent"
             >
               <Camera size={16} strokeWidth={1.8} />
             </span>
@@ -98,8 +98,8 @@ export function ProfileHero({ user, onEditAvatar }: ProfileHeroProps) {
         </Tooltip>
 
         <div className="flex min-w-0 flex-col items-center gap-1.5 sm:items-start sm:pb-1">
-          <span className="text-label-caps">{t("common.profile")}</span>
-          <h1 className="min-w-0 max-w-full truncate font-display text-3xl font-semibold tracking-tight text-gradient-accent">
+          <span className="text-label">{t("common.profile")}</span>
+          <h1 className="min-w-0 max-w-full truncate font-display text-3xl font-semibold tracking-tight text-on-surface">
             {displayName}
           </h1>
           <span className="min-w-0 max-w-full truncate font-mono text-sm text-on-surface-variant">

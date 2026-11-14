@@ -34,7 +34,7 @@ export function UserProfileButton({ className }: UserProfileButtonProps) {
     "inline-flex h-9 w-9 shrink-0 pointer-coarse:h-11 pointer-coarse:w-11 cursor-pointer items-center justify-center rounded-full relative",
     "glass-panel text-on-surface",
     "transition-[transform,translate,scale,box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
-    "hover:shadow-glow hover:text-accent motion-safe:hover:scale-105 motion-safe:active:scale-95",
+    "hover:shadow-glow hover:text-accent motion-safe:active:scale-95",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
     className,
   ]

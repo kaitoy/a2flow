@@ -350,7 +350,7 @@ export default function UserDetailPage() {
           className="flex flex-col gap-5 rounded-2xl glass-panel-strong p-6"
         >
           <div className="flex flex-col gap-1.5">
-            <span className="text-label-caps">{t("users.avatar")}</span>
+            <span className="text-label">{t("users.avatar")}</span>
             <div className="flex items-center gap-3">
               <Avatar
                 // `originalTenantId`, not the derived `tenantId`: the avatar seed

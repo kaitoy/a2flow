@@ -52,7 +52,7 @@ export function TagColorField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{t("common.color")}</span>
+      <span className="text-label">{t("common.color")}</span>
       {readOnly ? (
         <ReadOnlyField>{tagColorLabel(value)}</ReadOnlyField>
       ) : (

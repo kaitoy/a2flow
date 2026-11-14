@@ -195,11 +195,11 @@ export function McpToolField({
     return (
       <>
         <div className="flex flex-col gap-1.5">
-          <span className="text-label-caps">{t("admin.mcpServer")}</span>
+          <span className="text-label">{t("admin.mcpServer")}</span>
           <ReadOnlyField>{serverLabel || EMPTY_VALUE}</ReadOnlyField>
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="text-label-caps">{t("admin.toolName")}</span>
+          <span className="text-label">{t("admin.toolName")}</span>
           <ReadOnlyField>{toolName || EMPTY_VALUE}</ReadOnlyField>
         </div>
       </>
@@ -247,7 +247,7 @@ export function McpToolField({
           // offer either. Collapse to the one control that does something,
           // exactly as `SecretRefField` and `McpToolPicker` do.
           <div className="flex flex-col gap-1.5">
-            <span className="text-label-caps">{t("admin.mcpServer")}</span>
+            <span className="text-label">{t("admin.mcpServer")}</span>
             <div>
               <Button type="button" variant="secondary" onClick={openPicker}>
                 {t("admin.selectMcpServer2")}
@@ -260,7 +260,7 @@ export function McpToolField({
             {/* Deliberately not a FormField: its `<label htmlFor>` would become
                 the accessible name of the "Select MCP server…" button. */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-label-caps">{t("admin.mcpServer")}</span>
+              <span className="text-label">{t("admin.mcpServer")}</span>
               <div className="flex flex-wrap gap-1.5">
                 <Chip label={serverLabel} onRemove={() => handleServer("", "")} size="lg" />
               </div>

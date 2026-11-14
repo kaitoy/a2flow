@@ -74,7 +74,7 @@ export interface DateTimeProps {
  * Render a timestamp as short relative time (e.g. "5m ago"), with a hover/focus
  * tooltip revealing the full timestamp including seconds and time zone. Invalid
  * values render an em dash with no tooltip. Timestamps are machine-formatted
- * data, so they render in the mono data face (JetBrains Mono) per DESIGN.md;
+ * data, so they render in the mono data face (Geist Mono) per DESIGN.md;
  * the size is inherited from the caller.
  */
 export function DateTime({ value, placement = "top", className }: DateTimeProps) {

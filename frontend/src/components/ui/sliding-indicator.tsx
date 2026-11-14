@@ -52,7 +52,7 @@ export function SlidingIndicator({
         height: size,
         opacity,
       }}
-      className="pointer-events-none absolute left-0 top-0 w-[3px] rounded-r-full bg-accent shadow-glow"
+      className="pointer-events-none absolute left-0 top-0 w-[3px] rounded-r-full bg-accent"
     />
   );
 }

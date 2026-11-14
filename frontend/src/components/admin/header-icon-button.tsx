@@ -29,9 +29,9 @@ export function HeaderIconButton({ label, ref, className, ...rest }: HeaderIconB
     "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full",
     "glass-panel text-on-surface",
     "transition-[transform,translate,scale,box-shadow,color,background-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
-    "hover:shadow-glow hover:text-accent motion-safe:hover:scale-105 motion-safe:active:scale-95",
+    "hover:shadow-glow hover:text-accent motion-safe:active:scale-95",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
-    "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100",
+    "disabled:cursor-not-allowed disabled:opacity-60",
     className,
   ]
     .filter(Boolean)
