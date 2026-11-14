@@ -31,6 +31,8 @@ sequenceDiagram
 - An operator must have set the deployment's base URL when deploying — see [Server settings](../operations/configuration.md#server-settings). While it is not set, **Tenant Settings** shows a warning in place of the **Redirect URI** and single sign-on stays unavailable.
 - Your IdP must be reachable from A2Flow on a public address. An IdP on a private network works only after the operator has allowed its host — see [Single sign-on](../operations/configuration.md#single-sign-on) in the configuration reference.
 
+To try single sign-on without an IdP of your own, start the Keycloak that comes with the Docker Compose stack — see [Try single sign-on with Keycloak](../getting-started/docker-compose.md#keycloak).
+
 ## Set it up {#set-it-up}
 
 1. At your IdP, register a new application for A2Flow — a web application with a client secret. Note its issuer URL, client ID and client secret.

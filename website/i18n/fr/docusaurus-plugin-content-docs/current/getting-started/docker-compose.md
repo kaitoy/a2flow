@@ -28,8 +28,9 @@ Définissez `APP_PORT` dans `.env` pour publier l'application sur un autre port 
 | **frontend** | Les écrans que vous utilisez |
 | **caddy** | Uniquement avec `compose.https.yml` — voir [Servir en HTTPS](#https) |
 | **openbao** | Uniquement avec `--profile openbao` — voir [Essayer les secrets Vault avec OpenBao](#openbao) |
+| **keycloak** | Uniquement avec `--profile keycloak` — voir [Essayer l'authentification unique avec Keycloak](#keycloak) |
 
-Seul l'ingress — ou Caddy à sa place, avec `compose.https.yml` — (et, avec le profil, l'interface d'OpenBao) est accessible depuis l'extérieur ; les autres conteneurs communiquent entre eux sur le réseau interne de Docker.
+Seul l'ingress — ou Caddy à sa place, avec `compose.https.yml` — (et, avec leurs profils, l'interface d'OpenBao et Keycloak) est accessible depuis l'extérieur ; les autres conteneurs communiquent entre eux sur le réseau interne de Docker.
 
 Le premier démarrage prend plus de temps que les suivants : les images sont construites, le schéma de la base de données est créé et le proxy MCP attend que le backend lui remette le certificat dont il a besoin avant d'accepter quoi que ce soit.
 
@@ -106,3 +107,39 @@ Les deux dernières lignes affichent le **role id** et le **secret id**. La stra
 Référencez-le comme n'importe quel autre secret, par exemple sous la forme `${secret:<name>/password}` dans une variable d'environnement d'un [serveur MCP](../guides/mcp-servers.md). Partout où vous sélectionnez le secret, ses clés `username` et `password` sont listées : elles sont lues dans OpenBao à ce moment-là, ce qui montre que la connexion fonctionne.
 
 Définissez `OPENBAO_PORT` dans `.env` pour publier l'interface d'OpenBao sur un port de l'hôte autre que 8200. A2Flow lui-même y accède toujours à l'adresse `http://openbao:8200` sur le réseau interne.
+
+## Essayer l'authentification unique avec Keycloak {#keycloak}
+
+[Keycloak](https://www.keycloak.org/) est un fournisseur d'identité open source. La pile peut en démarrer un à côté d'A2Flow, déjà configuré pour lui, ce qui permet d'essayer l'[authentification unique](../guides/single-sign-on.md) sans votre propre IdP.
+
+```bash
+docker compose --profile keycloak up --build
+```
+
+Keycloak est publié à l'adresse [http://keycloak.localhost:8180](http://keycloak.localhost:8180), et sa console d'administration s'ouvre avec `admin` / `admin` (définissez `KEYCLOAK_ADMIN_PASSWORD` dans `.env` pour changer le mot de passe). Chrome, Edge et Firefox trouvent `keycloak.localhost` d'eux-mêmes ; dans un autre navigateur, ajoutez d'abord la ligne `127.0.0.1 keycloak.localhost` à votre fichier hosts. Keycloak ne conserve rien quand le conteneur est recréé : il repart de la configuration ci-dessous, et les modifications faites dans sa console sont perdues.
+
+Il démarre avec ceci déjà en place :
+
+| Élément | Valeur |
+|---|---|
+| Realm | `a2flow` |
+| URL de l'émetteur | `http://keycloak.localhost:8180/realms/a2flow` |
+| ID client | `a2flow` |
+| Secret client | `a2flow-dev-secret` |
+| URI de redirection | `http://localhost:3000` (ou votre `APP_BASE_URL`) et `https://localhost`, chacune suivie du chemin de retour d'A2Flow |
+| Claim de groupes | `groups` |
+| Utilisateurs | `alice` dans le groupe `a2flow-admins`, `bob` dans le groupe `a2flow-users`. Tous deux ont le mot de passe `password` |
+
+### 1. Connecter A2Flow {#1-connect-a2flow}
+
+1. Connectez-vous à A2Flow en tant que `admin` et ouvrez **Paramètres du tenant** dans la barre latérale d'administration.
+2. Dans la section **Authentification unique**, renseignez **URL de l'émetteur**, **ID client** et **Secret client** avec les valeurs du tableau ci-dessus, cochez **Activer l'authentification unique** et enregistrez.
+3. Ouvrez **Groupes d'utilisateurs**, ouvrez un groupe — ou créez-en un — qui porte les rôles voulus, saisissez `a2flow-admins` dans **Groupe IdP** et enregistrez.
+
+### 2. Se connecter {#2-sign-in}
+
+1. Déconnectez-vous. Sur l'écran de connexion, saisissez `default` dans **Tenant** et appuyez sur **Se connecter avec SSO**.
+2. Sur la page de connexion de Keycloak, connectez-vous en tant que `alice` / `password`. Vous revenez dans A2Flow, connecté en tant qu'Alice, membre du groupe de l'étape 1.
+3. Essayez aussi `bob` : son seul groupe, `a2flow-users`, n'est associé à aucun groupe d'utilisateurs, donc la connexion est refusée — jusqu'à ce que vous l'associiez à l'un d'eux.
+
+Keycloak parle aussi SAML, mais A2Flow se connecte uniquement via OpenID Connect.

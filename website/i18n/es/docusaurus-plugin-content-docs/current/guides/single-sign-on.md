@@ -31,6 +31,8 @@ sequenceDiagram
 - Un operador debe haber definido la URL base del despliegue al desplegar; consulta [Configuración del servidor](../operations/configuration.md#server-settings). Mientras no esté definida, **Configuración del tenant** muestra un aviso en lugar de la **URI de redirección** y el inicio de sesión único no está disponible.
 - A2Flow debe poder llegar a tu IdP en una dirección pública. Un IdP en una red privada solo funciona cuando el operador ha permitido su host; consulta [Inicio de sesión único](../operations/configuration.md#single-sign-on) en la referencia de configuración.
 
+Para probar el inicio de sesión único sin un IdP propio, inicia el Keycloak que incluye la pila de Docker Compose; consulta [Probar el inicio de sesión único con Keycloak](../getting-started/docker-compose.md#keycloak).
+
 ## Configurarlo {#set-it-up}
 
 1. En tu IdP, registra una aplicación nueva para A2Flow: una aplicación web con un secreto de cliente. Anota su URL del emisor, su ID de cliente y su secreto de cliente.

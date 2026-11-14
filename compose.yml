@@ -34,6 +34,12 @@
 # Its UI is then served at http://localhost:8200/ui (OPENBAO_PORT in .env to
 # change the host port). See the manual's "Run with Docker Compose" page for
 # initializing it and connecting A2Flow to it.
+#
+# Optional Keycloak, an identity provider, to try single sign-on against:
+#   docker compose --profile keycloak up --build
+# Its admin console is then served at http://keycloak.localhost:8180 (admin /
+# admin), with a realm, a client and two users already set up. See the
+# manual's "Run with Docker Compose" page for connecting A2Flow to it.
 services:
   db:
     image: postgres:17
@@ -117,6 +123,9 @@ services:
       # the image, and never mounted into `mcp-proxy`.
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       SECRET_KEY_FILE: /var/lib/a2flow/secret-key/.secret_key
+      # Lets a tenant's SSO issuer be the `keycloak` service below, which is
+      # on a private address and speaks plain http.
+      OIDC_ALLOWED_PRIVATE_HOSTS: ${OIDC_ALLOWED_PRIVATE_HOSTS:-keycloak.localhost}
     # `default` reaches the database and serves the frontend; `mcp` is the one
     # network it shares with `mcp-proxy` (see the `networks` block below).
     networks:
@@ -322,6 +331,33 @@ services:
       openbao-db-init:
         condition: service_completed_successfully
 
+  # Keycloak, an OpenID Connect (and SAML) identity provider, for trying single
+  # sign-on locally. Opt-in (`--profile keycloak`). Dev mode keeps its data in
+  # the container, so recreating it starts over from the realm imported from
+  # the `keycloak-realm` config below.
+  #
+  # The issuer must be one URL that both the browser and the backend can reach:
+  # `keycloak.localhost` resolves to 127.0.0.1 in Chrome, Edge and Firefox, and
+  # to this container through the network alias, and the port is the same
+  # inside and out.
+  keycloak:
+    profiles: ["keycloak"]
+    image: quay.io/keycloak/keycloak:26.7.3
+    command: ["start-dev", "--import-realm", "--http-port=8180"]
+    environment:
+      KC_HOSTNAME: http://keycloak.localhost:8180
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    configs:
+      - source: keycloak-realm
+        target: /opt/keycloak/data/import/a2flow-realm.json
+    ports:
+      - "8180:8180"
+    networks:
+      default:
+        aliases:
+          - keycloak.localhost
+
 configs:
   # Routes are matched in order. The /api/ route disables both the route
   # timeout (15 s by default) and the stream idle timeout (5 min by default):
@@ -390,6 +426,69 @@ configs:
       seal "static" {
         current_key_id = "compose-1"
         current_key    = "file:///openbao/file/unseal.key"
+      }
+  # The `a2flow` realm for the `keycloak` service: a confidential client whose
+  # ID tokens carry a `groups` claim (A2Flow's default groups claim), two groups,
+  # and one user in each. The first redirect URI follows APP_BASE_URL; the
+  # second is compose.https.yml's default address.
+  keycloak-realm:
+    content: |
+      {
+        "realm": "a2flow",
+        "enabled": true,
+        "clients": [
+          {
+            "clientId": "a2flow",
+            "name": "A2Flow",
+            "enabled": true,
+            "publicClient": false,
+            "clientAuthenticatorType": "client-secret",
+            "secret": "a2flow-dev-secret",
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "redirectUris": [
+              "${APP_BASE_URL:-http://localhost:${APP_PORT:-3000}}/api/v1/auth/oidc/callback",
+              "https://localhost/api/v1/auth/oidc/callback"
+            ],
+            "protocolMappers": [
+              {
+                "name": "groups",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-group-membership-mapper",
+                "config": {
+                  "claim.name": "groups",
+                  "full.path": "false",
+                  "id.token.claim": "true",
+                  "access.token.claim": "true",
+                  "userinfo.token.claim": "true"
+                }
+              }
+            ]
+          }
+        ],
+        "groups": [{ "name": "a2flow-admins" }, { "name": "a2flow-users" }],
+        "users": [
+          {
+            "username": "alice",
+            "email": "alice@example.com",
+            "firstName": "Alice",
+            "lastName": "Admin",
+            "enabled": true,
+            "emailVerified": true,
+            "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+            "groups": ["a2flow-admins"]
+          },
+          {
+            "username": "bob",
+            "email": "bob@example.com",
+            "firstName": "Bob",
+            "lastName": "User",
+            "enabled": true,
+            "emailVerified": true,
+            "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+            "groups": ["a2flow-users"]
+          }
+        ]
       }
 
 networks:

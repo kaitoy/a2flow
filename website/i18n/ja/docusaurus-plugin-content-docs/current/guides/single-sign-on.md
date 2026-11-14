@@ -31,6 +31,8 @@ sequenceDiagram
 - 運用者がデプロイ時に、デプロイのベース URL を設定している必要があります。[サーバーの設定](../operations/configuration.md#server-settings)を参照してください。設定されていない間は、**テナント設定**の **リダイレクト URI** の代わりに警告が表示され、シングルサインオンは使えません。
 - A2Flow から IdP に、パブリックなアドレスで接続できる必要があります。プライベートネットワーク上の IdP は、運用担当者がそのホストを許可して初めて使えます。設定リファレンスの[シングルサインオン](../operations/configuration.md#single-sign-on)を参照してください。
 
+自前の IdP なしでシングルサインオンを試すには、Docker Compose の構成に含まれる Keycloak を起動します。[Keycloak でシングルサインオンを試す](../getting-started/docker-compose.md#keycloak)を参照してください。
+
 ## 設定する {#set-it-up}
 
 1. IdP で、A2Flow 用のアプリケーションを新しく登録します。クライアントシークレットを持つ Web アプリケーションとして登録します。発行者 URL、クライアント ID、クライアントシークレットを控えます。

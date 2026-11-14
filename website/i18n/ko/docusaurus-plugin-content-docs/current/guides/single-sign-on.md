@@ -31,6 +31,8 @@ sequenceDiagram
 - 운영자가 배포할 때 배포의 기본 URL을 설정해 두어야 합니다. [서버 설정](../operations/configuration.md#server-settings)을 참조하세요. 설정되지 않은 동안에는 **테넌트 설정**에 **리디렉션 URI** 대신 경고가 표시되고 싱글 사인온을 사용할 수 없습니다.
 - A2Flow가 공개 주소로 IdP에 접속할 수 있어야 합니다. 사설 네트워크에 있는 IdP는 운영자가 그 호스트를 허용한 뒤에야 쓸 수 있습니다. 설정 레퍼런스의 [싱글 사인온](../operations/configuration.md#single-sign-on)을 참조하세요.
 
+자체 IdP 없이 싱글 사인온을 사용해 보려면 Docker Compose 스택에 포함된 Keycloak을 시작하세요. [Keycloak으로 싱글 사인온 사용해 보기](../getting-started/docker-compose.md#keycloak)를 참조하세요.
+
 ## 설정하기 {#set-it-up}
 
 1. IdP에서 A2Flow용 애플리케이션을 새로 등록합니다. 클라이언트 시크릿이 있는 웹 애플리케이션으로 등록합니다. 발급자 URL, 클라이언트 ID, 클라이언트 시크릿을 메모해 둡니다.

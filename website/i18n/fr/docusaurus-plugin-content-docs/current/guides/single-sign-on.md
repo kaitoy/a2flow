@@ -31,6 +31,8 @@ sequenceDiagram
 - Un opérateur doit avoir défini l'URL de base du déploiement au déploiement — voir [Paramètres du serveur](../operations/configuration.md#server-settings). Tant qu'elle n'est pas définie, **Paramètres du tenant** affiche un avertissement à la place de l'**URI de redirection** et l'authentification unique reste indisponible.
 - A2Flow doit pouvoir joindre votre IdP à une adresse publique. Un IdP sur un réseau privé ne fonctionne qu'une fois son hôte autorisé par l'opérateur ; voir [Authentification unique](../operations/configuration.md#single-sign-on) dans la référence de configuration.
 
+Pour essayer l'authentification unique sans votre propre IdP, démarrez le Keycloak fourni avec la pile Docker Compose — voir [Essayer l'authentification unique avec Keycloak](../getting-started/docker-compose.md#keycloak).
+
 ## La mettre en place {#set-it-up}
 
 1. Dans votre IdP, enregistrez une nouvelle application pour A2Flow : une application web dotée d'un secret client. Notez son URL de l'émetteur, son ID client et son secret client.

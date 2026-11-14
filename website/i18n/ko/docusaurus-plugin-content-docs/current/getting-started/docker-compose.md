@@ -28,8 +28,9 @@ docker compose up --build
 | **frontend** | 사용자가 보는 화면 |
 | **caddy** | `compose.https.yml`을 사용할 때만 시작됩니다. [HTTPS로 제공하기](#https)를 참조하세요 |
 | **openbao** | `--profile openbao`를 지정한 경우에만 시작됩니다. [OpenBao로 Vault 시크릿 사용해 보기](#openbao)를 참조하세요 |
+| **keycloak** | `--profile keycloak`를 지정한 경우에만 시작됩니다. [Keycloak으로 싱글 사인온 사용해 보기](#keycloak)를 참조하세요 |
 
-외부에서 접근할 수 있는 것은 ingress(`compose.https.yml`을 사용하면 대신 Caddy, 프로필을 지정한 경우 OpenBao UI도)뿐이며, 나머지는 Docker 내부 네트워크에서 서로 통신합니다.
+외부에서 접근할 수 있는 것은 ingress(`compose.https.yml`을 사용하면 대신 Caddy, 프로필을 지정한 경우 OpenBao UI와 Keycloak도)뿐이며, 나머지는 Docker 내부 네트워크에서 서로 통신합니다.
 
 처음 시작할 때는 이후보다 시간이 더 걸립니다. 이미지를 빌드하고 데이터베이스 스키마를 만들어야 하며, MCP 프록시는 필요한 인증서를 백엔드에서 받을 때까지 기다린 뒤에야 요청을 받기 때문입니다.
 
@@ -106,3 +107,39 @@ docker compose exec -e BAO_TOKEN=<root-token> openbao sh -c '
 이 시크릿은 다른 시크릿과 똑같이 참조합니다. 예를 들어 [MCP 서버](../guides/mcp-servers.md)의 환경 변수에 `${secret:<name>/password}`로 지정합니다. 시크릿을 선택하는 곳에는 그 키인 `username`과 `password`가 표시됩니다. 이 목록은 그 순간 OpenBao에서 읽어 온 것이므로, 표시된다면 연결이 정상이라는 뜻입니다.
 
 OpenBao UI를 8200이 아닌 호스트 포트로 공개하려면 `.env`에 `OPENBAO_PORT`를 설정하세요. A2Flow 자체는 항상 내부 네트워크에서 `http://openbao:8200`으로 접속합니다.
+
+## Keycloak으로 싱글 사인온 사용해 보기 {#keycloak}
+
+[Keycloak](https://www.keycloak.org/)은 오픈 소스 IdP입니다. 이 스택에서는 A2Flow용으로 이미 설정된 Keycloak을 A2Flow 옆에 함께 시작할 수 있으므로, 별도의 IdP 없이도 [싱글 사인온](../guides/single-sign-on.md)을 사용해 볼 수 있습니다.
+
+```bash
+docker compose --profile keycloak up --build
+```
+
+Keycloak은 [http://keycloak.localhost:8180](http://keycloak.localhost:8180)에 공개되며, 관리 콘솔에는 `admin` / `admin`으로 로그인합니다(비밀번호를 바꾸려면 `.env`에 `KEYCLOAK_ADMIN_PASSWORD`를 설정하세요). Chrome, Edge, Firefox는 `keycloak.localhost`를 스스로 찾습니다. 다른 브라우저에서는 먼저 hosts 파일에 `127.0.0.1 keycloak.localhost` 줄을 추가하세요. 컨테이너를 다시 만들면 Keycloak은 아무것도 남기지 않고 아래 설정에서 다시 시작하므로, 관리 콘솔에서 바꾼 내용은 사라집니다.
+
+시작 시점에 다음이 이미 설정되어 있습니다.
+
+| 항목 | 값 |
+|---|---|
+| 렐름 | `a2flow` |
+| 발급자 URL | `http://keycloak.localhost:8180/realms/a2flow` |
+| 클라이언트 ID | `a2flow` |
+| 클라이언트 시크릿 | `a2flow-dev-secret` |
+| 리디렉션 URI | `http://localhost:3000`(또는 `APP_BASE_URL`)과 `https://localhost`. 각각 뒤에 A2Flow의 콜백 경로가 붙습니다 |
+| 그룹 클레임 | `groups` |
+| 사용자 | `alice`는 그룹 `a2flow-admins`, `bob`은 그룹 `a2flow-users`에 속합니다. 두 사람 모두 비밀번호는 `password`입니다 |
+
+### 1. A2Flow 연결 {#1-connect-a2flow}
+
+1. A2Flow에 `admin`으로 로그인하고 관리 사이드바의 **테넌트 설정**을 엽니다.
+2. **싱글 사인온** 섹션에서 위 표의 값으로 **발급자 URL**, **클라이언트 ID**, **클라이언트 시크릿**을 채우고 **싱글 사인온 사용**을 선택한 뒤 저장합니다.
+3. **사용자 그룹**을 열고, 원하는 역할을 가진 그룹을 열거나 새로 만든 다음 **IdP 그룹**에 `a2flow-admins`를 입력하고 저장합니다.
+
+### 2. 로그인하기 {#2-sign-in}
+
+1. 로그아웃합니다. 로그인 화면의 **테넌트**에 `default`를 입력하고 **SSO로 로그인**을 누릅니다.
+2. Keycloak 로그인 페이지에서 `alice` / `password`로 로그인합니다. 1단계의 그룹 멤버인 Alice로 A2Flow에 로그인된 상태로 돌아옵니다.
+3. `bob`으로도 해 보세요. 그의 유일한 그룹 `a2flow-users`는 어떤 사용자 그룹에도 매핑되어 있지 않으므로 로그인이 거부됩니다. 사용자 그룹에 매핑하면 로그인할 수 있게 됩니다.
+
+Keycloak은 SAML도 지원하지만, A2Flow는 OpenID Connect로만 로그인합니다.
