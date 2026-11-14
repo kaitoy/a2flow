@@ -218,4 +218,71 @@ describe("WorkflowTaskTimeline", () => {
     );
     expect(screen.getByText("No tasks yet.")).toBeInTheDocument();
   });
+
+  describe("once the run has branched", () => {
+    const branched = [
+      { ...makeTask("t1", "Gather sources", "completed"), sessionId: "main" },
+      { ...makeTask("t2", "Estimate", "completed"), sessionId: "b1" },
+      makeTask("t3", "Review", "pending"),
+    ];
+    const entry = (title: string) => screen.getByText(title).closest("li") as HTMLElement;
+    const row = (title: string) => screen.getByText(title).closest("div") as HTMLElement;
+
+    it("indents and names a task a branch session works, and dims other sessions' tasks", () => {
+      render(
+        <WorkflowTaskTimeline
+          tasks={branched}
+          activeTaskId={null}
+          branchNames={new Map([["b1", "Branch 1"]])}
+          viewedSessionId="main"
+          onSelectTask={vi.fn()}
+          collapsed={false}
+          onToggle={vi.fn()}
+        />
+      );
+      expect(screen.getAllByTestId("workflow-task-branch").map((el) => el.textContent)).toEqual([
+        "Branch 1",
+      ]);
+      expect(within(entry("Estimate")).getByTestId("workflow-task-branch")).toBeInTheDocument();
+      expect(entry("Estimate")).toHaveAttribute("data-branch", "true");
+      expect(entry("Gather sources")).not.toHaveAttribute("data-branch");
+
+      // Only the other session's task is dimmed — not the viewed session's, and
+      // not the one no session works yet.
+      expect(row("Estimate")).toHaveClass("opacity-60");
+      expect(row("Gather sources")).not.toHaveClass("opacity-60");
+      expect(row("Review")).not.toHaveClass("opacity-60");
+    });
+
+    it("dims the main session's tasks while a branch is on screen", () => {
+      render(
+        <WorkflowTaskTimeline
+          tasks={branched}
+          activeTaskId={null}
+          branchNames={new Map([["b1", "Branch 1"]])}
+          viewedSessionId="b1"
+          onSelectTask={vi.fn()}
+          collapsed={false}
+          onToggle={vi.fn()}
+        />
+      );
+      expect(row("Gather sources")).toHaveClass("opacity-60");
+      expect(row("Estimate")).not.toHaveClass("opacity-60");
+    });
+
+    it("marks nothing when no session information is given", () => {
+      render(
+        <WorkflowTaskTimeline
+          tasks={branched}
+          activeTaskId={null}
+          onSelectTask={vi.fn()}
+          collapsed={false}
+          onToggle={vi.fn()}
+        />
+      );
+      expect(screen.queryByTestId("workflow-task-branch")).toBeNull();
+      expect(entry("Estimate")).not.toHaveAttribute("data-branch");
+      expect(row("Estimate")).not.toHaveClass("opacity-60");
+    });
+  });
 });

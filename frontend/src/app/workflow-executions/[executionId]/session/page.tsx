@@ -16,7 +16,7 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ChatInput } from "@/components/ChatInput";
 import { ConsultationNotice } from "@/components/ConsultationNotice";
-import { ExecutionSessionTabs } from "@/components/ExecutionSessionTabs";
+import { ExecutionSessionTabs, sessionNames } from "@/components/ExecutionSessionTabs";
 import { InitiatorResumeNotice } from "@/components/InitiatorResumeNotice";
 import { MessageList } from "@/components/MessageList";
 import { AccessDeniedState } from "@/components/ui/access-denied-state";
@@ -127,8 +127,29 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
     return running.at(-1)?.id ?? null;
   }, [tasks]);
 
-  /** Scroll the chat to the group that introduces the selected task. */
+  // How the timeline tells the run's sessions apart: the tab names of every
+  // session but the main one (only a branch ever works a task), and the session
+  // whose tasks are on screen — for a consultation, which works none, the
+  // session it was opened from.
+  const branchNames = useMemo(() => {
+    const names = sessionNames(sessions, execution.sessionId, t);
+    names.delete(execution.sessionId);
+    return names;
+  }, [sessions, execution.sessionId, t]);
+  const viewedSession = sessions.find((s) => s.id === selected);
+  const viewedSessionId =
+    viewedSession?.kind === "consultation" ? (viewedSession.parentId ?? selected) : selected;
+
+  /**
+   * Scroll the chat to the group that introduces the selected task — or, when
+   * another session works that task, switch to that session, whose chat has it.
+   */
   const handleSelectTask = (taskId: string) => {
+    const owner = tasksById.get(taskId)?.sessionId;
+    if (owner && owner !== selected) {
+      select(owner);
+      return;
+    }
     document
       .getElementById(`wf-task-group-${taskId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -186,6 +207,8 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
         activeTaskId={activeTaskId}
         taskIndexById={taskIndexById}
         highlightedTaskId={highlightedTaskId}
+        branchNames={branchNames}
+        viewedSessionId={viewedSessionId}
         onSelectTask={handleSelectTask}
         onHoverTask={setHoveredTaskId}
         collapsed={timelineCollapsed}
@@ -202,6 +225,8 @@ function WorkflowSessionView({ execution }: { execution: WorkflowExecution }) {
           activeTaskId={activeTaskId}
           taskIndexById={taskIndexById}
           highlightedTaskId={highlightedTaskId}
+          branchNames={branchNames}
+          viewedSessionId={viewedSessionId}
           onSelectTask={(taskId) => {
             setTimelineDrawerOpen(false);
             handleSelectTask(taskId);

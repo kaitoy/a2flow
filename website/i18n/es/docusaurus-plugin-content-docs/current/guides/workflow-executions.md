@@ -65,7 +65,7 @@ Ambos están vinculados en los dos sentidos:
 
 - Al desplazar el chat se resalta en la cronología la tarea situada en la parte superior de la vista.
 - Al pasar el cursor por una entrada de la cronología o por un grupo del chat se resalta su homólogo.
-- Al hacer clic en una entrada de la cronología, el chat se desplaza hasta el grupo de esa tarea.
+- Al hacer clic en una entrada de la cronología, el chat se desplaza hasta el grupo de esa tarea o, si de la tarea se ocupa otra sesión, [se abre la pestaña de esa sesión](#branch-sessions).
 
 ### Actualizaciones en directo {#live-updates}
 
@@ -98,6 +98,8 @@ Cuando el grafo de tareas de la ejecución se ramifica, A2Flow puede repartir la
 | Error | El último turno falló |
 
 Haz clic en una pestaña para abrir el chat de esa sesión; la vista sigue a la sesión seleccionada y la URL la conserva, de modo que un enlace a la página abre la misma pestaña. Una ejecución que nunca se ramifica y no tiene ninguna consulta no muestra pestañas.
+
+La cronología de tareas también distingue las sesiones. Una tarea de la que se ocupa una sesión de rama aparece sangrada respecto a la línea de la cronología y lleva el nombre de la rama (**Rama 1**). Las tareas de una sesión distinta de la que tiene la pestaña abierta se muestran atenuadas, y al hacer clic en una de ellas se abre la pestaña de su sesión en lugar de desplazarse el chat. Una tarea que aún no está lista no pertenece a ninguna sesión, así que no aparece ni sangrada ni atenuada.
 
 ### Consultas {#consultations}
 

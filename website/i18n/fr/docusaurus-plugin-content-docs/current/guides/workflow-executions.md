@@ -65,7 +65,7 @@ Les deux sont liés dans les deux sens :
 
 - Faire défiler la discussion met en évidence, dans la chronologie, la tâche située en haut de la zone visible.
 - Survoler une entrée de la chronologie ou un groupe de la discussion met en évidence son équivalent.
-- Cliquer sur une entrée de la chronologie fait défiler la discussion jusqu'au groupe de cette tâche.
+- Cliquer sur une entrée de la chronologie fait défiler la discussion jusqu'au groupe de cette tâche ou, si une autre session traite la tâche, [ouvre l'onglet de cette session](#branch-sessions).
 
 ### Mises à jour en direct {#live-updates}
 
@@ -98,6 +98,8 @@ Lorsque le graphe des tâches de l'exécution se ramifie, A2Flow peut répartir 
 | Erreur | Le dernier tour a échoué |
 
 Cliquez sur un onglet pour ouvrir la discussion de cette session ; l'affichage suit la session sélectionnée et l'URL la conserve : un lien vers la page ouvre donc le même onglet. Une exécution qui ne se ramifie jamais et n'a aucune consultation n'affiche aucun onglet.
+
+La chronologie des tâches distingue elle aussi les sessions. Une tâche traitée par une session de branche est affichée en retrait de la ligne de la chronologie et porte le nom de la branche (**Branche 1**). Les tâches d'une session autre que celle dont l'onglet est ouvert sont estompées, et cliquer sur l'une d'elles ouvre l'onglet de sa session au lieu de faire défiler la discussion. Une tâche qui n'est pas encore prête n'appartient à aucune session : elle n'est donc ni en retrait ni estompée.
 
 ### Consultations {#consultations}
 

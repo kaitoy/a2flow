@@ -31,6 +31,36 @@ function statusLabel(session: ExecutionSession, t: Translator): string {
   return t("session.statusUntil", { status: label, at });
 }
 
+/**
+ * The name each of a run's sessions goes by: "Main", then branches and
+ * consultations numbered apart in list order ("Branch 1", "Consultation 1").
+ * Shared by the tabs and the task timeline so the two never number a branch
+ * differently.
+ *
+ * @param sessions - The run's sessions, main session first (as the API lists them).
+ * @param mainSessionId - The run's main session id.
+ * @param t - Translator for the names.
+ * @returns Session id -> display name.
+ */
+export function sessionNames(
+  sessions: ExecutionSession[],
+  mainSessionId: string,
+  t: Translator
+): Map<string, string> {
+  let branch = 0;
+  let consultation = 0;
+  return new Map(
+    sessions.map((session) => [
+      session.id ?? "",
+      session.id === mainSessionId
+        ? t("session.main")
+        : session.kind === "consultation"
+          ? t("app.consultationValue", { value: ++consultation })
+          : t("app.branchValue", { value: ++branch }),
+    ])
+  );
+}
+
 /** Props for {@link ExecutionSessionTabs}. */
 export interface ExecutionSessionTabsProps {
   /** The run's sessions, main session first (as the API lists them). */
@@ -61,15 +91,9 @@ export function ExecutionSessionTabs({
 }: ExecutionSessionTabsProps) {
   const t = useT();
   if (sessions.length < 2) return null;
-  let branch = 0;
-  let consultation = 0;
+  const names = sessionNames(sessions, mainSessionId, t);
   const options = sessions.map((session) => {
-    const name =
-      session.id === mainSessionId
-        ? t("session.main")
-        : session.kind === "consultation"
-          ? t("app.consultationValue", { value: ++consultation })
-          : t("app.branchValue", { value: ++branch });
+    const name = names.get(session.id ?? "") ?? "";
     const status = statusLabel(session, t);
     return { value: session.id ?? "", label: status ? `${name} · ${status}` : name };
   });

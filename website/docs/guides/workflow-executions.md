@@ -65,7 +65,7 @@ The two are linked both ways:
 
 - Scrolling the chat highlights the task at the top of the viewport in the timeline.
 - Hovering either a timeline entry or a chat group highlights its counterpart.
-- Clicking a timeline entry scrolls the chat to that task's group.
+- Clicking a timeline entry scrolls the chat to that task's group — or, if another session works the task, [opens that session's tab](#branch-sessions).
 
 ### Live updates
 
@@ -98,6 +98,8 @@ When the run's task graph branches, A2Flow may split the run across several sess
 | Error | The last turn failed |
 
 Click a tab to open that session's chat; the view follows the selected session, and the URL keeps it, so a link to the page opens the same tab. A run that never branches and has no consultation shows no tabs.
+
+The task timeline tells the sessions apart too. A task a branch session works is indented off the timeline's line and labelled with the branch's name (**Branch 1**). Tasks worked by a session other than the one whose tab is open are dimmed, and clicking one opens its session's tab instead of scrolling the chat. A task that is not ready yet belongs to no session, so it is neither indented nor dimmed.
 
 ### Consultations {#consultations}
 

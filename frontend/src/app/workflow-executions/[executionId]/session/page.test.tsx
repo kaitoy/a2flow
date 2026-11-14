@@ -1,5 +1,5 @@
 import { http } from "msw";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/api";
 import type { RootState } from "@/store";
@@ -306,5 +306,41 @@ describe("WorkflowSessionPage", () => {
     );
     expect(await screen.findByRole("tab", { name: "Consultation 1 · Queued" })).toBeInTheDocument();
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("names a branch's task in the timeline and opens that branch when it is clicked", async () => {
+    const replace = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({ replace } as never);
+    const task = (id: string, title: string, sessionId: string) => ({
+      id,
+      title,
+      sessionId,
+      status: "completed",
+      workflowExecutionId: "execution-1",
+      dependsOnIds: [],
+      toolBindings: [],
+    });
+    useExecutionSessionChatMock.mockReturnValue({
+      ...useExecutionSessionChatMock(),
+      tasks: [task("t1", "Gather", "executed-session-id"), task("t2", "Estimate", "branch-1")],
+    });
+    server.use(
+      http.get("http://localhost:8000/api/v1/workflow-executions/:id/sessions", () =>
+        envelope([
+          sessionRow({ id: "executed-session-id", status: "idle" }),
+          sessionRow({ id: "branch-1", status: "done", parentId: "executed-session-id" }),
+        ])
+      )
+    );
+    render(<WorkflowSessionPage />, { preloadedState: AUTH_STATE });
+
+    // The desktop sidebar and the drawer each render the timeline.
+    const [branch] = await screen.findAllByTestId("workflow-task-branch");
+    expect(branch).toHaveTextContent("Branch 1");
+
+    screen.getAllByRole("button", { name: /Estimate/ })[0].click();
+    expect(replace).toHaveBeenCalledWith(
+      "/workflow-executions/execution-1/session?session=branch-1"
+    );
   });
 });

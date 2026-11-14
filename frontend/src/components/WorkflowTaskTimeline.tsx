@@ -27,6 +27,12 @@ export interface TimelineTask {
   description?: string | null;
   /** MCP tools bound to this task/template, shown as a small count indicator when non-empty. */
   toolBindings?: ToolBinding[];
+  /**
+   * Id of the session working the task, or absent while none is assigned (a
+   * task not runnable yet, or a task template). Drives the branch indent and
+   * the dimming of other sessions' tasks.
+   */
+  sessionId?: string | null;
 }
 
 /** Expanded panel's outer `aside` class, shared with {@link WorkflowSessionSkeleton} so its loading chrome can't drift from the real sidebar. */
@@ -54,6 +60,16 @@ export interface WorkflowTaskTimelineProps {
   taskIndexById?: Map<string, number>;
   /** Id of the focused task (chat hover / scroll-spy), shown with a ring. */
   highlightedTaskId?: string | null;
+  /**
+   * Branch session id -> the name its tab shows ("Branch 1"). A task worked by
+   * one of these sessions is indented off the rail and labelled with the name.
+   */
+  branchNames?: Map<string, string>;
+  /**
+   * Id of the session whose chat is on screen. Tasks another session works are
+   * dimmed; tasks no session works yet are not.
+   */
+  viewedSessionId?: string;
   /** Called with a task id when its entry is clicked (to scroll the chat to it). */
   onSelectTask: (taskId: string) => void;
   /** Called with a task id on hover and `null` on leave, to drive chat linkage. */
@@ -72,7 +88,10 @@ export interface WorkflowTaskTimelineProps {
  * follows the chat's scroll position / hover, and scrolls the chat to the
  * matching {@link WorkflowTaskGroup} when clicked. The badge number matches the
  * chat group's heading so the two views can be paired at a glance. Hovering a
- * title with a description reveals it in a tooltip. When a task or template
+ * title with a description reveals it in a tooltip. Once a run has branched, a
+ * task worked by a branch session is indented off the rail on an elbow and
+ * labelled with the branch's name, and tasks of sessions other than the one on
+ * screen are dimmed. When a task or template
  * has bound MCP tools, a small tool icon and count appear below the
  * title/status; clicking it opens a dialog listing each tool and its owning
  * MCP server.
@@ -82,6 +101,8 @@ export function WorkflowTaskTimeline({
   activeTaskId,
   taskIndexById,
   highlightedTaskId = null,
+  branchNames,
+  viewedSessionId,
   onSelectTask,
   onHoverTask,
   collapsed,
@@ -149,12 +170,32 @@ export function WorkflowTaskTimeline({
             const isHighlighted = task.id === highlightedTaskId;
             const index = taskIndexById?.get(task.id) ?? i + 1;
             const toolBindings = task.toolBindings ?? [];
+            const branchName = task.sessionId ? branchNames?.get(task.sessionId) : undefined;
+            const isDimmed =
+              viewedSessionId !== undefined &&
+              task.sessionId != null &&
+              task.sessionId !== viewedSessionId;
             return (
-              <li key={task.id} className="relative">
+              <li
+                key={task.id}
+                data-branch={branchName ? "true" : undefined}
+                className={`relative ${branchName ? "pl-5" : ""}`}
+              >
+                {/* The rail: from under the badge down to the next entry — or, beside
+                    a branch entry, straight past it, since the branch hangs off it. */}
                 {i < tasks.length - 1 && (
                   <span
                     aria-hidden="true"
-                    className="absolute bottom-0 left-[1.125rem] top-[1.85rem] w-px bg-glass-border"
+                    className={`absolute bottom-0 left-[1.125rem] w-px bg-glass-border ${
+                      branchName ? "top-0" : "top-[1.85rem]"
+                    }`}
+                  />
+                )}
+                {/* The elbow from the rail to a branch entry's badge. */}
+                {branchName && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-[1.125rem] top-0 h-5 w-2.5 rounded-bl-lg border-b border-l border-glass-border"
                   />
                 )}
                 {/* biome-ignore lint/a11y/noStaticElementInteractions: hover is a non-essential visual link to the chat; the core linkage is click + aria-current */}
@@ -167,7 +208,9 @@ export function WorkflowTaskTimeline({
                       : isHighlighted
                         ? "bg-glass text-on-surface"
                         : "text-on-surface-variant hover:bg-glass hover:text-on-surface"
-                  } ${isHighlighted ? "ring-2 ring-inset ring-accent/50" : ""}`}
+                  } ${isHighlighted ? "ring-2 ring-inset ring-accent/50" : ""} ${
+                    isDimmed ? "opacity-60 hover:opacity-100 focus-within:opacity-100" : ""
+                  }`}
                 >
                   <button
                     type="button"
@@ -190,12 +233,17 @@ export function WorkflowTaskTimeline({
                           {task.title}
                         </span>
                       </Tooltip>
-                      {status !== null && (
-                        <span
-                          className="block text-xs text-on-surface-variant"
-                          data-testid="workflow-task-status"
-                        >
-                          {formatStatusLabel(status)}
+                      {(status !== null || branchName) && (
+                        <span className="block truncate text-xs text-on-surface-variant">
+                          {status !== null && (
+                            <span data-testid="workflow-task-status">
+                              {formatStatusLabel(status)}
+                            </span>
+                          )}
+                          {status !== null && branchName && " · "}
+                          {branchName && (
+                            <span data-testid="workflow-task-branch">{branchName}</span>
+                          )}
                         </span>
                       )}
                     </span>
