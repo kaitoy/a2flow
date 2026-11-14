@@ -71,7 +71,7 @@ export function RolesField({
     const held = visibleRoles.filter((role) => value.includes(role));
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps">{t.maybe(label)}</span>
+        <span className="text-label">{t.maybe(label)}</span>
         <ReadOnlyField>
           {held.length === 0 ? EMPTY_VALUE : held.map((role) => roleLabel(role)).join(", ")}
         </ReadOnlyField>
@@ -91,7 +91,7 @@ export function RolesField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{t.maybe(label)}</span>
+      <span className="text-label">{t.maybe(label)}</span>
       <CheckboxGroup
         name="roles"
         options={options}

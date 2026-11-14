@@ -43,7 +43,7 @@ export function InheritedRolesField({ roles }: InheritedRolesProps) {
   const t = useT();
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{t("admin.rolesFromGroups")}</span>
+      <span className="text-label">{t("admin.rolesFromGroups")}</span>
       {roles.length === 0 ? (
         <p className="text-xs text-on-surface-variant">{t("admin.thisUserBelongsToNoGroupThat")}</p>
       ) : (

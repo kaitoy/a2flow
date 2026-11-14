@@ -50,7 +50,7 @@ const CHIP_PADDING_X = 12;
 /**
  * Width of one character in the chip's `xs` 11px mono face, in pixels.
  *
- * JetBrains Mono at 11px advances ~6.6px; rounded up so every derived width is
+ * Geist Mono at 11px advances 6.6px; rounded up so every derived width is
  * an upper bound rather than a hair short.
  */
 const MONO_CHAR_WIDTH = 7;

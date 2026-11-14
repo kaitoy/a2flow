@@ -21,7 +21,7 @@ export const customTextField = createComponentImplementation(TextFieldApi, ({ pr
   return (
     <div className="flex w-full flex-col gap-1.5">
       {props.label && (
-        <label htmlFor={id} className="text-label-caps">
+        <label htmlFor={id} className="text-label">
           {props.label}
         </label>
       )}

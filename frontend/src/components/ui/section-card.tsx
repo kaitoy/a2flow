@@ -21,7 +21,7 @@ export interface SectionCardProps {
  *
  * The icon tile reuses the vocabulary of
  * {@link import("../admin/admin-page-header").AdminPageHeader} and the admin
- * welcome cards — the same `glass-panel-strong` square with `shadow-glow` — so a
+ * welcome cards — the same `glass-panel-strong` square — so a
  * section heading inside a page reads as a quieter echo of the page heading
  * above it rather than as a new shape. Pages that stack several of these get
  * their structure from the headings instead of from bare dividers.
@@ -34,8 +34,8 @@ export function SectionCard({ icon, title, children, className }: SectionCardPro
   return (
     <section className={cls}>
       <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent shadow-glow">
-          <AnimatedIcon icon={icon} animation="spin-occasional" size={20} />
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent">
+          <AnimatedIcon icon={icon} size={20} />
         </span>
         <h2 className="min-w-0 truncate font-display text-lg font-semibold tracking-tight text-on-surface">
           {title}

@@ -86,7 +86,7 @@ describe("UserMessageBubble", () => {
     const bubble = screen.getByText("hello");
     expect(bubble).toHaveClass("bg-secondary/12");
     expect(bubble).toHaveClass("border-secondary/25");
-    expect(bubble).not.toHaveClass("bg-gradient-to-br");
+    expect(bubble).not.toHaveClass("bg-bubble");
   });
 
   it("keeps the viewer's own message right-aligned with the avatar trailing", () => {
@@ -100,7 +100,7 @@ describe("UserMessageBubble", () => {
     const row = container.firstChild as HTMLElement;
     expect(row).toHaveClass("justify-end");
     expect(row.lastChild).toBe(screen.getByTestId("sender-avatar"));
-    expect(screen.getByText("hello")).toHaveClass("bg-gradient-to-br");
+    expect(screen.getByText("hello")).toHaveClass("bg-bubble");
   });
 
   it("stays right-aligned without an avatar even when it is not the viewer's own", () => {
@@ -110,6 +110,6 @@ describe("UserMessageBubble", () => {
       <UserMessageBubble message={{ id: "1", role: "user", content: "hello" }} isOwn={false} />
     );
     expect(container.firstChild).toHaveClass("justify-end");
-    expect(screen.getByText("hello")).toHaveClass("bg-gradient-to-br");
+    expect(screen.getByText("hello")).toHaveClass("bg-bubble");
   });
 });

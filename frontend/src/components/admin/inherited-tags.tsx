@@ -38,7 +38,7 @@ export function InheritedTagsField({ tagIds, byId }: InheritedTagsProps) {
   const t = useT();
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{t("admin.tagsFromGroups")}</span>
+      <span className="text-label">{t("admin.tagsFromGroups")}</span>
       {tagIds.length === 0 ? (
         <p className="text-xs text-on-surface-variant">
           {t("admin.thisUserBelongsToNoGroupThat2")}

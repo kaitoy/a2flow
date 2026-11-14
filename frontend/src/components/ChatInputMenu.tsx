@@ -101,7 +101,7 @@ export function ChatInputMenu({
         aria-expanded={open}
         aria-label={t("app.chatActions")}
         onClick={() => setOpen((o) => !o)}
-        className="glass-panel flex size-9 shrink-0 self-end items-center justify-center rounded-xl cursor-pointer text-on-surface-variant transition-[background-color,border-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)] hover:border-accent/40 hover:bg-accent/10 hover:text-accent motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="glass-panel flex size-9 shrink-0 self-end items-center justify-center rounded-xl cursor-pointer text-on-surface-variant transition-[background-color,border-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)] hover:border-accent/40 hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         <Plus size={18} strokeWidth={1.8} aria-hidden="true" />
       </button>
@@ -124,7 +124,7 @@ export function ChatInputMenu({
                     opacity: style.opacity,
                     transform: style.y.to((y) => `translateY(${y}px)`),
                     zIndex: 9999,
-                    boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
+                    boxShadow: "var(--s-overlay)",
                   }}
                   className="glass-panel-overlay rounded-xl p-2 text-on-surface"
                 >

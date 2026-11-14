@@ -67,7 +67,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
             className="h-10 w-auto"
             priority
           />
-          <h1 className="max-md:hidden font-display text-[22px] leading-[32px] font-semibold tracking-tight text-gradient-accent">
+          <h1 className="max-md:hidden font-display [font-stretch:125%] text-xl leading-[32px] font-bold tracking-tight text-on-surface">
             A2Flow
           </h1>
         </Link>

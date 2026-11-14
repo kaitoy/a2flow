@@ -1,21 +1,21 @@
-/** @module EmptyState — centered empty-state placeholder with an animated accent icon. */
+/** @module EmptyState — centered empty-state placeholder with an accent icon. */
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AnimatedIcon, type IconAnimation } from "./animated-icon";
 
 /** Props for {@link EmptyState}. */
 export interface EmptyStateProps {
-  /** Accent icon shown in the glass tile. */
+  /** Accent icon shown in the tile. */
   icon: LucideIcon;
-  /** Animation applied to the icon. Defaults to `"breathe"`. */
+  /** Animation applied to the icon. Defaults to `"none"`. */
   animation?: IconAnimation;
-  /** Optional headline (rendered as gradient text). */
+  /** Optional headline, set in the display face. */
   title?: ReactNode;
   /** Optional supporting line beneath the title. */
   description?: ReactNode;
   /**
    * Compact layout for tight containers (sidebars, table cells): smaller tile,
-   * less padding, no gradient headline emphasis. Defaults to `false`.
+   * less padding, a plain-weight headline. Defaults to `false`.
    */
   compact?: boolean;
   /** Extra classes merged onto the outer wrapper. */
@@ -25,14 +25,14 @@ export interface EmptyStateProps {
 /**
  * Centered placeholder for empty regions (no messages, no rows, no sessions).
  *
- * Pairs an {@link AnimatedIcon} inside a frosted-glass tile with an optional
+ * Pairs an {@link AnimatedIcon} inside a raised tile with an optional
  * title and description so empty screens feel intentional rather than blank.
  * Use `compact` inside narrow containers like the session sidebar or a table's
  * empty cell.
  */
 export function EmptyState({
   icon,
-  animation = "breathe",
+  animation = "none",
   title,
   description,
   compact = false,
@@ -47,8 +47,8 @@ export function EmptyState({
     .join(" ");
 
   const tileCls = compact
-    ? "flex h-9 w-9 items-center justify-center rounded-xl glass-panel-strong shadow-glow"
-    : "mb-4 flex h-14 w-14 items-center justify-center rounded-2xl glass-panel-strong shadow-glow";
+    ? "flex h-9 w-9 items-center justify-center rounded-xl glass-panel-strong"
+    : "mb-4 flex h-14 w-14 items-center justify-center rounded-2xl glass-panel-strong";
 
   return (
     <div className={wrapperCls}>
@@ -64,7 +64,7 @@ export function EmptyState({
         (compact ? (
           <p className="text-xs font-medium text-on-surface">{title}</p>
         ) : (
-          <h2 className="font-display mb-1 text-2xl font-semibold tracking-tight text-gradient-accent">
+          <h2 className="font-display mb-1 text-2xl font-semibold tracking-tight text-on-surface">
             {title}
           </h2>
         ))}

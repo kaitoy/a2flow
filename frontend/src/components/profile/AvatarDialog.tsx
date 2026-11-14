@@ -199,7 +199,7 @@ function PalettePicker({ colors, onChange }: PalettePickerProps) {
   const t = useT();
   return (
     <fieldset className="flex min-w-0 flex-col gap-2">
-      <legend className="text-label-caps">{t("profile.palette")}</legend>
+      <legend className="text-label">{t("profile.palette")}</legend>
       <div className="flex flex-wrap gap-4">
         {colors.map((color, index) => (
           <label

@@ -246,7 +246,7 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
           // just doubles the empty state. Collapse to the one control that
           // actually does something, exactly as `SecretRefField` does.
           <div className="flex flex-col gap-1.5">
-            <span className="text-label-caps">{t("admin.mcpServer")}</span>
+            <span className="text-label">{t("admin.mcpServer")}</span>
             <div>
               <Button type="button" variant="secondary" onClick={openPicker}>
                 {t("admin.selectMcpServer2")}
@@ -259,7 +259,7 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
                 the accessible name of whatever it points at, renaming the
                 "Select MCP server…" button to the field's label. */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-label-caps">{t("admin.mcpServer")}</span>
+              <span className="text-label">{t("admin.mcpServer")}</span>
               <div className="flex flex-wrap gap-1.5">
                 <Chip label={picked.name} onRemove={() => setPicked(null)} size="lg" />
               </div>
@@ -290,7 +290,7 @@ export function McpToolPicker({ value, onChange, exempt, onExemptChange }: McpTo
         ))}
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps">{t("admin.selectedTools")}</span>
+        <span className="text-label">{t("admin.selectedTools")}</span>
         {chips.length === 0 ? (
           <p className="text-sm text-on-surface-variant">{t("admin.noToolsAreBoundToThisTask")}</p>
         ) : (

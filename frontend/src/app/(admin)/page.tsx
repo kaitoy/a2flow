@@ -32,7 +32,7 @@ export default function AdminPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-gradient-accent">
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface">
           {t("admin.welcomeToA2flow")}
         </h1>
         <p className="mt-2 text-sm text-on-surface-variant">
@@ -67,12 +67,12 @@ function WelcomeCard({
       href={href}
       className={[
         "group flex items-start gap-4 rounded-2xl glass-panel p-5",
-        "transition-[transform,translate,scale,box-shadow] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
-        "hover:shadow-glow motion-safe:hover:-translate-y-0.5",
+        "transition-[border-color] duration-[var(--motion-duration-base)] ease-[var(--motion-ease-standard)]",
+        "hover:border-accent/50",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
       ].join(" ")}
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent shadow-glow">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent">
         <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
       </span>
       <span className="flex min-w-0 flex-col">

@@ -232,7 +232,7 @@ export function Tooltip({
                     }),
                     pointerEvents: "none",
                     zIndex: 9999,
-                    boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
+                    boxShadow: "var(--s-overlay)",
                   }}
                   className="glass-panel-overlay max-w-xs whitespace-pre-line break-words rounded-lg px-2.5 py-1.5 text-[13px] leading-5 text-on-surface"
                 >

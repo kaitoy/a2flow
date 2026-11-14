@@ -154,12 +154,12 @@ export function NotificationPanel({ anchorRef, open, onClose }: NotificationPane
               opacity: style.opacity,
               transform: style.y.to((y) => `translateY(${y}px)`),
               zIndex: 9999,
-              boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
+              boxShadow: "var(--s-overlay)",
             }}
             className="glass-panel-overlay max-h-[70vh] overflow-y-auto rounded-xl p-2 text-on-surface"
           >
             <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+              <span className="text-xs font-medium text-on-surface-variant">
                 {t("common.notifications")}
               </span>
               {unreadCount > 0 && (

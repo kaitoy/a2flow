@@ -532,7 +532,6 @@ export function MessageList({
             <animated.div style={emptyStateSpring}>
               <EmptyState
                 icon={Sparkles}
-                animation="breathe"
                 title={t("app.startAConversation")}
                 description={t("app.askAnythingBuildAnA2uiSurfaceOr")}
               />

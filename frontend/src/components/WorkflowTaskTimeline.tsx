@@ -128,7 +128,7 @@ export function WorkflowTaskTimeline({
   return (
     <aside className={`${TASK_TIMELINE_ASIDE_CLASS} ${className ?? ""}`}>
       <div className={TASK_TIMELINE_HEADER_CLASS}>
-        <h2 className="text-label-caps">{t("app.tasks")}</h2>
+        <h2 className="text-label">{t("app.tasks")}</h2>
         <button
           type="button"
           onClick={onToggle}
@@ -205,7 +205,7 @@ export function WorkflowTaskTimeline({
                       type="button"
                       onClick={() => openToolsDialog(task)}
                       aria-label={t("app.boundToolsCount", { count: toolBindings.length })}
-                      className="ml-[1.875rem] mt-0.5 inline-flex items-center gap-1 rounded-full glass-panel px-1.5 py-0.5 text-xs text-on-surface-variant transition-all hover:text-accent hover:shadow-glow motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                      className="ml-[1.875rem] mt-0.5 inline-flex items-center gap-1 rounded-full glass-panel px-1.5 py-0.5 text-xs text-on-surface-variant transition-all hover:text-accent hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       <Wrench size={11} strokeWidth={1.8} aria-hidden="true" />
                       {toolBindings.length}

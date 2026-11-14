@@ -29,10 +29,10 @@ export function IntroPage({children}: WrapperProps): ReactNode {
 
 /** Props for {@link IntroHero}. */
 interface IntroHeroProps {
-  /** Small uppercase kicker above the headline. */
+  /** Small kicker above the headline. */
   eyebrow: ReactNode;
-  /** The page's `h1`. Wrap a fragment of it in `<span className="grad">` to
-   * pick up the accent-to-secondary gradient. */
+  /** The page's `h1`. A fragment wrapped in `<span className="grad">` marks the
+   * emphasized phrase for the translations; it is no longer painted differently. */
   title: ReactNode;
   /** The lead paragraph. */
   children: ReactNode;
@@ -155,7 +155,7 @@ const ACT_ICONS: Record<ActIcon, ReactNode> = {
 };
 
 /**
- * One act of the story — design, run, control — as a glass card carrying a
+ * One act of the story — design, run, control — as a panel carrying a
  * step number, a glyph, a heading, and its prose.
  */
 export function IntroAct({step, icon, title, children}: IntroActProps): ReactNode {
@@ -183,7 +183,7 @@ export function IntroAct({step, icon, title, children}: IntroActProps): ReactNod
 
 /** Props for {@link IntroClosing}. */
 interface IntroClosingProps {
-  /** The large gradient line. */
+  /** The large closing line, set in the display face. */
   headline: ReactNode;
   /** The sentence under it. */
   children: ReactNode;

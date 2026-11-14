@@ -137,7 +137,7 @@ export function SegmentedControl<T extends string>({
           width: size,
           opacity,
         }}
-        className="pointer-events-none absolute inset-y-1 left-0 rounded-full bg-accent shadow-glow"
+        className="pointer-events-none absolute inset-y-1 left-0 rounded-full bg-accent"
       />
       {options.map((option) => {
         const selected = option.value === value;

@@ -285,7 +285,7 @@ export function SecretRefField({
         // just doubled the empty state. Collapse to the one control that
         // actually does something: the button that starts a pick.
         <div className="flex flex-col gap-1.5">
-          <span className="text-label-caps">{label}</span>
+          <span className="text-label">{label}</span>
           {disabled ? (
             <ReadOnlyField>{EMPTY_VALUE}</ReadOnlyField>
           ) : (
@@ -304,7 +304,7 @@ export function SecretRefField({
               "Select secret…" button to the field's label. RecordPickerField
               renders the same span-plus-error pair, for the same reason. */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-label-caps">{label}</span>
+            <span className="text-label">{label}</span>
             <div className="flex flex-wrap gap-1.5">
               <Chip
                 label={nameMissing ? t("ui.valueNotFound", { value: name }) : name}

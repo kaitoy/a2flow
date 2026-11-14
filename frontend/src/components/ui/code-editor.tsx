@@ -257,7 +257,7 @@ export function CodeEditor(props: CodeEditorProps) {
       className={
         readOnly
           ? undefined
-          : "overflow-hidden rounded-xl glass-panel transition-all duration-150 focus-within:ring-2 focus-within:ring-accent/50"
+          : "overflow-hidden rounded-xl field-surface transition-all duration-150 focus-within:ring-2 focus-within:ring-accent/50"
       }
     />
   );

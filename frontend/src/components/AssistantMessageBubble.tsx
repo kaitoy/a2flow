@@ -78,7 +78,7 @@ export function AssistantMessageBubble({
           <span
             className={[
               "inline-block w-[2px] h-[1em] ml-0.5 align-middle origin-center rounded-full",
-              "bg-gradient-to-b from-accent to-secondary shadow-[0_0_8px_var(--color-accent-soft)]",
+              "bg-accent shadow-[0_0_8px_var(--color-accent-soft)]",
               "animate-blink motion-safe:animate-pulse-cursor",
             ].join(" ")}
           />

@@ -55,8 +55,8 @@ const config: Config = {
     },
   },
 
-  // Inter (body), Space Grotesk (display) and JetBrains Mono (data) are the
-  // application's own faces.
+  // Inter (body), Archivo (display, with its width axis) and Geist Mono (data)
+  // are the application's own faces.
   headTags: [
     {
       tagName: 'link',
@@ -69,7 +69,7 @@ const config: Config = {
   ],
 
   stylesheets: [
-    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;700&display=swap',
+    'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Geist+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap',
   ],
 
   presets: [
@@ -148,7 +148,6 @@ const config: Config = {
       ],
     },
     footer: {
-      style: 'dark',
       links: [
         {
           title: 'Manual',
@@ -170,7 +169,7 @@ const config: Config = {
     },
     prism: {
       theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
+      darkTheme: prismThemes.nightOwl,
       additionalLanguages: ['bash', 'json', 'yaml', 'python', 'sql', 'ini'],
     },
   } satisfies Preset.ThemeConfig,

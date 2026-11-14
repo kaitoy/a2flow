@@ -1,8 +1,8 @@
 /**
- * @module Select — glass-panel dropdown/listbox picker.
+ * @module Select — dropdown/listbox picker styled like the other form fields.
  *
  * Replaces a native `<select>`, whose OS-rendered option list cannot be
- * styled in any browser. This renders its own `glass-panel` trigger and a
+ * styled in any browser. This renders its own `field-surface` trigger and a
  * portaled `glass-panel-overlay` listbox, following the same architecture
  * (portal + `useDialogA11y` + `@react-spring/web` transition) as the app's
  * other floating panels (see `UserMenu`, `TableHeaderMenu`).
@@ -55,7 +55,7 @@ export interface SelectProps {
 }
 
 const TRIGGER_BASE =
-  "flex w-full items-center justify-between gap-2 rounded-xl glass-panel px-4 py-2.5 " +
+  "flex w-full items-center justify-between gap-2 rounded-xl field-surface px-4 py-2.5 " +
   // text-base below sm keeps the font at 16px so iOS Safari doesn't auto-zoom on focus
   "text-base sm:text-sm text-on-surface " +
   "transition-all duration-150 " +
@@ -74,7 +74,7 @@ const MIN_PANEL_WIDTH = 160;
 const MAX_LISTBOX_HEIGHT = 240;
 
 /**
- * Glass-panel dropdown/listbox picker. Renders a `glass-panel` trigger button
+ * Dropdown/listbox picker. Renders a `field-surface` trigger button
  * showing the selected option's label, and — on open — a portaled
  * `glass-panel-overlay` listbox placed by the shared `useAnchoredPanel` hook:
  * sized to the trigger's own measured width (clamped to the viewport with a
@@ -260,7 +260,7 @@ export function Select({
                     opacity: style.opacity,
                     transform: style.y.to((y) => `translateY(${y}px)`),
                     zIndex: 9999,
-                    boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
+                    boxShadow: "var(--s-overlay)",
                   }}
                   className="glass-panel-overlay overflow-y-auto rounded-xl p-2 text-on-surface"
                 >

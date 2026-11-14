@@ -42,7 +42,7 @@ export function DeleteIconButton({
           "glass-panel flex size-8 shrink-0 items-center justify-center rounded-lg",
           "cursor-pointer text-on-surface-variant",
           "transition-[background-color,border-color,color,transform,translate,scale] duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
-          "hover:border-error/40 hover:bg-error/10 hover:text-error motion-safe:hover:-translate-y-0.5",
+          "hover:border-error/40 hover:bg-error/10 hover:text-error",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/50",
           "disabled:cursor-not-allowed disabled:opacity-50",
           "disabled:hover:translate-y-0 disabled:hover:border-[var(--color-glass-border)] disabled:hover:bg-transparent disabled:hover:text-on-surface-variant",

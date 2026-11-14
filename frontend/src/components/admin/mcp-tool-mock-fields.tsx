@@ -348,7 +348,7 @@ function ResponseCard({
   return (
     <div className="flex flex-col gap-2 rounded-xl glass-panel p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-label-caps text-on-surface-variant">
+        <span className="text-label text-on-surface-variant">
           {t("admin.call")}
           {index + 1}
         </span>

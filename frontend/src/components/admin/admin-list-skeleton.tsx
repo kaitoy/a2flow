@@ -32,7 +32,7 @@ export function AdminListSkeleton({ columns, rows = 5 }: { columns: string[]; ro
             {columns.map((header) => (
               <th
                 key={header}
-                className="border-divider border-b px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant [&:not(:last-child)]:border-r"
+                className="border-divider border-b px-5 py-3 text-left text-xs font-medium text-on-surface-variant [&:not(:last-child)]:border-r"
               >
                 {header}
               </th>

@@ -188,7 +188,7 @@ export function RecordPickerField<T>({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-label-caps">{label}</span>
+      <span className="text-label">{label}</span>
       {value.length === 0 ? (
         <ReadOnlyField>{EMPTY_VALUE}</ReadOnlyField>
       ) : (

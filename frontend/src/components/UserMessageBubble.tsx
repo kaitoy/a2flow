@@ -6,11 +6,11 @@ import type { ReactNode } from "react";
 /**
  * Render a user message as a chat bubble on the sender's side of the thread.
  *
- * The viewer's own messages sit on the right in the accent gradient; in a shared
- * session chat (workflow executions and design sessions, where several people
- * post into one conversation) another participant's message sits on the left
- * instead, in a secondary tint that keeps it distinct from the agent's colorless
- * glass bubble beside it.
+ * The viewer's own messages sit on the right in a solid accent fill (`bubble`);
+ * in a shared session chat (workflow executions and design sessions, where
+ * several people post into one conversation) another participant's message sits
+ * on the left instead, in a secondary tint that keeps it distinct from the
+ * agent's colorless panel beside it.
  *
  * When `avatar` is provided the sender's avatar is shown on the bubble's outer
  * edge — right for the viewer, left for everyone else. Without it (the
@@ -48,8 +48,8 @@ export function UserMessageBubble({
           onOwnSide
             ? [
                 avatar ? "rounded-br-md" : "rounded-tr-md",
-                "bg-gradient-to-br from-accent to-secondary text-on-primary",
-                "shadow-[0_8px_24px_-12px_var(--color-accent-soft),inset_0_1px_0_var(--inner-top-highlight)]",
+                "bg-bubble text-on-bubble",
+                "shadow-[inset_0_1px_0_var(--inner-top-highlight)]",
               ].join(" ")
             : "rounded-bl-md bg-secondary/12 border border-secondary/25 text-on-surface",
         ].join(" ")}

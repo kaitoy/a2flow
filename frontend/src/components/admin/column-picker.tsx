@@ -42,7 +42,7 @@ const ITEM_CLASSES =
   "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-glass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent";
 
 /** The panel's section label, and the type the bulk toggle matches it with. */
-const LABEL_CLASSES = "text-[11px] font-semibold uppercase tracking-[0.08em]";
+const LABEL_CLASSES = "text-xs font-medium";
 
 /**
  * Bulk toggle sitting on the section-label row. Deliberately not `ITEM_CLASSES`
@@ -149,7 +149,7 @@ export function ColumnPicker({ options, value, onChange, onReset, customized }: 
                     opacity: style.opacity,
                     transform: style.y.to((y) => `translateY(${y}px)`),
                     zIndex: 9999,
-                    boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
+                    boxShadow: "var(--s-overlay)",
                   }}
                   className="glass-panel-overlay rounded-xl p-2 text-on-surface"
                 >

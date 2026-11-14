@@ -206,7 +206,7 @@ export function TableHeaderMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`group relative flex w-full min-w-0 cursor-pointer items-center rounded-md py-0.5 pr-2.5 pl-1 text-left uppercase tracking-[0.08em] transition-colors hover:bg-accent-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${sortDirection ? "text-accent" : "hover:text-on-surface"}`}
+        className={`group relative flex w-full min-w-0 cursor-pointer items-center rounded-md py-0.5 pr-2.5 pl-1 text-left transition-colors hover:bg-accent-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${sortDirection ? "text-accent" : "hover:text-on-surface"}`}
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {/* Parked mostly in the header cell's own right padding, so the
@@ -264,7 +264,7 @@ export function TableHeaderMenu({
                     opacity: style.opacity,
                     transform: style.y.to((y) => `translateY(${y}px)`),
                     zIndex: 9999,
-                    boxShadow: "var(--shadow-glass-lg), var(--shadow-glow)",
+                    boxShadow: "var(--s-overlay)",
                   }}
                   className="glass-panel-overlay rounded-xl p-2 text-on-surface"
                 >
@@ -293,7 +293,7 @@ export function TableHeaderMenu({
                   {sortable && filterable ? <div className="my-1 h-px bg-glass-border" /> : null}
                   {filterable ? (
                     <div>
-                      <div className="px-3 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant">
+                      <div className="px-3 pt-1 pb-1 text-xs font-medium text-on-surface-variant">
                         {/* The multi-select variant is conjunctive, which is
                             not the reading people default to — say so rather
                             than let a narrowing selection look broken. */}

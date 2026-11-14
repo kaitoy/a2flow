@@ -196,9 +196,7 @@ export function RunWorkflowDialog({
         )}
         {canChooseDesign && (
           <section className="flex flex-col gap-2">
-            <h3 className="text-label-caps text-on-surface-variant">
-              {t("admin.whichDesignToRun")}
-            </h3>
+            <h3 className="text-label text-on-surface-variant">{t("admin.whichDesignToRun")}</h3>
             <p className="text-sm text-on-surface-variant">
               {t("admin.thisWorkflowHasEditsThatHaveNot")}
             </p>
@@ -220,7 +218,7 @@ export function RunWorkflowDialog({
         )}
         {isDraftRun && (
           <section className="flex flex-col gap-2">
-            <h3 className="text-label-caps text-on-surface-variant">{t("admin.mockTools")}</h3>
+            <h3 className="text-label text-on-surface-variant">{t("admin.mockTools")}</h3>
             <p className="text-sm text-on-surface-variant">
               {t("admin.aStubbedToolIsNotCalledIt")}
             </p>

@@ -16,7 +16,7 @@ describe("Button", () => {
 
   it("primary variant applies gradient background", () => {
     render(<Button variant="primary">x</Button>);
-    expect(screen.getByRole("button").className).toContain("from-accent");
+    expect(screen.getByRole("button").className).toContain("bg-accent");
   });
 
   it("secondary variant applies glass-panel", () => {
@@ -54,7 +54,7 @@ describe("Button", () => {
       </Button>
     );
     const cls = screen.getByRole("button").className;
-    expect(cls).toContain("from-accent");
+    expect(cls).toContain("bg-accent");
     expect(cls).toContain("w-full");
   });
 
@@ -95,7 +95,8 @@ describe("Button", () => {
       const button = screen.getByRole("button", { name: "Saved!" });
       expect(button).toBeDisabled();
       expect(button.className).toContain("bg-success");
-      expect(button.className).toContain("animate-wiggle");
+      // Color and checkmark carry the success state; the button does not move.
+      expect(button.className).not.toContain("animate-");
     });
 
     it("pending status disables the button", () => {

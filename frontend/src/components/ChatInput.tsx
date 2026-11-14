@@ -184,7 +184,7 @@ export function ChatInput({
         style={{
           boxShadow: glow.glow.to(
             (g) =>
-              `var(--shadow-glass-lg), 0 0 ${36 + g * 32}px rgba(var(--color-accent-rgb), ${0.0 + g * 0.55})`
+              `var(--shadow-glass-lg), 0 0 ${12 + g * 20}px rgba(var(--color-accent-rgb), ${g * 0.35})`
           ),
         }}
         onDragOver={handleDragOver}

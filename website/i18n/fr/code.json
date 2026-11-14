@@ -5,18 +5,6 @@
   "home.meta.description": {
     "message": "A2Flow est un moteur de workflow conversationnel. Il reconstruit les workflows de type ITSM autour d'un agent IA : celui-ci planifie le travail sous forme de graphe de tâches, s'interrompt pour les personnes qui doivent donner leur accord et exécute le reste. Le plan est conservé sous forme de workflow : la prochaine exécution suit donc les mêmes étapes."
   },
-  "home.nav.concept": {
-    "message": "Concept"
-  },
-  "home.nav.how": {
-    "message": "Fonctionnement"
-  },
-  "home.nav.features": {
-    "message": "Fonctionnalités"
-  },
-  "home.nav.architecture": {
-    "message": "Architecture"
-  },
   "home.hero.eyebrow": {
     "message": "Agent as Workflow"
   },
@@ -37,9 +25,6 @@
   },
   "home.hero.demoCaption": {
     "message": "Deux discussions, un workflow : conçu avec l'agent, puis exécuté dans sa propre session, formulaires et approbations compris."
-  },
-  "home.concept.eyebrow": {
-    "message": "Le concept"
   },
   "home.concept.title": {
     "message": "Les workflows ITSM, {reimagined}"
@@ -146,9 +131,6 @@
   "home.concept.note.skill": {
     "message": "compétence d'agent, un fichier {file} dans un dépôt Git"
   },
-  "home.how.eyebrow": {
-    "message": "Fonctionnement"
-  },
   "home.how.title": {
     "message": "Planifier. Approuver. {execute}"
   },
@@ -158,17 +140,11 @@
   "home.how.lead": {
     "message": "Chaque exécution franchit les deux mêmes barrières : rien ne s'exécute tant qu'un humain n'a pas publié la conception, et aucun appel d'outil qui modifie quelque chose ne passe tant que l'approbateur désigné n'a pas donné son accord."
   },
-  "home.how.step1.label": {
-    "message": "ÉTAPE 1 — PLANIFIER"
-  },
   "home.how.step1.title": {
     "message": "L'agent transforme l'intention en graphe de tâches"
   },
   "home.how.step1.body": {
     "message": "Dans une session de conception, il lit la compétence d'agent, décompose votre prompt en modèles de tâches aux dépendances explicites et enregistre tout le DAG en un seul appel, détection des cycles comprise. Ajustez-le dans la discussion ou à la main : rien ne s'exécute encore."
-  },
-  "home.how.step2.label": {
-    "message": "ÉTAPE 2 — APPROUVER"
   },
   "home.how.step2.title": {
     "message": "Les humains gardent la main sur les moments décisifs"
@@ -179,17 +155,11 @@
   "home.how.step2.body.approver": {
     "message": "approbateur désigné"
   },
-  "home.how.step3.label": {
-    "message": "ÉTAPE 3 — EXÉCUTER"
-  },
   "home.how.step3.title": {
     "message": "L'agent parcourt le graphe"
   },
   "home.how.step3.body": {
     "message": "Appuyez sur Exécuter et l'agent démarre aussitôt dans la session du workflow propre à l'exécution. Les tâches passent par {statuses} dans l'ordre des dépendances, en n'appelant que les outils MCP liés à la tâche en cours, et l'agent pose ses questions au moyen de formulaires affichés directement dans la discussion."
-  },
-  "home.teams.eyebrow": {
-    "message": "Conçu pour les équipes"
   },
   "home.teams.title": {
     "message": "Trois rôles, {conversation}"
@@ -229,9 +199,6 @@
   },
   "home.teams.trust.audit.body": {
     "message": "Qui a approuvé, ce qui a été écrit et à quel moment précis : tout est conservé dans l'enregistrement de l'approbation et consultable dans la interface d'administration."
-  },
-  "home.features.eyebrow": {
-    "message": "Fonctionnalités"
   },
   "home.features.title": {
     "message": "Tout ce qu'il faut à un workflow, {nothing}"
@@ -275,9 +242,6 @@
   "home.features.llm.body": {
     "message": "Gemini par défaut ; les modèles OpenAI et Anthropic via LiteLLM. Changer de fournisseur ne demande qu'une variable d'environnement."
   },
-  "home.architecture.eyebrow": {
-    "message": "Sous le capot"
-  },
   "home.architecture.title": {
     "message": "Une {stack} aux protocoles ouverts"
   },
@@ -286,9 +250,6 @@
   },
   "home.architecture.lead": {
     "message": "L'interface de discussion reçoit en flux les événements AG-UI d'un backend FastAPI, et l'agent affiche des surfaces A2UI dans la discussion. Les compétences d'agent viennent de Git, les outils de serveurs MCP, et une seule base de données relationnelle conserve le tout."
-  },
-  "home.cta.eyebrow": {
-    "message": "Démarrer"
   },
   "home.cta.title": {
     "message": "Lancez-le {machine}"

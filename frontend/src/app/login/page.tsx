@@ -87,7 +87,7 @@ export default function LoginPage() {
             className="h-12 w-auto"
             priority
           />
-          <h1 className="font-display text-2xl font-semibold tracking-tight text-gradient-accent">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-on-surface">
             {t("login.signInToA2flow")}
           </h1>
         </div>

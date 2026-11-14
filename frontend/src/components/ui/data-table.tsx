@@ -629,7 +629,7 @@ export function DataTable<T>({
                     if (el) thRefs.current.set(col.header, el);
                     else thRefs.current.delete(col.header);
                   }}
-                  className="relative border-divider border-b px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant [&:not(:last-child)]:border-r"
+                  className="relative border-divider border-b px-5 py-3 text-left text-xs font-medium text-on-surface-variant [&:not(:last-child)]:border-r"
                 >
                   {interactive ? (
                     <TableHeaderMenu
@@ -719,11 +719,7 @@ export function DataTable<T>({
           ) : rows.length === 0 ? (
             <tr>
               <td colSpan={colSpan} className="px-5 py-10 text-on-surface-variant">
-                <EmptyState
-                  icon={emptyIcon}
-                  animation="spin-occasional"
-                  description={t.maybe(emptyMessage)}
-                />
+                <EmptyState icon={emptyIcon} description={t.maybe(emptyMessage)} />
               </td>
             </tr>
           ) : (

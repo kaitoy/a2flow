@@ -15,7 +15,7 @@ interface AdminPageHeaderProps {
    * bar then holds the heading's space until the name arrives.
    */
   title?: string;
-  /** Optional accent icon shown to the left of the title; twirls occasionally. */
+  /** Optional accent icon shown to the left of the title. */
   icon?: LucideIcon;
   /**
    * Target of the primary "Add" button, shown when both this and `addLabel` are
@@ -69,21 +69,14 @@ export function AdminPageHeader({
       {/* A detail page's title is a user-provided record name, so the heading
           truncates rather than pushing the action cluster off the page. */}
       <div className="flex min-w-0 items-center gap-3">
+        {/* On a phone the title competes with the action cluster for one
+            line; the tile is the part that can go. */}
         {icon && (
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent shadow-glow">
-            <AnimatedIcon icon={icon} animation="spin-occasional" size={22} />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl glass-panel-strong text-accent max-sm:hidden">
+            <AnimatedIcon icon={icon} size={22} />
           </span>
         )}
-        <h1
-          className={[
-            "min-w-0 truncate font-display text-3xl font-semibold tracking-tight",
-            // The gradient paints through `background-clip: text`, which has
-            // nothing to clip to while the placeholder stands in for the name.
-            title === undefined ? "" : "text-gradient-accent",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
+        <h1 className="min-w-0 truncate font-display text-2xl sm:text-3xl font-semibold tracking-tight text-on-surface">
           {title ?? <Skeleton className="h-8 w-48 rounded-lg" />}
         </h1>
       </div>

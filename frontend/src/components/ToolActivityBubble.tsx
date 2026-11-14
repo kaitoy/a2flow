@@ -12,7 +12,7 @@ import { Spinner } from "./ui/spinner";
 function DetailBlock({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-label-caps text-on-surface-variant">{label}</span>
+      <span className="text-label text-on-surface-variant">{label}</span>
       <JsonBlock value={value} />
     </div>
   );

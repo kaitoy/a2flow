@@ -1,116 +1,190 @@
 /**
  * A2Flow site theme.
  *
- * The palette is the application's own (see DESIGN.md) and the token names
- * mirror homepage/index.html's, so the landing page's styles can use them
- * unchanged. Docusaurus already stamps `data-theme="light|dark"` on <html>,
- * which is exactly the switch the tokens below key off.
+ * The palette is the application's own (see DESIGN.md): opaque panels on
+ * hairlines, ink-colored headings, one teal accent. Docusaurus already stamps
+ * `data-theme="light|dark"` on <html>, which is exactly the switch the tokens
+ * below key off.
  */
 
 /* ------------------------------------------------------------ A2Flow tokens */
 /*
- * Values are copied verbatim from DESIGN.md's front matter (colors → light /
- * dark); brand hues stay in oklch() like the app's, never a framework preset.
- * `--a2f-accent-rgb` is the one exception: rgba() glows can't take an oklch
- * value, so it carries the same R,G,B triple the app's `--c-accent-rgb` does.
+ * Values mirror DESIGN.md's front matter (colors → light / dark); brand hues
+ * stay in oklch() like the app's, never a framework preset. `--a2f-accent-rgb`
+ * is the one exception: rgba() glows can't take an oklch value, so it carries
+ * the same R,G,B triple the app's `--c-accent-rgb` does.
  */
 :root {
-  --a2f-surface: oklch(0.975 0.008 240);
-  --a2f-ink: #0b1c30;
-  --a2f-muted: #475569;
-  --a2f-accent: oklch(0.56 0.12 183);
+  /* `surface` is the landing page's canvas; `paper` is what long-form docs
+     are read on, a shade lighter so body text sits on near-white. */
+  --a2f-surface: oklch(0.972 0.005 215);
+  --a2f-paper: oklch(0.992 0.002 215);
+  --a2f-panel: #ffffff;
+  --a2f-ink: oklch(0.22 0.025 228);
+  --a2f-muted: oklch(0.47 0.02 228);
+  --a2f-hairline: oklch(0.22 0.025 228 / 0.12);
+  --a2f-wash: oklch(0.22 0.025 228 / 0.045);
+  --a2f-accent: oklch(0.52 0.105 184);
+  /* The live, luminous form of the accent: the "in progress" lamp and the
+     live edge. Never a text color on a light surface. */
   --a2f-accent-bright: oklch(0.72 0.14 178);
-  --a2f-secondary: oklch(0.58 0.17 292);
+  --a2f-accent-soft: oklch(0.52 0.105 184 / 0.1);
   --a2f-accent-rgb: 22, 191, 169;
   --a2f-on-primary: #ffffff;
-  --a2f-glass: rgba(255, 255, 255, 0.55);
-  --a2f-glass-strong: rgba(255, 255, 255, 0.72);
-  --a2f-glass-border: rgba(255, 255, 255, 0.65);
-  --a2f-success: #10b981;
+  /* Categorical only: the second human in the demo. */
+  --a2f-secondary: oklch(0.58 0.17 292);
+  --a2f-success: oklch(0.52 0.13 158);
   --a2f-error: #dc2626;
-  --a2f-code-bg: rgba(11, 28, 48, 0.85);
-  --a2f-code-ink: #d7e4f7;
-  --a2f-aurora-1: oklch(0.85 0.13 178 / 0.55);
-  --a2f-aurora-2: oklch(0.75 0.15 292 / 0.4);
-  --a2f-aurora-3: oklch(0.88 0.06 210 / 0.5);
-  --a2f-shadow-glass: 0 10px 32px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  --a2f-shadow-glass-lg: 0 28px 60px -16px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  --a2f-shadow-glow: 0 0 36px rgba(var(--a2f-accent-rgb), 0.32);
-  --a2f-font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --a2f-code-bg: oklch(0.2 0.022 228);
+  --a2f-code-ink: oklch(0.9 0.015 215);
+  /* The canvas's two still washes of light. */
+  --a2f-aurora-1: oklch(0.88 0.08 178 / 0.5);
+  --a2f-aurora-2: oklch(0.9 0.05 215 / 0.55);
+  --a2f-shadow-panel: 0 1px 2px oklch(0.22 0.025 228 / 0.05);
+  --a2f-shadow-raised: 0 1px 2px oklch(0.22 0.025 228 / 0.05), 0 18px 44px -20px oklch(0.22 0.025 228 / 0.22);
+  --a2f-font-display: "Archivo", "Inter", system-ui, sans-serif;
   --a2f-font-body: "Inter", system-ui, sans-serif;
-  --a2f-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --a2f-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/*
+ * Archivo has no kana or kanji, so a Japanese heading is drawn by whatever the
+ * stack reaches next — and `system-ui` on Windows is a UI face with narrowed
+ * kana, which reads as cramped at headline sizes. Name full-width gothics
+ * ahead of it. No web font is loaded for this: these all ship with the OS.
+ */
+:lang(ja) {
+  --a2f-font-display: "Archivo", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", "Meiryo", system-ui, sans-serif;
 }
 
 [data-theme="dark"] {
-  --a2f-surface: oklch(0.13 0.025 262);
-  --a2f-ink: #e2e8f0;
-  --a2f-muted: #94a3b8;
-  --a2f-accent: oklch(0.87 0.16 170);
-  --a2f-accent-bright: oklch(0.87 0.16 170);
-  --a2f-secondary: oklch(0.72 0.16 295);
+  --a2f-surface: oklch(0.165 0.02 225);
+  --a2f-paper: oklch(0.165 0.02 225);
+  --a2f-panel: oklch(0.205 0.022 225);
+  --a2f-ink: oklch(0.93 0.01 215);
+  --a2f-muted: oklch(0.72 0.02 220);
+  --a2f-hairline: oklch(0.93 0.01 215 / 0.1);
+  --a2f-wash: oklch(0.93 0.01 215 / 0.06);
+  --a2f-accent: oklch(0.86 0.15 172);
+  --a2f-accent-bright: oklch(0.86 0.15 172);
+  --a2f-accent-soft: oklch(0.86 0.15 172 / 0.14);
   --a2f-accent-rgb: 85, 242, 194;
-  --a2f-on-primary: oklch(0.24 0.05 175);
-  --a2f-glass: rgba(15, 23, 42, 0.45);
-  --a2f-glass-strong: rgba(15, 23, 42, 0.65);
-  --a2f-glass-border: rgba(148, 163, 184, 0.2);
+  --a2f-on-primary: oklch(0.22 0.04 185);
+  --a2f-secondary: oklch(0.72 0.16 295);
   --a2f-success: #34d399;
   --a2f-error: #fb7185;
-  --a2f-code-bg: rgba(2, 8, 20, 0.72);
-  --a2f-code-ink: #cbd8ec;
-  --a2f-aurora-1: oklch(0.8 0.15 172 / 0.3);
-  --a2f-aurora-2: oklch(0.6 0.19 295 / 0.32);
-  --a2f-aurora-3: oklch(0.75 0.1 220 / 0.16);
-  --a2f-shadow-glass: 0 10px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(148, 163, 184, 0.12);
-  --a2f-shadow-glass-lg: 0 28px 60px -16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(148, 163, 184, 0.12);
-  --a2f-shadow-glow: 0 0 42px rgba(var(--a2f-accent-rgb), 0.45);
+  --a2f-code-bg: oklch(0.13 0.018 225);
+  --a2f-code-ink: oklch(0.88 0.015 215);
+  --a2f-aurora-1: oklch(0.62 0.12 178 / 0.2);
+  --a2f-aurora-2: oklch(0.55 0.09 225 / 0.22);
+  --a2f-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --a2f-shadow-raised: 0 24px 56px -20px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* ------------------------------------------- the same palette, as Infima vars */
 /* The primary shades step the accent's oklch lightness up and down. */
 :root {
   --ifm-color-primary: var(--a2f-accent);
-  --ifm-color-primary-dark: oklch(0.52 0.12 183);
-  --ifm-color-primary-darker: oklch(0.5 0.12 183);
-  --ifm-color-primary-darkest: oklch(0.44 0.12 183);
-  --ifm-color-primary-light: oklch(0.6 0.12 183);
-  --ifm-color-primary-lighter: oklch(0.62 0.12 183);
-  --ifm-color-primary-lightest: oklch(0.68 0.12 183);
+  --ifm-color-primary-dark: oklch(0.48 0.105 184);
+  --ifm-color-primary-darker: oklch(0.46 0.105 184);
+  --ifm-color-primary-darkest: oklch(0.4 0.105 184);
+  --ifm-color-primary-light: oklch(0.56 0.105 184);
+  --ifm-color-primary-lighter: oklch(0.58 0.105 184);
+  --ifm-color-primary-lightest: oklch(0.64 0.105 184);
 
   --ifm-font-family-base: var(--a2f-font-body);
   --ifm-font-family-monospace: var(--a2f-font-mono);
   /* Headings default to the body face; h1/h2 take the display face below. */
   --ifm-heading-font-family: var(--a2f-font-body);
-  --ifm-background-color: var(--a2f-surface);
+  --ifm-font-color-base: var(--a2f-ink);
+  --ifm-background-color: var(--a2f-paper);
+  --ifm-background-surface-color: var(--a2f-paper);
+  /* Opaque on purpose: the mobile sidebar paints itself with this too. The
+     desktop bar's translucency comes from the rule on `.navbar` below. */
+  --ifm-navbar-background-color: var(--a2f-paper);
+  --ifm-navbar-shadow: none;
+  --ifm-global-radius: 0.5rem;
+  --ifm-code-border-radius: 0.375rem;
+  --ifm-pre-border-radius: 0.5rem;
   --ifm-code-font-size: 92%;
-  --docusaurus-highlighted-code-line-bg: oklch(0.56 0.12 183 / 0.12);
+  --ifm-code-background: var(--a2f-wash);
+  --ifm-toc-border-color: var(--a2f-hairline);
+  --ifm-hr-background-color: var(--a2f-hairline);
+  --ifm-table-border-color: var(--a2f-hairline);
+  --ifm-table-head-background: var(--a2f-wash);
+  --ifm-table-stripe-background: transparent;
+  --ifm-menu-color: var(--a2f-muted);
+  --ifm-menu-color-active: var(--a2f-accent);
+  --ifm-menu-color-background-active: var(--a2f-accent-soft);
+  --ifm-menu-color-background-hover: var(--a2f-wash);
+  --ifm-footer-background-color: transparent;
+  --ifm-footer-color: var(--a2f-muted);
+  --ifm-footer-title-color: var(--a2f-ink);
+  --ifm-footer-link-color: var(--a2f-muted);
+  --ifm-footer-link-hover-color: var(--a2f-accent);
+  --docusaurus-highlighted-code-line-bg: oklch(0.52 0.105 184 / 0.12);
 }
 
 [data-theme="dark"] {
-  --ifm-color-primary-dark: oklch(0.83 0.16 170);
-  --ifm-color-primary-darker: oklch(0.81 0.16 170);
-  --ifm-color-primary-darkest: oklch(0.75 0.16 170);
-  --ifm-color-primary-light: oklch(0.9 0.16 170);
-  --ifm-color-primary-lighter: oklch(0.92 0.16 170);
-  --ifm-color-primary-lightest: oklch(0.95 0.16 170);
+  --ifm-color-primary-dark: oklch(0.82 0.15 172);
+  --ifm-color-primary-darker: oklch(0.8 0.15 172);
+  --ifm-color-primary-darkest: oklch(0.74 0.15 172);
+  --ifm-color-primary-light: oklch(0.89 0.15 172);
+  --ifm-color-primary-lighter: oklch(0.91 0.15 172);
+  --ifm-color-primary-lightest: oklch(0.94 0.15 172);
 
-  --docusaurus-highlighted-code-line-bg: oklch(0.87 0.16 170 / 0.16);
+  --docusaurus-highlighted-code-line-bg: oklch(0.86 0.15 172 / 0.16);
 }
 
-/* --------------------------------------------------------------- doc pages */
+/* ------------------------------------------------------------- site chrome */
 /*
- * Docs are dense text, so they get the brand's colors and type but a plain
- * background — the animated aurora belongs to the landing page alone.
+ * The navbar is the site's one glass surface: content scrolls underneath it.
+ * The blur lives on a pseudo-element rather than on `.navbar` itself, because
+ * `backdrop-filter` makes an element the containing block of its fixed
+ * descendants — and the mobile sidebar is a fixed child of the navbar.
  */
-/* Display face on h1/h2 only — h3 and below stay on the body face. */
-.navbar__title,
-.markdown h1,
-.markdown h2 {
+.navbar {
+  background-color: transparent;
+  border-bottom: 1px solid var(--a2f-hairline);
+}
+
+.navbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-color: color-mix(in oklab, var(--a2f-paper) 78%, transparent);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
+/* The wordmark, as in the application's header: Archivo, set wide. */
+.navbar__title {
   font-family: var(--a2f-font-display);
-  letter-spacing: -0.01em;
+  font-stretch: 125%;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .navbar__logo img {
   border-radius: 8px;
+}
+
+.footer {
+  border-top: 1px solid var(--a2f-hairline);
+}
+
+/* --------------------------------------------------------------- doc pages */
+/*
+ * Docs are dense text, so they get the brand's colors and type on plain
+ * paper — the canvas's washes of light belong to the landing page alone.
+ */
+/* Display face on h1/h2 only, a little wide — h3 and below stay on the body face. */
+.markdown h1,
+.markdown h2 {
+  font-family: var(--a2f-font-display);
+  font-stretch: 112%;
+  letter-spacing: -0.02em;
 }
 
 /* Tables in the manual carry wide reference material; let them scroll. */
@@ -118,6 +192,21 @@
   display: block;
   overflow-x: auto;
   max-width: 100%;
+}
+
+.markdown table thead tr {
+  border-bottom: 1px solid var(--a2f-hairline);
+}
+
+/* The dark code theme brings its own navy; sit it on the site's ink instead.
+   Both rules need `!important`: the theme writes the color inline, as a custom
+   property on the container and as a background on the `pre` inside it. */
+[data-theme="dark"] .theme-code-block {
+  --prism-background-color: var(--a2f-code-bg) !important;
+}
+
+[data-theme="dark"] .theme-code-block pre.prism-code {
+  background-color: var(--a2f-code-bg) !important;
 }
 
 /* Landing-page section anchors have to clear the sticky navbar. */
