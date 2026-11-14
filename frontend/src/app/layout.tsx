@@ -25,10 +25,10 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
 });
 
-/** Page metadata, with the description in the request's language. */
+/** Page metadata: the favicon, and the description in the request's language. */
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getServerT();
-  return { title: "A2Flow", description: t("app.description") };
+  return { title: "A2Flow", description: t("app.description"), icons: { icon: "/icon.svg" } };
 }
 
 /**

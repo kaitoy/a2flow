@@ -7,7 +7,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const config: Config = {
   title: 'A2Flow',
   tagline: 'Agent as Workflow',
-  favicon: 'img/logo.png',
+  favicon: 'img/favicon.svg',
 
   future: {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
@@ -106,7 +106,7 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/logo.png',
+    image: 'img/social-card.png',
     metadata: [
       {
         name: 'description',
@@ -130,7 +130,8 @@ const config: Config = {
       title: 'A2Flow',
       logo: {
         alt: 'A2Flow',
-        src: 'img/logo.png',
+        src: 'img/logo.svg',
+        srcDark: 'img/logo-dark.svg',
       },
       items: [
         {

@@ -16,7 +16,7 @@ vi.mock("./ThemeToggle", () => ({
 describe("AppHeader", () => {
   it("renders the logo, notification bell, profile button, and theme toggle", () => {
     render(<AppHeader />);
-    expect(screen.getByAltText("A2Flow logo")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "A2Flow logo" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /profile/i })).toBeInTheDocument();
     expect(screen.getByTestId("theme-toggle-mock")).toBeInTheDocument();

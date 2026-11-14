@@ -55,7 +55,7 @@ describe("ChatShell", () => {
       </ChatShell>
     );
     expect(screen.getByTestId("session-list-mock")).toBeInTheDocument();
-    expect(screen.getByAltText("A2Flow logo")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "A2Flow logo" })).toBeInTheDocument();
     expect(screen.getByTestId("theme-toggle-mock")).toBeInTheDocument();
     expect(screen.getByTestId("panel")).toBeInTheDocument();
   });

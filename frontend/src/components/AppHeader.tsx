@@ -2,15 +2,14 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import logo from "@/../assets/logo.png";
 import { TenantSwitcher } from "@/components/admin/tenant-switcher";
 import { ImpersonationIndicator } from "@/components/ImpersonationIndicator";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfileButton } from "@/components/UserProfileButton";
+import { Logo } from "@/components/ui/logo";
 import { useT } from "@/i18n/provider";
 
 /** Props for {@link AppHeader}. */
@@ -59,14 +58,7 @@ export function AppHeader({ children, onMenuClick }: AppHeaderProps) {
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
           ].join(" ")}
         >
-          <Image
-            src={logo}
-            alt={t("common.a2flowLogo")}
-            width={logo.width}
-            height={logo.height}
-            className="h-10 w-auto"
-            priority
-          />
+          <Logo className="size-10" />
           <h1 className="max-md:hidden font-display [font-stretch:125%] text-xl leading-[32px] font-bold tracking-tight text-on-surface">
             A2Flow
           </h1>

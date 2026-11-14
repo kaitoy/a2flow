@@ -166,10 +166,6 @@
   letter-spacing: -0.02em;
 }
 
-.navbar__logo img {
-  border-radius: 8px;
-}
-
 .footer {
   border-top: 1px solid var(--a2f-hairline);
 }

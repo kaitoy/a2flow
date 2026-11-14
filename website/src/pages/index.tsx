@@ -32,7 +32,7 @@ const QUICK_START = [
  */
 export default function Home(): ReactNode {
   const rootRef = useRef<HTMLDivElement>(null);
-  const logoUrl = useBaseUrl('/img/logo.png');
+  const logoUrl = useBaseUrl('/img/favicon.svg');
 
   useEffect(() => {
     const root = rootRef.current;

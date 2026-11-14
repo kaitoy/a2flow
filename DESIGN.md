@@ -159,6 +159,19 @@ Four principles follow from that rule:
 
 All brand hues are defined in `oklch()` rather than framework presets. Archivo headings and Geist Mono data text keep the experience grounded for power users.
 
+### Logo
+
+The mark is a lowercase **"a" drawn as one flowing ribbon**: a stroke that enters from the upper right, loops a bowl around a single node, and leaves to the lower right, tapering to a point at both ends. The ribbon is the flow; the dot it circles is the agent.
+
+It follows the same rules as the rest of the interface: a **flat, single-color shape** — no gradient, glow, shadow or outline — and it holds still. It comes in two forms:
+
+| Form | Use | Where |
+|---|---|---|
+| **Mark** — the bare ribbon on a transparent ground, in the accent | Beside the wordmark: the app header, the login card, the manual's navbar, the README | `Logo` (`frontend/src/components/ui/logo.tsx`) in the app, where it is painted with `currentColor` and so follows the theme; `website/static/img/logo.svg` (light) and `logo-dark.svg` (dark) elsewhere |
+| **Tile** — the ribbon in white on a rounded square of the light theme's accent | Anywhere the background is not ours to choose: favicons, the social card | `frontend/public/icon.svg`, `website/static/img/favicon.svg` |
+
+In the app always render `Logo` rather than an `<img>`: an image file cannot follow `data-theme`. The static files carry the two accents as literal hex (`#007c70` light, `#46f0c6` dark) for the same reason the avatar palette does — there is no stylesheet to resolve a token where they are shown. The wordmark is never part of the image; it is the text "A2Flow" in Archivo at 125% width (see Typography). All the files share one path: change them together.
+
 The system supports **light** and **dark** themes via a `data-theme` attribute on `<html>`, with all tokens cascading via CSS variables. The user's preference is persisted in `localStorage` (`a2flow.theme`) and falls back to `prefers-color-scheme`.
 
 ## Colors

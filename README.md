@@ -1,6 +1,9 @@
 # A2Flow
 
-<img src="frontend/assets/logo.png" alt="A2Flow" width="512">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="website/static/img/logo-dark.svg">
+  <img src="website/static/img/logo.svg" alt="A2Flow" width="96">
+</picture>
 
 **A2Flow is a chat-driven workflow engine, rebuilt from the ground up around an AI
 agent.** Not an engine with an AI step bolted into it: an engine whose runtime *is* an

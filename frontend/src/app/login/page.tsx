@@ -1,14 +1,13 @@
 /** @module LoginPage — Username/password sign-in that establishes the session cookie. */
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import logo from "@/../assets/logo.png";
 import { FormField } from "@/components/admin/form-field";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Logo } from "@/components/ui/logo";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useT } from "@/i18n/provider";
@@ -79,14 +78,7 @@ export default function LoginPage() {
         className="glass-panel flex w-full max-w-sm flex-col gap-5 rounded-2xl p-8"
       >
         <div className="flex flex-col items-center gap-3">
-          <Image
-            src={logo}
-            alt={t("common.a2flowLogo")}
-            width={logo.width}
-            height={logo.height}
-            className="h-12 w-auto"
-            priority
-          />
+          <Logo className="size-12" />
           <h1 className="font-display text-2xl font-semibold tracking-tight text-on-surface">
             {t("login.signInToA2flow")}
           </h1>
