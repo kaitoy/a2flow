@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import get_settings
 from infrastructure.bootstrap import (
     apply_system_settings_env_overrides,
     seed_default_tenant_and_admin_user,
@@ -488,7 +489,7 @@ async def _settings_row(engine: AsyncEngine) -> SystemSettings:
 
 @pytest.fixture(autouse=True)
 def _blank_system_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force every ``SMTP_*`` env var blank before each test below.
+    """Force every ``SMTP_*`` and ``SYSTEM_DEFAULT_LLM_*`` env var blank before each test below.
 
     ``config.get_settings`` always reads real ``os.environ`` regardless of
     the conftest-level ``_reset_settings_cache`` fixture blocking
@@ -513,6 +514,8 @@ def _blank_system_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "SMTP_PASSWORD",
         "SMTP_FROM_EMAIL",
         "SMTP_FROM_NAME",
+        "SYSTEM_DEFAULT_LLM_MODEL",
+        "SYSTEM_DEFAULT_LLM_API_KEY",
     ):
         monkeypatch.setenv(name, "")
 
@@ -636,3 +639,111 @@ async def test_apply_system_settings_env_overrides_requires_the_row_to_exist(
     async with AsyncSession(engine) as session:  # note: settings row NOT seeded
         with pytest.raises(NotFoundError):
             await apply_system_settings_env_overrides(session)
+
+
+# ---------- apply_system_settings_env_overrides: SYSTEM_DEFAULT_LLM_* ----------
+
+
+async def _boot(engine: AsyncEngine) -> None:
+    # ``get_settings`` caches, so a variable changed since the last "boot" is
+    # only seen after the cache is dropped -- which is what a restart does.
+    get_settings.cache_clear()
+    async with AsyncSession(engine) as session:
+        await apply_system_settings_env_overrides(session)
+
+
+async def test_llm_env_does_nothing_when_unset(settings_engine: AsyncEngine) -> None:
+    await _boot(settings_engine)
+    row = await _settings_row(settings_engine)
+    assert row.llm_model is None
+    assert row.llm_api_key is None
+
+
+async def test_llm_env_loads_the_model_and_an_encrypted_key(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_MODEL", "litellm:openai/gpt-6.1-sol")
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_API_KEY", "sk-from-env")
+
+    await _boot(settings_engine)
+
+    row = await _settings_row(settings_engine)
+    assert row.llm_model == "litellm:openai/gpt-6.1-sol"
+    assert row.llm_api_key is not None
+    assert row.llm_api_key != "sk-from-env"
+    assert get_secret_cipher().decrypt(row.llm_api_key) == "sk-from-env"
+    assert row.updated_by == SYSTEM_USER_ID
+
+
+async def test_llm_env_overwrites_a_value_saved_since_on_every_restart(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Like ``SMTP_*``: a set variable wins over the screen at the next restart,
+    so rotating it is enough to rotate the stored key."""
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_MODEL", "gemini-3.8-flash")
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_API_KEY", "sk-from-env")
+    await _boot(settings_engine)
+    async with AsyncSession(settings_engine) as session:
+        row = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
+        assert row is not None
+        row.llm_model = "litellm:anthropic/claude-sonnet-5-5"
+        session.add(row)
+        await session.commit()
+
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_API_KEY", "sk-rotated")
+    await _boot(settings_engine)
+
+    row = await _settings_row(settings_engine)
+    assert row.llm_model == "gemini-3.8-flash"
+    assert row.llm_api_key is not None
+    assert get_secret_cipher().decrypt(row.llm_api_key) == "sk-rotated"
+
+
+async def test_llm_env_leaves_a_field_alone_while_its_variable_is_unset(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_MODEL", "gemini-3.8-flash")
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_API_KEY", "sk-from-env")
+    await _boot(settings_engine)
+
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_MODEL", "litellm:openai/gpt-6.1-sol")
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_API_KEY", "")
+    await _boot(settings_engine)
+
+    row = await _settings_row(settings_engine)
+    assert row.llm_model == "litellm:openai/gpt-6.1-sol"
+    assert row.llm_api_key is not None
+    assert get_secret_cipher().decrypt(row.llm_api_key) == "sk-from-env"
+
+
+async def test_llm_env_skips_an_invalid_value_without_logging_the_key(
+    settings_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_MODEL", "m" * 500)
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_API_KEY", "super-secret-key")
+
+    with caplog.at_level(logging.WARNING, logger=_BOOTSTRAP_LOGGER):
+        await _boot(settings_engine)
+
+    row = await _settings_row(settings_engine)
+    assert row.llm_model is None
+    assert row.llm_api_key is None
+    assert "SYSTEM_DEFAULT_LLM_*" in caplog.text
+    assert "llm_model" in caplog.text
+    assert "super-secret-key" not in caplog.text
+
+
+async def test_a_bad_smtp_variable_does_not_hold_back_the_llm(
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_PORT", "99999")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SYSTEM_DEFAULT_LLM_MODEL", "gemini-3.8-flash")
+
+    await _boot(settings_engine)
+
+    row = await _settings_row(settings_engine)
+    assert row.smtp_host is None
+    assert row.llm_model == "gemini-3.8-flash"

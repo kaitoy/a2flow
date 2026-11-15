@@ -55,7 +55,7 @@ Not using mise? The minimum versions are Python 3.11+, Node.js 20+, plus
 cd backend
 uv sync
 cp .env.example .env
-# Edit .env — set LLM_MODEL and the corresponding API key
+# Edit .env — set SYSTEM_DEFAULT_LLM_MODEL and SYSTEM_DEFAULT_LLM_API_KEY
 uv run uvicorn main:app --reload
 ```
 
@@ -87,7 +87,7 @@ The whole stack — PostgreSQL 17, the backend, the outgoing-email worker, the M
 and the frontend — comes up with [compose.yml](compose.yml):
 
 ```bash
-echo GOOGLE_API_KEY=your_google_api_key_here > .env
+echo SYSTEM_DEFAULT_LLM_API_KEY=your_google_api_key_here > .env
 docker compose up --build
 ```
 
@@ -158,7 +158,7 @@ screenshots, and app log as the `e2e-results` artifact. It is not in the git hoo
 
 No LLM API key is involved. [e2e/start.sh](e2e/start.sh) — which the runner launches —
 starts the backend through [backend/scripts/e2e_server.py](backend/scripts/e2e_server.py)
-with `LLM_MODEL=e2e-fake`. That script registers a scripted model with ADK's model
+with `SYSTEM_DEFAULT_LLM_MODEL=e2e-fake`. That script registers a scripted model with ADK's model
 registry, so every agent and the summarizer get the same tool calls on every run:
 the design agent registers two task templates, and the execution agent works both
 tasks through to `completed`. No production code knows about it. Change the script

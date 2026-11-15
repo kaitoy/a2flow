@@ -10,7 +10,8 @@ def test_defaults_with_no_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_BASE_URL",
         "CORS_ORIGINS",
         "DB_URL",
-        "LLM_MODEL",
+        "SYSTEM_DEFAULT_LLM_MODEL",
+        "SYSTEM_DEFAULT_LLM_API_KEY",
         "ROLE_DESCRIPTION",
         "SESSION_COOKIE_SECURE",
         "SESSION_IDLE_TIMEOUT_SECONDS",
@@ -22,7 +23,8 @@ def test_defaults_with_no_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert settings.cors_origins == ["http://localhost:3000"]
     assert settings.db_url == "sqlite:///a2flow.db"
-    assert settings.llm_model == "gemini-3.8-flash"
+    assert settings.system_default_llm_model is None
+    assert settings.system_default_llm_api_key is None
     assert settings.session_cookie_secure is False
     assert settings.session_idle_timeout_seconds == 28800
     assert settings.mcp_registry_url == "https://registry.modelcontextprotocol.io"

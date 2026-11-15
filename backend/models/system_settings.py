@@ -96,14 +96,24 @@ class SystemSettingsUpdate(SQLModel):
     #: ``HttpUrl``: only a ``super_admin`` sets it, and a Vault typically lives
     #: on a private address the SSRF guard would refuse.
     vault_addr: PrivateHttpUrl | None = None
+    #: The platform-wide LLM: ``litellm:<provider>/<model>`` or a bare Gemini
+    #: model name. Empty falls back to :data:`infrastructure.llm_settings.DEFAULT_LLM_MODEL`.
+    #: Overwritten at every startup by ``SYSTEM_DEFAULT_LLM_MODEL`` when that is
+    #: set, see :func:`infrastructure.bootstrap.apply_system_settings_env_overrides`.
+    llm_model: ShortText | None = None
+    #: API key of the platform-wide LLM, write-only like ``smtp_password`` (an
+    #: empty string keeps the stored key, ``null`` clears it). Empty falls back
+    #: to the provider's own environment variable (``GOOGLE_API_KEY`` ...).
+    llm_api_key: str | None = Field(default=None, max_length=4096)
 
 
 class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
     """The single, database-persisted row of platform-wide settings.
 
     Not tenant-scoped: these settings apply to every tenant on the deployment.
-    ``smtp_password`` holds Fernet ciphertext and is never exposed through the
-    API — every route responds with :class:`SystemSettingsRead`.
+    ``smtp_password`` and ``llm_api_key`` hold Fernet ciphertext and are never
+    exposed through the API — every route responds with
+    :class:`SystemSettingsRead`.
     """
 
     __tablename__ = "system_settings"
@@ -118,14 +128,18 @@ class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
     smtp_enabled: bool = False
     smtp_port: int = DEFAULT_SMTP_PORT
     smtp_security: SmtpSecurity = SmtpSecurity.starttls
+    #: Fernet ciphertext, longer than the plaintext the update payload caps, so
+    #: redeclared without that cap.
+    llm_api_key: str | None = None
 
 
 class SystemSettingsRead(BaseEntity):
-    """Read view of the system settings, excluding the SMTP password.
+    """Read view of the system settings, excluding the SMTP password and LLM key.
 
-    ``smtp_password_set`` reports only whether a password is stored, so the
-    admin UI can show the field as already configured without ever receiving
-    the value — the same shape as :attr:`models.secret.SecretRead.keys`.
+    ``smtp_password_set`` and ``llm_api_key_set`` report only whether a secret
+    is stored, so the admin UI can show the field as already configured
+    without ever receiving the value — the same shape as
+    :attr:`models.secret.SecretRead.keys`.
     """
 
     model_config = _alias_config
@@ -139,19 +153,24 @@ class SystemSettingsRead(BaseEntity):
     #: Whether a password is stored. The password itself is never serialized.
     smtp_password_set: bool = False
     vault_addr: str | None = None
+    llm_model: str | None = None
+    #: Whether an LLM API key is stored. The key itself is never serialized.
+    llm_api_key_set: bool = False
 
     @classmethod
     def from_settings(cls, settings: SystemSettings) -> "SystemSettingsRead":
-        """Build the read view of the stored settings, dropping the password.
+        """Build the read view of the stored settings, dropping the secrets.
 
         Args:
             settings: The persisted (or default, unsaved) settings row.
 
         Returns:
-            A read view carrying every field except ``smtp_password``, plus the
-            ``smtp_password_set`` flag derived from it.
+            A read view carrying every field except ``smtp_password`` and
+            ``llm_api_key``, plus the ``smtp_password_set`` and
+            ``llm_api_key_set`` flags derived from them.
         """
         return cls(
-            **settings.model_dump(exclude={"smtp_password"}),
+            **settings.model_dump(exclude={"smtp_password", "llm_api_key"}),
             smtp_password_set=bool(settings.smtp_password),
+            llm_api_key_set=bool(settings.llm_api_key),
         )

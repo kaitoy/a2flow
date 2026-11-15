@@ -439,3 +439,88 @@ async def test_global_vault_address_may_be_private(
     assert body["vaultAddr"] == "https://10.0.0.5:8200"
     # The credential is per tenant (on the tenant record), never global.
     assert not any(key.startswith("vault") and key != "vaultAddr" for key in body)
+
+
+# ---------- LLM ----------
+
+
+async def _stored_settings(client: AsyncClient) -> SystemSettings:
+    from infrastructure.database import get_session
+    from main import app
+
+    session_factory = app.dependency_overrides[get_session]
+    async for session in session_factory():
+        stored = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
+        assert stored is not None
+        result: SystemSettings = stored
+        return result
+    raise AssertionError("no session")
+
+
+async def test_llm_defaults_to_nothing_stored(settings_client: AsyncClient) -> None:
+    body = assert_ok(await settings_client.get(_PATH))
+    assert body["llmModel"] is None
+    assert body["llmApiKeySet"] is False
+    assert "llmApiKey" not in body
+
+
+async def test_llm_key_is_write_only_and_stored_encrypted(
+    settings_client: AsyncClient,
+) -> None:
+    from dependencies.singletons import get_secret_cipher
+
+    body = assert_ok(
+        await settings_client.patch(
+            _PATH,
+            json={"llmModel": "litellm:openai/gpt-6.1-sol", "llmApiKey": "sk-secret"},
+        )
+    )
+
+    assert body["llmModel"] == "litellm:openai/gpt-6.1-sol"
+    assert body["llmApiKeySet"] is True
+    assert "sk-secret" not in str(body)
+    stored = await _stored_settings(settings_client)
+    assert stored.llm_api_key is not None
+    assert stored.llm_api_key != "sk-secret"
+    assert get_secret_cipher().decrypt(stored.llm_api_key) == "sk-secret"
+
+
+async def test_empty_or_omitted_llm_key_keeps_the_stored_one(
+    settings_client: AsyncClient,
+) -> None:
+    assert_ok(await settings_client.patch(_PATH, json={"llmApiKey": "sk-secret"}))
+
+    kept_empty = assert_ok(
+        await settings_client.patch(_PATH, json={"llmApiKey": "", "llmModel": "m1"})
+    )
+    kept_omitted = assert_ok(await settings_client.patch(_PATH, json={"smtpPort": 25}))
+
+    assert kept_empty["llmApiKeySet"] is True
+    assert kept_omitted["llmApiKeySet"] is True
+    assert kept_omitted["llmModel"] == "m1"
+
+
+async def test_explicit_null_clears_the_llm_key_and_model(
+    settings_client: AsyncClient,
+) -> None:
+    assert_ok(
+        await settings_client.patch(
+            _PATH, json={"llmModel": "gemini-3.8-flash", "llmApiKey": "sk-secret"}
+        )
+    )
+
+    body = assert_ok(
+        await settings_client.patch(_PATH, json={"llmModel": None, "llmApiKey": None})
+    )
+
+    assert body["llmModel"] is None
+    assert body["llmApiKeySet"] is False
+    assert (await _stored_settings(settings_client)).llm_api_key is None
+
+
+async def test_an_empty_llm_model_is_rejected(settings_client: AsyncClient) -> None:
+    assert_err(
+        await settings_client.patch(_PATH, json={"llmModel": ""}),
+        "VALIDATION_ERROR",
+        422,
+    )

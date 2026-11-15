@@ -8,7 +8,7 @@ sidebar_position: 2
 個別に起動する代わりに、一式まとめて Docker Compose でビルドして起動することもできます([compose.yml](https://github.com/kaitoy/a2flow/blob/master/compose.yml))。
 
 ```bash
-echo GOOGLE_API_KEY=your_google_api_key_here > .env
+echo SYSTEM_DEFAULT_LLM_API_KEY=your_google_api_key_here > .env
 docker compose up --build
 ```
 

@@ -51,8 +51,10 @@ from infrastructure.knowledge_extract import (
     fetch_url,
     split_chunks,
 )
+from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.locks import advisory_lock, knowledge_base_key
 from infrastructure.okf import normalize_page_path
+from infrastructure.secret_cipher import get_secret_cipher
 from models.knowledge import (
     KnowledgePage,
     KnowledgeSource,
@@ -416,8 +418,8 @@ class KnowledgeIngestService:
         db: AsyncSession,
         *,
         tenant_id: str,
+        llm: BaseLlm | str,
         settings: Settings | None = None,
-        llm: BaseLlm | str | None = None,
         fetch: Fetcher = fetch_url,
     ) -> None:
         """Initialize the service.
@@ -425,18 +427,20 @@ class KnowledgeIngestService:
         Args:
             db: Database session owned by the job.
             tenant_id: Tenant of the source being processed.
+            llm: Model the agent runs on: the tenant's, as
+                :func:`infrastructure.agent.resolve_model` builds it. Its name
+                is recorded as the ``by`` of every page it writes.
             settings: Application settings; read from the environment by default.
-            llm: Model the agent runs on; the configured model by default.
             fetch: Downloader for URL sources, replaceable in tests.
         """
         self._db = db
         self._settings = settings or get_settings()
-        self._llm = llm if llm is not None else resolve_model()
+        self._llm = llm
         self._fetch = fetch
         self._sources = SqlKnowledgeSourceRepository(db, tenant_id=tenant_id)
         self._pages = SqlKnowledgePageRepository(db, tenant_id=tenant_id)
-        model = self._settings.llm_model.removeprefix("litellm:")
-        self._actor = f"a2flow/{model}"
+        model = llm if isinstance(llm, str) else llm.model
+        self._actor = f"a2flow/{model.removeprefix('litellm:')}"
 
     async def run(
         self, source_id: str, action: KnowledgeJobAction, *, user_id: str
@@ -675,7 +679,10 @@ async def run_knowledge_job(
                     "Knowledge job on source %s: source not found.", source_id
                 )
                 return
-            service = KnowledgeIngestService(db, tenant_id=tenant_id)
+            llm = await LlmSettingsResolver(db, get_secret_cipher()).resolve(tenant_id)
+            service = KnowledgeIngestService(
+                db, tenant_id=tenant_id, llm=resolve_model(llm)
+            )
             await service.run(source_id, action, user_id=user_id)
     except Exception:
         logger.exception("Knowledge job on source %s crashed.", source_id)

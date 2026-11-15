@@ -36,7 +36,9 @@ from infrastructure.client_tools import (
     a2ui_context,
     client_tools,
 )
+from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.session_fork import fork_adk_session
 from infrastructure.skill_manager import SkillManager
 from models.execution_session import (
@@ -449,6 +451,7 @@ class SessionRunner:
             SqlAgentSkillRepository(db, tenant_id=tenant_id),
             self._skills_store,
             self._registry,
+            LlmSettingsResolver(db, get_secret_cipher()),
             self._session_service,
             self._app_name,
             WorkflowExecutionAccessPolicy(

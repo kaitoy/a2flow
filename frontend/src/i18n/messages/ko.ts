@@ -707,6 +707,28 @@ export const ko = {
   "lib.stubToolsForDraftWorkflowRuns": "초안 워크플로 실행을 위해 도구를 스텁 처리",
   "lib.traceToolCallsImpersonationCertificatesAndMail": "도구 호출, 대리 로그인, 인증서, 메일 추적",
   "lib.trackWorkflowRuns": "워크플로 실행 추적",
+  "llm.title": "LLM",
+  "llm.model": "모델",
+  "llm.modelHint":
+    "Gemini 모델 이름이거나, 다른 제공자는 litellm:<제공자>/<모델> 형식으로 입력하세요.",
+  "llm.modelEmpty": "비워 두면 기본 제공 모델을 사용합니다.",
+  "llm.modelEmptyTenant": "비워 두면 시스템의 모델을 사용합니다.",
+  "llm.modelTooLong": "200자 이내로 입력하세요.",
+  "llm.apiKey": "API 키",
+  "llm.apiKeyHint":
+    "암호화하여 저장하며 다시 표시하지 않습니다. 비워 두면 서버 환경에 설정된 제공자의 키를 사용합니다.",
+  "llm.apiKeyHintTenant":
+    "암호화하여 저장하며 다시 표시하지 않습니다. 비워 두면 시스템의 키를 사용합니다.",
+  "llm.apiKeyHintTenantAdmin":
+    "암호화하여 저장하며 다시 표시하지 않습니다. 모델을 입력하면 필수입니다. 둘 다 비워 두면 시스템의 LLM을 사용합니다.",
+  "llm.apiKeyRequired": "자체 모델을 사용하려면 API 키를 입력하세요.",
+  "llm.mode": "LLM을 설정하는 사람",
+  "llm.modeSystemDefault": "시스템 기본값",
+  "llm.modeSuperAdmin": "슈퍼 관리자가 설정",
+  "llm.modeTenantAdmin": "테넌트 관리자가 설정",
+  "llm.modeSystemDefaultHint": "이 테넌트는 시스템 설정에 지정된 LLM을 사용합니다.",
+  "llm.modeSuperAdminHint": "이 테넌트의 LLM은 슈퍼 관리자가 아래에서 설정합니다.",
+  "llm.modeTenantAdminHint": "이 테넌트의 LLM은 테넌트 관리자가 관리자 설정에서 설정합니다.",
   "login.eGAcmeCorp": "예: acme-corp",
   "login.leaveBlankIfYouSignInAs": "플랫폼 관리자로 로그인하는 경우 비워 두세요.",
   "login.signIn": "로그인",

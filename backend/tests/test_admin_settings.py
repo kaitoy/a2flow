@@ -12,7 +12,7 @@ from config import get_settings
 from infrastructure import url_safety
 from infrastructure.bootstrap import seed_system_settings
 from infrastructure.secret_cipher import get_secret_cipher
-from models.tenant import Tenant
+from models.tenant import LlmMode, Tenant
 from models.user import SYSTEM_USER_ID, User
 from repositories.exceptions import ForeignKeyViolationError, UniqueViolationError
 from repositories.tenant import SqlTenantRepository
@@ -76,6 +76,9 @@ _NO_OIDC = {
     "oidcRedirectUri": None,
 }
 
+#: The LLM fields of a tenant that runs on the platform's LLM.
+_NO_LLM = {"llmMode": "system_default", "llmModel": None, "llmApiKeySet": False}
+
 #: The Vault fields of an unconfigured tenant.
 _NO_VAULT = {
     "vaultAddr": None,
@@ -99,6 +102,7 @@ async def test_get_returns_defaults(settings_client: AsyncClient) -> None:
         "loginLockoutMinutes": 15,
         **_NO_VAULT,
         **_NO_OIDC,
+        **_NO_LLM,
     }
 
 
@@ -108,10 +112,11 @@ async def test_patch_updates_and_null_keeps(settings_client: AsyncClient) -> Non
         **limits,
         **_NO_VAULT,
         **_NO_OIDC,
+        **_NO_LLM,
     }
     assert assert_ok(
         await settings_client.patch(_PATH, json={"loginMaxFailures": None})
-    ) == {**limits, **_NO_VAULT, **_NO_OIDC}
+    ) == {**limits, **_NO_VAULT, **_NO_OIDC, **_NO_LLM}
 
 
 async def test_global_vault_credential_is_not_a_tenant_setting(
@@ -128,6 +133,7 @@ async def test_global_vault_credential_is_not_a_tenant_setting(
         "loginLockoutMinutes": 15,
         **_NO_VAULT,
         **_NO_OIDC,
+        **_NO_LLM,
     }
 
 
@@ -518,3 +524,120 @@ async def test_redirect_uri_follows_app_base_url(
         assert_ok(await settings_client.get(_PATH))["oidcRedirectUri"]
         == "https://a2.example.com/api/v1/auth/oidc/callback"
     )
+
+
+# ---------- LLM ----------
+
+
+async def _set_llm_mode(engine: AsyncEngine, mode: LlmMode) -> None:
+    """Hand the default tenant's LLM to ``mode``, as a super admin would."""
+    async with AsyncSession(engine) as session:
+        tenant = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
+        assert tenant is not None
+        tenant.llm_mode = mode
+        session.add(tenant)
+        await session.commit()
+
+
+_LLM_BODY = {"llmModel": "litellm:openai/gpt-6.1-sol", "llmApiKey": "sk-tenant"}
+
+
+@pytest.mark.parametrize("mode", [LlmMode.system_default, LlmMode.super_admin])
+async def test_admin_cannot_set_the_llm_unless_it_was_handed_to_them(
+    settings_client: AsyncClient, settings_engine: AsyncEngine, mode: LlmMode
+) -> None:
+    await _set_llm_mode(settings_engine, mode)
+
+    assert_err(await settings_client.patch(_PATH, json=_LLM_BODY), "FORBIDDEN", 403)
+
+    body = assert_ok(await settings_client.get(_PATH))
+    assert body["llmMode"] == mode.value
+    assert body["llmModel"] is None
+    assert body["llmApiKeySet"] is False
+
+
+async def test_admin_can_set_the_llm_once_handed_to_them(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await _set_llm_mode(settings_engine, LlmMode.tenant_admin)
+
+    body = assert_ok(await settings_client.patch(_PATH, json=_LLM_BODY))
+
+    assert body["llmMode"] == "tenant_admin"
+    assert body["llmModel"] == "litellm:openai/gpt-6.1-sol"
+    assert body["llmApiKeySet"] is True
+    assert "sk-tenant" not in str(body)
+    async with AsyncSession(settings_engine) as session:
+        tenant = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
+    assert tenant is not None and tenant.llm_api_key is not None
+    assert tenant.llm_api_key != "sk-tenant"
+    assert get_secret_cipher().decrypt(tenant.llm_api_key) == "sk-tenant"
+
+
+async def test_empty_llm_key_keeps_the_stored_one_and_null_clears_it(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await _set_llm_mode(settings_engine, LlmMode.tenant_admin)
+    assert_ok(await settings_client.patch(_PATH, json=_LLM_BODY))
+
+    kept = assert_ok(
+        await settings_client.patch(_PATH, json={"llmApiKey": "", "llmModel": "m2"})
+    )
+    cleared = assert_ok(
+        await settings_client.patch(_PATH, json={"llmApiKey": None, "llmModel": None})
+    )
+
+    assert kept["llmApiKeySet"] is True
+    assert kept["llmModel"] == "m2"
+    assert cleared["llmApiKeySet"] is False
+    assert cleared["llmModel"] is None
+
+
+async def test_admin_cannot_set_a_model_without_a_key(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    """The tenant's model would otherwise run, and bill, on the platform's key."""
+    await _set_llm_mode(settings_engine, LlmMode.tenant_admin)
+
+    assert_err(
+        await settings_client.patch(_PATH, json={"llmModel": "m1", "llmApiKey": ""}),
+        "INVALID_TENANT",
+        422,
+    )
+
+    body = assert_ok(await settings_client.get(_PATH))
+    assert body["llmModel"] is None
+
+
+async def test_admin_cannot_clear_the_key_while_a_model_is_set(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await _set_llm_mode(settings_engine, LlmMode.tenant_admin)
+    assert_ok(await settings_client.patch(_PATH, json=_LLM_BODY))
+
+    assert_err(
+        await settings_client.patch(_PATH, json={"llmApiKey": None}),
+        "INVALID_TENANT",
+        422,
+    )
+
+    body = assert_ok(await settings_client.get(_PATH))
+    assert body["llmApiKeySet"] is True
+
+
+async def test_unrelated_settings_still_save_while_the_llm_is_not_theirs(
+    settings_client: AsyncClient,
+) -> None:
+    """The guard only applies to a payload that actually sets an ``llm*`` field."""
+    body = assert_ok(await settings_client.patch(_PATH, json={"loginMaxFailures": 3}))
+    assert body["loginMaxFailures"] == 3
+
+
+async def test_admin_cannot_change_the_llm_mode(
+    settings_client: AsyncClient,
+) -> None:
+    """Handing the LLM over is the super admin's call; the field is ignored here."""
+    body = assert_ok(
+        await settings_client.patch(_PATH, json={"llmMode": "tenant_admin"})
+    )
+    assert body["llmMode"] == "system_default"

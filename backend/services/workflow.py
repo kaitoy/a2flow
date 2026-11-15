@@ -36,6 +36,7 @@ from google.adk.sessions import BaseSessionService, Session
 from google.adk.sessions.base_session_service import GetSessionConfig
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
+from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.skill_manager import SkillManager
 from infrastructure.tool_mocks import snapshot_mock
 from models.mcp_tool_mock import MCPToolMock
@@ -241,6 +242,7 @@ class WorkflowService:
         mocks: MCPToolMockRepository,
         skills_store: SkillManager,
         registry: AgentRegistry,
+        llms: LlmSettingsResolver,
         session_service: BaseSessionService,
         app_name: str,
     ) -> None:
@@ -265,6 +267,7 @@ class WorkflowService:
                 time to snapshot the mocks a draft run applies.
             skills_store: Store locating a skill revision's directory on disk.
             registry: Registry resolving ADK agents per skill revision and kind.
+            llms: Resolver of the LLM the workflow's tenant runs its agents on.
             session_service: ADK session store holding the design chat history.
             app_name: ADK application name keying sessions in the store.
         """
@@ -279,6 +282,7 @@ class WorkflowService:
         self._mocks = mocks
         self._skills_store = skills_store
         self._registry = registry
+        self._llms = llms
         self._session_service = session_service
         self._app_name = app_name
 
@@ -473,6 +477,7 @@ class WorkflowService:
             commit_sha,
             skill_dir,
             tenant_id=workflow.tenant_id,
+            llm=await self._llms.resolve(workflow.tenant_id),
             kind=AgentKind.design,
         )
         return agent, workflow

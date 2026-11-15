@@ -34,7 +34,7 @@ mise を使わない場合は、Python 3.11 以上、Node.js 20 以上に加え�
 cd backend
 uv sync
 cp .env.example .env
-sed -i.bak 's/^GOOGLE_API_KEY=.*/GOOGLE_API_KEY=YOUR_API_KEY/' .env && rm .env.bak
+sed -i.bak 's/^SYSTEM_DEFAULT_LLM_API_KEY=.*/SYSTEM_DEFAULT_LLM_API_KEY=YOUR_API_KEY/' .env && rm .env.bak
 uv run uvicorn main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 30
 ```
 

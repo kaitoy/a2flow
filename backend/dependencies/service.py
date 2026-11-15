@@ -11,6 +11,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from config import get_settings
+from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.secret_resolver import SecretResolver
 from infrastructure.vault_client import TenantVaults
 from repositories.session_file import SessionFileRepository
@@ -131,6 +132,18 @@ def get_tenant_vaults(db: DBSessionDep, cipher: SecretCipherDep) -> TenantVaults
 
 
 TenantVaultsDep = Annotated[TenantVaults, Depends(get_tenant_vaults)]
+
+
+def get_llm_settings_resolver(
+    db: DBSessionDep, cipher: SecretCipherDep
+) -> LlmSettingsResolver:
+    """Create the per-request source of the LLM each tenant's agents run on."""
+    return LlmSettingsResolver(db, cipher)
+
+
+LlmSettingsResolverDep = Annotated[
+    LlmSettingsResolver, Depends(get_llm_settings_resolver)
+]
 
 
 def get_secret_resolver(
@@ -388,14 +401,15 @@ def get_workflow_service(
     mocks: MCPToolMockRepositoryDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
+    llms: LlmSettingsResolverDep,
     session_service: SessionServiceDep,
 ) -> WorkflowService:
     """Create a WorkflowService wiring its repositories, skill store, agent registry, and session store.
 
-    The last five collaborators serve the workflow's design session: the store
-    and registry resolve the design agent, the session store holds its chat
-    history, and the metadata repository records which developer sent each
-    message in that shared chat.
+    The last six collaborators serve the workflow's design session: the store,
+    registry and LLM resolver build the design agent, the session store holds
+    its chat history, and the metadata repository records which developer sent
+    each message in that shared chat.
     """
     return WorkflowService(
         workflows,
@@ -409,6 +423,7 @@ def get_workflow_service(
         mocks,
         skills_store,
         registry,
+        llms,
         session_service,
         APP_NAME,
     )
@@ -423,15 +438,17 @@ def get_workflow_design_service(
     templates: WorkflowTaskTemplateRepositoryDep,
     versions: WorkflowPublishedVersionRepositoryDep,
     knowledge_bases: KnowledgeBaseRepositoryDep,
+    llms: LlmSettingsResolverDep,
     session_service: SessionServiceDep,
 ) -> WorkflowDesignService:
-    """Create a WorkflowDesignService wiring the repositories and the session store."""
+    """Create a WorkflowDesignService wiring the repositories, LLM resolver and the session store."""
     return WorkflowDesignService(
         workflows,
         skills,
         templates,
         versions,
         knowledge_bases,
+        llms,
         session_service,
         APP_NAME,
     )
@@ -590,6 +607,7 @@ def get_workflow_execution_service(
     skills: AgentSkillLookupDep,
     skills_store: SkillManagerDep,
     registry: AgentRegistryDep,
+    llms: LlmSettingsResolverDep,
     session_service: SessionServiceDep,
     access: WorkflowExecutionAccessPolicyDep,
     sessions: ExecutionSessionRepositoryDep,
@@ -609,6 +627,7 @@ def get_workflow_execution_service(
         skills,
         skills_store,
         registry,
+        llms,
         session_service,
         APP_NAME,
         access,

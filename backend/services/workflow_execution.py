@@ -17,6 +17,7 @@ from google.adk.sessions import BaseSessionService, Session
 
 from infrastructure.agent import AgentKind, AgentRegistry, tenant_app_name
 from infrastructure.client_tools import RENDER_A2UI_TOOL_NAME
+from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.skill_manager import SkillManager
 from models.execution_session import (
     ConsultationCreate,
@@ -68,6 +69,7 @@ class WorkflowExecutionService:
         skills: AgentSkillRepository,
         skills_store: SkillManager,
         registry: AgentRegistry,
+        llms: LlmSettingsResolver,
         session_service: BaseSessionService,
         app_name: str,
         access: WorkflowExecutionAccessPolicy,
@@ -97,6 +99,7 @@ class WorkflowExecutionService:
                 the ``repo_path`` and fallback revision of an execution's skill.
             skills_store: Store locating a skill revision's directory on disk.
             registry: Registry resolving ADK agents per skill revision.
+            llms: Resolver of the LLM the execution's tenant runs its agents on.
             session_service: ADK session store, used to delete the workflow
                 session when a WorkflowExecution is removed.
             app_name: ADK application name keying sessions in the store.
@@ -115,6 +118,7 @@ class WorkflowExecutionService:
         self._skills = skills
         self._skills_store = skills_store
         self._registry = registry
+        self._llms = llms
         self._session_service = session_service
         self._app_name = app_name
         self._access = access
@@ -463,6 +467,7 @@ class WorkflowExecutionService:
             commit_sha,
             skill_dir,
             tenant_id=execution.tenant_id,
+            llm=await self._llms.resolve(execution.tenant_id),
             kind=AgentKind.execution,
         )
 

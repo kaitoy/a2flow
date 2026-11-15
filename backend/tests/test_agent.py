@@ -2,7 +2,7 @@ import asyncio
 import json
 from collections.abc import AsyncGenerator
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -10,7 +10,11 @@ from ag_ui.core import EventType, RunAgentInput, RunFinishedEvent, RunStartedEve
 from google.adk.sessions import InMemorySessionService
 from httpx import ASGITransport, AsyncClient, Response
 
+from infrastructure.llm_settings import ResolvedLlm
 from tests.conftest import _install_auth_overrides
+
+#: The LLM every agent in this module is built on.
+_LLM = ResolvedLlm("gemini-3.8-flash")
 
 
 def _make_run_agent_input(
@@ -39,6 +43,7 @@ def _async_gen_factory(
 
 @pytest_asyncio.fixture()
 async def agent_client() -> AsyncGenerator[tuple[AsyncClient, MagicMock], None]:
+    from dependencies.service import get_llm_settings_resolver
     from dependencies.singletons import get_agent_registry, get_session_service
     from main import app
 
@@ -46,10 +51,14 @@ async def agent_client() -> AsyncGenerator[tuple[AsyncClient, MagicMock], None]:
     mock_agent.run = _async_gen_factory([])
     mock_registry = MagicMock()
     mock_registry.get.return_value = mock_agent
+    # The resolver reads the database, which this fixture does not set up.
+    llms = MagicMock()
+    llms.resolve = AsyncMock(return_value=_LLM)
 
     session_service = InMemorySessionService()
     app.dependency_overrides[get_session_service] = lambda: session_service
     app.dependency_overrides[get_agent_registry] = lambda: mock_registry
+    app.dependency_overrides[get_llm_settings_resolver] = lambda: llms
     _install_auth_overrides(app)
     try:
         async with AsyncClient(
@@ -352,7 +361,7 @@ def test_create_agent_without_skill_has_only_agui_toolset() -> None:
 
     from infrastructure.agent import create_agent
 
-    agent = create_agent()
+    agent = create_agent(_LLM)
     assert any(isinstance(t, AGUIToolset) for t in agent.tools)
     assert len(agent.tools) == 1
 
@@ -370,7 +379,7 @@ def test_create_agent_with_skill_dir_loads_skill_toolset(tmp_path: Any) -> None:
         encoding="utf-8",
     )
 
-    agent = create_agent(skill_dir=skill_dir)
+    agent = create_agent(_LLM, skill_dir=skill_dir)
     assert any(isinstance(t, AGUIToolset) for t in agent.tools)
     assert any(isinstance(t, SkillToolset) for t in agent.tools)
 
@@ -384,7 +393,7 @@ def test_create_app_enables_resumability() -> None:
     """
     from infrastructure.agent import create_app
 
-    app = create_app("A2Flow")
+    app = create_app("A2Flow", _LLM)
 
     assert app.name == "A2Flow"
     assert app.resumability_config is not None
@@ -397,11 +406,82 @@ def test_agent_registry_builds_resumable_agents() -> None:
     service = InMemorySessionService()
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
-    agent = registry.get(None, None, None, tenant_id="tenant-1")
+    agent = registry.get(None, None, None, tenant_id="tenant-1", llm=_LLM)
 
     # Private to ag-ui-adk, but it is the exact predicate that decides whether an
     # LRO tool call pauses through ADK or abandons the runner's generator.
     assert agent._is_adk_resumable() is True
+
+
+def test_agent_registry_builds_a_new_agent_when_the_llm_changes() -> None:
+    """The model and key are baked into an agent, so an edit of the LLM
+    settings must not be served by an agent cached on the old ones."""
+    from infrastructure.agent import AgentRegistry
+
+    registry = AgentRegistry(
+        session_service=InMemorySessionService(), app_name="A2Flow"
+    )
+    before = registry.get(None, None, None, tenant_id="tenant-1", llm=_LLM)
+    other_model = ResolvedLlm("litellm:openai/gpt-6.1-sol")
+    other_key = ResolvedLlm(_LLM.model, api_key="sk-other")
+
+    assert registry.get(None, None, None, tenant_id="tenant-1", llm=_LLM) is before
+    assert (
+        registry.get(None, None, None, tenant_id="tenant-1", llm=other_model)
+        is not before
+    )
+    assert (
+        registry.get(None, None, None, tenant_id="tenant-1", llm=other_key)
+        is not before
+    )
+
+
+def test_resolved_llm_repr_hides_the_api_key() -> None:
+    assert "sk-secret" not in repr(ResolvedLlm("m", api_key="sk-secret"))
+
+
+def test_resolve_model_returns_a_bare_gemini_name_unchanged() -> None:
+    from infrastructure.agent import resolve_model
+
+    assert resolve_model(ResolvedLlm("gemini-3.8-flash")) == "gemini-3.8-flash"
+
+
+def test_resolve_model_sends_the_key_to_gemini() -> None:
+    from google.adk.models.google_llm import Gemini
+
+    from infrastructure.agent import resolve_model
+
+    model = resolve_model(ResolvedLlm("gemini-3.8-flash", api_key="g-key"))
+
+    assert isinstance(model, Gemini)
+    assert model.model == "gemini-3.8-flash"
+    assert model.client_kwargs == {"api_key": "g-key"}
+
+
+def test_resolve_model_sends_the_key_to_litellm() -> None:
+    from google.adk.models.lite_llm import LiteLlm
+
+    from infrastructure.agent import resolve_model
+
+    model = resolve_model(
+        ResolvedLlm("litellm:anthropic/claude-sonnet-5-5", api_key="a-key")
+    )
+
+    assert isinstance(model, LiteLlm)
+    assert model.model == "anthropic/claude-sonnet-5-5"
+    assert model._additional_args["api_key"] == "a-key"
+    assert model._additional_args["drop_params"] is True
+
+
+def test_resolve_model_omits_the_key_when_there_is_none() -> None:
+    from google.adk.models.lite_llm import LiteLlm
+
+    from infrastructure.agent import resolve_model
+
+    model = resolve_model(ResolvedLlm("litellm:anthropic/claude-sonnet-5-5"))
+
+    assert isinstance(model, LiteLlm)
+    assert "api_key" not in model._additional_args
 
 
 def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
@@ -412,9 +492,9 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
     service = InMemorySessionService()
     registry = AgentRegistry(session_service=service, app_name="A2Flow")
 
-    assert registry.get(None, None, None, tenant_id="tenant-1") is registry.get(
-        None, None, None, tenant_id="tenant-1"
-    )
+    assert registry.get(
+        None, None, None, tenant_id="tenant-1", llm=_LLM
+    ) is registry.get(None, None, None, tenant_id="tenant-1", llm=_LLM)
 
     def _skill_dir(name: str) -> Any:
         path = tmp_path / name
@@ -425,9 +505,13 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
         )
         return path
 
-    old = registry.get("skill-1", "a" * 40, _skill_dir("old"), tenant_id="tenant-1")
+    old = registry.get(
+        "skill-1", "a" * 40, _skill_dir("old"), tenant_id="tenant-1", llm=_LLM
+    )
     assert (
-        registry.get("skill-1", "a" * 40, _skill_dir("ignored"), tenant_id="tenant-1")
+        registry.get(
+            "skill-1", "a" * 40, _skill_dir("ignored"), tenant_id="tenant-1", llm=_LLM
+        )
         is old
     )
 
@@ -435,7 +519,9 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
     # a different agent, because create_agent reads the skill directory once and
     # keeps its contents in memory forever after.
     assert (
-        registry.get("skill-1", "b" * 40, _skill_dir("new"), tenant_id="tenant-1")
+        registry.get(
+            "skill-1", "b" * 40, _skill_dir("new"), tenant_id="tenant-1", llm=_LLM
+        )
         is not old
     )
 
@@ -448,6 +534,7 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
         "a" * 40,
         _skill_dir("design"),
         tenant_id="tenant-1",
+        llm=_LLM,
         kind=AgentKind.design,
     )
     assert design is not old
@@ -457,6 +544,7 @@ def test_agent_registry_caches_by_skill_id_and_revision(tmp_path: Any) -> None:
             "a" * 40,
             _skill_dir("x"),
             tenant_id="tenant-1",
+            llm=_LLM,
             kind=AgentKind.design,
         )
         is design
@@ -477,11 +565,16 @@ def test_agent_registry_caches_are_isolated_per_tenant(tmp_path: Any) -> None:
         encoding="utf-8",
     )
 
-    tenant_a = registry.get("skill-1", "a" * 40, skill_dir, tenant_id="tenant-a")
-    tenant_b = registry.get("skill-1", "a" * 40, skill_dir, tenant_id="tenant-b")
+    tenant_a = registry.get(
+        "skill-1", "a" * 40, skill_dir, tenant_id="tenant-a", llm=_LLM
+    )
+    tenant_b = registry.get(
+        "skill-1", "a" * 40, skill_dir, tenant_id="tenant-b", llm=_LLM
+    )
     assert tenant_a is not tenant_b
     assert (
-        registry.get("skill-1", "a" * 40, skill_dir, tenant_id="tenant-a") is tenant_a
+        registry.get("skill-1", "a" * 40, skill_dir, tenant_id="tenant-a", llm=_LLM)
+        is tenant_a
     )
 
 
@@ -505,22 +598,36 @@ def test_agent_registry_evicts_lru_entry_per_tenant_when_over_capacity(
         )
         return path
 
-    first = registry.get("skill-1", "a" * 40, _skill_dir("s1"), tenant_id="tenant-1")
-    second = registry.get("skill-2", "a" * 40, _skill_dir("s2"), tenant_id="tenant-1")
+    first = registry.get(
+        "skill-1", "a" * 40, _skill_dir("s1"), tenant_id="tenant-1", llm=_LLM
+    )
+    second = registry.get(
+        "skill-2", "a" * 40, _skill_dir("s2"), tenant_id="tenant-1", llm=_LLM
+    )
     # Touch `first` again so `second` becomes the true LRU entry.
-    registry.get("skill-1", "a" * 40, _skill_dir("s1-again"), tenant_id="tenant-1")
-    third = registry.get("skill-3", "a" * 40, _skill_dir("s3"), tenant_id="tenant-1")
+    registry.get(
+        "skill-1", "a" * 40, _skill_dir("s1-again"), tenant_id="tenant-1", llm=_LLM
+    )
+    third = registry.get(
+        "skill-3", "a" * 40, _skill_dir("s3"), tenant_id="tenant-1", llm=_LLM
+    )
 
     assert (
-        registry.get("skill-1", "a" * 40, _skill_dir("s1-x"), tenant_id="tenant-1")
+        registry.get(
+            "skill-1", "a" * 40, _skill_dir("s1-x"), tenant_id="tenant-1", llm=_LLM
+        )
         is first
     )
     assert (
-        registry.get("skill-3", "a" * 40, _skill_dir("s3-x"), tenant_id="tenant-1")
+        registry.get(
+            "skill-3", "a" * 40, _skill_dir("s3-x"), tenant_id="tenant-1", llm=_LLM
+        )
         is third
     )
     assert (
-        registry.get("skill-2", "a" * 40, _skill_dir("s2-x"), tenant_id="tenant-1")
+        registry.get(
+            "skill-2", "a" * 40, _skill_dir("s2-x"), tenant_id="tenant-1", llm=_LLM
+        )
         is not second
     )
 
@@ -546,18 +653,22 @@ def test_agent_registry_lru_cap_is_independent_per_tenant(
         return path
 
     tenant_a_agent = registry.get(
-        "skill-1", "a" * 40, _skill_dir("a1"), tenant_id="tenant-a"
+        "skill-1", "a" * 40, _skill_dir("a1"), tenant_id="tenant-a", llm=_LLM
     )
     tenant_b_agent = registry.get(
-        "skill-1", "a" * 40, _skill_dir("b1"), tenant_id="tenant-b"
+        "skill-1", "a" * 40, _skill_dir("b1"), tenant_id="tenant-b", llm=_LLM
     )
 
     assert (
-        registry.get("skill-1", "a" * 40, _skill_dir("a2"), tenant_id="tenant-a")
+        registry.get(
+            "skill-1", "a" * 40, _skill_dir("a2"), tenant_id="tenant-a", llm=_LLM
+        )
         is tenant_a_agent
     )
     assert (
-        registry.get("skill-1", "a" * 40, _skill_dir("b2"), tenant_id="tenant-b")
+        registry.get(
+            "skill-1", "a" * 40, _skill_dir("b2"), tenant_id="tenant-b", llm=_LLM
+        )
         is tenant_b_agent
     )
 
@@ -627,7 +738,7 @@ def test_create_agent_with_skill_uses_execution_instruction(tmp_path: Any) -> No
 
     from infrastructure.agent import A2UIInstructionProvider, create_agent
 
-    agent = create_agent(skill_dir=_write_skill_md(tmp_path))
+    agent = create_agent(_LLM, skill_dir=_write_skill_md(tmp_path))
     provider = agent.instruction
     assert isinstance(provider, A2UIInstructionProvider)
 
@@ -669,7 +780,9 @@ def test_create_agent_design_kind_uses_design_instruction(tmp_path: Any) -> None
 
     from infrastructure.agent import A2UIInstructionProvider, AgentKind, create_agent
 
-    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.design)
+    agent = create_agent(
+        _LLM, skill_dir=_write_skill_md(tmp_path), kind=AgentKind.design
+    )
     provider = agent.instruction
     assert isinstance(provider, A2UIInstructionProvider)
 
@@ -699,7 +812,7 @@ def test_create_agent_initial_design_kind_has_no_a2ui(tmp_path: Any) -> None:
     from infrastructure.agent import AgentKind, create_agent
 
     agent = create_agent(
-        skill_dir=_write_skill_md(tmp_path), kind=AgentKind.initial_design
+        _LLM, skill_dir=_write_skill_md(tmp_path), kind=AgentKind.initial_design
     )
     assert isinstance(agent.instruction, str)
     assert "register_task_templates" in agent.instruction
@@ -719,7 +832,7 @@ def test_create_agent_with_skill_attaches_task_tools(tmp_path: Any) -> None:
         update_workflow_task,
     )
 
-    agent = create_agent(skill_dir=_write_skill_md(tmp_path))
+    agent = create_agent(_LLM, skill_dir=_write_skill_md(tmp_path))
     for tool in (
         list_workflow_tasks,
         get_workflow_task,
@@ -751,7 +864,9 @@ def test_create_agent_design_kind_attaches_design_tools(tmp_path: Any) -> None:
         update_task_template,
     )
 
-    agent = create_agent(skill_dir=_write_skill_md(tmp_path), kind=AgentKind.design)
+    agent = create_agent(
+        _LLM, skill_dir=_write_skill_md(tmp_path), kind=AgentKind.design
+    )
     for tool in (
         register_task_templates,
         create_task_template,

@@ -17,11 +17,22 @@ from urllib.parse import urlsplit
 from config import get_settings
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.url_safety import assert_public_http_url
-from models.tenant import AdminSettingsUpdate, Tenant, TenantCreate, TenantUpdate
-from repositories.exceptions import NotFoundError, TenantValidationError
+from models.tenant import (
+    AdminSettingsUpdate,
+    LlmMode,
+    Tenant,
+    TenantCreate,
+    TenantUpdate,
+)
+from repositories.exceptions import (
+    ForbiddenError,
+    NotFoundError,
+    TenantValidationError,
+)
 from repositories.query import FilterSpec, SortSpec
 from repositories.tenant import TenantRepository
 from repositories.user import UserRepository
+from services.llm_settings import prepare_llm_fields
 from services.vault_settings import prepare_vault_fields
 
 
@@ -126,9 +137,9 @@ class TenantService:
             TenantValidationError: If the merged Vault connection would be
                 unusable, or the OIDC settings invalid.
         """
-        # The sign-in limits are non-nullable columns with defaults; an
-        # explicit null means "leave as is", not "clear".
-        for field in ("login_max_failures", "login_lockout_minutes"):
+        # The sign-in limits and the LLM mode are non-nullable columns with
+        # defaults; an explicit null means "leave as is", not "clear".
+        for field in ("login_max_failures", "login_lockout_minutes", "llm_mode"):
             if payload.get(field, 0) is None:
                 payload.pop(field)
         for prefix in ("vault_", "global_vault_"):
@@ -136,6 +147,7 @@ class TenantService:
                 current, payload, self._cipher, TenantValidationError, prefix=prefix
             )
         self._prepare_oidc(current, payload)
+        prepare_llm_fields(payload, self._cipher)
 
     async def get(self, tenant_id: str) -> Tenant:
         """Return the Tenant with the given ID.
@@ -205,6 +217,10 @@ class TenantService:
     ) -> Tenant:
         """Apply a partial update to a Tenant.
 
+        Handing the tenant's LLM to its ``admin`` (``llm_mode`` turning
+        ``tenant_admin``) clears the stored model and API key, except one the
+        same write sets: what a super admin entered is not the admin's.
+
         Args:
             tenant_id: Identifier of the tenant to update.
             data: Fields to update: the super admin's tenant fields, or the
@@ -216,12 +232,46 @@ class TenantService:
 
         Raises:
             NotFoundError: If no tenant exists with the given ID.
+            ForbiddenError: If the tenant's own ``admin`` sets an ``llm_*`` field
+                while a ``super_admin`` has not handed the tenant's LLM to it
+                (:attr:`~models.tenant.LlmMode.tenant_admin`).
             TenantValidationError: If the merged Vault connection would be
-                unusable, or the OIDC settings invalid.
+                unusable, the OIDC settings invalid, or the tenant's own
+                ``admin`` would leave an LLM model without an API key.
         """
         current = await self.get(tenant_id)
         payload = data.model_dump(exclude_unset=True)
+        if (
+            isinstance(data, AdminSettingsUpdate)
+            and any(field.startswith("llm_") for field in payload)
+            and current.llm_mode != LlmMode.tenant_admin
+        ):
+            raise ForbiddenError(
+                "The LLM of this tenant is not set by its admin; ask a super admin."
+            )
+        if (
+            current.llm_mode != LlmMode.tenant_admin
+            and payload.get("llm_mode") == LlmMode.tenant_admin
+        ):
+            # Any stored model and key are ones a super admin entered (the admin
+            # could not write them before this hand-over), and not the admin's
+            # to inherit: the admin starts from an empty LLM, unless this same
+            # write names a model or key. A blank key normally means "keep the
+            # stored one", which is exactly what is not wanted here.
+            payload.setdefault("llm_model", None)
+            if not payload.get("llm_api_key"):
+                payload["llm_api_key"] = None
         self._prepare(current, payload)
+        if isinstance(data, AdminSettingsUpdate) and any(
+            field.startswith("llm_") for field in payload
+        ):
+            # An admin's model needs the tenant's own key, or the platform's
+            # would pay for it (``LlmSettingsResolver`` ignores such a model
+            # anyway; this makes the save say so).
+            model = payload.get("llm_model", current.llm_model)
+            key = payload.get("llm_api_key", current.llm_api_key)
+            if model and not key:
+                raise TenantValidationError("llmApiKey is required with llmModel")
         # Stage the reset before the tenant write: ``clear_oidc_subjects`` does
         # not commit, so the repository's commit lands both together and a
         # failed write rolls the reset back too. The provider can therefore

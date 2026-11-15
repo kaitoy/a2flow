@@ -18,6 +18,8 @@ A [user](../guides/users-and-groups.md#users) belongs to **at most one** tenant.
 
 Each tenant can also connect its own identity provider, so its staff sign in with their company account instead of a password. The connection belongs to the tenant: another tenant's identity provider can never sign anyone in to this one. See [Single sign-on](../guides/single-sign-on.md).
 
+A tenant can also run its agents on an LLM of its own — a model and an API key that a Super Admin, or the tenant's own Admin, enters — instead of the system's. See [The tenant's LLM](../guides/users-and-groups.md#tenant-llm).
+
 ## The tenant boundary
 
 Every tenant-scoped read and write resolves within the caller's tenant, and a record that exists only in another tenant is reported as **HTTP 404, not 403** — the boundary hides existence rather than announcing it. That applies to a workflow id typed into a URL as much as to an id passed to an API, and it is why a cross-tenant reference never confirms that the record is real.

@@ -32,7 +32,7 @@ Every environment variable the backend reads is documented in the manual, and
 
 | | |
 |---|---|
-| [LLM configuration](https://kaitoy.github.io/a2flow/docs/getting-started/llm-configuration) | `LLM_MODEL` and the provider API keys |
+| [LLM configuration](https://kaitoy.github.io/a2flow/docs/getting-started/llm-configuration) | `SYSTEM_DEFAULT_LLM_MODEL`, `SYSTEM_DEFAULT_LLM_API_KEY` and the provider API keys |
 | [Configuration reference](https://kaitoy.github.io/a2flow/docs/operations/configuration) | Server settings, the agent skill store, secret management, the database, the seeded users, session lifetime, CORS |
 | [Demo data](https://kaitoy.github.io/a2flow/docs/getting-started/demo-data) | `DEMO_DATA` and the records it seeds |
 | [Horizontal scaling](https://kaitoy.github.io/a2flow/docs/operations/scaling) | What running more than one replica requires |
@@ -568,6 +568,20 @@ The dispatcher also exposes `exists_for_session` as a pass-through, which is wha
 `smtp_host` uses its own constraint alias rather than `HttpUrl`, whose `assert_public_http_url` SSRF guard would reject exactly the value it legitimately holds: a relay on `localhost` or a private subnet. It is never fetched server-side on a caller's behalf.
 
 The deployment's base URL is not a system setting. `APP_BASE_URL` is read from the environment only (`config.Settings.app_base_url`), validated as a bare http(s) origin at startup, and also supplies the defaults of `CORS_ORIGINS` and `SESSION_COOKIE_SECURE`.
+
+---
+
+### LLM settings
+
+Which model the agents run on, and the API key it is reached with, are stored settings at two levels: the platform's (`system_settings.llm_model` / `llm_api_key`, edited through `PATCH /api/v1/system-settings`) and a tenant's own (`tenants.llm_mode` / `llm_model` / `llm_api_key`). Both keys are Fernet ciphertext written through `services/llm_settings.py::prepare_llm_fields` and are write-only on the wire (`llmApiKeySet` instead of the key; an empty string keeps the stored one, an explicit `null` clears it), exactly like `smtp_password`.
+
+**Resolution.** `infrastructure/llm_settings.py::LlmSettingsResolver.resolve(tenant_id)` folds the two levels into one `ResolvedLlm(model, api_key)`. A tenant whose `llm_mode` is `system_default` gets the platform's values; one in `super_admin` mode gets its own **field by field** (an empty tenant model or key falls back to the platform's), and one in `tenant_admin` mode gets its own only when it has a key of its own (its model may still fall back), otherwise the platform's model and key unchanged, so a tenant's admin can never run a model of their choosing on the platform's key. An empty platform model falls back to `DEFAULT_LLM_MODEL`. Nothing at run time reads the environment. A stored key that no longer decrypts raises `ValueError` rather than falling back to the platform's key, which would bill the wrong account. When neither level has a key, none is passed, and litellm / google-genai read the provider's own variable as they always did — which is also how credentials that are not one key (Vertex AI's ADC, Bedrock's IAM) keep working.
+
+**Who writes.** `llm_mode` is a `TenantUpdate` field, so only a `super_admin` changes it (`PATCH /api/v1/tenants/{id}`, which may also write the model and key in any mode). `PATCH /api/v1/admin-settings` accepts `llm_model` / `llm_api_key` too, but `TenantService.update` answers `403 FORBIDDEN` unless the tenant's mode is `tenant_admin`, and `422 INVALID_TENANT` when the merged result would leave a model without a key. Switching a tenant into `tenant_admin` clears the stored model and key unless the same write sets them; `AdminSettings` reports `llmMode` so the screen knows whether to show the fields.
+
+**Wiring.** `infrastructure.agent.resolve_model(llm)` turns a `ResolvedLlm` into what ADK takes: `LiteLlm(..., api_key=...)` for a `litellm:` model, `Gemini(model=..., client_kwargs={"api_key": ...})` for a bare Gemini name with a key, and the bare name otherwise. `AgentRegistry.get` takes `llm` as a **required** keyword and keys its cache on it, so an edit of the settings builds a fresh agent on the next request (the old one ages out of the capped cache) and no call site can silently run on the platform's LLM by forgetting it. Request-scoped services get a `LlmSettingsResolver` through `LlmSettingsResolverDep` (`WorkflowService`, `WorkflowExecutionService`, `WorkflowDesignService`, `POST /agent`); background code builds one on its own session (the design job in `services/workflow_design.py`, `SessionRunner._execution_service`, `run_knowledge_job`).
+
+**Environment.** `SYSTEM_DEFAULT_LLM_MODEL` and `SYSTEM_DEFAULT_LLM_API_KEY` are applied like `SMTP_*`: `infrastructure/bootstrap.py::apply_system_settings_env_overrides` writes each one that is set into the row **on every startup**, so rotating the variable rotates the stored key, and a value saved on the System Settings screen is overwritten at the next restart while its variable is set. A blank or unset variable leaves its field alone. The two groups (`SMTP_*`, `SYSTEM_DEFAULT_LLM_*`) are validated and applied independently, so a malformed value in one does not hold back the other.
 
 ---
 

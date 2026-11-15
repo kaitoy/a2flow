@@ -207,3 +207,92 @@ describe("AdminSettingsPage", () => {
     });
   });
 });
+
+describe("AdminSettingsPage LLM", () => {
+  const SETTINGS = { loginMaxFailures: 5, loginLockoutMinutes: 15 };
+
+  /** Serve `settings` and capture the PATCH body the page sends. */
+  function capturePatch(settings: object) {
+    const captured: { body: Record<string, unknown> | null } = { body: null };
+    server.use(
+      http.get(`${BASE}/api/v1/admin-settings`, () => envelope(settings)),
+      http.patch(`${BASE}/api/v1/admin-settings`, async ({ request }) => {
+        captured.body = (await request.json()) as Record<string, unknown>;
+        return envelope(settings);
+      })
+    );
+    return captured;
+  }
+
+  it.each(["system_default", "super_admin"])(
+    "shows no LLM fields while the mode is %s, and never sends them",
+    async (llmMode) => {
+      const captured = capturePatch({ ...SETTINGS, llmMode, llmModel: "gemini-3.8-flash" });
+      renderPage();
+      await screen.findByLabelText(/Failed Sign-ins Before Lockout/);
+      expect(screen.queryByLabelText("Model")).toBeNull();
+      expect(screen.queryByLabelText("API key")).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => expect(captured.body).not.toBeNull());
+      expect(Object.keys(captured.body ?? {}).filter((key) => key.startsWith("llm"))).toEqual([]);
+    }
+  );
+
+  it("shows the LLM fields once a super admin has handed them over", async () => {
+    capturePatch({
+      ...SETTINGS,
+      llmMode: "tenant_admin",
+      llmModel: "litellm:openai/gpt-6.1-sol",
+      llmApiKeySet: true,
+    });
+    renderPage();
+    expect(await screen.findByLabelText("Model")).toHaveValue("litellm:openai/gpt-6.1-sol");
+    expect(screen.getByLabelText("API key")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("Saved")
+    );
+  });
+
+  it("refuses a model without an API key, and saves once one is typed", async () => {
+    const captured = capturePatch({ ...SETTINGS, llmMode: "tenant_admin" });
+    renderPage();
+    await userEvent.type(await screen.findByLabelText("Model"), "litellm:openai/gpt-6.1-sol");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByText("Enter an API key to use your own model.")).toBeInTheDocument();
+    expect(captured.body).toBeNull();
+
+    await userEvent.type(screen.getByLabelText("API key"), "sk-tenant");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(captured.body).toMatchObject({
+        llmModel: "litellm:openai/gpt-6.1-sol",
+        llmApiKey: "sk-tenant",
+      })
+    );
+  });
+
+  it("saves the model, and the key only when one is typed", async () => {
+    const captured = capturePatch({
+      ...SETTINGS,
+      llmMode: "tenant_admin",
+      llmModel: "gemini-3.8-flash",
+      llmApiKeySet: true,
+    });
+    renderPage();
+    const model = await screen.findByLabelText("Model");
+    await userEvent.clear(model);
+    await userEvent.type(model, "litellm:openai/gpt-6.1-sol");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(captured.body).not.toBeNull());
+    expect(captured.body).toMatchObject({ llmModel: "litellm:openai/gpt-6.1-sol" });
+    expect(captured.body).not.toHaveProperty("llmApiKey");
+
+    captured.body = null;
+    await userEvent.type(screen.getByLabelText("API key"), "sk-tenant");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() => expect(captured.body).toMatchObject({ llmApiKey: "sk-tenant" }));
+  });
+});

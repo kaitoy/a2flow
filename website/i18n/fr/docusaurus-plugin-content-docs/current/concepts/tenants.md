@@ -18,6 +18,8 @@ Un [utilisateur](../guides/users-and-groups.md#users) appartient à **au plus un
 
 Chaque tenant peut aussi connecter son propre fournisseur d'identité, afin que son personnel se connecte avec son compte professionnel plutôt qu'avec un mot de passe. La connexion appartient au tenant : le fournisseur d'identité d'un autre tenant ne peut jamais connecter quelqu'un à celui-ci. Voir [Authentification unique](../guides/single-sign-on.md).
 
+Un tenant peut aussi exécuter ses agents sur un LLM qui lui est propre — un modèle et une clé d'API saisis par un Super administrateur ou par l'Administrateur du tenant — au lieu de celui du système. Voir [Le LLM du tenant](../guides/users-and-groups.md#tenant-llm).
+
 ## La frontière du tenant {#the-tenant-boundary}
 
 Toute lecture et toute écriture au niveau d'un tenant s'effectuent dans le tenant de l'appelant, et un enregistrement qui n'existe que dans un autre tenant est signalé par une erreur **HTTP 404, et non 403** : la frontière dissimule l'existence de l'enregistrement au lieu de la révéler. Cela vaut aussi bien pour un identifiant de workflow saisi dans une URL que pour un identifiant transmis à une API, et c'est pourquoi une référence vers un autre tenant ne confirme jamais que l'enregistrement existe.

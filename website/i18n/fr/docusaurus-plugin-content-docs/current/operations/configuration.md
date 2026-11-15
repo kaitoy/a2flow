@@ -171,6 +171,21 @@ Si ces variables ne sont pas définies, comme lors d'une simple exécution local
 | `MCP_TRANSPORT_CERT_VALIDITY_DAYS` | `365` | Durée de vie de ces éléments. Ils sont réémis automatiquement lorsqu'il reste moins de 30 jours et ne demandent donc aucune attention |
 | `MCP_SANDBOX_DIR` | non définie | Emplacement du répertoire personnel de chaque tenant pour les [lancements de serveurs en bac à sable](../architecture/mcp-gateway-and-proxy.md#per-launch-sandbox) : les paquets téléchargés par les serveurs d'un tenant y sont conservés, à raison d'un répertoire par tenant. Si elle est définie, chaque serveur démarré localement s'exécute dans son propre bac à sable ; le proxy refuse de démarrer sans elle. Elle n'est pas définie lors d'une simple exécution locale, où les serveurs démarrent sans bac à sable |
 
+## LLM {#llm}
+
+Le LLM par défaut du système — le modèle sur lequel s'exécutent les agents de tous les tenants, et la clé avec laquelle on l'atteint — se modifie sur l'écran [Paramètres système](../guides/system-settings.md#llm). Ces deux variables permettent aussi de le définir depuis l'environnement, comme les paramètres d'e-mail ci-dessous. La configuration d'un fournisseur est décrite dans [Configuration du LLM](../getting-started/llm-configuration.md).
+
+| Variable | Valeur par défaut | Rôle |
+|---|---|---|
+| `SYSTEM_DEFAULT_LLM_MODEL` | — | Un nom de modèle Gemini ou, pour tout autre fournisseur, `litellm:<fournisseur>/<modèle>`. Si ni cette variable ni l'écran n'en définissent un, le modèle par défaut intégré `gemini-3.8-flash` est utilisé |
+| `SYSTEM_DEFAULT_LLM_API_KEY` | — | La clé d'API de ce fournisseur. Stockée chiffrée, jamais écrite dans les journaux et jamais renvoyée par une réponse de l'API |
+
+Comme les paramètres d'e-mail ci-dessous, celles-ci sont **réappliquées à chaque démarrage** :
+
+- **Appliquées au démarrage du backend**, dans Paramètres système. Une variable définie écrase ce qu'un admin a enregistré sur l'écran : la modifier puis redémarrer est donc la façon de renouveler la clé. Une variable non définie ou vide laisse son champ tel quel, géré depuis l'écran.
+- **Une valeur mal formée est journalisée comme avertissement et ignorée**, par exemple un nom de modèle de plus de 200 caractères. Les paramètres d'e-mail sont tout de même appliqués, et l'application démarre.
+- **Si elles ne sont pas définies, la variable propre au fournisseur est lue comme avant** (`GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` ou `AWS_BEARER_TOKEN_BEDROCK`) tant qu'aucune clé n'est stockée. C'est aussi ainsi que l'on fournit des identifiants qui ne sont pas une clé unique, comme ceux de Vertex AI.
+
 ## E-mails de notification {#notification-email}
 
 Ce sont les mêmes valeurs que celles modifiées dans l'interface d'administration sous [Paramètres système](../guides/system-settings.md). Elles peuvent être définies depuis l'environnement, de sorte qu'un déploiement puisse embarquer sa configuration de messagerie au lieu d'en faire une étape manuelle.

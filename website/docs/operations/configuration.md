@@ -171,6 +171,21 @@ Left unset — which is what a plain local run does — the agent reaches MCP se
 | `MCP_TRANSPORT_CERT_VALIDITY_DAYS` | `365` | Lifetime of that material. Reissued automatically once fewer than 30 days remain, so it needs no attention |
 | `MCP_SANDBOX_DIR` | unset | Where each tenant's home directory for [sandboxed server launches](../architecture/mcp-gateway-and-proxy.md#per-launch-sandbox) lives — the packages a tenant's servers download are kept here, one directory per tenant. Set, every locally started server runs in its own sandbox; the proxy refuses to start without it. Unset on a plain local run, where servers start unsandboxed |
 
+## LLM {#llm}
+
+The system's default LLM — the model every tenant's agents run on, and the key it is reached with — is edited on the [System Settings](../guides/system-settings.md#llm) screen. These two variables set it from the environment instead, like the mail settings below. Setting up a provider is covered in [LLM configuration](../getting-started/llm-configuration.md).
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SYSTEM_DEFAULT_LLM_MODEL` | — | A Gemini model name, or `litellm:<provider>/<model>` for any other provider. When neither this nor the screen sets one, the built-in default `gemini-3.8-flash` is used |
+| `SYSTEM_DEFAULT_LLM_API_KEY` | — | The API key for that provider. Stored encrypted, never logged, and never returned by any API response |
+
+Like the mail settings below, these are **re-applied on every startup**:
+
+- **Applied when the backend starts**, into System Settings. A variable that is set overwrites what an admin saved on the screen, so changing it and restarting is how the key is rotated. A variable left unset or blank leaves its field alone, for the screen to manage.
+- **A malformed value is logged as a warning and skipped**, for example a model name over 200 characters. The mail settings are still applied, and the app still starts.
+- **Left unset, the provider's own variable is read as before** — `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or `AWS_BEARER_TOKEN_BEDROCK` — for as long as no key is stored. That is also how credentials that are not a single key, such as Vertex AI's, are supplied.
+
 ## Notification email {#notification-email}
 
 These are the same values the admin UI edits under [System Settings](../guides/system-settings.md), settable from the environment so a deployment can ship its mail configuration rather than leaving it as a manual step.

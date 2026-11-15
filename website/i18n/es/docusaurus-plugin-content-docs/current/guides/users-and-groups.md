@@ -90,6 +90,27 @@ Para conectar el Vault propio del tenant, abre **Configuración de administrador
 
 Guardar una dirección sin credencial, o AppRole sin ID de rol, se rechaza con un error. Un tenant que no tenga Vault propio ni credencial para el global no puede resolver sus secretos de tipo Vault.
 
+## El LLM del tenant {#tenant-llm}
+
+Los agentes se ejecutan con el LLM definido en [Configuración del sistema](./system-settings.md#llm). Un Superadministrador puede dar a un tenant uno propio —otro modelo, o la clave de API del propio tenant, por ejemplo para facturar su uso por separado— y decide quién lo introduce.
+
+Abre el tenant en **Tenants** y elige **Quién configura el LLM**:
+
+| Opción | Qué ocurre |
+|---|---|
+| **Predeterminado del sistema** | El tenant usa el LLM del sistema. Todos los tenants empiezan así. |
+| **Lo configura un superadministrador** | Los campos **Modelo** y **Clave de API** aparecen en la página del tenant y el Superadministrador los rellena. |
+| **Lo configura el administrador del tenant** | Los Administradores del tenant los introducen en **Configuración de administrador**, en una sección **LLM** que solo aparece en un tenant con esta opción. |
+
+Los dos campos funcionan como en [Configuración del sistema](./system-settings.md#llm) y la clave de API es **solo de escritura**. Lo que significa un campo vacío depende de quién los rellena:
+
+| Quién configura el LLM | Un campo vacío |
+|---|---|
+| **Lo configura un superadministrador** | Usa el valor del sistema, de modo que un tenant puede cambiar solo el modelo y conservar la clave del sistema, o al revés. |
+| **Lo configura el administrador del tenant** | Un modelo necesita una clave de API propia del tenant: guardar un modelo sin ella se rechaza con un error. Sin clave, el tenant usa el LLM del sistema, modelo y clave por igual, así que su uso nunca se factura a la clave del sistema. Una clave sola usa el modelo del sistema con la clave del tenant. |
+
+Lo introducido se conserva al cambiar de opción, pero solo se aplica mientras esté elegida una de las dos últimas. La excepción es elegir **Lo configura el administrador del tenant**: borra tanto el modelo como la clave de API, de modo que los administradores del tenant empiezan con los campos vacíos y no con lo que introdujo un superadministrador.
+
 ## Tu propia cuenta {#your-own-account}
 
 Haz clic en el botón de perfil de la barra de la aplicación y elige **Perfil** para revisar tu propia cuenta. La página se abre con una tarjeta de identidad (un banner, tu avatar sobre su borde inferior, tu nombre visible como encabezado y, a su lado, tu `@username`, tus roles y tus píldoras de estado), seguida de dos tarjetas de solo lectura y una tarjeta **Preferencias**:
@@ -168,7 +189,7 @@ Escribir en esta sección requiere el rol Administrador. La lectura sigue abiert
 
 Abre **Tenants** en la barra lateral de administración para gestionar los tenants: el límite organizativo de nivel superior para la multitenencia. Lo que ese límite significa para todo lo demás, y cómo un Superadministrador elige el tenant con el que actuar, se explica en [Tenants](../concepts/tenants.md); esta sección trata de los propios registros.
 
-A diferencia de todas las demás secciones de administración, esta es **solo para Superadministradores** (el administrador de un tenant cambia su bloqueo de inicio de sesión, su propio Vault y su [inicio de sesión único](./single-sign-on.md) en **Configuración de administrador**). Está oculta en la barra lateral y en la página de bienvenida para todos los demás roles, y las escrituras de cualquier otra persona se rechazan.
+A diferencia de todas las demás secciones de administración, esta es **solo para Superadministradores** (el administrador de un tenant cambia su bloqueo de inicio de sesión, su propio Vault, su [inicio de sesión único](./single-sign-on.md) y, si un Superadministrador se lo cede, su LLM en **Configuración de administrador**). Está oculta en la barra lateral y en la página de bienvenida para todos los demás roles, y las escrituras de cualquier otra persona se rechazan.
 
 | Campo | Notas |
 |---|---|
@@ -176,6 +197,7 @@ A diferencia de todas las demás secciones de administración, esta es **solo pa
 | **Nombre** | Un identificador apto para URL, en minúsculas y kebab-case. Único y no editable después de crearlo. |
 | **Habilitado** | Desmárcalo para desactivar un tenant sin eliminarlo: sus usuarios ya no pueden iniciar sesión, y a quienes ya la tengan iniciada se les cierra en su siguiente solicitud. |
 | **Inicios de sesión fallidos antes del bloqueo** / **Minutos de bloqueo** | Cómo bloquean los inicios de sesión fallidos las cuentas del tenant; consulta [Inicios de sesión fallidos](#failed-sign-ins). |
+| **Quién configura el LLM** | Si el tenant usa el LLM del sistema o uno introducido por un Superadministrador o por el administrador del tenant; consulta [El LLM del tenant](#tenant-llm). |
 | **Iniciar sesión en el Vault global** | Márcalo para registrar la credencial del tenant para el Vault global; consulta más abajo. |
 
 ### La credencial del Vault global {#global-vault-credential}

@@ -18,6 +18,8 @@ Un [usuario](../guides/users-and-groups.md#users) pertenece **como máximo a un*
 
 Cada tenant también puede conectar su propio proveedor de identidad, de modo que su personal inicie sesión con la cuenta de la empresa en lugar de una contraseña. La conexión pertenece al tenant: el proveedor de identidad de otro tenant nunca puede dar acceso a este. Consulta [Inicio de sesión único](../guides/single-sign-on.md).
 
+Un tenant también puede ejecutar sus agentes con un LLM propio —un modelo y una clave de API que introduce un Superadministrador o el propio Administrador del tenant— en lugar del del sistema. Consulta [El LLM del tenant](../guides/users-and-groups.md#tenant-llm).
+
 ## El límite del tenant {#the-tenant-boundary}
 
 Toda lectura y escritura con ámbito de tenant se resuelve dentro del tenant de quien la hace, y un registro que solo existe en otro tenant se notifica como **HTTP 404, no 403**: el límite oculta la existencia del registro en lugar de anunciarla. Esto vale tanto para un ID de flujo de trabajo escrito en una URL como para un ID pasado a una API, y es la razón por la que una referencia entre tenants nunca confirma que el registro sea real.

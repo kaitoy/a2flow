@@ -19,12 +19,12 @@ import logging
 from ag_ui_adk import adk_events_to_messages
 from google.adk.events import Event
 from google.adk.models.base_llm import BaseLlm
-from google.adk.models.lite_llm import LiteLlm
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.registry import LLMRegistry
 from google.genai import types
 
 from infrastructure.agent import resolve_model
+from infrastructure.llm_settings import ResolvedLlm
 
 logger = logging.getLogger(__name__)
 
@@ -81,25 +81,32 @@ _DESCRIPTION_PROMPT = (
 )
 
 
-def build_llm() -> BaseLlm:
-    """Instantiate a :class:`BaseLlm` for one-shot calls from the configured model.
+def build_llm(llm: ResolvedLlm) -> BaseLlm:
+    """Instantiate a :class:`BaseLlm` for one-shot calls from a tenant's LLM.
 
-    :func:`resolve_model` already yields a :class:`LiteLlm` instance for
-    ``litellm:``-prefixed selections; bare model names (e.g. Gemini) are turned
-    into an instance via :meth:`LLMRegistry.new_llm`.
+    :func:`resolve_model` already yields an instance for ``litellm:``-prefixed
+    selections and for a Gemini name that carries an API key; a bare model name
+    is turned into one via :meth:`LLMRegistry.new_llm`.
+
+    Args:
+        llm: The model and key to call, from
+            :meth:`infrastructure.llm_settings.LlmSettingsResolver.resolve`.
+
+    Returns:
+        The model to send the one-shot request to.
     """
-    model = resolve_model()
-    if isinstance(model, LiteLlm):
+    model = resolve_model(llm)
+    if isinstance(model, BaseLlm):
         return model
     return LLMRegistry.new_llm(model)
 
 
 async def summarize_design_transcript(
-    transcript: str, *, max_chars: int = 10000
+    transcript: str, *, llm: ResolvedLlm, max_chars: int = 10000
 ) -> str:
     """Summarize a design-session transcript into a workflow prompt.
 
-    Sends a single user turn to the configured LLM and concatenates the text
+    Sends a single user turn to the tenant's LLM and concatenates the text
     parts of its response. The transcript is truncated to
     :data:`_TRANSCRIPT_MAX_CHARS` before sending, and the result is hard-cut to
     ``max_chars`` so it always fits the ``WorkflowPromptText`` column constraint.
@@ -107,6 +114,7 @@ async def summarize_design_transcript(
     Args:
         transcript: The design conversation as plain text (one line per
             message, speaker-prefixed).
+        llm: The tenant's resolved LLM.
         max_chars: Upper bound on the returned summary length; defaults to the
             ``WorkflowPromptText`` maximum.
 
@@ -119,11 +127,13 @@ async def summarize_design_transcript(
             callers decide the fallback (the generation job falls back to the
             transcript head; the on-demand endpoint surfaces HTTP 502).
     """
-    summary = await _complete(_SUMMARY_PROMPT, transcript)
+    summary = await _complete(_SUMMARY_PROMPT, transcript, llm)
     return summary[:max_chars].rstrip()
 
 
-async def describe_design_transcript(transcript: str, *, max_chars: int = 2000) -> str:
+async def describe_design_transcript(
+    transcript: str, *, llm: ResolvedLlm, max_chars: int = 2000
+) -> str:
     """Write a short, requester-facing description from a design transcript.
 
     Unlike :func:`summarize_design_transcript`, whose output is the prompt a
@@ -134,6 +144,7 @@ async def describe_design_transcript(transcript: str, *, max_chars: int = 2000) 
     Args:
         transcript: The design conversation as plain text (one line per
             message, speaker-prefixed).
+        llm: The tenant's resolved LLM.
         max_chars: Upper bound on the returned text; defaults to the
             ``DescText`` maximum of a workflow's ``description``.
 
@@ -144,11 +155,11 @@ async def describe_design_transcript(transcript: str, *, max_chars: int = 2000) 
         ValueError: If the LLM returned no usable text.
         Exception: Whatever the underlying LLM client raises on failure.
     """
-    description = await _complete(_DESCRIPTION_PROMPT, transcript)
+    description = await _complete(_DESCRIPTION_PROMPT, transcript, llm)
     return description[:max_chars].rstrip()
 
 
-async def _complete(template: str, transcript: str) -> str:
+async def _complete(template: str, transcript: str, llm: ResolvedLlm) -> str:
     """Send one prompt built from ``template`` and return the reply text.
 
     The transcript is truncated to :data:`_TRANSCRIPT_MAX_CHARS` before it is
@@ -157,6 +168,7 @@ async def _complete(template: str, transcript: str) -> str:
     Args:
         template: The instruction, with a ``{transcript}`` placeholder.
         transcript: The design conversation as plain text.
+        llm: The tenant's resolved LLM.
 
     Returns:
         The reply's concatenated text parts, stripped.
@@ -164,14 +176,14 @@ async def _complete(template: str, transcript: str) -> str:
     Raises:
         ValueError: If the LLM returned no usable text.
     """
-    llm = build_llm()
+    model = build_llm(llm)
     prompt = template.format(transcript=transcript[:_TRANSCRIPT_MAX_CHARS])
     request = LlmRequest(
-        model=getattr(llm, "model", None),
+        model=getattr(model, "model", None),
         contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
     )
     chunks: list[str] = []
-    async for response in llm.generate_content_async(request, stream=False):
+    async for response in model.generate_content_async(request, stream=False):
         content = response.content
         if content is None or not content.parts:
             continue

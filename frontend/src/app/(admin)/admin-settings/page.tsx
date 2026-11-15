@@ -1,7 +1,8 @@
 /**
  * @module AdminSettingsPage — Admin page for the settings a tenant's own
  * `admin` manages: how failed sign-ins lock the tenant's accounts, the
- * tenant's own HashiCorp Vault, and its OpenID Connect single sign-on.
+ * tenant's own HashiCorp Vault, its OpenID Connect single sign-on and — only
+ * while a super admin has handed it over — the tenant's LLM.
  */
 "use client";
 
@@ -15,6 +16,13 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import {
+  LlmSettingsFields,
+  llmShape,
+  refineTenantAdminLlm,
+  toLlmBody,
+  toLlmFormValues,
+} from "@/components/admin/llm-settings-fields";
 import {
   OidcSettingsFields,
   oidcShape,
@@ -41,6 +49,7 @@ import { useT } from "@/i18n/provider";
 import {
   type AdminSettings,
   getAdminSettings,
+  type LlmMode,
   SUPPRESS_FORBIDDEN_TOAST,
   updateAdminSettings,
   type VaultAuthMethod,
@@ -50,12 +59,20 @@ import { showToast } from "@/store/toastSlice";
 
 /**
  * Build the validation schema. `savedMethod` is the auth method whose Vault
- * credential is stored, if any (see {@link refineVaultConnection}).
+ * credential is stored, if any (see {@link refineVaultConnection}). `llm` is
+ * whether the LLM fields are this admin's to set and whether a key is stored;
+ * only then are they checked (see {@link refineTenantAdminLlm}).
  */
-function buildSchema(savedMethod: VaultAuthMethod | null) {
+function buildSchema(
+  savedMethod: VaultAuthMethod | null,
+  llm: { editable: boolean; keySaved: boolean }
+) {
   return z
-    .object({ ...signInLockoutShape, ...vaultConnectionShape, ...oidcShape })
-    .superRefine((values, ctx) => refineVaultConnection(values, ctx, savedMethod));
+    .object({ ...signInLockoutShape, ...vaultConnectionShape, ...oidcShape, ...llmShape })
+    .superRefine((values, ctx) => {
+      refineVaultConnection(values, ctx, savedMethod);
+      if (llm.editable) refineTenantAdminLlm(values, ctx, llm.keySaved);
+    });
 }
 
 type FormValues = z.infer<ReturnType<typeof buildSchema>>;
@@ -66,6 +83,7 @@ function toFormValues(settings: Partial<AdminSettings>): FormValues {
     ...toSignInLockoutFormValues(settings),
     ...toVaultConnectionFormValues(settings),
     ...toOidcFormValues(settings),
+    ...toLlmFormValues(settings),
   };
 }
 
@@ -88,7 +106,14 @@ export default function AdminSettingsPage() {
   // allow (null while the deployment's base URL is unset). Both are read-only.
   const [secretSaved, setSecretSaved] = useState(false);
   const [redirectUri, setRedirectUri] = useState<string | null>(null);
-  const schema = useMemo(() => buildSchema(savedMethod), [savedMethod]);
+  // Whether a super admin has handed the tenant's LLM to its admin, and whether
+  // a key is stored. Only in that mode are the LLM fields shown or sent.
+  const [llmMode, setLlmMode] = useState<LlmMode>("system_default");
+  const [llmKeySet, setLlmKeySet] = useState(false);
+  const schema = useMemo(
+    () => buildSchema(savedMethod, { editable: llmMode === "tenant_admin", keySaved: llmKeySet }),
+    [savedMethod, llmMode, llmKeySet]
+  );
   const save = useAsyncAction({ showDone: false });
   const {
     register,
@@ -109,6 +134,8 @@ export default function AdminSettingsPage() {
         setSavedMethod(savedVaultMethod(settings));
         setSecretSaved(settings.oidcClientSecretSet ?? false);
         setRedirectUri(settings.oidcRedirectUri ?? null);
+        setLlmMode(settings.llmMode ?? "system_default");
+        setLlmKeySet(settings.llmApiKeySet ?? false);
         reset(toFormValues(settings));
       })
       .catch(() => setDenied(true))
@@ -122,10 +149,13 @@ export default function AdminSettingsPage() {
           ...toSignInLockoutBody(values),
           ...toVaultConnectionBody(values),
           ...toOidcBody(values),
+          ...(llmMode === "tenant_admin" ? toLlmBody(values) : {}),
         });
         setSavedMethod(savedVaultMethod(saved));
         setSecretSaved(saved.oidcClientSecretSet ?? false);
         setRedirectUri(saved.oidcRedirectUri ?? null);
+        setLlmMode(saved.llmMode ?? "system_default");
+        setLlmKeySet(saved.llmApiKeySet ?? false);
         reset(toFormValues(saved));
         dispatch(showToast({ message: t("adminSettings.adminSettingsUpdated") }));
       });
@@ -212,6 +242,24 @@ export default function AdminSettingsPage() {
             secretSaved={secretSaved}
             redirectUri={redirectUri}
           />
+
+          {llmMode === "tenant_admin" && (
+            <>
+              <hr className="border-outline-variant" />
+
+              <LlmSettingsFields
+                model={register("llmModel")}
+                apiKey={register("llmApiKey")}
+                apiKeySaved={llmKeySet}
+                inherits
+                keyRequired
+                errors={{
+                  llmModel: errors.llmModel?.message,
+                  llmApiKey: errors.llmApiKey?.message,
+                }}
+              />
+            </>
+          )}
 
           <div className="flex gap-2">
             <Button

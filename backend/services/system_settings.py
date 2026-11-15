@@ -32,6 +32,7 @@ from models.system_settings import (
 )
 from repositories.exceptions import NotFoundError, SystemSettingsValidationError
 from repositories.system_settings import SystemSettingsRepository
+from services.llm_settings import prepare_llm_fields
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ class SystemSettingsService:
                 payload["smtp_password"] = self._cipher.encrypt(password)
             elif password is not None:
                 payload.pop("smtp_password")
+        prepare_llm_fields(payload, self._cipher)
         _assert_usable(current, payload)
         return await self._repo.update(
             SystemSettingsUpdate.model_construct(**payload), user_id=user_id

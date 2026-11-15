@@ -171,6 +171,21 @@ HashiCorp Vault 没有对应的环境变量：租户自己的 Vault 由其管理
 | `MCP_TRANSPORT_CERT_VALIDITY_DAYS` | `365` | 这些材料的有效期。剩余不足 30 天时会自动重新签发，无需人工关注 |
 | `MCP_SANDBOX_DIR` | 未设置 | [沙箱化服务器启动](../architecture/mcp-gateway-and-proxy.md#per-launch-sandbox)所用的各租户主目录的位置，租户的服务器下载的软件包保存在这里，每个租户一个目录。设置后，每个本地启动的服务器都在自己的沙箱中运行；未设置时 MCP 代理服务器会拒绝启动。在普通的本地运行中不设置，此时服务器不使用沙箱启动 |
 
+## LLM {#llm}
+
+系统的默认 LLM（所有租户的代理所运行的模型，以及访问它所用的密钥）在[系统设置](../guides/system-settings.md#llm)界面中编辑。也可以像下面的邮件设置一样，用这两个变量从环境中设置它。提供商的设置方法见 [LLM 配置](../getting-started/llm-configuration.md)。
+
+| 变量 | 默认值 | 作用 |
+|---|---|---|
+| `SYSTEM_DEFAULT_LLM_MODEL` | — | Gemini 模型名称，其他提供商则用 `litellm:<提供商>/<模型>`。这个变量和界面都没有设置时，使用内置的默认值 `gemini-3.8-flash` |
+| `SYSTEM_DEFAULT_LLM_API_KEY` | — | 该提供商的 API 密钥。加密存储，不会写入日志，也不会出现在任何 API 响应中 |
+
+与下面的邮件设置一样，这些变量**在每次启动时重新应用**：
+
+- **后端启动时应用**到系统设置。已设置的变量会覆盖管理员在界面中保存的值，因此更换密钥的方法是修改变量后重启。未设置或为空的变量不会改动对应字段，由界面管理。
+- **格式不正确的值会作为警告记入日志并被跳过**，例如超过 200 个字符的模型名称。邮件设置仍会应用，应用也仍会启动。
+- **未设置时，仍像以前一样读取提供商自己的环境变量**（`GOOGLE_API_KEY`、`OPENAI_API_KEY`、`ANTHROPIC_API_KEY` 或 `AWS_BEARER_TOKEN_BEDROCK`），前提是尚未存储任何密钥。Vertex AI 这类不是单个密钥的凭据也通过这种方式提供。
+
 ## 通知邮件 {#notification-email}
 
 这些值与管理界面中[系统设置](../guides/system-settings.md)所编辑的值相同。它们也可以通过环境变量设置，这样部署就能自带邮件配置，而不必留作手动步骤。

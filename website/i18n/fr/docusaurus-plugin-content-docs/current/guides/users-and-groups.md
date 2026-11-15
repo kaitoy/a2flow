@@ -90,6 +90,27 @@ Pour connecter le Vault propre au tenant, ouvrez **Paramètres administrateur** 
 
 Enregistrer une adresse sans identifiant, ou AppRole sans ID de rôle, est rejeté avec une erreur. Un tenant qui n'a ni Vault propre ni identifiant pour le Vault global ne peut pas résoudre ses secrets de type Vault.
 
+## Le LLM du tenant {#tenant-llm}
+
+Les agents s'exécutent sur le LLM défini dans [Paramètres système](./system-settings.md#llm). Un Super administrateur peut donner à un tenant le sien — un autre modèle, ou la clé d'API propre du tenant, par exemple pour facturer son usage séparément — et décide qui le saisit.
+
+Ouvrez le tenant sous **Tenants**, puis choisissez **Qui configure le LLM** :
+
+| Option | Effet |
+|---|---|
+| **Par défaut du système** | Le tenant utilise le LLM du système. Tous les tenants commencent ainsi. |
+| **Configuré par un super administrateur** | Les champs **Modèle** et **Clé d'API** apparaissent sur la page du tenant, et le Super administrateur les remplit. |
+| **Configuré par l'administrateur du tenant** | Les Administrateurs du tenant les saisissent dans **Paramètres administrateur**, dans une section **LLM** qui n'apparaît que pour un tenant réglé sur cette option. |
+
+Les deux champs fonctionnent comme dans [Paramètres système](./system-settings.md#llm), et la clé d'API est **en écriture seule**. Ce que signifie un champ vide dépend de qui les remplit :
+
+| Qui configure le LLM | Un champ vide |
+|---|---|
+| **Configuré par un super administrateur** | Utilise la valeur du système ; un tenant peut donc ne changer que le modèle et garder la clé du système, ou l'inverse. |
+| **Configuré par l'administrateur du tenant** | Un modèle exige une clé d'API propre au tenant : enregistrer un modèle sans clé est refusé avec une erreur. Sans clé, le tenant utilise le LLM du système, modèle et clé compris, si bien que son usage n'est jamais facturé à la clé du système. Une clé seule fait tourner le modèle du système avec la clé du tenant. |
+
+Ce qui a été saisi est conservé quand vous changez d'option, mais ne s'applique que tant que l'une des deux dernières est choisie. Choisir **Configuré par l'administrateur du tenant** fait exception : le modèle et la clé d'API sont tous deux effacés, si bien que les administrateurs du tenant partent de champs vides plutôt que de ce qu'un super administrateur a saisi.
+
 ## Votre propre compte {#your-own-account}
 
 Cliquez sur le bouton de profil dans la barre d'application et choisissez **Profil** pour consulter votre compte. La page s'ouvre sur une carte d'identité : une bannière, votre avatar à cheval sur son bord inférieur, votre nom d'affichage en titre et, à côté, votre `@username`, vos rôles et des pastilles d'état. Viennent ensuite deux cartes en lecture seule et une carte **Préférences** :
@@ -168,7 +189,7 @@ L'écriture dans cette section requiert le rôle Administrateur. La lecture rest
 
 Ouvrez **Tenants** dans la barre latérale d'administration pour gérer les tenants, la frontière organisationnelle de plus haut niveau du fonctionnement multi-tenant. Ce que cette frontière implique pour tout le reste, et la façon dont un Super administrateur choisit le tenant à utiliser, sont traités dans [Tenants](../concepts/tenants.md) ; cette section porte sur les enregistrements eux-mêmes.
 
-Contrairement à toutes les autres sections d'administration, celle-ci est **réservée au Super administrateur** (l'administrateur d'un tenant change le verrouillage de connexion, le Vault propre de celui-ci et son [authentification unique](./single-sign-on.md) dans **Paramètres administrateur**). Elle est masquée de la barre latérale et de la page de bienvenue pour tous les autres rôles, et les écritures venant de quiconque d'autre sont refusées.
+Contrairement à toutes les autres sections d'administration, celle-ci est **réservée au Super administrateur** (l'administrateur d'un tenant change le verrouillage de connexion, le Vault propre de celui-ci, son [authentification unique](./single-sign-on.md) et, si un Super administrateur la lui confie, son LLM dans **Paramètres administrateur**). Elle est masquée de la barre latérale et de la page de bienvenue pour tous les autres rôles, et les écritures venant de quiconque d'autre sont refusées.
 
 | Champ | Remarques |
 |---|---|
@@ -176,6 +197,7 @@ Contrairement à toutes les autres sections d'administration, celle-ci est **ré
 | **Nom** | Un identifiant compatible avec les URL, en minuscules et en kebab-case. Unique et non modifiable après la création. |
 | **Activé** | Décochez-le pour désactiver un tenant sans le supprimer : ses utilisateurs ne peuvent plus se connecter, et toute personne déjà connectée est déconnectée à sa prochaine requête. |
 | **Échecs de connexion avant verrouillage** / **Minutes de verrouillage** | La façon dont les échecs de connexion verrouillent les comptes du tenant : voir [Échecs de connexion](#failed-sign-ins). |
+| **Qui configure le LLM** | Si le tenant utilise le LLM du système ou un LLM saisi par un Super administrateur ou par l'administrateur du tenant : voir [Le LLM du tenant](#tenant-llm). |
 | **Connexion au Vault global** | Cochez-la pour enregistrer l'identifiant du tenant pour le Vault global : voir ci-dessous. |
 
 ### L'identifiant du Vault global {#global-vault-credential}

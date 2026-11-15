@@ -1,6 +1,6 @@
 """Run the backend with a scripted LLM, for the browser end-to-end suite in ``e2e/``.
 
-Usage (from ``backend/``, with ``LLM_MODEL=e2e-fake``)::
+Usage (from ``backend/``, with ``SYSTEM_DEFAULT_LLM_MODEL=e2e-fake``)::
 
     uv run python -m scripts.e2e_server
 

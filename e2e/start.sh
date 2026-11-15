@@ -20,7 +20,7 @@ export SKILLS_DIR="$state/skills"
 export SECRET_KEY_FILE="$state/secret.key"
 export ADMIN_PASSWORD=e2e-admin-pass-123
 export DEMO_DATA=true
-export LLM_MODEL=e2e-fake
+export SYSTEM_DEFAULT_LLM_MODEL=e2e-fake
 export CORS_ORIGINS=http://127.0.0.1:3099
 
 (cd "$root/backend" && exec uv run python -m scripts.e2e_server) &

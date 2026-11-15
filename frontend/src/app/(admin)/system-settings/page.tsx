@@ -18,6 +18,12 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import {
+  LlmSettingsFields,
+  llmShape,
+  toLlmBody,
+  toLlmFormValues,
+} from "@/components/admin/llm-settings-fields";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -88,6 +94,7 @@ function buildSchema(passwordSet: boolean) {
       smtpFromEmail: z.string(),
       smtpFromName: z.string(),
       vaultAddr: z.string(),
+      ...llmShape,
     })
     .superRefine((values, ctx) => {
       validateOptional(values.smtpHost, zSystemSettingsUpdate.shape.smtpHost, ctx, "smtpHost");
@@ -178,6 +185,7 @@ function toFormValues(settings: Partial<SystemSettings>): FormValues {
     smtpFromEmail: settings.smtpFromEmail ?? "",
     smtpFromName: settings.smtpFromName ?? "",
     vaultAddr: settings.vaultAddr ?? "",
+    ...toLlmFormValues(settings),
   };
 }
 
@@ -198,6 +206,7 @@ function toBody(values: FormValues): SystemSettingsUpdate {
     smtpFromEmail: values.smtpFromEmail || null,
     smtpFromName: values.smtpFromName || null,
     vaultAddr: values.vaultAddr || null,
+    ...toLlmBody(values),
   };
   if (values.smtpPassword !== "") {
     body.smtpPassword = values.smtpPassword;
@@ -240,6 +249,8 @@ export default function SystemSettingsPage() {
   // Whether a password is stored. Drives both the placeholder and the
   // "username needs a password" rule, since the value itself never arrives.
   const [passwordSet, setPasswordSet] = useState(false);
+  // Whether an LLM API key is stored; drives only the placeholder.
+  const [llmKeySet, setLlmKeySet] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const save = useAsyncAction({ showDone: false });
@@ -264,6 +275,7 @@ export default function SystemSettingsPage() {
     getSystemSettings(SUPPRESS_FORBIDDEN_TOAST)
       .then((settings) => {
         setPasswordSet(settings.smtpPasswordSet ?? false);
+        setLlmKeySet(settings.llmApiKeySet ?? false);
         reset(toFormValues(settings));
         setAudit({
           createdBy: settings.createdBy,
@@ -283,6 +295,7 @@ export default function SystemSettingsPage() {
       await save.run(async () => {
         const saved = await updateSystemSettings(toBody(values));
         setPasswordSet(saved.smtpPasswordSet ?? false);
+        setLlmKeySet(saved.llmApiKeySet ?? false);
         // The password is write-only, so the field goes back to blank: what is
         // stored is reported by the placeholder, not by the input's value.
         reset(toFormValues(saved));
@@ -370,6 +383,18 @@ export default function SystemSettingsPage() {
               {t("systemSettings.theHashicorpVaultEveryTenantWithoutA")}
             </p>
           </FormField>
+
+          <hr className="border-outline-variant" />
+
+          <LlmSettingsFields
+            model={register("llmModel")}
+            apiKey={register("llmApiKey")}
+            apiKeySaved={llmKeySet}
+            errors={{
+              llmModel: errors.llmModel?.message,
+              llmApiKey: errors.llmApiKey?.message,
+            }}
+          />
 
           <hr className="border-outline-variant" />
 

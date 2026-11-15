@@ -90,6 +90,27 @@ To connect the tenant's own Vault, open **Admin Settings** in the admin sidebar 
 
 Saving an address without a credential, or AppRole without a role id, is rejected with an error. A tenant with neither its own Vault nor a credential for the global one cannot resolve its Vault-type secrets.
 
+## The tenant's LLM {#tenant-llm}
+
+Agents run on the LLM set under [System Settings](./system-settings.md#llm). A Super Admin can give a tenant its own instead — another model, or the tenant's own API key, for example to bill that tenant's usage separately — and decides who enters it.
+
+Open the tenant under **Tenants** and choose **Who sets the LLM**:
+
+| Option | What happens |
+|---|---|
+| **System default** | The tenant uses the system's LLM. Every tenant starts here. |
+| **Set by a Super Admin** | The **Model** and **API key** fields appear on the tenant's page, and the Super Admin fills them in. |
+| **Set by the tenant's Admin** | The tenant's Admins enter them under **Admin Settings**, in an **LLM** section that appears only for a tenant set to this option. |
+
+Both fields work as they do in [System Settings](./system-settings.md#llm), and the API key is **write-only**. What an empty field means depends on who fills them in:
+
+| Who sets the LLM | An empty field |
+|---|---|
+| **Set by a Super Admin** | Uses the system's value, so a tenant can change only the model and keep the system's key, or the reverse. |
+| **Set by the tenant's Admin** | A model needs the tenant's own API key: saving a model without one is rejected with an error. With no key the tenant runs on the system's LLM, model and key alike, so its usage is never billed to the system's key. A key alone runs the system's model on the tenant's key. |
+
+What was entered stays when you switch options, but it applies only while one of the last two is chosen. The exception is choosing **Set by the tenant's Admin**: it clears both the model and the API key, so the tenant's Admins start from empty fields rather than what a Super Admin entered.
+
 ## Your own account {#your-own-account}
 
 Click the profile button in the app bar and choose **Profile** to review your own account. The page opens with an identity card — a banner, your avatar across its lower edge, your display name as the heading, and your `@username`, roles and status pills beside it — followed by two read-only cards and a **Preferences** card:
@@ -168,7 +189,7 @@ Writing to this section requires the `admin` role. Reads stay open, so a viewer 
 
 Open **Tenants** in the admin sidebar to manage tenants — the top-level organizational boundary for multi-tenancy. What that boundary means for everything else, and how a Super Admin picks a tenant to act as, is covered under [Tenants](../concepts/tenants.md); this section is about the records themselves.
 
-Unlike every other admin section, this one is **Super Admin only** (a tenant's own admin changes its sign-in lockout and its own Vault under **Admin Settings** instead, along with its [single sign-on](./single-sign-on.md)). It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
+Unlike every other admin section, this one is **Super Admin only** (a tenant's own admin changes its sign-in lockout and its own Vault under **Admin Settings** instead, along with its [single sign-on](./single-sign-on.md) and, if a Super Admin hands it over, its LLM). It is hidden from the sidebar and the welcome page for every other role, and writes from anyone else are refused.
 
 | Field | Notes |
 |---|---|
@@ -176,6 +197,7 @@ Unlike every other admin section, this one is **Super Admin only** (a tenant's o
 | **Name** | A URL-safe identifier, lowercase kebab-case. Unique, and not editable after creation. |
 | **Enabled** | Clear it to deactivate a tenant without deleting it: its users can no longer sign in, and anyone already signed in is signed out on their next request. |
 | **Failed Sign-ins Before Lockout** / **Lockout Minutes** | How failed sign-ins lock the tenant's accounts — see [Failed sign-ins](#failed-sign-ins). |
+| **Who sets the LLM** | Whether the tenant uses the system's LLM or one entered by a Super Admin or by the tenant's Admin — see [The tenant's LLM](#tenant-llm). |
 | **Log in to the global Vault** | Tick it to register the tenant's credential for the global Vault — see below. |
 
 ### The global Vault credential {#global-vault-credential}

@@ -7,12 +7,16 @@ import pytest
 from google.genai import types
 
 from infrastructure import summarizer
+from infrastructure.llm_settings import ResolvedLlm
 from infrastructure.summarizer import (
     _TRANSCRIPT_MAX_CHARS,
     build_llm,
     describe_design_transcript,
     summarize_design_transcript,
 )
+
+#: The LLM the summaries are requested for; the fake replaces it.
+_LLM = ResolvedLlm("gemini-3.8-flash")
 
 
 class _FakeLlm:
@@ -40,9 +44,9 @@ async def test_summarize_concatenates_text_parts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = _FakeLlm(["A workflow that ", "does the thing."])
-    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+    monkeypatch.setattr(summarizer, "build_llm", lambda _llm: llm)
 
-    result = await summarize_design_transcript("User: do the thing")
+    result = await summarize_design_transcript("User: do the thing", llm=_LLM)
 
     assert result == "A workflow that does the thing."
     prompt = llm.requests[0].contents[0].parts[0].text
@@ -53,9 +57,9 @@ async def test_summarize_truncates_to_max_chars(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = _FakeLlm(["x" * 5000])
-    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+    monkeypatch.setattr(summarizer, "build_llm", lambda _llm: llm)
 
-    result = await summarize_design_transcript("t", max_chars=100)
+    result = await summarize_design_transcript("t", llm=_LLM, max_chars=100)
 
     assert len(result) == 100
 
@@ -64,9 +68,9 @@ async def test_summarize_caps_the_transcript_it_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = _FakeLlm(["ok"])
-    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+    monkeypatch.setattr(summarizer, "build_llm", lambda _llm: llm)
 
-    await summarize_design_transcript("y" * (_TRANSCRIPT_MAX_CHARS + 10_000))
+    await summarize_design_transcript("y" * (_TRANSCRIPT_MAX_CHARS + 10_000), llm=_LLM)
 
     prompt = llm.requests[0].contents[0].parts[0].text
     assert len(prompt) < _TRANSCRIPT_MAX_CHARS + 1_000
@@ -76,19 +80,19 @@ async def test_summarize_raises_on_empty_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = _FakeLlm([None])
-    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+    monkeypatch.setattr(summarizer, "build_llm", lambda _llm: llm)
 
     with pytest.raises(ValueError):
-        await summarize_design_transcript("t")
+        await summarize_design_transcript("t", llm=_LLM)
 
 
 async def test_describe_asks_for_a_requester_facing_blurb(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = _FakeLlm(["Builds your weekly report."])
-    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+    monkeypatch.setattr(summarizer, "build_llm", lambda _llm: llm)
 
-    result = await describe_design_transcript("User: do the thing")
+    result = await describe_design_transcript("User: do the thing", llm=_LLM)
 
     assert result == "Builds your weekly report."
     prompt = llm.requests[0].contents[0].parts[0].text
@@ -100,23 +104,17 @@ async def test_describe_truncates_to_max_chars(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = _FakeLlm(["x" * 5000])
-    monkeypatch.setattr(summarizer, "build_llm", lambda: llm)
+    monkeypatch.setattr(summarizer, "build_llm", lambda _llm: llm)
 
-    assert len(await describe_design_transcript("t")) == 2000
+    assert len(await describe_design_transcript("t", llm=_LLM)) == 2000
 
 
-def test_build_llm_uses_litellm_for_prefixed_models(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_build_llm_uses_litellm_for_prefixed_models() -> None:
     """The ``litellm:`` prefix selects LiteLlm with the prefix stripped and
     pins reasoning_effort="none" + drop_params=True."""
     from google.adk.models.lite_llm import LiteLlm
 
-    monkeypatch.setenv("LLM_MODEL", "litellm:openai/gpt-5.6-terra")
-    from config import get_settings
-
-    get_settings.cache_clear()
-    llm = build_llm()
+    llm = build_llm(ResolvedLlm("litellm:openai/gpt-5.6-terra"))
     assert isinstance(llm, LiteLlm)
     assert llm.model == "openai/gpt-5.6-terra"
     assert llm._additional_args["reasoning_effort"] == "none"
@@ -126,30 +124,26 @@ def test_build_llm_uses_litellm_for_prefixed_models(
 @pytest.mark.parametrize(
     "model", ["litellm:anthropic/claude-sonnet-5-5", "litellm:openai/gpt-6.1-sol"]
 )
-def test_build_llm_leaves_thinking_default_for_non_gpt5_routes(
-    monkeypatch: pytest.MonkeyPatch, model: str
-) -> None:
+def test_build_llm_leaves_thinking_default_for_non_gpt5_routes(model: str) -> None:
     """Only ``openai/gpt-5*`` routes get the reasoning_effort="none" pin;
     gpt-6 rejects "none", and other providers keep their own thinking
     default."""
     from google.adk.models.lite_llm import LiteLlm
 
-    monkeypatch.setenv("LLM_MODEL", model)
-    from config import get_settings
-
-    get_settings.cache_clear()
-    llm = build_llm()
+    llm = build_llm(ResolvedLlm(model))
     assert isinstance(llm, LiteLlm)
     assert "reasoning_effort" not in llm._additional_args
     assert llm._additional_args["drop_params"] is True
 
 
-def test_build_llm_uses_registry_for_bare_models(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("LLM_MODEL", "gemini-3.8-flash")
-    from config import get_settings
-
-    get_settings.cache_clear()
-    llm = build_llm()
+def test_build_llm_uses_registry_for_bare_models() -> None:
+    llm = build_llm(ResolvedLlm("gemini-3.8-flash"))
     assert llm.model == "gemini-3.8-flash"
+
+
+def test_build_llm_passes_the_tenants_key() -> None:
+    from google.adk.models.google_llm import Gemini
+
+    llm = build_llm(ResolvedLlm("gemini-3.8-flash", api_key="g-key"))
+    assert isinstance(llm, Gemini)
+    assert llm.client_kwargs == {"api_key": "g-key"}

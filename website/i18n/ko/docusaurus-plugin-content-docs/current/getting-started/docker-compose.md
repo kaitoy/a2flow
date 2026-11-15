@@ -8,7 +8,7 @@ sidebar_position: 2
 또는 Docker Compose([compose.yml](https://github.com/kaitoy/a2flow/blob/master/compose.yml))로 전체 스택을 한 번에 빌드하고 시작할 수도 있습니다.
 
 ```bash
-echo GOOGLE_API_KEY=your_google_api_key_here > .env
+echo SYSTEM_DEFAULT_LLM_API_KEY=your_google_api_key_here > .env
 docker compose up --build
 ```
 

@@ -23,19 +23,30 @@ from services.system_settings import SystemSettingsService
 
 logger = logging.getLogger(__name__)
 
-#: Attribute names on config.Settings that apply_system_settings_env_overrides
-#: may apply, exactly as SystemSettingsUpdate's fields expect (snake_case;
-#: populate_by_name=True accepts these directly without the camelCase alias).
-_SYSTEM_SETTINGS_ENV_FIELDS = (
-    "smtp_enabled",
-    "smtp_host",
-    "smtp_port",
-    "smtp_security",
-    "smtp_username",
-    "smtp_password",
-    "smtp_from_email",
-    "smtp_from_name",
-)
+#: The groups of variables apply_system_settings_env_overrides applies, keyed
+#: by the ``<PREFIX>_*`` its log lines name. Each maps a config.Settings
+#: attribute to the SystemSettingsUpdate field it sets. A group is validated and
+#: applied on its own, so a bad ``SMTP_PORT`` does not hold back the LLM, nor the
+#: reverse.
+_SYSTEM_SETTINGS_ENV_GROUPS: dict[str, dict[str, str]] = {
+    "SMTP": {
+        field: field
+        for field in (
+            "smtp_enabled",
+            "smtp_host",
+            "smtp_port",
+            "smtp_security",
+            "smtp_username",
+            "smtp_password",
+            "smtp_from_email",
+            "smtp_from_name",
+        )
+    },
+    "SYSTEM_DEFAULT_LLM": {
+        "system_default_llm_model": "llm_model",
+        "system_default_llm_api_key": "llm_api_key",
+    },
+}
 
 
 async def seed_system_settings(session: AsyncSession) -> None:
@@ -66,13 +77,15 @@ async def seed_system_settings(session: AsyncSession) -> None:
 
 
 async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
-    """Apply whichever ``SMTP_*`` env vars are set onto the settings row.
+    """Apply whichever ``SMTP_*`` and ``SYSTEM_DEFAULT_LLM_*`` env vars are set onto the settings row.
 
     Runs on every startup, not just the first: an operator may add or rotate
-    a ``SMTP_*`` variable on a later deploy (e.g. changing
-    ``SMTP_PASSWORD``), and that should reach the database without a manual
-    admin-UI edit. Only fields whose environment variable is actually set are
-    touched — this is built by constructing a real
+    a variable on a later deploy (e.g. changing ``SMTP_PASSWORD`` or
+    ``SYSTEM_DEFAULT_LLM_API_KEY``), and that should reach the database
+    without a manual admin-UI edit. The flip side is that a set variable wins
+    over what was saved on the System Settings screen, at the next restart.
+    Only fields whose environment variable is actually set are touched — this
+    is built by constructing a real
     :class:`~models.system_settings.SystemSettingsUpdate` from just those
     fields, not ``model_construct`` (which would skip validation entirely),
     so pydantic's ``model_fields_set`` records exactly the env-sourced fields
@@ -81,7 +94,9 @@ async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
     :meth:`~repositories.system_settings.SqlSystemSettingsRepository.update`'s
     ``exclude_unset=True`` handling — the same mechanism the admin UI's
     partial PATCH already relies on — leaves every other field, including
-    anything configured by hand through the admin UI, untouched.
+    anything configured by hand through the admin UI, untouched. The service
+    encrypts ``SMTP_PASSWORD`` and ``SYSTEM_DEFAULT_LLM_API_KEY`` on the way
+    in, exactly as for a screen save.
 
     ``SMTP_ENABLED`` is never inferred from the presence of the other
     ``SMTP_*`` variables; it must be set explicitly, matching the opt-in
@@ -93,14 +108,16 @@ async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
     flipping the flag on is harmless — it lets "configure the relay" and
     "turn delivery on" ship as two separate deploys.
 
-    A malformed value — a pydantic field-level failure (an out-of-range
-    ``SMTP_PORT``, a malformed ``SMTP_FROM_EMAIL``, an unrecognized
-    ``SMTP_SECURITY``) or the service's business-rule check (e.g.
-    ``SMTP_ENABLED=true`` with no ``SMTP_HOST``) — is logged as a
-    ``WARNING`` (naming only the offending field(s), never their value, so a
-    bad ``SMTP_PASSWORD`` is never written to the log) and the entire apply
-    is skipped: the row keeps whatever configuration it already had, and
-    startup continues normally.
+    The two groups (:data:`_SYSTEM_SETTINGS_ENV_GROUPS`) are applied one after
+    the other, each on its own. A malformed value — a pydantic field-level
+    failure (an out-of-range ``SMTP_PORT``, a malformed ``SMTP_FROM_EMAIL``, an
+    unrecognized ``SMTP_SECURITY``, a model name over the length cap) or the
+    service's business-rule check (e.g. ``SMTP_ENABLED=true`` with no
+    ``SMTP_HOST``) — is logged as a ``WARNING`` (naming only the offending
+    field(s), never their value, so a bad password or API key is never written
+    to the log) and that group's apply is skipped: the row keeps whatever that
+    group had, the other group is still applied, and startup continues
+    normally.
 
     Must run after :func:`seed_system_settings` — the row has to exist,
     since :meth:`~services.system_settings.SystemSettingsService.update`
@@ -113,42 +130,45 @@ async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
         session: Database session used to read and write the settings row.
     """
     settings = get_settings()
-    set_fields = {
-        field: getattr(settings, field)
-        for field in _SYSTEM_SETTINGS_ENV_FIELDS
-        if getattr(settings, field) is not None
-    }
-    if not set_fields:
-        return
-
-    try:
-        update = SystemSettingsUpdate(**set_fields)
-    except ValidationError as exc:
-        bad_fields = ", ".join(
-            str(err["loc"][0])
-            for err in exc.errors(
-                include_url=False, include_input=False, include_context=False
-            )
-        )
-        logger.warning(
-            "Invalid SMTP_* environment configuration for "
-            "field(s) %s; leaving the stored system settings unchanged. "
-            "(Values are never logged here, including SMTP_PASSWORD.)",
-            bad_fields,
-        )
-        return
-
     service = SystemSettingsService(
         SqlSystemSettingsRepository(session), get_secret_cipher()
     )
-    try:
-        await service.update(update, user_id=SYSTEM_USER_ID)
-    except SystemSettingsValidationError as exc:
-        logger.warning(
-            "SMTP_* environment configuration would leave email delivery "
-            "unusable (%s); leaving the stored system settings unchanged.",
-            exc.reason,
-        )
+    for prefix, fields in _SYSTEM_SETTINGS_ENV_GROUPS.items():
+        set_fields = {
+            target: getattr(settings, source)
+            for source, target in fields.items()
+            if getattr(settings, source) is not None
+        }
+        if not set_fields:
+            continue
+
+        try:
+            update = SystemSettingsUpdate(**set_fields)
+        except ValidationError as exc:
+            bad_fields = ", ".join(
+                str(err["loc"][0])
+                for err in exc.errors(
+                    include_url=False, include_input=False, include_context=False
+                )
+            )
+            logger.warning(
+                "Invalid %s_* environment configuration for "
+                "field(s) %s; leaving the stored system settings unchanged. "
+                "(Values are never logged here, including passwords and keys.)",
+                prefix,
+                bad_fields,
+            )
+            continue
+
+        try:
+            await service.update(update, user_id=SYSTEM_USER_ID)
+        except SystemSettingsValidationError as exc:
+            logger.warning(
+                "%s_* environment configuration would leave the system settings "
+                "unusable (%s); leaving the stored system settings unchanged.",
+                prefix,
+                exc.reason,
+            )
 
 
 #: Bytes of entropy for a generated seed password (used when ``ROOT_PASSWORD``

@@ -116,7 +116,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     Seeds the system, root, and Default-tenant admin users and the singleton
     system-settings row, applies any ``SMTP_*`` environment
-    overrides onto that row, then registers or removes the optional demo
+    overrides onto that row, loads ``SYSTEM_DEFAULT_LLM_*`` into the LLM
+    fields it still has empty, then registers or removes the optional demo
     dataset depending on ``DEMO_DATA``. A demo agent skill registered by this
     run still needs its repository cloned; that runs as a background task
     rather than inline, so a slow or unreachable remote delays nothing

@@ -716,6 +716,28 @@ export const ja = {
   "lib.traceToolCallsImpersonationCertificatesAndMail":
     "ツールの呼び出し、代理ログイン、証明書、メールを追跡する",
   "lib.trackWorkflowRuns": "ワークフローの実行を追跡する",
+  "llm.title": "LLM",
+  "llm.model": "モデル",
+  "llm.modelHint":
+    "Gemini のモデル名、または他のプロバイダを使う場合は litellm:<プロバイダ>/<モデル> の形式で指定します。",
+  "llm.modelEmpty": "空欄の場合は、組み込みの既定モデルを使います。",
+  "llm.modelEmptyTenant": "空欄の場合は、システムのモデルを使います。",
+  "llm.modelTooLong": "200 文字以内で入力してください。",
+  "llm.apiKey": "API キー",
+  "llm.apiKeyHint":
+    "暗号化して保存し、再表示はしません。空欄の場合は、サーバーの環境に設定されたプロバイダのキーを使います。",
+  "llm.apiKeyHintTenant":
+    "暗号化して保存し、再表示はしません。空欄の場合は、システムのキーを使います。",
+  "llm.apiKeyHintTenantAdmin":
+    "暗号化して保存し、再表示はしません。モデルを入力する場合は必須です。両方とも空欄の場合は、システムの LLM を使います。",
+  "llm.apiKeyRequired": "独自のモデルを使うには、API キーを入力してください。",
+  "llm.mode": "LLM を設定する人",
+  "llm.modeSystemDefault": "システムの既定",
+  "llm.modeSuperAdmin": "上位管理者が設定",
+  "llm.modeTenantAdmin": "テナントの管理者が設定",
+  "llm.modeSystemDefaultHint": "このテナントは、システム設定で指定した LLM を使います。",
+  "llm.modeSuperAdminHint": "このテナントの LLM は、上位管理者が下で設定します。",
+  "llm.modeTenantAdminHint": "このテナントの LLM は、テナントの管理者が管理者設定で設定します。",
   "login.eGAcmeCorp": "例: acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "プラットフォーム管理者としてログインする場合は空欄にしてください。",

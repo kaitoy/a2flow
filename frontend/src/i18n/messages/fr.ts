@@ -733,6 +733,29 @@ export const fr = {
   "lib.traceToolCallsImpersonationCertificatesAndMail":
     "Suivez les appels d'outils, les emprunts d'identité, les certificats et les e-mails",
   "lib.trackWorkflowRuns": "Suivez les exécutions de workflows",
+  "llm.title": "LLM",
+  "llm.model": "Modèle",
+  "llm.modelHint":
+    "Un nom de modèle Gemini ou, pour un autre fournisseur, litellm:<fournisseur>/<modèle>.",
+  "llm.modelEmpty": "Laissé vide, le modèle par défaut intégré est utilisé.",
+  "llm.modelEmptyTenant": "Laissé vide, le modèle du système est utilisé.",
+  "llm.modelTooLong": "Utilisez 200 caractères au maximum.",
+  "llm.apiKey": "Clé d'API",
+  "llm.apiKeyHint":
+    "Enregistrée chiffrée et jamais réaffichée. Laissée vide, la clé du fournisseur définie dans l'environnement du serveur est utilisée.",
+  "llm.apiKeyHintTenant":
+    "Enregistrée chiffrée et jamais réaffichée. Laissée vide, la clé du système est utilisée.",
+  "llm.apiKeyHintTenantAdmin":
+    "Enregistrée chiffrée et jamais réaffichée. Obligatoire si vous saisissez un modèle ; si les deux restent vides, le LLM du système est utilisé.",
+  "llm.apiKeyRequired": "Saisissez une clé d'API pour utiliser votre propre modèle.",
+  "llm.mode": "Qui configure le LLM",
+  "llm.modeSystemDefault": "Par défaut du système",
+  "llm.modeSuperAdmin": "Configuré par un super administrateur",
+  "llm.modeTenantAdmin": "Configuré par l'administrateur du tenant",
+  "llm.modeSystemDefaultHint": "Ce tenant utilise le LLM défini dans Paramètres système.",
+  "llm.modeSuperAdminHint": "Un super administrateur configure le LLM de ce tenant, ci-dessous.",
+  "llm.modeTenantAdminHint":
+    "Les administrateurs de ce tenant configurent son LLM dans Paramètres administrateur.",
   "login.eGAcmeCorp": "p. ex. acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "Laissez vide si vous vous connectez en tant qu'administrateur de la plateforme.",

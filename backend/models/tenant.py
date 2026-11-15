@@ -127,18 +127,54 @@ class TenantOidcFields(SQLModel):
     oidc_trust_email: bool | None = None
 
 
-class TenantUpdate(TenantGlobalVaultFields):
+class LlmMode(StrEnum):
+    """Who decides which LLM a tenant's agents run on."""
+
+    #: The platform-wide LLM of :class:`models.system_settings.SystemSettings`.
+    system_default = "system_default"
+    #: The model and key a ``super_admin`` enters for the tenant.
+    super_admin = "super_admin"
+    #: The model and key the tenant's own ``admin`` enters in Admin Settings.
+    tenant_admin = "tenant_admin"
+
+
+class TenantLlmFields(SQLModel):
+    """The tenant's own LLM model and API key.
+
+    Whoever may write them is decided by :attr:`TenantUpdate.llm_mode`: a
+    ``super_admin`` always may, the tenant's ``admin`` only while the mode is
+    :attr:`LlmMode.tenant_admin`. Set by a ``super_admin``, a field left empty
+    falls back to the platform-wide LLM; set by the tenant's ``admin``, a model
+    requires a key of the tenant's own, and without one the platform's LLM is
+    used as it is (:meth:`infrastructure.llm_settings.LlmSettingsResolver.resolve`).
+    Both are ignored while the mode is :attr:`LlmMode.system_default`.
+
+    ``llm_api_key`` is write-only, with the same semantics as
+    :attr:`models.system_settings.SystemSettingsUpdate.smtp_password`: an
+    **empty string** keeps the stored key and an explicit ``null`` clears it.
+    """
+
+    model_config = _alias_config
+    #: ``litellm:<provider>/<model>`` or a bare Gemini model name.
+    llm_model: ShortText | None = None
+    llm_api_key: str | None = Field(default=None, max_length=4096)
+
+
+class TenantUpdate(TenantGlobalVaultFields, TenantLlmFields):
     """Partial update payload for a Tenant — all fields are optional.
 
     ``name`` is intentionally absent: a tenant's name (slug) is immutable
     after creation, so it cannot be changed through the update endpoint. The
     tenant's own Vault connection is absent too: it is a tenant setting,
     changed through :class:`AdminSettingsUpdate`. The credential for the
-    global Vault is here, since only a ``super_admin`` registers it.
+    global Vault is here, since only a ``super_admin`` registers it. So is
+    ``llm_mode``: whether the tenant's ``admin`` may set the tenant's LLM is
+    the ``super_admin``'s call.
     """
 
     display_name: EntityName | None = None
     enabled: bool | None = None
+    llm_mode: LlmMode | None = None
     #: Failed sign-ins within :attr:`login_lockout_minutes` that lock an
     #: account of this tenant.
     login_max_failures: LoginMaxFailures | None = None
@@ -156,6 +192,7 @@ class TenantCreate(TenantUpdate):
     enabled: bool = True
     login_max_failures: LoginMaxFailures = DEFAULT_LOGIN_MAX_FAILURES
     login_lockout_minutes: LoginLockoutMinutes = DEFAULT_LOGIN_LOCKOUT_MINUTES
+    llm_mode: LlmMode = LlmMode.system_default
 
 
 class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
@@ -187,6 +224,9 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     vault_credential: str | None = None
     #: Fernet ciphertext, like :attr:`vault_credential`.
     global_vault_credential: str | None = None
+    #: Fernet ciphertext of the tenant's LLM API key, like
+    #: :attr:`vault_credential`.
+    llm_api_key: str | None = None
     #: Whether members of this tenant may sign in through its OIDC provider.
     oidc_enabled: bool = False
     #: Issuer URL of the tenant's OIDC provider (the base of its discovery document).
@@ -202,12 +242,13 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     oidc_trust_email: bool = False
 
 
-class AdminSettingsUpdate(TenantVaultFields, TenantOidcFields):
+class AdminSettingsUpdate(TenantVaultFields, TenantOidcFields, TenantLlmFields):
     """Partial update of the settings a tenant's own ``admin`` may change.
 
     Exposed on ``PATCH /admin-settings``, which acts on the caller's tenant
-    rather than on a tenant id: sign-in throttling, the tenant's own Vault and
-    its OIDC single sign-on.
+    rather than on a tenant id: sign-in throttling, the tenant's own Vault, its
+    OIDC single sign-on and -- only while a ``super_admin`` has set the tenant's
+    :attr:`Tenant.llm_mode` to :attr:`LlmMode.tenant_admin` -- its LLM.
     """
 
     login_max_failures: LoginMaxFailures | None = None
@@ -232,15 +273,21 @@ def oidc_redirect_uri(app_base_url: str | None) -> str | None:
 class AdminSettings(SQLModel):
     """Read view of the settings a tenant's own ``admin`` may change.
 
-    ``vault_credential_set`` and ``oidc_client_secret_set`` report only whether
-    a credential is stored, so the form can show it as configured without ever
-    receiving it. ``oidc_redirect_uri`` is the callback URL the provider must
-    allow, derived from the deployment's ``APP_BASE_URL``.
+    ``vault_credential_set``, ``oidc_client_secret_set`` and ``llm_api_key_set``
+    report only whether a credential is stored, so the form can show it as
+    configured without ever receiving it. ``oidc_redirect_uri`` is the callback
+    URL the provider must allow, derived from the deployment's ``APP_BASE_URL``.
+    ``llm_mode`` tells the form whether to offer the LLM fields at all: only
+    :attr:`LlmMode.tenant_admin` lets this ``admin`` set them.
     """
 
     model_config = _alias_config
     login_max_failures: int
     login_lockout_minutes: int
+    llm_mode: LlmMode = LlmMode.system_default
+    llm_model: str | None = None
+    #: Whether an LLM API key is stored. The key is never serialized.
+    llm_api_key_set: bool = False
     vault_addr: str | None = None
     vault_auth_method: VaultAuthMethod | None = None
     vault_role_id: str | None = None
@@ -275,6 +322,9 @@ class AdminSettings(SQLModel):
         return cls(
             login_max_failures=tenant.login_max_failures,
             login_lockout_minutes=tenant.login_lockout_minutes,
+            llm_mode=tenant.llm_mode,
+            llm_model=tenant.llm_model,
+            llm_api_key_set=bool(tenant.llm_api_key),
             vault_addr=tenant.vault_addr,
             vault_auth_method=tenant.vault_auth_method,
             vault_role_id=tenant.vault_role_id,
@@ -295,7 +345,8 @@ class TenantRead(BaseEntity):
 
     The tenant's own Vault connection is a tenant setting (see
     :class:`AdminSettings`), so it is left out here. Its credential for the
-    global Vault is reported only as ``global_vault_credential_set``.
+    global Vault is reported only as ``global_vault_credential_set``, and its
+    LLM API key only as ``llm_api_key_set``.
     """
 
     model_config = _alias_config
@@ -309,6 +360,10 @@ class TenantRead(BaseEntity):
     global_vault_approle_mount: str | None = None
     #: Whether a global Vault credential is stored. It is never serialized.
     global_vault_credential_set: bool = False
+    llm_mode: LlmMode = LlmMode.system_default
+    llm_model: str | None = None
+    #: Whether an LLM API key is stored. The key is never serialized.
+    llm_api_key_set: bool = False
 
     @classmethod
     def from_tenant(cls, tenant: Tenant) -> "TenantRead":
@@ -318,12 +373,17 @@ class TenantRead(BaseEntity):
             tenant: The persisted tenant row.
 
         Returns:
-            A read view carrying every field except the ``vault_*`` ones and
-            ``global_vault_credential``, plus the
-            ``global_vault_credential_set`` flag derived from it.
+            A read view carrying every field except the ``vault_*`` ones,
+            ``global_vault_credential`` and ``llm_api_key``, plus the
+            ``global_vault_credential_set`` and ``llm_api_key_set`` flags
+            derived from them.
         """
-        exclude = set(TenantVaultFields.model_fields) | {"global_vault_credential"}
+        exclude = set(TenantVaultFields.model_fields) | {
+            "global_vault_credential",
+            "llm_api_key",
+        }
         return cls(
             **tenant.model_dump(exclude=exclude),
             global_vault_credential_set=bool(tenant.global_vault_credential),
+            llm_api_key_set=bool(tenant.llm_api_key),
         )

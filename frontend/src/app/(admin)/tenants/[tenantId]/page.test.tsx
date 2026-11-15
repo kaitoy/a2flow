@@ -281,3 +281,77 @@ describe("TenantDetailPage", () => {
     });
   });
 });
+
+describe("TenantDetailPage LLM", () => {
+  it("starts on the system default and offers no model or key", async () => {
+    setup();
+    capturePatch(FULL_TENANT);
+    renderPage();
+    await screen.findByDisplayValue("Acme Corp");
+    expect(screen.getByRole("tab", { name: "System default" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(screen.queryByLabelText("Model")).toBeNull();
+    expect(screen.queryByLabelText("API key")).toBeNull();
+  });
+
+  it("sends only the mode while the tenant's own admin is the one setting the LLM", async () => {
+    setup();
+    const captured = capturePatch({
+      ...FULL_TENANT,
+      llmMode: "tenant_admin",
+      llmModel: "gemini-3.8-flash",
+    });
+    renderPage();
+    await screen.findByDisplayValue("Acme Corp");
+    expect(screen.queryByLabelText("Model")).toBeNull();
+    expect(
+      screen.getByText("This tenant's Admins set its LLM in Admin Settings.")
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(captured.body).not.toBeNull());
+    expect(captured.body).toMatchObject({ llmMode: "tenant_admin" });
+    expect(captured.body).not.toHaveProperty("llmModel");
+    expect(captured.body).not.toHaveProperty("llmApiKey");
+  });
+
+  it("lets a super admin set the model and key once they pick themselves", async () => {
+    setup();
+    const captured = capturePatch(FULL_TENANT);
+    renderPage();
+    await screen.findByDisplayValue("Acme Corp");
+    await userEvent.click(screen.getByRole("tab", { name: "Set by a Super Admin" }));
+    await userEvent.type(await screen.findByLabelText("Model"), "litellm:openai/gpt-6.1-sol");
+    await userEvent.type(screen.getByLabelText("API key"), "sk-tenant");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(captured.body).not.toBeNull());
+    expect(captured.body).toMatchObject({
+      llmMode: "super_admin",
+      llmModel: "litellm:openai/gpt-6.1-sol",
+      llmApiKey: "sk-tenant",
+    });
+  });
+
+  it("keeps a saved key by leaving the field blank", async () => {
+    setup();
+    const captured = capturePatch({
+      ...FULL_TENANT,
+      llmMode: "super_admin",
+      llmModel: "gemini-3.8-flash",
+      llmApiKeySet: true,
+    });
+    renderPage();
+    expect(await screen.findByLabelText("API key")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("Saved")
+    );
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(captured.body).not.toBeNull());
+    expect(captured.body).toMatchObject({ llmMode: "super_admin", llmModel: "gemini-3.8-flash" });
+    expect(captured.body).not.toHaveProperty("llmApiKey");
+  });
+});

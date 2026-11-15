@@ -8,7 +8,7 @@ sidebar_position: 2
 您也可以用 Docker Compose（[compose.yml](https://github.com/kaitoy/a2flow/blob/master/compose.yml)）一次性构建并启动整套服务：
 
 ```bash
-echo GOOGLE_API_KEY=your_google_api_key_here > .env
+echo SYSTEM_DEFAULT_LLM_API_KEY=your_google_api_key_here > .env
 docker compose up --build
 ```
 

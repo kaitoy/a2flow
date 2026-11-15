@@ -7,6 +7,8 @@ sidebar_position: 13
 
 System Settings is where the mail server that [notification email](./notifications.md#email-delivery) goes through, and the global HashiCorp Vault, are configured. There is exactly one settings record for the whole deployment, seeded on first startup with email delivery **off**, so a fresh install keeps notifications in-app until an operator turns it on. The address users open A2Flow at is not configured here: an operator sets it when deploying — see [Server settings](../operations/configuration.md#server-settings).
 
+It also holds the [LLM](#llm) every tenant's agents run on, unless the tenant has been given one of its own.
+
 Open **System Settings** in the admin sidebar. Like [Tenants](./users-and-groups.md#tenants), this section is restricted to **Super Admin** — the settings are platform-wide rather than tenant-scoped, so there is no tenant-admin carve-out, and even reading them is refused for anyone else.
 
 ## The settings
@@ -42,6 +44,17 @@ path "secret/data/tenants/acme/*" {
   capabilities = ["read"]
 }
 ```
+
+## The LLM {#llm}
+
+The LLM is the model every agent runs on, and the key it is reached with. What is set here is the **system's** LLM: a tenant uses it unless a Super Admin has given the tenant one of its own — see [The tenant's LLM](./users-and-groups.md#tenant-llm).
+
+| Field | Purpose |
+|---|---|
+| **Model** | A Gemini model name such as `gemini-3.8-flash`, or `litellm:<provider>/<model>` for any other provider, for example `litellm:openai/gpt-6.1-sol`. Left empty, the built-in default model is used. |
+| **API key** | The provider's API key. It is **write-only**, like the SMTP password: once one is stored the field shows blank with a "Saved" placeholder, and saving with it left empty keeps the stored key. Left empty with none stored, the key set in the server's environment for that provider is used. |
+
+A change reaches a run the next time its agent answers; nothing needs a restart. Like the mail settings, both fields can also be set from the server's environment, which is re-applied on every startup and overwrites what was typed here — see [LLM](../operations/configuration.md#llm). Setting up a provider is covered in [LLM configuration](../getting-started/llm-configuration.md).
 
 ## Checking the configuration
 

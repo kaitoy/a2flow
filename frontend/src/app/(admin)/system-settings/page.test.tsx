@@ -308,3 +308,75 @@ describe("SystemSettingsPage", () => {
     );
   });
 });
+
+describe("SystemSettingsPage LLM", () => {
+  const WITH_LLM = {
+    ...CONFIGURED,
+    llmModel: "litellm:openai/gpt-6.1-sol",
+    llmApiKeySet: true,
+  };
+
+  /** Serve `settings` and capture the PATCH body the page sends. */
+  function capturePatch(settings: object) {
+    const captured: { body: Record<string, unknown> | null } = { body: null };
+    server.use(
+      http.get(`${BASE}/api/v1/system-settings`, () => envelope(settings)),
+      http.patch(`${BASE}/api/v1/system-settings`, async ({ request }) => {
+        captured.body = (await request.json()) as Record<string, unknown>;
+        return envelope(settings);
+      })
+    );
+    return captured;
+  }
+
+  it("prefills the model and marks a saved key without showing it", async () => {
+    capturePatch(WITH_LLM);
+    renderPage();
+    expect(await screen.findByLabelText("Model")).toHaveValue("litellm:openai/gpt-6.1-sol");
+    const key = screen.getByLabelText("API key");
+    expect(key).toHaveValue("");
+    expect(key).toHaveAttribute("placeholder", expect.stringContaining("Saved"));
+  });
+
+  it("keeps a saved key by leaving the field blank", async () => {
+    const captured = capturePatch(WITH_LLM);
+    renderPage();
+    await screen.findByDisplayValue("litellm:openai/gpt-6.1-sol");
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(captured.body).not.toBeNull());
+    expect(captured.body).toMatchObject({ llmModel: "litellm:openai/gpt-6.1-sol" });
+    expect(captured.body).not.toHaveProperty("llmApiKey");
+  });
+
+  it("sends a newly typed key", async () => {
+    const captured = capturePatch(WITH_LLM);
+    renderPage();
+    await userEvent.type(await screen.findByLabelText("API key"), "sk-new");
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(captured.body).toMatchObject({ llmApiKey: "sk-new" }));
+  });
+
+  it("clears the model when the field is emptied", async () => {
+    const captured = capturePatch(WITH_LLM);
+    renderPage();
+    await userEvent.clear(await screen.findByLabelText("Model"));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(captured.body).toMatchObject({ llmModel: null }));
+  });
+
+  it("rejects a model name over 200 characters without saving", async () => {
+    const captured = capturePatch(WITH_LLM);
+    renderPage();
+    const model = await screen.findByLabelText("Model");
+    await userEvent.clear(model);
+    await userEvent.click(model);
+    await userEvent.paste("m".repeat(201));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(await screen.findByText("Use 200 characters or fewer.")).toBeInTheDocument();
+    expect(captured.body).toBeNull();
+  });
+});

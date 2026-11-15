@@ -20,6 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from dependencies.context import APP_NAME
 from infrastructure.agent import AgentKind, tenant_app_name
+from infrastructure.llm_settings import DEFAULT_LLM_MODEL, ResolvedLlm
 from models.message_meta import MessageScope
 from repositories.message_meta import SqlMessageMetaRepository
 from tests._envelope import assert_err, assert_ok
@@ -260,6 +261,7 @@ async def test_design_session_agent_uses_design_kind(
         FAKE_COMMIT_SHA,
         mock_agent_registry.get.call_args.args[2],
         tenant_id=DEFAULT_TEST_TENANT_ID,
+        llm=ResolvedLlm(DEFAULT_LLM_MODEL),
         kind=AgentKind.design,
     )
 

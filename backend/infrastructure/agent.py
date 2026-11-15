@@ -9,6 +9,7 @@ from ag_ui_adk import CONTEXT_STATE_KEY, ADKAgent, AGUIToolset
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.apps import App, ResumabilityConfig
+from google.adk.models.google_llm import Gemini
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.sessions import BaseSessionService
 from google.adk.skills import load_skill_from_dir
@@ -29,6 +30,7 @@ from infrastructure.knowledge_tools import (
     read_knowledge_page,
     search_knowledge,
 )
+from infrastructure.llm_settings import ResolvedLlm
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
 from infrastructure.reply_suggestion_tools import suggest_replies
 from infrastructure.session_file_tools import (
@@ -494,13 +496,16 @@ class A2UIInstructionProvider:
         return instruction
 
 
-def resolve_model() -> LiteLlm | str:
-    """Resolve ``config.Settings.llm_model`` into an ADK model selection.
+def resolve_model(llm: ResolvedLlm) -> LiteLlm | Gemini | str:
+    """Turn a tenant's resolved LLM into an ADK model selection.
 
     - Gemini model name (e.g. "gemini-*"): returned as-is, so ADK uses
-      Google AI / Vertex AI directly.
+      Google AI / Vertex AI directly -- or, when the settings carry an API key,
+      as a :class:`Gemini` that sends it, since a name alone can only be
+      authenticated by the process-wide ``GOOGLE_API_KEY``.
     - "litellm:<provider>/<model>" format: wrapped in :class:`LiteLlm` so any
-      LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-6.1-sol``.
+      LLM can be used via LiteLLM, e.g. ``litellm:openai/gpt-6.1-sol``. A key
+      in the settings is passed as its ``api_key``.
 
     ``reasoning_effort="none"`` is pinned for ``openai/gpt-5*`` routes only:
     some gpt-5 reasoning-tier models (e.g. gpt-5.4+) apply a non-"none"
@@ -515,15 +520,25 @@ def resolve_model() -> LiteLlm | str:
 
     Shared by :func:`create_agent` and the one-shot summarizer
     (:mod:`infrastructure.summarizer`) so model selection is defined once.
+
+    Args:
+        llm: The model and key to run on, from
+            :meth:`infrastructure.llm_settings.LlmSettingsResolver.resolve`.
+
+    Returns:
+        What :class:`LlmAgent` takes as its ``model``.
     """
-    model_env = get_settings().llm_model
-    if model_env.startswith(LITELLM_PREFIX):
-        litellm_model = model_env[len(LITELLM_PREFIX) :]
+    if llm.model.startswith(LITELLM_PREFIX):
+        litellm_model = llm.model[len(LITELLM_PREFIX) :]
         extra: dict[str, Any] = {}
         if litellm_model.startswith("openai/gpt-5"):
             extra["reasoning_effort"] = "none"
+        if llm.api_key:
+            extra["api_key"] = llm.api_key
         return LiteLlm(model=litellm_model, drop_params=True, **extra)
-    return model_env
+    if llm.api_key:
+        return Gemini(model=llm.model, client_kwargs={"api_key": llm.api_key})
+    return llm.model
 
 
 #: Task-management toolset per skill-backed agent kind. Design kinds edit the
@@ -596,9 +611,11 @@ _KIND_TOOLS: dict[AgentKind, list[ToolUnion]] = {
 
 
 def create_agent(
-    skill_dir: Path | None = None, kind: AgentKind = AgentKind.execution
+    llm: ResolvedLlm,
+    skill_dir: Path | None = None,
+    kind: AgentKind = AgentKind.execution,
 ) -> LlmAgent:
-    """Create an agent based on ``config.Settings.llm_model``.
+    """Create an agent running on ``llm``.
 
     When ``skill_dir`` is provided, the directory is loaded as an ADK Skill and
     exposed to the agent via SkillToolset, and ``kind`` selects the instruction
@@ -613,7 +630,7 @@ def create_agent(
     """
     settings = get_settings()
     role_description = settings.role_description
-    model = resolve_model()
+    model = resolve_model(llm)
 
     instruction: str | A2UIInstructionProvider
     tools: list[ToolUnion]
@@ -642,6 +659,7 @@ def create_agent(
 
 def create_app(
     app_name: str,
+    llm: ResolvedLlm,
     skill_dir: Path | None = None,
     kind: AgentKind = AgentKind.execution,
 ) -> App:
@@ -663,6 +681,7 @@ def create_app(
             agent's ``app_name``, so it must match the one the routers use. For
             a tenant-scoped run this is :func:`tenant_app_name`'s result, as
             computed by :meth:`AgentRegistry.get`.
+        llm: The model and key the agent runs on.
         skill_dir: Directory ADK loads the skill from, or ``None`` for the
             default skill-less agent.
         kind: Role of the skill-backed agent (see :class:`AgentKind`); ignored
@@ -673,7 +692,7 @@ def create_app(
     """
     return App(
         name=app_name,
-        root_agent=create_agent(skill_dir=skill_dir, kind=kind),
+        root_agent=create_agent(llm, skill_dir=skill_dir, kind=kind),
         resumability_config=ResumabilityConfig(is_resumable=True),
     )
 
@@ -709,12 +728,19 @@ def tenant_app_name(app_name: str, tenant_id: str) -> str:
 
 
 class AgentRegistry:
-    """Caches one ADKAgent per tenant, per ``(agent_skill_id, commit_sha, kind)``.
+    """Caches one ADKAgent per tenant, per ``(agent_skill_id, commit_sha, kind, llm)``.
 
     Agents are stateless across sessions — per-session context lives in the ADK
     session state — so a single ADKAgent serves every session running the same
-    revision of the same skill in the same role, for the same tenant.
-    ``(None, None, execution)`` keys the default agent that has no skill loaded.
+    revision of the same skill in the same role on the same LLM, for the same
+    tenant. ``(None, None, execution, llm)`` keys the default agent that has no
+    skill loaded.
+
+    The LLM is part of the key because ``create_agent`` bakes the model and its
+    API key into the agent: after an edit of the LLM settings the next session
+    resolves a different :class:`ResolvedLlm`, builds a new agent, and the old
+    one ages out of the capped cache. Sessions keep their state in ADK's session
+    store, so changing agents between turns loses nothing.
 
     The revision has to be part of the key because ``create_agent`` reads the
     skill directory eagerly (``load_skill_from_dir`` slurps every file into
@@ -743,7 +769,10 @@ class AgentRegistry:
         self._session_service = session_service
         self._app_name = app_name
         self._cache: dict[
-            str, OrderedDict[tuple[str | None, str | None, AgentKind], ADKAgent]
+            str,
+            OrderedDict[
+                tuple[str | None, str | None, AgentKind, ResolvedLlm], ADKAgent
+            ],
         ] = {}
 
     def get(
@@ -753,6 +782,7 @@ class AgentRegistry:
         skill_dir: Path | None,
         *,
         tenant_id: str,
+        llm: ResolvedLlm,
         kind: AgentKind = AgentKind.execution,
     ) -> ADKAgent:
         """Return the ADKAgent for one tenant's revision of a skill.
@@ -773,14 +803,19 @@ class AgentRegistry:
                 :func:`tenant_app_name` so two tenants never share an ADK
                 session store namespace even when the underlying database is
                 shared.
+            llm: The model and key the tenant's agents run on, resolved by the
+                caller (:class:`~infrastructure.llm_settings.LlmSettingsResolver`).
+                Required rather than defaulted so that no caller can fall back
+                to the platform's LLM by forgetting it. Part of the cache key.
             kind: Role of the skill-backed agent (see :class:`AgentKind`);
                 part of the cache key because each kind bakes a different
                 instruction and toolset into its agent.
 
         Returns:
-            The cached (or freshly built) agent for that tenant, revision, and kind.
+            The cached (or freshly built) agent for that tenant, revision,
+            kind, and LLM.
         """
-        key = (agent_skill_id, commit_sha, kind)
+        key = (agent_skill_id, commit_sha, kind, llm)
         tenant_cache = self._cache.setdefault(tenant_id, OrderedDict())
         cached = tenant_cache.get(key)
         if cached is not None:
@@ -789,6 +824,7 @@ class AgentRegistry:
         agent = ADKAgent.from_app(
             create_app(
                 tenant_app_name(self._app_name, tenant_id),
+                llm,
                 skill_dir=skill_dir,
                 kind=kind,
             ),

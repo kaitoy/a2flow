@@ -29,7 +29,9 @@ from infrastructure.agent import (
     AgentRegistry,
     tenant_app_name,
 )
+from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.locks import advisory_lock, agent_run_key
+from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.skill_manager import SkillManager
 from infrastructure.summarizer import (
     build_design_transcript,
@@ -65,8 +67,9 @@ from services.workflow import build_workflow_read
 
 logger = logging.getLogger(__name__)
 
-#: Signature of the summarizer, injectable for tests.
-Summarizer = Callable[[str], Awaitable[str]]
+#: Signature of the summarizer, injectable for tests: the transcript, and the
+#: tenant's LLM as the keyword ``llm``.
+Summarizer = Callable[..., Awaitable[str]]
 
 #: Signature of the background design job as the router hands it to
 #: ``BackgroundTasks``.
@@ -134,6 +137,7 @@ class WorkflowDesignService:
         templates: WorkflowTaskTemplateRepository,
         versions: WorkflowPublishedVersionRepository,
         knowledge_bases: KnowledgeBaseRepository,
+        llms: LlmSettingsResolver,
         session_service: BaseSessionService,
         app_name: str,
         summarize: Summarizer | None = None,
@@ -149,6 +153,7 @@ class WorkflowDesignService:
             knowledge_bases: The caller's tag-scoped KnowledgeBase repository,
                 linking a generated workflow to the knowledge bases picked
                 for it; a hidden one is rejected like a missing one.
+            llms: Resolver of the LLM the workflow's tenant summarizes on.
             session_service: ADK session store, read by
                 :meth:`generate_prompt` to build the design transcript.
             app_name: ADK application name keying sessions in the store.
@@ -164,6 +169,7 @@ class WorkflowDesignService:
         self._templates = templates
         self._versions = versions
         self._knowledge_bases = knowledge_bases
+        self._llms = llms
         self._session_service = session_service
         self._app_name = app_name
         self._summarize = summarize or summarize_design_transcript
@@ -378,7 +384,8 @@ class WorkflowDesignService:
                 workflow_id, "it has no design conversation to summarize"
             )
         try:
-            summary = await self._summarize(transcript)
+            llm = await self._llms.resolve(workflow.tenant_id)
+            summary = await self._summarize(transcript, llm=llm)
         except Exception as e:
             raise SummarizationFailedError(workflow_id, str(e)) from e
 
@@ -544,6 +551,7 @@ async def generate_workflow_design(
             session_id = workflow.session_id
             owner_id = workflow.created_by
             commit_sha = workflow.agent_skill_commit_sha
+            llm = await LlmSettingsResolver(db, get_secret_cipher()).resolve(tenant_id)
 
         skill_dir = skills_store.skill_dir(skill, commit_sha)
         if not skill_dir.exists():
@@ -554,6 +562,7 @@ async def generate_workflow_design(
             commit_sha,
             skill_dir,
             tenant_id=tenant_id,
+            llm=llm,
             kind=AgentKind.initial_design,
         )
 
@@ -611,7 +620,7 @@ async def generate_workflow_design(
         transcript = build_design_transcript(session.events) if session else ""
         generated_prompt: str | None
         try:
-            generated_prompt = await summarize_design_transcript(transcript)
+            generated_prompt = await summarize_design_transcript(transcript, llm=llm)
         except Exception:
             logger.warning(
                 "Failed to summarize the design conversation of workflow %s; "
@@ -622,7 +631,7 @@ async def generate_workflow_design(
             generated_prompt = transcript[:2000].rstrip() or None
         description: str | None
         try:
-            description = await describe_design_transcript(transcript)
+            description = await describe_design_transcript(transcript, llm=llm)
         except Exception:
             # No transcript fallback here: the transcript is exactly what a
             # requester must not be shown, so a failure leaves it empty.

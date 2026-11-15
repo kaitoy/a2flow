@@ -14,6 +14,13 @@ import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
+import {
+  LlmModeField,
+  LlmSettingsFields,
+  llmShape,
+  toLlmBody,
+  toLlmFormValues,
+} from "@/components/admin/llm-settings-fields";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import {
   SignInLockoutFields,
@@ -60,7 +67,12 @@ function buildSchema(savedMethod: VaultAuthMethod | null) {
   return zTenantCreate
     .pick({ displayName: true, enabled: true })
     .extend(signInLockoutShape)
-    .extend({ globalVaultEnabled: z.boolean(), ...vaultCredentialShape })
+    .extend({
+      globalVaultEnabled: z.boolean(),
+      ...vaultCredentialShape,
+      llmMode: z.enum(["system_default", "super_admin", "tenant_admin"]),
+      ...llmShape,
+    })
     .superRefine((values, ctx) => {
       if (values.globalVaultEnabled) refineVaultCredential(values, ctx, savedMethod);
     });
@@ -87,13 +99,17 @@ function toFormValues(tenant: Partial<Tenant>): FormValues {
     vaultRoleId: tenant.globalVaultRoleId ?? "",
     vaultApproleMount: tenant.globalVaultApproleMount ?? "",
     vaultCredential: "",
+    llmMode: tenant.llmMode ?? "system_default",
+    ...toLlmFormValues(tenant),
   };
 }
 
 /**
  * Build the PATCH body. Unticking the global Vault clears the whole
  * credential; otherwise an untouched credential field is omitted so the
- * backend keeps the ciphertext it holds.
+ * backend keeps the ciphertext it holds. The LLM model and key are sent only
+ * while a super admin is the one setting them: otherwise they belong to the
+ * tenant's admin (or to nobody) and are left as they are.
  */
 function toBody(values: FormValues): TenantUpdate {
   const approle = values.vaultAuthMethod === "approle";
@@ -110,13 +126,16 @@ function toBody(values: FormValues): TenantUpdate {
   };
   if (!values.globalVaultEnabled) body.globalVaultCredential = null;
   else if (values.vaultCredential !== "") body.globalVaultCredential = values.vaultCredential;
+  body.llmMode = values.llmMode;
+  if (values.llmMode === "super_admin") Object.assign(body, toLlmBody(values));
   return body;
 }
 
 /**
  * Detail page of a tenant: its display name, its immutable URL-safe name,
- * whether it is enabled, how failed sign-ins lock its accounts, and the
- * credential it logs in to the global Vault with. The page
+ * whether it is enabled, how failed sign-ins lock its accounts, the
+ * credential it logs in to the global Vault with, and who sets its LLM (and the
+ * LLM itself, while that is a super admin). The page
  * is titled with the tenant's display name —
  * the same label its row carries in the list. Reachable only by `super_admin`
  * — `layout.tsx` blocks every other viewer before this page mounts. Name is
@@ -139,6 +158,8 @@ export default function TenantDetailPage() {
   const [name, setName] = useState("");
   // The auth method whose global Vault credential is stored, or null.
   const [vaultMethod, setVaultMethod] = useState<VaultAuthMethod | null>(null);
+  // Whether an LLM API key is stored for the tenant; drives only the placeholder.
+  const [llmKeySet, setLlmKeySet] = useState(false);
 
   const save = useAsyncAction({ showDone: false });
   const schema = useMemo(() => buildSchema(vaultMethod), [vaultMethod]);
@@ -161,6 +182,7 @@ export default function TenantDetailPage() {
         setDisplayName(tenant.displayName);
         setName(tenant.name);
         setVaultMethod(savedVaultMethod(storedGlobalVault(tenant)));
+        setLlmKeySet(tenant.llmApiKeySet ?? false);
         reset(toFormValues(tenant));
         setAudit({
           createdBy: tenant.createdBy,
@@ -283,6 +305,27 @@ export default function TenantDetailPage() {
                 vaultRoleId: errors.vaultRoleId?.message,
                 vaultApproleMount: errors.vaultApproleMount?.message,
                 vaultCredential: errors.vaultCredential?.message,
+              }}
+            />
+          )}
+
+          <hr className="border-outline-variant" />
+
+          <LlmModeField
+            mode={watch("llmMode")}
+            onModeChange={(mode) => setValue("llmMode", mode)}
+          />
+
+          {watch("llmMode") === "super_admin" && (
+            <LlmSettingsFields
+              model={register("llmModel")}
+              apiKey={register("llmApiKey")}
+              apiKeySaved={llmKeySet}
+              inherits
+              withTitle={false}
+              errors={{
+                llmModel: errors.llmModel?.message,
+                llmApiKey: errors.llmApiKey?.message,
               }}
             />
           )}

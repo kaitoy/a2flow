@@ -7,6 +7,8 @@ sidebar_position: 13
 
 Les Paramètres système permettent de configurer le serveur de messagerie par lequel passent les [e-mails de notification](./notifications.md#email-delivery), ainsi que le HashiCorp Vault global. Il existe un seul enregistrement de paramètres pour tout le déploiement, initialisé au premier démarrage avec l'envoi d'e-mails **désactivé** : sur une nouvelle installation, les notifications restent donc dans l'application jusqu'à ce qu'un opérateur active l'envoi. L'adresse à laquelle les utilisateurs ouvrent A2Flow ne se configure pas ici : un opérateur la définit au déploiement — voir [Paramètres du serveur](../operations/configuration.md#server-settings).
 
+Elle conserve aussi le [LLM](#llm) sur lequel s'exécutent les agents de tous les tenants, sauf pour un tenant qui a le sien.
+
 Ouvrez **Paramètres système** dans la barre latérale d'administration. Comme les [Tenants](./users-and-groups.md#tenants), cette section est réservée au **Super administrateur** : les paramètres s'appliquent à toute la plateforme et non à un tenant, si bien qu'aucune exception n'est prévue pour les administrateurs de tenant, et même leur lecture est refusée à quiconque d'autre.
 
 ## Les paramètres {#the-settings}
@@ -42,6 +44,17 @@ path "secret/data/tenants/acme/*" {
   capabilities = ["read"]
 }
 ```
+
+## Le LLM {#llm}
+
+Le LLM est le modèle sur lequel s'exécute chaque agent, et la clé avec laquelle on l'atteint. Ce qui est défini ici est le LLM **du système** : un tenant l'utilise, sauf si un Super administrateur lui en a donné un qui lui est propre ; voir [Le LLM du tenant](./users-and-groups.md#tenant-llm).
+
+| Champ | Rôle |
+|---|---|
+| **Modèle** | Un nom de modèle Gemini tel que `gemini-3.8-flash` ou, pour tout autre fournisseur, `litellm:<fournisseur>/<modèle>`, par exemple `litellm:openai/gpt-6.1-sol`. Laissé vide, le modèle par défaut intégré est utilisé. |
+| **Clé d'API** | La clé d'API du fournisseur. Elle est **en écriture seule**, comme le mot de passe SMTP : une fois enregistrée, le champ s'affiche vide avec un espace réservé « Enregistré », et enregistrer en le laissant vide conserve la clé stockée. Laissé vide sans clé stockée, la clé définie dans l'environnement du serveur pour ce fournisseur est utilisée. |
+
+Un changement atteint une exécution à la prochaine réponse de son agent ; aucun redémarrage n'est nécessaire. Comme les paramètres d'e-mail, les deux champs peuvent aussi être définis depuis l'environnement du serveur, réappliqué à chaque démarrage et qui écrase ce qui a été saisi ici (voir [LLM](../operations/configuration.md#llm)). La configuration d'un fournisseur est décrite dans [Configuration du LLM](../getting-started/llm-configuration.md).
 
 ## Vérifier la configuration {#checking-the-configuration}
 

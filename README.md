@@ -62,7 +62,7 @@ frontend, and an Envoy ingress that routes `/api` straight to the backend — co
 [compose.yml](compose.yml):
 
 ```bash
-echo GOOGLE_API_KEY=your_google_api_key_here > .env
+echo SYSTEM_DEFAULT_LLM_API_KEY=your_google_api_key_here > .env
 docker compose up --build
 ```
 

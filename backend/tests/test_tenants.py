@@ -413,3 +413,136 @@ async def test_switching_global_vault_auth_method_needs_a_new_credential(
     )
     assert body["globalVaultAuthMethod"] == "approle"
     assert body["globalVaultRoleId"] == "role-1"
+
+
+# ---------- LLM ----------
+
+
+async def test_a_new_tenant_runs_on_the_platform_llm(
+    tenant_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    assert body["llmMode"] == "system_default"
+    assert body["llmModel"] is None
+    assert body["llmApiKeySet"] is False
+
+
+async def test_super_admin_sets_the_tenants_llm_and_mode(
+    tenant_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+
+    body = assert_ok(
+        await tenant_client.patch(
+            f"/api/v1/tenants/{created['id']}",
+            json={
+                "llmMode": "super_admin",
+                "llmModel": "litellm:openai/gpt-6.1-sol",
+                "llmApiKey": "sk-tenant",
+            },
+        )
+    )
+
+    assert body["llmMode"] == "super_admin"
+    assert body["llmModel"] == "litellm:openai/gpt-6.1-sol"
+    assert body["llmApiKeySet"] is True
+    assert "sk-tenant" not in str(body)
+
+
+async def test_handing_the_llm_to_the_admin_clears_the_super_admins_llm(
+    tenant_client: AsyncClient,
+) -> None:
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    path = f"/api/v1/tenants/{created['id']}"
+    assert_ok(
+        await tenant_client.patch(
+            path,
+            json={
+                "llmMode": "super_admin",
+                "llmModel": "litellm:openai/gpt-6.1-sol",
+                "llmApiKey": "sk-tenant",
+            },
+        )
+    )
+
+    # A blank key, which elsewhere keeps the stored one, clears it here too.
+    body = assert_ok(
+        await tenant_client.patch(
+            path, json={"llmMode": "tenant_admin", "llmApiKey": ""}
+        )
+    )
+
+    assert body["llmMode"] == "tenant_admin"
+    assert body["llmModel"] is None
+    assert body["llmApiKeySet"] is False
+
+
+async def test_handing_the_llm_over_from_system_default_clears_a_kept_model(
+    tenant_client: AsyncClient,
+) -> None:
+    """A model kept from an earlier super-admin setting is cleared as well."""
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    path = f"/api/v1/tenants/{created['id']}"
+    assert_ok(
+        await tenant_client.patch(
+            path, json={"llmMode": "system_default", "llmModel": "m1"}
+        )
+    )
+
+    body = assert_ok(await tenant_client.patch(path, json={"llmMode": "tenant_admin"}))
+
+    assert body["llmModel"] is None
+
+
+async def test_staying_with_the_admin_keeps_the_admins_model(
+    tenant_client: AsyncClient,
+) -> None:
+    """Re-saving the tenant page with the mode unchanged keeps what the admin set."""
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    path = f"/api/v1/tenants/{created['id']}"
+    assert_ok(
+        await tenant_client.patch(
+            path,
+            json={"llmMode": "tenant_admin", "llmModel": "m1", "llmApiKey": "sk"},
+        )
+    )
+
+    body = assert_ok(await tenant_client.patch(path, json={"llmMode": "tenant_admin"}))
+
+    assert body["llmModel"] == "m1"
+    assert body["llmApiKeySet"] is True
+
+
+async def test_a_null_llm_mode_leaves_it_as_is(tenant_client: AsyncClient) -> None:
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    path = f"/api/v1/tenants/{created['id']}"
+    assert_ok(await tenant_client.patch(path, json={"llmMode": "tenant_admin"}))
+
+    body = assert_ok(await tenant_client.patch(path, json={"llmMode": None}))
+
+    assert body["llmMode"] == "tenant_admin"
+
+
+async def test_an_unknown_llm_mode_is_rejected(tenant_client: AsyncClient) -> None:
+    created = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    assert_err(
+        await tenant_client.patch(
+            f"/api/v1/tenants/{created['id']}", json={"llmMode": "everyone"}
+        ),
+        "VALIDATION_ERROR",
+        422,
+    )

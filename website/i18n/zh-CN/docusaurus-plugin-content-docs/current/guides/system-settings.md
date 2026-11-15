@@ -7,6 +7,8 @@ sidebar_position: 13
 
 在系统设置中，可以配置发送[通知邮件](./notifications.md#email-delivery)所用的邮件服务器以及全局 HashiCorp Vault。整个部署只有一条设置记录，首次启动时写入，邮件投递为**关闭**状态，因此全新安装在运维人员开启之前，通知只留在应用内。用户打开 A2Flow 的地址不在这里配置，而是由运维人员在部署时设置，请参阅[服务器设置](../operations/configuration.md#server-settings)。
 
+此外，这里还保存所有租户的代理所运行的 [LLM](#llm)，除非租户拥有自己的 LLM。
+
 在管理侧边栏中打开**系统设置**。与[租户](./users-and-groups.md#tenants)一样，此分区仅限**超级管理员**使用：这些设置面向整个平台，而不是单个租户，因此没有为租户管理员留出例外，其他任何人甚至连读取都会被拒绝。
 
 ## 设置项 {#the-settings}
@@ -42,6 +44,17 @@ path "secret/data/tenants/acme/*" {
   capabilities = ["read"]
 }
 ```
+
+## LLM {#llm}
+
+LLM 是每个代理所运行的模型，以及访问它所用的密钥。这里设置的是**系统**的 LLM：除非超级管理员为租户设置了专属 LLM，否则租户使用它，详见[租户的 LLM](./users-and-groups.md#tenant-llm)。
+
+| 字段 | 用途 |
+|---|---|
+| **模型** | Gemini 模型名称，如 `gemini-3.8-flash`；其他提供商则使用 `litellm:<提供商>/<模型>`，例如 `litellm:openai/gpt-6.1-sol`。留空则使用内置的默认模型。 |
+| **API 密钥** | 提供商的 API 密钥。与 SMTP 密码一样**只写不读**：保存后，该字段显示为空并带有“已保存”占位提示，留空保存会保留已存储的密钥。留空且尚未存储时，使用服务器环境中为该提供商设置的密钥。 |
+
+更改会在代理下一次回复时对运行生效，无需重启。与邮件设置一样，这两个字段也可以通过服务器环境设置，环境中的值会在每次启动时重新应用并覆盖这里输入的值，详见 [LLM](../operations/configuration.md#llm)。提供商的设置方法见 [LLM 配置](../getting-started/llm-configuration.md)。
 
 ## 检查配置 {#checking-the-configuration}
 

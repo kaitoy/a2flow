@@ -1,19 +1,19 @@
 # Full A2Flow stack: PostgreSQL 17 + backend (FastAPI/ADK) + frontend (Next.js).
 #
 # Usage (Google AI Studio — default):
-#   echo GOOGLE_API_KEY=<your-key> > .env
+#   echo SYSTEM_DEFAULT_LLM_API_KEY=<your-key> > .env
 #   docker compose up --build
 #
 # Usage (OpenAI):
-#   printf 'LLM_MODEL=litellm:openai/gpt-6.1-sol\nOPENAI_API_KEY=<your-key>\n' > .env
+#   printf 'SYSTEM_DEFAULT_LLM_MODEL=litellm:openai/gpt-6.1-sol\nSYSTEM_DEFAULT_LLM_API_KEY=<your-key>\n' > .env
 #   docker compose up --build
 #
 # Usage (Anthropic):
-#   printf 'LLM_MODEL=litellm:anthropic/claude-sonnet-5-5\nANTHROPIC_API_KEY=<your-key>\n' > .env
+#   printf 'SYSTEM_DEFAULT_LLM_MODEL=litellm:anthropic/claude-sonnet-5-5\nSYSTEM_DEFAULT_LLM_API_KEY=<your-key>\n' > .env
 #   docker compose up --build
 #
 # Usage (Amazon Bedrock):
-#   printf 'LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-5-5\nAWS_BEARER_TOKEN_BEDROCK=<token>\n' > .env
+#   printf 'SYSTEM_DEFAULT_LLM_MODEL=litellm:bedrock/global.anthropic.claude-sonnet-5-5\nSYSTEM_DEFAULT_LLM_API_KEY=<token>\n' > .env
 #   docker compose up --build
 #
 # The app is served at http://localhost:3000 by default. The browser talks
@@ -61,7 +61,12 @@ services:
       target: backend
     environment:
       DB_URL: postgresql://a2flow:a2flow@db:5432/a2flow
-      LLM_MODEL: ${LLM_MODEL:-gemini-3.8-flash}
+      # The system's default LLM, applied to System Settings on every startup
+      # like SMTP_*. Left blank, that field is managed on the screen instead
+      # (and an empty model runs the built-in default). See .env.example.
+      SYSTEM_DEFAULT_LLM_MODEL: ${SYSTEM_DEFAULT_LLM_MODEL:-}
+      SYSTEM_DEFAULT_LLM_API_KEY: ${SYSTEM_DEFAULT_LLM_API_KEY:-}
+      # The providers' own variables, still read while no key is stored.
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

@@ -171,6 +171,21 @@ Sin definir, que es lo que ocurre en un arranque local sencillo, el agente acced
 | `MCP_TRANSPORT_CERT_VALIDITY_DAYS` | `365` | Vigencia de ese material. Se vuelve a emitir automáticamente cuando quedan menos de 30 días, así que no requiere atención |
 | `MCP_SANDBOX_DIR` | sin definir | Donde está el directorio personal de cada tenant para los [inicios de servidor en sandbox](../architecture/mcp-gateway-and-proxy.md#per-launch-sandbox): aquí se guardan los paquetes que descargan los servidores de un tenant, un directorio por tenant. Si está definida, cada servidor iniciado localmente se ejecuta en su propio sandbox; el proxy se niega a arrancar sin ella. Queda sin definir en un arranque local sencillo, donde los servidores se inician sin sandbox |
 
+## LLM {#llm}
+
+El LLM predeterminado del sistema —el modelo con el que se ejecutan los agentes de todos los tenants y la clave con la que se accede a él— se edita en la pantalla [Configuración del sistema](../guides/system-settings.md#llm). Estas dos variables permiten fijarlo desde el entorno, igual que los ajustes de correo de abajo. La configuración de un proveedor se explica en [Configuración del LLM](../getting-started/llm-configuration.md).
+
+| Variable | Valor predeterminado | Qué hace |
+|---|---|---|
+| `SYSTEM_DEFAULT_LLM_MODEL` | — | Un nombre de modelo de Gemini o, para cualquier otro proveedor, `litellm:<proveedor>/<modelo>`. Si ni esta variable ni la pantalla definen uno, se usa el predeterminado integrado `gemini-3.8-flash` |
+| `SYSTEM_DEFAULT_LLM_API_KEY` | — | La clave de API de ese proveedor. Se guarda cifrada, nunca se registra en el log y ninguna respuesta de la API la devuelve |
+
+Igual que los ajustes de correo de abajo, estas **se vuelven a aplicar en cada arranque**:
+
+- **Se aplican al arrancar el backend**, en Configuración del sistema. Una variable definida sobrescribe lo que un administrador guardó en la pantalla, así que cambiarla y reiniciar es la forma de rotar la clave. Una variable sin definir o vacía deja su campo como está, para gestionarlo en la pantalla.
+- **Un valor con formato incorrecto se registra como advertencia y se omite**, por ejemplo un nombre de modelo de más de 200 caracteres. Los ajustes de correo se aplican igualmente y la aplicación arranca.
+- **Si no se definen, se lee como antes la variable propia del proveedor** (`GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` o `AWS_BEARER_TOKEN_BEDROCK`) mientras no haya ninguna clave guardada. Así también se facilitan las credenciales que no son una sola clave, como las de Vertex AI.
+
 ## Correo de notificación {#notification-email}
 
 Son los mismos valores que la interfaz de administración edita en [Configuración del sistema](../guides/system-settings.md), y se pueden definir desde el entorno para que un despliegue incluya su configuración de correo en lugar de dejarla como un paso manual.

@@ -7,6 +7,8 @@ sidebar_position: 13
 
 En Configuración del sistema se definen el servidor de correo por el que sale el [correo de notificación](./notifications.md#email-delivery) y el HashiCorp Vault global. Hay exactamente un registro de configuración para todo el despliegue, que se crea en el primer inicio con la entrega de correo **desactivada**, de modo que en una instalación nueva las notificaciones se quedan dentro de la aplicación hasta que un operador la active. La dirección en la que los usuarios abren A2Flow no se configura aquí: la define un operador al desplegar; consulta [Configuración del servidor](../operations/configuration.md#server-settings).
 
+También guarda el [LLM](#llm) con el que se ejecutan los agentes de todos los tenants, salvo que el tenant tenga uno propio.
+
 Abre **Configuración del sistema** en la barra lateral de administración. Igual que [Tenants](./users-and-groups.md#tenants), esta sección está reservada al **Superadministrador**: la configuración afecta a toda la plataforma y no a un tenant, así que no hay ninguna excepción para los administradores de tenant, e incluso su lectura se rechaza para cualquier otra persona.
 
 ## La configuración {#the-settings}
@@ -42,6 +44,17 @@ path "secret/data/tenants/acme/*" {
   capabilities = ["read"]
 }
 ```
+
+## El LLM {#llm}
+
+El LLM es el modelo con el que se ejecuta cada agente y la clave con la que se accede a él. Lo que se define aquí es el LLM **del sistema**: un tenant lo usa salvo que un Superadministrador le haya dado uno propio; consulta [El LLM del tenant](./users-and-groups.md#tenant-llm).
+
+| Campo | Para qué sirve |
+|---|---|
+| **Modelo** | Un nombre de modelo de Gemini como `gemini-3.8-flash` o, para cualquier otro proveedor, `litellm:<proveedor>/<modelo>`, por ejemplo `litellm:openai/gpt-6.1-sol`. Si se deja vacío, se usa el modelo predeterminado integrado. |
+| **Clave de API** | La clave de API del proveedor. Es **solo de escritura**, igual que la contraseña SMTP: una vez guardada, el campo aparece vacío con un marcador «Guardado», y guardar con el campo vacío conserva la clave almacenada. Si se deja vacío y no hay ninguna guardada, se usa la clave definida en el entorno del servidor para ese proveedor. |
+
+Un cambio llega a una ejecución la próxima vez que responde su agente; no hace falta reiniciar. Igual que los ajustes de correo, ambos campos también pueden fijarse desde el entorno del servidor, que se vuelve a aplicar en cada arranque y sobrescribe lo escrito aquí (consulta [LLM](../operations/configuration.md#llm)). La configuración de un proveedor se explica en [Configuración del LLM](../getting-started/llm-configuration.md).
 
 ## Comprobar la configuración {#checking-the-configuration}
 

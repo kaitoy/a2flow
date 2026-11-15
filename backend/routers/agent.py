@@ -12,6 +12,7 @@ from dependencies.auth import CurrentTenantIdDep, CurrentUserIdDep
 from dependencies.authz import require_roles
 from dependencies.context import APP_NAME
 from dependencies.repository import DBSessionDep
+from dependencies.service import LlmSettingsResolverDep
 from dependencies.singletons import AgentRegistryDep, SessionServiceDep
 from infrastructure.agent import (
     SESSION_TITLE_KEY,
@@ -36,6 +37,7 @@ async def agent_endpoint(
     input_data: RunAgentInput,
     request: Request,
     registry: AgentRegistryDep,
+    llms: LlmSettingsResolverDep,
     session_service: SessionServiceDep,
     user_id: CurrentUserIdDep,
     tenant_id: CurrentTenantIdDep,
@@ -94,7 +96,13 @@ async def agent_endpoint(
                     session_id=input_data.thread_id,
                     state={SESSION_TITLE_KEY: title},
                 )
-        adk_agent = registry.get(None, None, None, tenant_id=tenant_id)
+        adk_agent = registry.get(
+            None,
+            None,
+            None,
+            tenant_id=tenant_id,
+            llm=await llms.resolve(tenant_id),
+        )
 
         # Override forwarded_props.userId with the trusted X-User-Id header so the
         # agent run is keyed by the same user the skill lookup above resolved.

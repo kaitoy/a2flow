@@ -716,6 +716,27 @@ export const en = {
   "lib.traceToolCallsImpersonationCertificatesAndMail":
     "Trace tool calls, impersonation, certificates, and mail",
   "lib.trackWorkflowRuns": "Track workflow runs",
+  "llm.title": "LLM",
+  "llm.model": "Model",
+  "llm.modelHint": "A Gemini model name, or litellm:<provider>/<model> for any other provider.",
+  "llm.modelEmpty": "Left empty, the built-in default model is used.",
+  "llm.modelEmptyTenant": "Left empty, the system's model is used.",
+  "llm.modelTooLong": "Use 200 characters or fewer.",
+  "llm.apiKey": "API key",
+  "llm.apiKeyHint":
+    "Stored encrypted and never shown again. Left empty, the provider's key set in the server environment is used.",
+  "llm.apiKeyHintTenant":
+    "Stored encrypted and never shown again. Left empty, the system's key is used.",
+  "llm.apiKeyHintTenantAdmin":
+    "Stored encrypted and never shown again. Required when you enter a model; with both left empty, the system's LLM is used.",
+  "llm.apiKeyRequired": "Enter an API key to use your own model.",
+  "llm.mode": "Who sets the LLM",
+  "llm.modeSystemDefault": "System default",
+  "llm.modeSuperAdmin": "Set by a Super Admin",
+  "llm.modeTenantAdmin": "Set by the tenant's Admin",
+  "llm.modeSystemDefaultHint": "This tenant uses the LLM set in System Settings.",
+  "llm.modeSuperAdminHint": "A Super Admin sets this tenant's LLM, below.",
+  "llm.modeTenantAdminHint": "This tenant's Admins set its LLM in Admin Settings.",
   "login.eGAcmeCorp": "e.g. acme-corp",
   "login.leaveBlankIfYouSignInAs": "Leave blank if you sign in as a platform administrator.",
   "login.signIn": "Sign in",
