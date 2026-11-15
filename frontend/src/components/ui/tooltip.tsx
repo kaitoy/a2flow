@@ -8,6 +8,7 @@ import {
   type MouseEvent,
   type ReactElement,
   type Ref,
+  type RefObject,
   useCallback,
   useEffect,
   useId,
@@ -29,6 +30,12 @@ interface TooltipProps {
   delay?: number;
   /** When true, render the child unchanged with no tooltip behavior. Defaults to `false`. */
   disabled?: boolean;
+  /**
+   * For `left` / `right` placements, the element whose edge the tooltip clears
+   * instead of the trigger's — lets a tooltip sit beside a whole panel rather
+   * than just its trigger. The vertical position still follows the trigger.
+   */
+  anchorRef?: RefObject<HTMLElement | null>;
   /** Single element that acts as the hover/focus trigger. */
   children: ReactElement;
 }
@@ -51,12 +58,15 @@ const EDGE_PADDING = 8;
  * Renders via a portal to `document.body` so it is never clipped by the
  * trigger's scroll container, and uses React Spring's `useTransition` to
  * animate the chip in and out with the project's `gentle` motion preset.
+ * Pass `anchorRef` to have a `left` / `right` tooltip clear a whole panel
+ * instead of only its trigger.
  */
 export function Tooltip({
   label,
   placement = "top",
   delay = 300,
   disabled = false,
+  anchorRef,
   children,
 }: TooltipProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -71,6 +81,9 @@ export function Tooltip({
     const trigger = triggerRef.current;
     if (!trigger) return null;
     const rect = trigger.getBoundingClientRect();
+    // `left` / `right` clear the anchor's edge when one is given; everything
+    // else (and the vertical centring) follows the trigger.
+    const edge = anchorRef?.current?.getBoundingClientRect() ?? rect;
     const tw = tooltipRef.current?.offsetWidth ?? 0;
     const th = tooltipRef.current?.offsetHeight ?? 0;
     let top = 0;
@@ -93,13 +106,13 @@ export function Tooltip({
         break;
       case "left":
         top = rect.top + rect.height / 2 - th / 2;
-        left = rect.left - tw - GAP;
+        left = edge.left - tw - GAP;
         origin = "right center";
         slideX = 6;
         break;
       case "right":
         top = rect.top + rect.height / 2 - th / 2;
-        left = rect.right + GAP;
+        left = edge.right + GAP;
         origin = "left center";
         slideX = -6;
         break;
@@ -113,7 +126,7 @@ export function Tooltip({
       top = Math.max(EDGE_PADDING, Math.min(top, window.innerHeight - th - EDGE_PADDING));
     }
     return { top, left, origin, slideX, slideY };
-  }, [placement]);
+  }, [placement, anchorRef]);
 
   const show = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);

@@ -88,7 +88,8 @@ export interface WorkflowTaskTimelineProps {
  * follows the chat's scroll position / hover, and scrolls the chat to the
  * matching {@link WorkflowTaskGroup} when clicked. The badge number matches the
  * chat group's heading so the two views can be paired at a glance. Hovering a
- * title with a description reveals it in a tooltip. Once a run has branched, a
+ * title with a description reveals it in a tooltip beside the panel, clear of
+ * the neighbouring entries. Once a run has branched, a
  * task worked by a branch session is indented off the rail on an elbow and
  * labelled with the branch's name, and tasks of sessions other than the one on
  * screen are dimmed. When a task or template
@@ -114,6 +115,7 @@ export function WorkflowTaskTimeline({
   const [serverNames, setServerNames] = useState<Map<string, string>>(new Map());
   const [serverNamesLoading, setServerNamesLoading] = useState(false);
   const serverNamesFetched = useRef(false);
+  const asideRef = useRef<HTMLElement>(null);
 
   function openToolsDialog(task: TimelineTask) {
     setOpenToolsTask(task);
@@ -147,7 +149,7 @@ export function WorkflowTaskTimeline({
   }
 
   return (
-    <aside className={`${TASK_TIMELINE_ASIDE_CLASS} ${className ?? ""}`}>
+    <aside ref={asideRef} className={`${TASK_TIMELINE_ASIDE_CLASS} ${className ?? ""}`}>
       <div className={TASK_TIMELINE_HEADER_CLASS}>
         <h2 className="text-label">{t("app.tasks")}</h2>
         <button
@@ -228,7 +230,12 @@ export function WorkflowTaskTimeline({
                       {index}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <Tooltip label={task.description ?? ""} disabled={!task.description}>
+                      <Tooltip
+                        label={task.description ?? ""}
+                        placement="right"
+                        anchorRef={asideRef}
+                        disabled={!task.description}
+                      >
                         <span className="block truncate text-sm font-medium leading-snug">
                           {task.title}
                         </span>

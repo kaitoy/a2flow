@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Tooltip } from "./tooltip";
 
@@ -78,6 +79,28 @@ describe("Tooltip", () => {
     await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(), {
       timeout: 3000,
     });
+  });
+
+  it("clears the anchor's edge, not the trigger's, when an anchorRef is given", async () => {
+    const user = userEvent.setup();
+    const anchorRef = createRef<HTMLDivElement>();
+    render(
+      <div ref={anchorRef}>
+        <Tooltip label="Full text" placement="right" anchorRef={anchorRef} delay={0}>
+          <button type="button">trigger</button>
+        </Tooltip>
+      </div>
+    );
+    // happy-dom lays nothing out, so every rect is zero; give the anchor a real
+    // right edge. The trigger's own right edge (0) must not be what is used.
+    const anchor = anchorRef.current;
+    if (!anchor) throw new Error("anchor not mounted");
+    anchor.getBoundingClientRect = () => ({ right: 300 }) as DOMRect;
+
+    await user.hover(screen.getByRole("button", { name: "trigger" }));
+
+    // The anchor's right edge plus the 10px gap.
+    expect((await screen.findByRole("tooltip")).style.left).toBe("310px");
   });
 
   it("attaches no tooltip behavior when disabled", async () => {
