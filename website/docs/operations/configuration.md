@@ -86,7 +86,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | empty | Comma-separated host names, such as `keycloak.internal,localhost`, that a tenant's [single sign-on](../guides/single-sign-on.md) issuer URL may have even though they resolve to a private address — for an on-premises identity provider. Every other issuer must resolve to a public address |
 
-Single sign-on also depends on the deployment's base URL, `APP_BASE_URL` (see [Server settings](#server-settings)). Without it, single sign-on is unavailable and **Tenant Settings** shows a warning instead of the **Redirect URI**. Two requirements:
+Single sign-on also depends on the deployment's base URL, `APP_BASE_URL` (see [Server settings](#server-settings)). Without it, single sign-on is unavailable and **Admin Settings** shows a warning instead of the **Redirect URI**. Two requirements:
 
 - **The base URL is the origin only** — scheme, host and an optional port, such as `https://a2flow.example.com`, with no path. The backend refuses to start with any other value.
 - **The backend should see the public origin.** Behind a reverse proxy, have the proxy keep the original `Host` header when it forwards a request and set `X-Forwarded-Proto` to the original scheme, and let the backend trust the proxy by listing the proxy's address in `FORWARDED_ALLOW_IPS` (by default only `127.0.0.1` is trusted). Otherwise every SSO sign-in takes one extra redirect.
@@ -141,7 +141,7 @@ The encryption key is resolved at first use, in order:
 
 **Back the key up.** Losing it makes every stored local secret undecryptable, and the same key protects the [approval CA](../architecture/approvals.md)'s signing key.
 
-There is no environment variable for HashiCorp Vault: a tenant's own Vault is set by its admin under [Tenant Settings](../guides/users-and-groups.md#tenant-vault), and the global Vault's address by a Super Admin under [System Settings](../guides/system-settings.md#global-vault), with each tenant's [credential for it](../guides/users-and-groups.md#global-vault-credential) on the tenant's page. A tenant's own Vault address goes through the same SSRF checks as other user-supplied URLs, so it must be public. The global Vault address is exempt, since only a Super Admin can set it and a Vault typically lives on a private address.
+There is no environment variable for HashiCorp Vault: a tenant's own Vault is set by its admin under [Admin Settings](../guides/users-and-groups.md#tenant-vault), and the global Vault's address by a Super Admin under [System Settings](../guides/system-settings.md#global-vault), with each tenant's [credential for it](../guides/users-and-groups.md#global-vault-credential) on the tenant's page. A tenant's own Vault address goes through the same SSRF checks as other user-supplied URLs, so it must be public. The global Vault address is exempt, since only a Super Admin can set it and a Vault typically lives on a private address.
 
 ## MCP tools and approvals {#mcp-tools-and-approvals}
 

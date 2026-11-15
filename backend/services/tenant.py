@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from config import get_settings
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.url_safety import assert_public_http_url
-from models.tenant import Tenant, TenantCreate, TenantSettingsUpdate, TenantUpdate
+from models.tenant import AdminSettingsUpdate, Tenant, TenantCreate, TenantUpdate
 from repositories.exceptions import NotFoundError, TenantValidationError
 from repositories.query import FilterSpec, SortSpec
 from repositories.tenant import TenantRepository
@@ -199,7 +199,7 @@ class TenantService:
     async def update(
         self,
         tenant_id: str,
-        data: TenantUpdate | TenantSettingsUpdate,
+        data: TenantUpdate | AdminSettingsUpdate,
         *,
         user_id: str,
     ) -> Tenant:

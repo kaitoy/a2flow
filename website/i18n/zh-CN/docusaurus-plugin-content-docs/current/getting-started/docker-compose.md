@@ -132,7 +132,7 @@ Keycloak 发布在 [http://keycloak.localhost:8180](http://keycloak.localhost:81
 
 ### 1. 连接 A2Flow {#1-connect-a2flow}
 
-1. 以 `admin` 身份登录 A2Flow，打开管理侧边栏的**租户设置**。
+1. 以 `admin` 身份登录 A2Flow，打开管理侧边栏的**管理员设置**。
 2. 在**单点登录**部分，用上表的值填写**颁发者 URL**、**客户端 ID** 和**客户端密钥**，勾选**启用单点登录**并保存。
 3. 打开**用户组**，打开（或新建）一个带有所需角色的组，在 **IdP 组**中输入 `a2flow-admins` 并保存。
 

@@ -287,6 +287,29 @@ export const ja = {
   "admin.whichDesignToRun": "実行する設計",
   "admin.workflowGenerationStarted": "ワークフローの生成を開始しました",
   "admin.workflowName": "ワークフロー名",
+  "adminSettings.adminSettingsUpdated": "管理者設定を更新しました",
+  "adminSettings.oidc.title": "シングルサインオン",
+  "adminSettings.oidc.enable": "シングルサインオンを有効にする",
+  "adminSettings.oidc.issuerUrl": "発行者 URL",
+  "adminSettings.oidc.issuerUrlHint": "IdP の OpenID Connect 発行者です。",
+  "adminSettings.oidc.clientId": "クライアント ID",
+  "adminSettings.oidc.clientSecret": "クライアントシークレット",
+  "adminSettings.oidc.groupsClaim": "グループクレーム",
+  "adminSettings.oidc.groupsClaimHint":
+    "ユーザーの IdP グループを列挙する ID トークンのクレームです。トークンにこのクレームがないユーザーは、IdP グループに対応付けられたすべてのグループから外れます。",
+  "adminSettings.oidc.trustEmail": "この IdP のメールアドレスを信頼する",
+  "adminSettings.oidc.trustEmailHint":
+    "IdP がメールアドレスを確認済みとしていない場合でも、メールアドレスで既存のアカウントを紐付けます。",
+  "adminSettings.oidc.redirectUri": "リダイレクト URI",
+  "adminSettings.oidc.redirectUriHint":
+    "この URL を IdP のリダイレクト URI として登録してください。",
+  "adminSettings.oidc.copy": "コピー",
+  "adminSettings.oidc.copied": "リダイレクト URI をコピーしました",
+  "adminSettings.oidc.baseUrlMissing":
+    "デプロイのベース URL が設定されていないため、シングルサインオンはまだ利用できません。運用担当者に設定を依頼してください。",
+  "adminSettings.theAdminSettingsCouldNotBeLoaded": "管理者設定を読み込めませんでした。",
+  "adminSettings.theHashicorpVaultThisTenantsVaultType":
+    "このテナントの Vault タイプのシークレットを読み取る HashiCorp Vault です。空欄にすると、上位管理者が設定したグローバル Vault を使います。",
   "agentSkills.addSkill": "+ スキルを追加",
   "agentSkills.agentSkillCreated": "エージェントスキルを作成しました",
   "agentSkills.agentSkillUpdated": "エージェントスキルを更新しました",
@@ -482,6 +505,7 @@ export const ja = {
   "common.a2flowLogo": "A2Flow ロゴ",
   "common.accessControl": "アクセス制御",
   "common.actions": "操作",
+  "common.adminSettings": "管理者設定",
   "common.agentSkill": "エージェントスキル",
   "common.agentSkills": "エージェントスキル",
   "common.allowed": "許可",
@@ -564,7 +588,6 @@ export const ja = {
   "common.tags": "タグ",
   "common.task": "タスク",
   "common.tenant": "テナント",
-  "common.tenantSettings": "テナント設定",
   "common.tenants": "テナント",
   "common.title": "タイトル",
   "common.tool": "ツール",
@@ -672,7 +695,8 @@ export const ja = {
   "knowledgeBases.noKnowledgeBasesCreatedYet": "ナレッジベースはまだ作成されていません。",
   "lib.buildWikisYourWorkflowsCanRead": "ワークフローが読める Wiki を作る",
   "lib.configureAgentCapabilities": "エージェントの機能を設定する",
-  "lib.configureTheMailServerNotificationsAreSent": "通知の送信に使うメールサーバーを設定する",
+  "lib.configureSettingsForAdmins": "管理者向けの設定を行う",
+  "lib.configureSystemSettings": "システムの設定を行う",
   "lib.curateTheLabelsRecordsAreClassifiedBy": "レコードの分類に使うラベルを整理する",
   "lib.designMultiStepFlows": "複数ステップのフローを設計する",
   "lib.grantRolesToSeveralAccountsAtOnce": "複数のアカウントにまとめてロールを付与する",
@@ -686,7 +710,6 @@ export const ja = {
     "エクスポートされた関数がありません。このサーバーが公開するツールはありません。",
   "lib.scriptNoInputSchema":
     "'{exported}' に inputSchema がありません。ツールはどの引数オブジェクトも受け付けます。",
-  "lib.setHowFailedSignInsLockAccounts": "ログイン失敗時のアカウントロックを設定する",
   "lib.storeCredentialsForToolsAndRepos": "ツールとリポジトリの認証情報を保管する",
   "lib.stubToolsForDraftWorkflowRuns": "下書きワークフローの実行用にツールをスタブにする",
   "lib.traceToolCallsImpersonationCertificatesAndMail":
@@ -871,29 +894,6 @@ export const ja = {
     "このタグを作成する前に、ヘッダーでテナントを選択してください。",
   "tags.tagCreated": "タグを作成しました",
   "tags.tagUpdated": "タグを更新しました",
-  "tenantSettings.oidc.title": "シングルサインオン",
-  "tenantSettings.oidc.enable": "シングルサインオンを有効にする",
-  "tenantSettings.oidc.issuerUrl": "発行者 URL",
-  "tenantSettings.oidc.issuerUrlHint": "IdP の OpenID Connect 発行者です。",
-  "tenantSettings.oidc.clientId": "クライアント ID",
-  "tenantSettings.oidc.clientSecret": "クライアントシークレット",
-  "tenantSettings.oidc.groupsClaim": "グループクレーム",
-  "tenantSettings.oidc.groupsClaimHint":
-    "ユーザーの IdP グループを列挙する ID トークンのクレームです。トークンにこのクレームがないユーザーは、IdP グループに対応付けられたすべてのグループから外れます。",
-  "tenantSettings.oidc.trustEmail": "この IdP のメールアドレスを信頼する",
-  "tenantSettings.oidc.trustEmailHint":
-    "IdP がメールアドレスを確認済みとしていない場合でも、メールアドレスで既存のアカウントを紐付けます。",
-  "tenantSettings.oidc.redirectUri": "リダイレクト URI",
-  "tenantSettings.oidc.redirectUriHint":
-    "この URL を IdP のリダイレクト URI として登録してください。",
-  "tenantSettings.oidc.copy": "コピー",
-  "tenantSettings.oidc.copied": "リダイレクト URI をコピーしました",
-  "tenantSettings.oidc.baseUrlMissing":
-    "デプロイのベース URL が設定されていないため、シングルサインオンはまだ利用できません。運用担当者に設定を依頼してください。",
-  "tenantSettings.tenantSettingsUpdated": "テナント設定を更新しました",
-  "tenantSettings.theHashicorpVaultThisTenantsVaultType":
-    "このテナントの Vault タイプのシークレットを読み取る HashiCorp Vault です。空欄にすると、上位管理者が設定したグローバル Vault を使います。",
-  "tenantSettings.theTenantSettingsCouldNotBeLoaded": "テナント設定を読み込めませんでした。",
   "tenants.addTenant": "+ テナントを追加",
   "tenants.deleteDisplayname": "「{displayName}」を削除しますか?",
   "tenants.deleteTenant": "テナントを削除",

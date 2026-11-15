@@ -86,7 +86,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | vacío | Nombres de host separados por comas, como `keycloak.internal,localhost`, que la URL del emisor del [inicio de sesión único](../guides/single-sign-on.md) de un tenant puede tener aunque se resuelvan a una dirección privada; sirve para un proveedor de identidad local. Cualquier otro emisor debe resolverse a una dirección pública |
 
-El inicio de sesión único depende también de la URL base del despliegue, `APP_BASE_URL` (consulta [Configuración del servidor](#server-settings)). Sin ella, el inicio de sesión único no está disponible y **Configuración del tenant** muestra un aviso en lugar de la **URI de redirección**. Dos requisitos:
+El inicio de sesión único depende también de la URL base del despliegue, `APP_BASE_URL` (consulta [Configuración del servidor](#server-settings)). Sin ella, el inicio de sesión único no está disponible y **Configuración de administrador** muestra un aviso en lugar de la **URI de redirección**. Dos requisitos:
 
 - **La URL base es solo el origen**: esquema, host y un puerto opcional, como `https://a2flow.example.com`, sin ruta. El backend no arranca con ningún otro valor.
 - **El backend debe ver el origen público.** Detrás de un proxy inverso, haz que el proxy conserve la cabecera `Host` original al reenviar una petición y que establezca `X-Forwarded-Proto` con el esquema original, y haz que el backend confíe en el proxy indicando su dirección en `FORWARDED_ALLOW_IPS` (por defecto solo se confía en `127.0.0.1`). Si no, cada inicio de sesión SSO requiere una redirección adicional.
@@ -141,7 +141,7 @@ La clave de cifrado se resuelve en el primer uso, en este orden:
 
 **Haz copia de seguridad de la clave.** Perderla hace indescifrables todos los secretos locales almacenados, y esa misma clave protege la clave de firma de la [CA de aprobaciones](../architecture/approvals.md).
 
-No hay ninguna variable de entorno para HashiCorp Vault: el administrador de un tenant configura el Vault propio de este en [Configuración del tenant](../guides/users-and-groups.md#tenant-vault), y un Superadministrador configura la dirección del Vault global en [Configuración del sistema](../guides/system-settings.md#global-vault), con la [credencial de cada tenant para él](../guides/users-and-groups.md#global-vault-credential) en la página del tenant. La dirección del Vault propio de un tenant pasa por las mismas comprobaciones SSRF que las demás URL que introducen los usuarios, así que debe ser pública. La dirección del Vault global está exenta, ya que solo un Superadministrador puede establecerla y un Vault suele estar en una dirección privada.
+No hay ninguna variable de entorno para HashiCorp Vault: el administrador de un tenant configura el Vault propio de este en [Configuración de administrador](../guides/users-and-groups.md#tenant-vault), y un Superadministrador configura la dirección del Vault global en [Configuración del sistema](../guides/system-settings.md#global-vault), con la [credencial de cada tenant para él](../guides/users-and-groups.md#global-vault-credential) en la página del tenant. La dirección del Vault propio de un tenant pasa por las mismas comprobaciones SSRF que las demás URL que introducen los usuarios, así que debe ser pública. La dirección del Vault global está exenta, ya que solo un Superadministrador puede establecerla y un Vault suele estar en una dirección privada.
 
 ## Herramientas MCP y aprobaciones {#mcp-tools-and-approvals}
 

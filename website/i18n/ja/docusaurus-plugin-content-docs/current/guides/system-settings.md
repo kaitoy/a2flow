@@ -27,7 +27,7 @@ sidebar_position: 13
 
 ## グローバル Vault {#global-vault}
 
-グローバル Vault は、**自分専用の Vault を持たない**テナントすべてが [Vault 型シークレット](./secrets.md)を読む HashiCorp Vault(KV v2 のみ)です。テナントの管理者は [テナント設定](./users-and-groups.md#tenant-vault) でテナント専用の Vault に接続でき、その場合は常にそちらが優先されます。
+グローバル Vault は、**自分専用の Vault を持たない**テナントすべてが [Vault 型シークレット](./secrets.md)を読む HashiCorp Vault(KV v2 のみ)です。テナントの管理者は [管理者設定](./users-and-groups.md#tenant-vault) でテナント専用の Vault に接続でき、その場合は常にそちらが優先されます。
 
 | 項目 | 用途 |
 |---|---|

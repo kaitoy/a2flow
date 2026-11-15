@@ -57,14 +57,14 @@ Los registros nunca muestran un ID de usuario en bruto. Todas las páginas de de
 
 Las contraseñas incorrectas repetidas bloquean una cuenta durante un tiempo. Cuando el mismo nombre de usuario (y tenant) acumula el número de fallos fijado en **Inicios de sesión fallidos antes del bloqueo** dentro del plazo de **Minutos de bloqueo** (5 en 15 minutos, salvo que el tenant los haya cambiado), la pantalla de inicio de sesión rechaza incluso la contraseña correcta e indica cuántos minutos hay que esperar. El bloqueo se levanta cuando el más antiguo de esos fallos alcanza la antigüedad de **Minutos de bloqueo**.
 
-Cada tenant define sus propios valores. Abre **Configuración del tenant** en la barra lateral de administración (se necesita el rol Administrador) para cambiarlos en tu tenant:
+Cada tenant define sus propios valores. Abre **Configuración de administrador** en la barra lateral de administración (se necesita el rol Administrador) para cambiarlos en tu tenant:
 
 | Campo | Notas |
 |---|---|
 | **Inicios de sesión fallidos antes del bloqueo** | Cuántos fallos bloquean una cuenta. De 1 a 100; valor predeterminado: 5. |
 | **Minutos de bloqueo** | Durante cuántos minutos se cuentan los fallos y cuánto tiempo permanece bloqueada una cuenta. De 1 a 1440 (un día); valor predeterminado: 15. |
 
-Un Superadministrador edita esos mismos dos campos en la página de detalle de un tenant, en **Tenants**, o abre **Configuración del tenant** mientras actúa como ese tenant. Las cuentas que no pertenecen a ningún tenant, como `root`, siempre usan los valores predeterminados.
+Un Superadministrador edita esos mismos dos campos en la página de detalle de un tenant, en **Tenants**, o abre **Configuración de administrador** mientras actúa como ese tenant. Las cuentas que no pertenecen a ningún tenant, como `root`, siempre usan los valores predeterminados.
 
 Un inicio de sesión correcto pone a cero el recuento de fallos de la cuenta. Un nombre de usuario que no existe se bloquea tras el mismo número de fallos, de modo que un bloqueo nunca revela si una cuenta existe. Nadie tiene que desbloquear una cuenta: el bloqueo se levanta solo.
 
@@ -79,7 +79,7 @@ flowchart LR
   Q -- no --> G["El Vault global<br/>Montaje de Vault / Ruta de Vault indicados en el secreto,<br/>leído con la credencial propia del tenant"]
 ```
 
-Para conectar el Vault propio del tenant, abre **Configuración del tenant** en la barra lateral de administración (se necesita el rol Administrador). Un Superadministrador abre la misma página mientras actúa como ese tenant.
+Para conectar el Vault propio del tenant, abre **Configuración de administrador** en la barra lateral de administración (se necesita el rol Administrador). Un Superadministrador abre la misma página mientras actúa como ese tenant.
 
 | Campo | Notas |
 |---|---|
@@ -168,7 +168,7 @@ Escribir en esta sección requiere el rol Administrador. La lectura sigue abiert
 
 Abre **Tenants** en la barra lateral de administración para gestionar los tenants: el límite organizativo de nivel superior para la multitenencia. Lo que ese límite significa para todo lo demás, y cómo un Superadministrador elige el tenant con el que actuar, se explica en [Tenants](../concepts/tenants.md); esta sección trata de los propios registros.
 
-A diferencia de todas las demás secciones de administración, esta es **solo para Superadministradores** (el administrador de un tenant cambia su bloqueo de inicio de sesión, su propio Vault y su [inicio de sesión único](./single-sign-on.md) en **Configuración del tenant**). Está oculta en la barra lateral y en la página de bienvenida para todos los demás roles, y las escrituras de cualquier otra persona se rechazan.
+A diferencia de todas las demás secciones de administración, esta es **solo para Superadministradores** (el administrador de un tenant cambia su bloqueo de inicio de sesión, su propio Vault y su [inicio de sesión único](./single-sign-on.md) en **Configuración de administrador**). Está oculta en la barra lateral y en la página de bienvenida para todos los demás roles, y las escrituras de cualquier otra persona se rechazan.
 
 | Campo | Notas |
 |---|---|

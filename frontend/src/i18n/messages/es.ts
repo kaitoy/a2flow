@@ -289,6 +289,29 @@ export const es = {
   "admin.whichDesignToRun": "Qué diseño ejecutar",
   "admin.workflowGenerationStarted": "Se inició la generación del flujo de trabajo",
   "admin.workflowName": "Nombre del flujo de trabajo",
+  "adminSettings.adminSettingsUpdated": "Configuración de administrador actualizada",
+  "adminSettings.oidc.title": "Inicio de sesión único",
+  "adminSettings.oidc.enable": "Habilitar el inicio de sesión único",
+  "adminSettings.oidc.issuerUrl": "URL del emisor",
+  "adminSettings.oidc.issuerUrlHint": "El emisor OpenID Connect de tu proveedor de identidad.",
+  "adminSettings.oidc.clientId": "ID de cliente",
+  "adminSettings.oidc.clientSecret": "Secreto de cliente",
+  "adminSettings.oidc.groupsClaim": "Claim de grupos",
+  "adminSettings.oidc.groupsClaimHint":
+    "El claim del token de ID que enumera los grupos del IdP de un usuario. Un usuario cuyo token no lo incluye sale de todos los grupos asignados a un grupo del IdP.",
+  "adminSettings.oidc.trustEmail": "Confiar en las direcciones de correo de este IdP",
+  "adminSettings.oidc.trustEmailHint":
+    "Vincula una cuenta existente por dirección de correo aunque el IdP no la marque como verificada.",
+  "adminSettings.oidc.redirectUri": "URI de redirección",
+  "adminSettings.oidc.redirectUriHint": "Registra esta URL como URI de redirección en tu IdP.",
+  "adminSettings.oidc.copy": "Copiar",
+  "adminSettings.oidc.copied": "URI de redirección copiada",
+  "adminSettings.oidc.baseUrlMissing":
+    "La URL base del despliegue no está configurada, así que el inicio de sesión único aún no se puede usar. Pide a tu operador que la configure.",
+  "adminSettings.theAdminSettingsCouldNotBeLoaded":
+    "No se pudo cargar la configuración de administrador.",
+  "adminSettings.theHashicorpVaultThisTenantsVaultType":
+    "El HashiCorp Vault del que se leen los secretos de tipo Vault de este tenant. Déjalo vacío para usar el Vault global configurado por un superadministrador.",
   "agentSkills.addSkill": "+ Añadir skill",
   "agentSkills.agentSkillCreated": "Skill de agente creada",
   "agentSkills.agentSkillUpdated": "Skill de agente actualizada",
@@ -494,6 +517,7 @@ export const es = {
   "common.a2flowLogo": "Logotipo de A2Flow",
   "common.accessControl": "Control de acceso",
   "common.actions": "Acciones",
+  "common.adminSettings": "Configuración de administrador",
   "common.agentSkill": "Skill de agente",
   "common.agentSkills": "Skills de agente",
   "common.allowed": "Permitido",
@@ -576,7 +600,6 @@ export const es = {
   "common.tags": "Etiquetas",
   "common.task": "Tarea",
   "common.tenant": "Tenant",
-  "common.tenantSettings": "Configuración del tenant",
   "common.tenants": "Tenants",
   "common.title": "Título",
   "common.tool": "Herramienta",
@@ -688,8 +711,8 @@ export const es = {
   "knowledgeBases.noKnowledgeBasesCreatedYet": "Aún no se han creado bases de conocimiento.",
   "lib.buildWikisYourWorkflowsCanRead": "Crea wikis que tus flujos de trabajo puedan leer",
   "lib.configureAgentCapabilities": "Configura las capacidades de los agentes",
-  "lib.configureTheMailServerNotificationsAreSent":
-    "Configura el servidor de correo por el que se envían las notificaciones",
+  "lib.configureSettingsForAdmins": "Configura los ajustes para administradores",
+  "lib.configureSystemSettings": "Configura los ajustes del sistema",
   "lib.curateTheLabelsRecordsAreClassifiedBy":
     "Organiza las etiquetas con las que se clasifican los registros",
   "lib.designMultiStepFlows": "Diseña flujos de varios pasos",
@@ -703,8 +726,6 @@ export const es = {
   "lib.scriptNoExports": "No hay ninguna función exportada: este servidor no expone herramientas.",
   "lib.scriptNoInputSchema":
     "'{exported}' no tiene inputSchema: la herramienta aceptará cualquier objeto de argumentos.",
-  "lib.setHowFailedSignInsLockAccounts":
-    "Define cómo los inicios de sesión fallidos bloquean las cuentas",
   "lib.storeCredentialsForToolsAndRepos": "Guarda credenciales para herramientas y repositorios",
   "lib.stubToolsForDraftWorkflowRuns":
     "Simula herramientas para las ejecuciones de flujos de trabajo en borrador",
@@ -896,29 +917,6 @@ export const es = {
     "Selecciona un tenant en el encabezado antes de crear esta etiqueta.",
   "tags.tagCreated": "Etiqueta creada",
   "tags.tagUpdated": "Etiqueta actualizada",
-  "tenantSettings.oidc.title": "Inicio de sesión único",
-  "tenantSettings.oidc.enable": "Habilitar el inicio de sesión único",
-  "tenantSettings.oidc.issuerUrl": "URL del emisor",
-  "tenantSettings.oidc.issuerUrlHint": "El emisor OpenID Connect de tu proveedor de identidad.",
-  "tenantSettings.oidc.clientId": "ID de cliente",
-  "tenantSettings.oidc.clientSecret": "Secreto de cliente",
-  "tenantSettings.oidc.groupsClaim": "Claim de grupos",
-  "tenantSettings.oidc.groupsClaimHint":
-    "El claim del token de ID que enumera los grupos del IdP de un usuario. Un usuario cuyo token no lo incluye sale de todos los grupos asignados a un grupo del IdP.",
-  "tenantSettings.oidc.trustEmail": "Confiar en las direcciones de correo de este IdP",
-  "tenantSettings.oidc.trustEmailHint":
-    "Vincula una cuenta existente por dirección de correo aunque el IdP no la marque como verificada.",
-  "tenantSettings.oidc.redirectUri": "URI de redirección",
-  "tenantSettings.oidc.redirectUriHint": "Registra esta URL como URI de redirección en tu IdP.",
-  "tenantSettings.oidc.copy": "Copiar",
-  "tenantSettings.oidc.copied": "URI de redirección copiada",
-  "tenantSettings.oidc.baseUrlMissing":
-    "La URL base del despliegue no está configurada, así que el inicio de sesión único aún no se puede usar. Pide a tu operador que la configure.",
-  "tenantSettings.tenantSettingsUpdated": "Configuración del tenant actualizada",
-  "tenantSettings.theHashicorpVaultThisTenantsVaultType":
-    "El HashiCorp Vault del que se leen los secretos de tipo Vault de este tenant. Déjalo vacío para usar el Vault global configurado por un superadministrador.",
-  "tenantSettings.theTenantSettingsCouldNotBeLoaded":
-    "No se pudo cargar la configuración del tenant.",
   "tenants.addTenant": "+ Añadir tenant",
   "tenants.deleteDisplayname": "¿Eliminar «{displayName}»?",
   "tenants.deleteTenant": "Eliminar tenant",

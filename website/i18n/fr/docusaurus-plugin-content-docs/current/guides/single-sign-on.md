@@ -28,7 +28,7 @@ sequenceDiagram
 ## Avant de commencer {#before-you-start}
 
 - Il vous faut le rôle Administrateur dans le tenant.
-- Un opérateur doit avoir défini l'URL de base du déploiement au déploiement — voir [Paramètres du serveur](../operations/configuration.md#server-settings). Tant qu'elle n'est pas définie, **Paramètres du tenant** affiche un avertissement à la place de l'**URI de redirection** et l'authentification unique reste indisponible.
+- Un opérateur doit avoir défini l'URL de base du déploiement au déploiement — voir [Paramètres du serveur](../operations/configuration.md#server-settings). Tant qu'elle n'est pas définie, **Paramètres administrateur** affiche un avertissement à la place de l'**URI de redirection** et l'authentification unique reste indisponible.
 - A2Flow doit pouvoir joindre votre IdP à une adresse publique. Un IdP sur un réseau privé ne fonctionne qu'une fois son hôte autorisé par l'opérateur ; voir [Authentification unique](../operations/configuration.md#single-sign-on) dans la référence de configuration.
 
 Pour essayer l'authentification unique sans votre propre IdP, démarrez le Keycloak fourni avec la pile Docker Compose — voir [Essayer l'authentification unique avec Keycloak](../getting-started/docker-compose.md#keycloak).
@@ -36,7 +36,7 @@ Pour essayer l'authentification unique sans votre propre IdP, démarrez le Keycl
 ## La mettre en place {#set-it-up}
 
 1. Dans votre IdP, enregistrez une nouvelle application pour A2Flow : une application web dotée d'un secret client. Notez son URL de l'émetteur, son ID client et son secret client.
-2. Dans A2Flow, ouvrez **Paramètres du tenant** dans la barre latérale d'administration et trouvez la section **Authentification unique**. Appuyez sur **Copier** à côté de **URI de redirection** et enregistrez cette adresse comme URI de redirection de l'application dans votre IdP.
+2. Dans A2Flow, ouvrez **Paramètres administrateur** dans la barre latérale d'administration et trouvez la section **Authentification unique**. Appuyez sur **Copier** à côté de **URI de redirection** et enregistrez cette adresse comme URI de redirection de l'application dans votre IdP.
 3. Dans votre IdP, faites en sorte que le jeton d'ID de l'application porte la liste des groupes de chaque personne (le claim de groupes). L'oublier retire les rôles ; voir [À savoir](#things-to-know).
 4. Remplissez la section à l'aide du tableau ci-dessous et cochez **Activer l'authentification unique**.
 5. Enregistrez. L'enregistrement vérifie que l'URL de l'émetteur est une adresse autorisée (`https`, ou un hôte autorisé par l'opérateur) et, si **Activer l'authentification unique** est cochée, que l'URL de l'émetteur, l'ID client et le secret client sont renseignés. Il ne contacte pas l'IdP, donc le vrai test est l'étape suivante.

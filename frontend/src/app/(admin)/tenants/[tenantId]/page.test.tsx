@@ -204,7 +204,7 @@ describe("TenantDetailPage", () => {
       expect(captured.body).toMatchObject({ loginMaxFailures: 8, loginLockoutMinutes: 45 });
     });
 
-    it("leaves the Vault connection to the Tenant Settings page", async () => {
+    it("leaves the Vault connection to the Admin Settings page", async () => {
       setup();
       const captured = capturePatch(FULL_TENANT);
       renderPage();

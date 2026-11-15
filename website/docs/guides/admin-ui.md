@@ -33,7 +33,7 @@ The breadcrumb trail above every title mirrors that path — `Home › Workflows
 | **Workflow Executions** | Workflow runs and their history | Everyone signed in |
 | **Approvals** | Approval requests and their decisions | Everyone signed in |
 | **Audit Logs** | Tool calls, impersonation, granted authority, and sent mail | Admin, Super Admin |
-| **Tenant Settings** | How failed sign-ins lock your tenant's accounts, and your tenant's own Vault — see [Failed sign-ins](./users-and-groups.md#failed-sign-ins) and [The tenant's Vault](./users-and-groups.md#tenant-vault) | Admin |
+| **Admin Settings** | How failed sign-ins lock your tenant's accounts, and your tenant's own Vault — see [Failed sign-ins](./users-and-groups.md#failed-sign-ins) and [The tenant's Vault](./users-and-groups.md#tenant-vault) | Admin |
 | **System Settings** | The mail server notifications are sent through, and the global Vault's address | Super Admin |
 
 A section missing from your sidebar is one your roles cannot write to. Reads stay open, so a colleague can still send you a direct link to a record inside it — see [Roles and authorization](../concepts/authorization.md).

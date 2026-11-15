@@ -292,7 +292,7 @@ async def test_non_super_admin_cannot_delete_tenant(
 async def test_tenant_routes_neither_take_nor_return_the_vault_connection(
     tenant_client: AsyncClient,
 ) -> None:
-    """The Vault connection is a tenant setting, edited on /tenant-settings."""
+    """The Vault connection is a tenant setting, edited on /admin-settings."""
     response = await tenant_client.post(
         "/api/v1/tenants",
         json={

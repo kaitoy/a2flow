@@ -4,6 +4,8 @@ import type { Message } from "@ag-ui/core";
 import { client } from "@/generated/api/client.gen";
 import * as sdk from "@/generated/api/sdk.gen";
 import type {
+  AdminSettings,
+  AdminSettingsUpdate,
   AgentSkillContent,
   AgentSkillCreate,
   AgentSkillRead as AgentSkillModel,
@@ -74,8 +76,6 @@ import type {
   TagUpdate,
   TenantCreate,
   TenantRead as TenantModel,
-  TenantSettings,
-  TenantSettingsUpdate,
   TenantUpdate,
   ToolBinding,
   UserCreate,
@@ -406,6 +406,8 @@ export type Session = SessionModel;
 /** One file attached to a workflow session, by a participant or by the agent. */
 export type SessionFile = WithAudit<SessionFileModel>;
 export type {
+  AdminSettings,
+  AdminSettingsUpdate,
   AgentSkillContent,
   AgentSkillCreate,
   AgentSkillUpdate,
@@ -454,8 +456,6 @@ export type {
   TagCreate,
   TagUpdate,
   TenantCreate,
-  TenantSettings,
-  TenantSettingsUpdate,
   TenantUpdate,
   ToolBinding,
   UserCreate,
@@ -1121,15 +1121,15 @@ export async function updateSystemSettings(body: SystemSettingsUpdate): Promise<
  * Fetch the acting tenant's admin-managed settings (sign-in lockout). `admin`
  * only; a `super_admin` gets the tenant selected in the tenant switcher.
  */
-export async function getTenantSettings(options?: CallOptions): Promise<TenantSettings> {
-  return unwrap(sdk.getTenantSettingsApiV1TenantSettingsGet(), options) as Promise<TenantSettings>;
+export async function getAdminSettings(options?: CallOptions): Promise<AdminSettings> {
+  return unwrap(sdk.getAdminSettingsApiV1AdminSettingsGet(), options) as Promise<AdminSettings>;
 }
 
 /** Apply a partial update to the acting tenant's admin-managed settings. `admin` only. */
-export async function updateTenantSettings(body: TenantSettingsUpdate): Promise<TenantSettings> {
+export async function updateAdminSettings(body: AdminSettingsUpdate): Promise<AdminSettings> {
   return unwrap(
-    sdk.updateTenantSettingsApiV1TenantSettingsPatch({ body: body })
-  ) as Promise<TenantSettings>;
+    sdk.updateAdminSettingsApiV1AdminSettingsPatch({ body: body })
+  ) as Promise<AdminSettings>;
 }
 
 /**

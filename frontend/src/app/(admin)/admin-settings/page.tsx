@@ -1,12 +1,12 @@
 /**
- * @module TenantSettingsPage — Admin page for the settings a tenant's own
+ * @module AdminSettingsPage — Admin page for the settings a tenant's own
  * `admin` manages: how failed sign-ins lock the tenant's accounts, the
  * tenant's own HashiCorp Vault, and its OpenID Connect single sign-on.
  */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ShieldCheck } from "lucide-react";
+import { Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -39,10 +39,10 @@ import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useT } from "@/i18n/provider";
 import {
-  getTenantSettings,
+  type AdminSettings,
+  getAdminSettings,
   SUPPRESS_FORBIDDEN_TOAST,
-  type TenantSettings,
-  updateTenantSettings,
+  updateAdminSettings,
   type VaultAuthMethod,
 } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
@@ -61,7 +61,7 @@ function buildSchema(savedMethod: VaultAuthMethod | null) {
 type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 
 /** Convert the stored settings into form values. */
-function toFormValues(settings: Partial<TenantSettings>): FormValues {
+function toFormValues(settings: Partial<AdminSettings>): FormValues {
   return {
     ...toSignInLockoutFormValues(settings),
     ...toVaultConnectionFormValues(settings),
@@ -76,7 +76,7 @@ function toFormValues(settings: Partial<TenantSettings>): FormValues {
  * is used). Reachable only by `admin` (and `super_admin`) — `layout.tsx`
  * blocks every other viewer before this page mounts.
  */
-export default function TenantSettingsPage() {
+export default function AdminSettingsPage() {
   const t = useT();
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
@@ -104,7 +104,7 @@ export default function TenantSettingsPage() {
   });
 
   useEffect(() => {
-    getTenantSettings(SUPPRESS_FORBIDDEN_TOAST)
+    getAdminSettings(SUPPRESS_FORBIDDEN_TOAST)
       .then((settings) => {
         setSavedMethod(savedVaultMethod(settings));
         setSecretSaved(settings.oidcClientSecretSet ?? false);
@@ -118,7 +118,7 @@ export default function TenantSettingsPage() {
   async function onSubmit(values: FormValues) {
     try {
       await save.run(async () => {
-        const saved = await updateTenantSettings({
+        const saved = await updateAdminSettings({
           ...toSignInLockoutBody(values),
           ...toVaultConnectionBody(values),
           ...toOidcBody(values),
@@ -127,7 +127,7 @@ export default function TenantSettingsPage() {
         setSecretSaved(saved.oidcClientSecretSet ?? false);
         setRedirectUri(saved.oidcRedirectUri ?? null);
         reset(toFormValues(saved));
-        dispatch(showToast({ message: t("tenantSettings.tenantSettingsUpdated") }));
+        dispatch(showToast({ message: t("adminSettings.adminSettingsUpdated") }));
       });
     } catch {
       // Failure toast is shown globally by api.ts; nothing else to do here.
@@ -136,9 +136,9 @@ export default function TenantSettingsPage() {
 
   const breadcrumbItems = [
     { label: t("common.home"), href: "/" },
-    { label: t("common.tenantSettings") },
+    { label: t("common.adminSettings") },
   ];
-  const header = <AdminPageHeader title={t("common.tenantSettings")} icon={ShieldCheck} />;
+  const header = <AdminPageHeader title={t("common.adminSettings")} icon={Settings} />;
 
   if (loading) {
     return (
@@ -157,7 +157,7 @@ export default function TenantSettingsPage() {
         <Breadcrumbs items={breadcrumbItems} />
         <FormLayout header={header}>
           <p className="rounded-2xl glass-panel-strong p-6 text-on-surface-variant">
-            {t("tenantSettings.theTenantSettingsCouldNotBeLoaded")}
+            {t("adminSettings.theAdminSettingsCouldNotBeLoaded")}
           </p>
         </FormLayout>
       </AdminPageContainer>
@@ -191,7 +191,7 @@ export default function TenantSettingsPage() {
             authMethod={watch("vaultAuthMethod")}
             onAuthMethodChange={(method) => setValue("vaultAuthMethod", method)}
             savedMethod={savedMethod}
-            addrHint={t("tenantSettings.theHashicorpVaultThisTenantsVaultType")}
+            addrHint={t("adminSettings.theHashicorpVaultThisTenantsVaultType")}
             errors={{
               vaultAddr: errors.vaultAddr?.message,
               vaultRoleId: errors.vaultRoleId?.message,

@@ -27,7 +27,7 @@ sidebar_position: 13
 
 ## 全局 Vault {#global-vault}
 
-全局 Vault 是一个 HashiCorp Vault（仅支持 KV v2），所有**没有自有 Vault** 的租户都从中读取 [Vault 类型的密钥](./secrets.md)。租户管理员可以改在[租户设置](./users-and-groups.md#tenant-vault)中连接租户自有的 Vault，此时始终优先使用后者。
+全局 Vault 是一个 HashiCorp Vault（仅支持 KV v2），所有**没有自有 Vault** 的租户都从中读取 [Vault 类型的密钥](./secrets.md)。租户管理员可以改在[管理员设置](./users-and-groups.md#tenant-vault)中连接租户自有的 Vault，此时始终优先使用后者。
 
 | 字段 | 用途 |
 |---|---|

@@ -28,7 +28,7 @@ sequenceDiagram
 ## 开始之前 {#before-you-start}
 
 - 你需要在该租户中拥有管理员角色。
-- 运维人员必须已在部署时设置部署的基础 URL，请参阅[服务器设置](../operations/configuration.md#server-settings)。未设置时，**租户设置**会显示警告来代替**重定向 URI**，单点登录也无法使用。
+- 运维人员必须已在部署时设置部署的基础 URL，请参阅[服务器设置](../operations/configuration.md#server-settings)。未设置时，**管理员设置**会显示警告来代替**重定向 URI**，单点登录也无法使用。
 - A2Flow 必须能通过公网地址访问你的 IdP。位于私有网络中的 IdP 只有在运维人员允许其主机后才能使用，请参阅配置参考中的[单点登录](../operations/configuration.md#single-sign-on)。
 
 要在没有自己 IdP 的情况下试用单点登录，可以启动 Docker Compose 配置中附带的 Keycloak，请参阅[使用 Keycloak 试用单点登录](../getting-started/docker-compose.md#keycloak)。
@@ -36,7 +36,7 @@ sequenceDiagram
 ## 设置步骤 {#set-it-up}
 
 1. 在 IdP 中为 A2Flow 注册一个新应用，类型为带客户端密钥的 Web 应用。记下它的颁发者 URL、客户端 ID 和客户端密钥。
-2. 在 A2Flow 中，打开管理侧边栏的**租户设置**，找到**单点登录**部分。点击**重定向 URI**旁的**复制**，并把该地址登记为 IdP 中该应用的重定向 URI。
+2. 在 A2Flow 中，打开管理侧边栏的**管理员设置**，找到**单点登录**部分。点击**重定向 URI**旁的**复制**，并把该地址登记为 IdP 中该应用的重定向 URI。
 3. 在 IdP 中，让应用的 ID 令牌带上每个人所属组的列表（组声明）。忘记这一步会导致角色被移除，请参阅[注意事项](#things-to-know)。
 4. 对照下表填写该部分，并勾选**启用单点登录**。
 5. 保存。保存时会检查颁发者 URL 是否为允许的地址（`https`，或运维人员已允许的主机）；如果勾选了**启用单点登录**，还会检查颁发者 URL、客户端 ID 和客户端密钥是否已填写。不会联系 IdP，所以真正的测试是下一步。

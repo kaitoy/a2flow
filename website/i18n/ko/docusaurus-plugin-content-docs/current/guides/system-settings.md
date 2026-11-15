@@ -27,7 +27,7 @@ sidebar_position: 13
 
 ## 전역 Vault {#global-vault}
 
-전역 Vault는 **자체 Vault가 없는** 모든 테넌트가 [Vault 유형 시크릿](./secrets.md)을 읽어 오는 HashiCorp Vault(KV v2만 해당)입니다. 테넌트 관리자는 [테넌트 설정](./users-and-groups.md#tenant-vault)에서 테넌트 자체 Vault를 대신 연결할 수 있으며, 이 경우 항상 테넌트 자체 Vault가 우선합니다.
+전역 Vault는 **자체 Vault가 없는** 모든 테넌트가 [Vault 유형 시크릿](./secrets.md)을 읽어 오는 HashiCorp Vault(KV v2만 해당)입니다. 테넌트 관리자는 [관리자 설정](./users-and-groups.md#tenant-vault)에서 테넌트 자체 Vault를 대신 연결할 수 있으며, 이 경우 항상 테넌트 자체 Vault가 우선합니다.
 
 | 필드 | 용도 |
 |---|---|

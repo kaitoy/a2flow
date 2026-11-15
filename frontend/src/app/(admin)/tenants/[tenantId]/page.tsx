@@ -50,7 +50,7 @@ import { showToast } from "@/store/toastSlice";
 /**
  * Build the validation schema. `name` is immutable after creation, so it is
  * kept out of the form and rendered as a read-only field instead. The tenant's
- * own Vault connection is a tenant setting, edited on the Tenant Settings page;
+ * own Vault connection is a tenant setting, edited on the Admin Settings page;
  * its credential for the global Vault is edited here.
  *
  * @param savedMethod - The auth method whose global Vault credential is

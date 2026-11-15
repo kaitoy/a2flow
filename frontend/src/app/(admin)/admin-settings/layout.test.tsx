@@ -2,17 +2,17 @@ import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ADMIN, DEVELOPER, REQUESTER, SUPER_ADMIN } from "@/test/auth-state";
 import { render } from "@/test/test-utils";
-import TenantSettingsLayout from "./layout";
+import AdminSettingsLayout from "./layout";
 
-describe("TenantSettingsLayout", () => {
+describe("AdminSettingsLayout", () => {
   it.each([
     ["an admin", ADMIN],
     ["a super_admin", SUPER_ADMIN],
   ])("renders children for %s", (_label, state) => {
     render(
-      <TenantSettingsLayout>
+      <AdminSettingsLayout>
         <div data-testid="panel">panel</div>
-      </TenantSettingsLayout>,
+      </AdminSettingsLayout>,
       { preloadedState: state }
     );
     expect(screen.getByTestId("panel")).toBeInTheDocument();
@@ -23,9 +23,9 @@ describe("TenantSettingsLayout", () => {
     ["a requester", REQUESTER],
   ])("shows an access-denied state instead of the children for %s", (_label, state) => {
     render(
-      <TenantSettingsLayout>
+      <AdminSettingsLayout>
         <div data-testid="panel">panel</div>
-      </TenantSettingsLayout>,
+      </AdminSettingsLayout>,
       { preloadedState: state }
     );
     expect(screen.queryByTestId("panel")).not.toBeInTheDocument();

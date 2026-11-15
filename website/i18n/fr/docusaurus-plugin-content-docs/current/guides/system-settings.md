@@ -27,7 +27,7 @@ Le mot de passe est en **écriture seule**, comme les [secrets](./secrets.md) et
 
 ## Le Vault global {#global-vault}
 
-Le Vault global est le HashiCorp Vault (KV v2 uniquement) dans lequel tout tenant **sans Vault propre** lit ses [secrets de type Vault](./secrets.md). L'administrateur d'un tenant peut connecter à la place le Vault propre du tenant dans les [Paramètres du tenant](./users-and-groups.md#tenant-vault), et celui-ci a toujours la priorité.
+Le Vault global est le HashiCorp Vault (KV v2 uniquement) dans lequel tout tenant **sans Vault propre** lit ses [secrets de type Vault](./secrets.md). L'administrateur d'un tenant peut connecter à la place le Vault propre du tenant dans les [Paramètres administrateur](./users-and-groups.md#tenant-vault), et celui-ci a toujours la priorité.
 
 | Champ | Rôle |
 |---|---|

@@ -1,6 +1,6 @@
 /**
  * @module SignInLockoutFields — Shared schema and field set for a tenant's
- * sign-in lockout, edited on both the Tenant Settings page (the tenant's own
+ * sign-in lockout, edited on both the Admin Settings page (the tenant's own
  * admin) and the tenant detail page (super admins).
  */
 "use client";
@@ -9,7 +9,7 @@ import type { UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
 import { FormField } from "@/components/admin/form-field";
 import { Input } from "@/components/ui/input";
-import { zTenantSettingsUpdate } from "@/generated/api/zod.gen";
+import { zAdminSettingsUpdate } from "@/generated/api/zod.gen";
 import { useT } from "@/i18n/provider";
 
 /**
@@ -28,11 +28,11 @@ function wholeNumber(schema: z.ZodType, message: string) {
  */
 export const signInLockoutShape = {
   loginMaxFailures: wholeNumber(
-    zTenantSettingsUpdate.shape.loginMaxFailures,
+    zAdminSettingsUpdate.shape.loginMaxFailures,
     "Enter a whole number from 1 to 100"
   ),
   loginLockoutMinutes: wholeNumber(
-    zTenantSettingsUpdate.shape.loginLockoutMinutes,
+    zAdminSettingsUpdate.shape.loginLockoutMinutes,
     "Enter a whole number of minutes from 1 to 1440"
   ),
 };

@@ -291,6 +291,30 @@ export const fr = {
   "admin.whichDesignToRun": "Quelle conception exécuter",
   "admin.workflowGenerationStarted": "Génération du workflow lancée",
   "admin.workflowName": "Nom du workflow",
+  "adminSettings.adminSettingsUpdated": "Paramètres administrateur mis à jour",
+  "adminSettings.oidc.title": "Authentification unique",
+  "adminSettings.oidc.enable": "Activer l'authentification unique",
+  "adminSettings.oidc.issuerUrl": "URL de l'émetteur",
+  "adminSettings.oidc.issuerUrlHint": "L'émetteur OpenID Connect de votre fournisseur d'identité.",
+  "adminSettings.oidc.clientId": "ID client",
+  "adminSettings.oidc.clientSecret": "Secret client",
+  "adminSettings.oidc.groupsClaim": "Claim de groupes",
+  "adminSettings.oidc.groupsClaimHint":
+    "Le claim du jeton d'ID qui liste les groupes IdP d'un utilisateur. Un utilisateur dont le jeton ne le contient pas quitte tous les groupes associés à un groupe IdP.",
+  "adminSettings.oidc.trustEmail": "Faire confiance aux adresses e-mail de cet IdP",
+  "adminSettings.oidc.trustEmailHint":
+    "Associe un compte existant par adresse e-mail, même si l'IdP ne marque pas l'adresse comme vérifiée.",
+  "adminSettings.oidc.redirectUri": "URI de redirection",
+  "adminSettings.oidc.redirectUriHint":
+    "Enregistrez cette URL comme URI de redirection auprès de votre IdP.",
+  "adminSettings.oidc.copy": "Copier",
+  "adminSettings.oidc.copied": "URI de redirection copiée",
+  "adminSettings.oidc.baseUrlMissing":
+    "L'URL de base du déploiement n'est pas définie : l'authentification unique ne peut pas encore être utilisée. Demandez à votre opérateur de la définir.",
+  "adminSettings.theAdminSettingsCouldNotBeLoaded":
+    "Impossible de charger les paramètres administrateur.",
+  "adminSettings.theHashicorpVaultThisTenantsVaultType":
+    "Le HashiCorp Vault d'où sont lus les secrets de type Vault de ce tenant. Laissez vide pour utiliser le Vault global configuré par un super administrateur.",
   "agentSkills.addSkill": "+ Ajouter une compétence",
   "agentSkills.agentSkillCreated": "Compétence d'agent créée",
   "agentSkills.agentSkillUpdated": "Compétence d'agent mise à jour",
@@ -494,6 +518,7 @@ export const fr = {
   "common.a2flowLogo": "Logo A2Flow",
   "common.accessControl": "Contrôle d'accès",
   "common.actions": "Actions",
+  "common.adminSettings": "Paramètres administrateur",
   "common.agentSkill": "Compétence d'agent",
   "common.agentSkills": "Compétences d'agent",
   "common.allowed": "Autorisé",
@@ -576,7 +601,6 @@ export const fr = {
   "common.tags": "Étiquettes",
   "common.task": "Tâche",
   "common.tenant": "Tenant",
-  "common.tenantSettings": "Paramètres du tenant",
   "common.tenants": "Tenants",
   "common.title": "Titre",
   "common.tool": "Outil",
@@ -687,8 +711,8 @@ export const fr = {
   "knowledgeBases.noKnowledgeBasesCreatedYet": "Aucune base de connaissances n'a encore été créée.",
   "lib.buildWikisYourWorkflowsCanRead": "Créez des wikis lisibles par vos workflows",
   "lib.configureAgentCapabilities": "Configurez les capacités des agents",
-  "lib.configureTheMailServerNotificationsAreSent":
-    "Configurez le serveur de messagerie d'envoi des notifications",
+  "lib.configureSettingsForAdmins": "Configurez les paramètres pour les administrateurs",
+  "lib.configureSystemSettings": "Configurez les paramètres du système",
   "lib.curateTheLabelsRecordsAreClassifiedBy":
     "Organisez les libellés servant à classer les enregistrements",
   "lib.designMultiStepFlows": "Concevez des flux en plusieurs étapes",
@@ -702,8 +726,6 @@ export const fr = {
   "lib.scriptNoExports": "Aucune fonction exportée : ce serveur n'expose aucun outil.",
   "lib.scriptNoInputSchema":
     "« {exported} » n'a pas d'inputSchema : l'outil acceptera n'importe quel objet d'arguments.",
-  "lib.setHowFailedSignInsLockAccounts":
-    "Définissez le verrouillage des comptes après des échecs de connexion",
   "lib.storeCredentialsForToolsAndRepos": "Stockez les identifiants des outils et des dépôts",
   "lib.stubToolsForDraftWorkflowRuns":
     "Simulez des outils pour les exécutions de workflows en brouillon",
@@ -895,30 +917,6 @@ export const fr = {
     "Sélectionnez un tenant dans l'en-tête avant de créer cette étiquette.",
   "tags.tagCreated": "Étiquette créée",
   "tags.tagUpdated": "Étiquette mise à jour",
-  "tenantSettings.oidc.title": "Authentification unique",
-  "tenantSettings.oidc.enable": "Activer l'authentification unique",
-  "tenantSettings.oidc.issuerUrl": "URL de l'émetteur",
-  "tenantSettings.oidc.issuerUrlHint": "L'émetteur OpenID Connect de votre fournisseur d'identité.",
-  "tenantSettings.oidc.clientId": "ID client",
-  "tenantSettings.oidc.clientSecret": "Secret client",
-  "tenantSettings.oidc.groupsClaim": "Claim de groupes",
-  "tenantSettings.oidc.groupsClaimHint":
-    "Le claim du jeton d'ID qui liste les groupes IdP d'un utilisateur. Un utilisateur dont le jeton ne le contient pas quitte tous les groupes associés à un groupe IdP.",
-  "tenantSettings.oidc.trustEmail": "Faire confiance aux adresses e-mail de cet IdP",
-  "tenantSettings.oidc.trustEmailHint":
-    "Associe un compte existant par adresse e-mail, même si l'IdP ne marque pas l'adresse comme vérifiée.",
-  "tenantSettings.oidc.redirectUri": "URI de redirection",
-  "tenantSettings.oidc.redirectUriHint":
-    "Enregistrez cette URL comme URI de redirection auprès de votre IdP.",
-  "tenantSettings.oidc.copy": "Copier",
-  "tenantSettings.oidc.copied": "URI de redirection copiée",
-  "tenantSettings.oidc.baseUrlMissing":
-    "L'URL de base du déploiement n'est pas définie : l'authentification unique ne peut pas encore être utilisée. Demandez à votre opérateur de la définir.",
-  "tenantSettings.tenantSettingsUpdated": "Paramètres du tenant mis à jour",
-  "tenantSettings.theHashicorpVaultThisTenantsVaultType":
-    "Le HashiCorp Vault d'où sont lus les secrets de type Vault de ce tenant. Laissez vide pour utiliser le Vault global configuré par un super administrateur.",
-  "tenantSettings.theTenantSettingsCouldNotBeLoaded":
-    "Impossible de charger les paramètres du tenant.",
   "tenants.addTenant": "+ Ajouter un tenant",
   "tenants.deleteDisplayname": "Supprimer « {displayName} » ?",
   "tenants.deleteTenant": "Supprimer le tenant",

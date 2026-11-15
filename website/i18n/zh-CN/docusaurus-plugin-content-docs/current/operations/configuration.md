@@ -86,7 +86,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | 空 | 以逗号分隔的主机名，例如 `keycloak.internal,localhost`。租户的[单点登录](../guides/single-sign-on.md)颁发者 URL 可以使用这些主机，即使它们解析到私有地址，用于本地部署的身份提供商。其他颁发者必须解析到公网地址 |
 
-单点登录还依赖部署的基础 URL，即 `APP_BASE_URL`（请参阅[服务器设置](#server-settings)）。没有它，单点登录无法使用，**租户设置**会显示警告来代替**重定向 URI**。有两点要求：
+单点登录还依赖部署的基础 URL，即 `APP_BASE_URL`（请参阅[服务器设置](#server-settings)）。没有它，单点登录无法使用，**管理员设置**会显示警告来代替**重定向 URI**。有两点要求：
 
 - **基础 URL 只能是源**——只包含协议、主机和可选的端口，例如 `https://a2flow.example.com`，不带路径。其他值会让后端无法启动。
 - **后端应能看到公开的源。** 在反向代理之后，请让代理在转发请求时保留原始的 `Host` 头，并把 `X-Forwarded-Proto` 设为原始协议，再把代理的地址写入 `FORWARDED_ALLOW_IPS`，让后端信任该代理（默认只信任 `127.0.0.1`）。否则每次 SSO 登录都会多一次重定向。
@@ -141,7 +141,7 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 **请备份加密密钥**。一旦丢失，所有已存储的本地密钥都将无法解密，而且[审批 CA](../architecture/approvals.md) 的签名密钥也由同一个加密密钥保护。
 
-HashiCorp Vault 没有对应的环境变量：租户自己的 Vault 由其管理员在[租户设置](../guides/users-and-groups.md#tenant-vault)中配置，全局 Vault 的地址由超级管理员在[系统设置](../guides/system-settings.md#global-vault)中配置，每个租户[访问全局 Vault 的凭据](../guides/users-and-groups.md#global-vault-credential)则在该租户的页面上配置。租户自己的 Vault 地址与其他用户提供的 URL 一样要经过 SSRF 检查，因此必须是公网地址。全局 Vault 地址不受此限制，因为只有超级管理员才能设置它，而且 Vault 通常位于私有地址上。
+HashiCorp Vault 没有对应的环境变量：租户自己的 Vault 由其管理员在[管理员设置](../guides/users-and-groups.md#tenant-vault)中配置，全局 Vault 的地址由超级管理员在[系统设置](../guides/system-settings.md#global-vault)中配置，每个租户[访问全局 Vault 的凭据](../guides/users-and-groups.md#global-vault-credential)则在该租户的页面上配置。租户自己的 Vault 地址与其他用户提供的 URL 一样要经过 SSRF 检查，因此必须是公网地址。全局 Vault 地址不受此限制，因为只有超级管理员才能设置它，而且 Vault 通常位于私有地址上。
 
 ## MCP 工具与审批 {#mcp-tools-and-approvals}
 

@@ -27,7 +27,7 @@ The password is **write-only**, the same treatment [secrets](./secrets.md) and u
 
 ## The global Vault {#global-vault}
 
-The global Vault is the HashiCorp Vault (KV v2 only) that every tenant **without a Vault of its own** reads its [Vault-type secrets](./secrets.md) from. A tenant's admin can connect the tenant's own Vault instead under [Tenant Settings](./users-and-groups.md#tenant-vault), and that one always takes precedence.
+The global Vault is the HashiCorp Vault (KV v2 only) that every tenant **without a Vault of its own** reads its [Vault-type secrets](./secrets.md) from. A tenant's admin can connect the tenant's own Vault instead under [Admin Settings](./users-and-groups.md#tenant-vault), and that one always takes precedence.
 
 | Field | Purpose |
 |---|---|

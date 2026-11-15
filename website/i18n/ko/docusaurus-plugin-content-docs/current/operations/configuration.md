@@ -86,7 +86,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | 비어 있음 | 쉼표로 구분한 호스트 이름(예: `keycloak.internal,localhost`). 테넌트의 [싱글 사인온](../guides/single-sign-on.md) 발급자 URL이 사설 주소로 확인되더라도 이 호스트는 쓸 수 있습니다. 온프레미스 IdP용입니다. 그 밖의 발급자는 공개 주소로 확인되어야 합니다 |
 
-싱글 사인온은 배포의 기본 URL인 `APP_BASE_URL`에도 의존합니다([서버 설정](#server-settings) 참조). 없으면 싱글 사인온을 사용할 수 없고 **테넌트 설정**에 **리디렉션 URI** 대신 경고가 표시됩니다. 요건은 두 가지입니다.
+싱글 사인온은 배포의 기본 URL인 `APP_BASE_URL`에도 의존합니다([서버 설정](#server-settings) 참조). 없으면 싱글 사인온을 사용할 수 없고 **관리자 설정**에 **리디렉션 URI** 대신 경고가 표시됩니다. 요건은 두 가지입니다.
 
 - **기본 URL은 오리진만** — 스킴, 호스트, 필요하면 포트만 쓰고(예: `https://a2flow.example.com`) 경로는 붙이지 않습니다. 다른 값이면 백엔드가 시작되지 않습니다.
 - **백엔드가 공개 오리진을 볼 수 있어야 합니다.** 리버스 프록시 뒤에서는 프록시가 요청을 전달할 때 원래의 `Host` 헤더를 유지하고 `X-Forwarded-Proto`를 원래 스킴으로 설정하게 하며, 프록시 주소를 `FORWARDED_ALLOW_IPS`에 적어 백엔드가 프록시를 신뢰하게 하세요(기본값으로는 `127.0.0.1`만 신뢰합니다). 그러지 않으면 SSO 로그인마다 리디렉션이 한 번 더 일어납니다.
@@ -141,7 +141,7 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 **키를 백업하세요.** 키를 잃으면 저장된 로컬 시크릿을 모두 복호화할 수 없으며, [승인 CA](../architecture/approvals.md)의 서명 키도 같은 키로 보호됩니다.
 
-HashiCorp Vault용 환경 변수는 없습니다. 테넌트 전용 Vault는 해당 테넌트의 관리자가 [테넌트 설정](../guides/users-and-groups.md#tenant-vault)에서, 전역 Vault의 주소는 슈퍼 관리자가 [시스템 설정](../guides/system-settings.md#global-vault)에서 설정하며, 전역 Vault에 대한 각 테넌트의 [자격 증명](../guides/users-and-groups.md#global-vault-credential)은 테넌트 페이지에서 설정합니다. 테넌트 전용 Vault 주소는 사용자가 입력하는 다른 URL과 같은 SSRF 검사를 거치므로 공개 주소여야 합니다. 전역 Vault 주소는 슈퍼 관리자만 설정할 수 있고 Vault는 보통 사설 주소에 있으므로 이 검사에서 제외됩니다.
+HashiCorp Vault용 환경 변수는 없습니다. 테넌트 전용 Vault는 해당 테넌트의 관리자가 [관리자 설정](../guides/users-and-groups.md#tenant-vault)에서, 전역 Vault의 주소는 슈퍼 관리자가 [시스템 설정](../guides/system-settings.md#global-vault)에서 설정하며, 전역 Vault에 대한 각 테넌트의 [자격 증명](../guides/users-and-groups.md#global-vault-credential)은 테넌트 페이지에서 설정합니다. 테넌트 전용 Vault 주소는 사용자가 입력하는 다른 URL과 같은 SSRF 검사를 거치므로 공개 주소여야 합니다. 전역 Vault 주소는 슈퍼 관리자만 설정할 수 있고 Vault는 보통 사설 주소에 있으므로 이 검사에서 제외됩니다.
 
 ## MCP 도구와 승인 {#mcp-tools-and-approvals}
 

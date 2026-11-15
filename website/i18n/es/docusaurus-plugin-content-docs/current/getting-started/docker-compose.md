@@ -132,7 +132,7 @@ Arranca con esto ya preparado:
 
 ### 1. Conectar A2Flow {#1-connect-a2flow}
 
-1. Inicia sesión en A2Flow como `admin` y abre **Configuración del tenant** en la barra lateral de administración.
+1. Inicia sesión en A2Flow como `admin` y abre **Configuración de administrador** en la barra lateral de administración.
 2. En la sección **Inicio de sesión único**, rellena **URL del emisor**, **ID de cliente** y **Secreto de cliente** con los valores de la tabla anterior, marca **Habilitar el inicio de sesión único** y guarda.
 3. Abre **Grupos de usuarios**, abre un grupo —o crea uno— que tenga los roles que quieras, escribe `a2flow-admins` en **Grupo del IdP** y guarda.
 

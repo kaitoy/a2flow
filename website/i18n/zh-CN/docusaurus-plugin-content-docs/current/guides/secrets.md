@@ -30,7 +30,7 @@ sidebar_position: 9
 
 两种类型的值都**绝不会返回**，无论明文还是密文，所以本地类型的详情页只显示键、值留空。只有键是可读的，因此选择器可以列出它们：本地密钥的键来自存储的映射，Vault 密钥的键则在当时从 Vault 读取。
 
-Vault 密钥从**其所属租户的** Vault 读取，由租户管理员在[租户设置](./users-and-groups.md#tenant-vault)中连接。没有自有 Vault 的租户使用[其自有凭据](./users-and-groups.md#global-vault-credential)从[全局 Vault](./system-settings.md#global-vault) 读取，该凭据的 Vault 策略决定可读取的内容。两者都没有时，Vault 类型的密钥无法解析。本地密钥所用的加密密钥只需设置一次，详见[配置参考](../operations/configuration.md#secret-management)。
+Vault 密钥从**其所属租户的** Vault 读取，由租户管理员在[管理员设置](./users-and-groups.md#tenant-vault)中连接。没有自有 Vault 的租户使用[其自有凭据](./users-and-groups.md#global-vault-credential)从[全局 Vault](./system-settings.md#global-vault) 读取，该凭据的 Vault 策略决定可读取的内容。两者都没有时，Vault 类型的密钥无法解析。本地密钥所用的加密密钥只需设置一次，详见[配置参考](../operations/configuration.md#secret-management)。
 
 ## 重命名和删除 {#renaming-and-deleting}
 

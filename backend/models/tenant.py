@@ -7,7 +7,7 @@ only — except ``super_admin``, which is platform-wide and ignores tenancy.
 
 A tenant may also carry the connection to **its own** HashiCorp Vault, which its
 ``vault``-type secrets are read from (see :mod:`infrastructure.vault_client`).
-The tenant's own ``admin`` sets it through :class:`TenantSettingsUpdate`.
+The tenant's own ``admin`` sets it through :class:`AdminSettingsUpdate`.
 ``vault_addr`` is :data:`models.constraints.HttpUrl`, so a tenant user cannot
 point A2Flow at a private address.
 
@@ -133,7 +133,7 @@ class TenantUpdate(TenantGlobalVaultFields):
     ``name`` is intentionally absent: a tenant's name (slug) is immutable
     after creation, so it cannot be changed through the update endpoint. The
     tenant's own Vault connection is absent too: it is a tenant setting,
-    changed through :class:`TenantSettingsUpdate`. The credential for the
+    changed through :class:`AdminSettingsUpdate`. The credential for the
     global Vault is here, since only a ``super_admin`` registers it.
     """
 
@@ -202,10 +202,10 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     oidc_trust_email: bool = False
 
 
-class TenantSettingsUpdate(TenantVaultFields, TenantOidcFields):
+class AdminSettingsUpdate(TenantVaultFields, TenantOidcFields):
     """Partial update of the settings a tenant's own ``admin`` may change.
 
-    Exposed on ``PATCH /tenant-settings``, which acts on the caller's tenant
+    Exposed on ``PATCH /admin-settings``, which acts on the caller's tenant
     rather than on a tenant id: sign-in throttling, the tenant's own Vault and
     its OIDC single sign-on.
     """
@@ -229,7 +229,7 @@ def oidc_redirect_uri(app_base_url: str | None) -> str | None:
     return f"{app_base_url.rstrip('/')}/api/v1/auth/oidc/callback"
 
 
-class TenantSettings(SQLModel):
+class AdminSettings(SQLModel):
     """Read view of the settings a tenant's own ``admin`` may change.
 
     ``vault_credential_set`` and ``oidc_client_secret_set`` report only whether
@@ -259,7 +259,7 @@ class TenantSettings(SQLModel):
     @classmethod
     def from_tenant(
         cls, tenant: Tenant, *, oidc_redirect_uri: str | None
-    ) -> "TenantSettings":
+    ) -> "AdminSettings":
         """Project a tenant into its admin-managed settings.
 
         Args:
@@ -294,7 +294,7 @@ class TenantRead(BaseEntity):
     """Read view of a Tenant, excluding its own Vault connection.
 
     The tenant's own Vault connection is a tenant setting (see
-    :class:`TenantSettings`), so it is left out here. Its credential for the
+    :class:`AdminSettings`), so it is left out here. Its credential for the
     global Vault is reported only as ``global_vault_credential_set``.
     """
 

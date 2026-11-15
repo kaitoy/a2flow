@@ -33,7 +33,7 @@ Le fil d'Ariane au-dessus de chaque titre reflète ce parcours, par exemple `Acc
 | **Exécutions de workflows** | Les exécutions de workflows et leur historique | Toute personne connectée |
 | **Approbations** | Les demandes d'approbation et leurs décisions | Toute personne connectée |
 | **Journaux d'audit** | Les appels d'outils, les emprunts d'identité, l'autorité accordée et les e-mails envoyés | Administrateur, Super administrateur |
-| **Paramètres du tenant** | La façon dont les échecs de connexion verrouillent les comptes de votre tenant, et le Vault propre à votre tenant : voir [Échecs de connexion](./users-and-groups.md#failed-sign-ins) et [Le Vault du tenant](./users-and-groups.md#tenant-vault) | Administrateur |
+| **Paramètres administrateur** | La façon dont les échecs de connexion verrouillent les comptes de votre tenant, et le Vault propre à votre tenant : voir [Échecs de connexion](./users-and-groups.md#failed-sign-ins) et [Le Vault du tenant](./users-and-groups.md#tenant-vault) | Administrateur |
 | **Paramètres système** | Le serveur de messagerie par lequel partent les notifications, et l'adresse du Vault global | Super administrateur |
 
 Une section absente de votre barre latérale est une section dans laquelle vos rôles ne permettent pas d'écrire. La lecture reste ouverte : un collègue peut donc toujours vous envoyer un lien direct vers un enregistrement qu'elle contient. Voir [Rôles et autorisations](../concepts/authorization.md).

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@/test/test-utils";
 import { OidcSettingsFields, type OidcSettingsFieldsProps } from "./oidc-settings-fields";
 
-/** Mounts the fields on a real form, as the Tenant Settings page does. */
+/** Mounts the fields on a real form, as the Admin Settings page does. */
 function Harness(props: Pick<OidcSettingsFieldsProps, "redirectUri" | "secretSaved">) {
   const { register } = useForm({
     defaultValues: {

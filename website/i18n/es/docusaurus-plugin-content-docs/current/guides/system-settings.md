@@ -27,7 +27,7 @@ La contraseña es de **solo escritura**, el mismo tratamiento que reciben los [s
 
 ## El Vault global {#global-vault}
 
-El Vault global es el HashiCorp Vault (solo KV v2) del que leen sus [secretos de tipo Vault](./secrets.md) todos los tenants **que no tienen Vault propio**. El administrador de un tenant puede conectar en su lugar el Vault propio del tenant en [Configuración del tenant](./users-and-groups.md#tenant-vault), y ese siempre tiene prioridad.
+El Vault global es el HashiCorp Vault (solo KV v2) del que leen sus [secretos de tipo Vault](./secrets.md) todos los tenants **que no tienen Vault propio**. El administrador de un tenant puede conectar en su lugar el Vault propio del tenant en [Configuración de administrador](./users-and-groups.md#tenant-vault), y ese siempre tiene prioridad.
 
 | Campo | Para qué sirve |
 |---|---|

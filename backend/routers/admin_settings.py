@@ -16,10 +16,10 @@ from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep
 from dependencies.service import TenantServiceDep
 from models.response import ApiResponse
-from models.tenant import TenantSettings, TenantSettingsUpdate, oidc_redirect_uri
+from models.tenant import AdminSettings, AdminSettingsUpdate, oidc_redirect_uri
 from models.user import Role
 
-router = APIRouter(prefix="/tenant-settings", tags=["tenant-settings"])
+router = APIRouter(prefix="/admin-settings", tags=["admin-settings"])
 
 #: Route dependency gating both routes behind ``admin`` (``super_admin`` passes).
 _requires_admin = [Depends(require_roles(Role.admin))]
@@ -34,35 +34,33 @@ def _redirect_uri() -> str | None:
     return oidc_redirect_uri(get_settings().app_base_url)
 
 
-@router.get(
-    "", response_model=ApiResponse[TenantSettings], dependencies=_requires_admin
-)
-async def get_tenant_settings(
+@router.get("", response_model=ApiResponse[AdminSettings], dependencies=_requires_admin)
+async def get_admin_settings(
     tenant_id: CurrentTenantIdDep,
     service: TenantServiceDep,
     meta: ApiMetaDep,
-) -> ApiResponse[TenantSettings]:
+) -> ApiResponse[AdminSettings]:
     """Return the caller's tenant's admin-managed settings."""
     tenant = await service.get(tenant_id)
     return ApiResponse(
         meta=meta,
-        data=TenantSettings.from_tenant(tenant, oidc_redirect_uri=_redirect_uri()),
+        data=AdminSettings.from_tenant(tenant, oidc_redirect_uri=_redirect_uri()),
     )
 
 
 @router.patch(
-    "", response_model=ApiResponse[TenantSettings], dependencies=_requires_admin
+    "", response_model=ApiResponse[AdminSettings], dependencies=_requires_admin
 )
-async def update_tenant_settings(
-    body: TenantSettingsUpdate,
+async def update_admin_settings(
+    body: AdminSettingsUpdate,
     tenant_id: CurrentTenantIdDep,
     service: TenantServiceDep,
     user_id: CurrentUserIdDep,
     meta: ApiMetaDep,
-) -> ApiResponse[TenantSettings]:
+) -> ApiResponse[AdminSettings]:
     """Apply a partial update to the caller's tenant's admin-managed settings."""
     tenant = await service.update(tenant_id, body, user_id=user_id)
     return ApiResponse(
         meta=meta,
-        data=TenantSettings.from_tenant(tenant, oidc_redirect_uri=_redirect_uri()),
+        data=AdminSettings.from_tenant(tenant, oidc_redirect_uri=_redirect_uri()),
     )

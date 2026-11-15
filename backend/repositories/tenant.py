@@ -8,10 +8,10 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from models.tenant import (
+    AdminSettingsUpdate,
     Tenant,
     TenantCreate,
     TenantRead,
-    TenantSettingsUpdate,
     TenantUpdate,
 )
 from repositories._integrity import is_foreign_key_error, is_unique_error
@@ -45,7 +45,7 @@ class TenantRepository(Protocol):
     async def update(
         self,
         tenant_id: str,
-        data: TenantUpdate | TenantSettingsUpdate,
+        data: TenantUpdate | AdminSettingsUpdate,
         *,
         user_id: str,
     ) -> Tenant: ...
@@ -133,7 +133,7 @@ class SqlTenantRepository:
     async def update(
         self,
         tenant_id: str,
-        data: TenantUpdate | TenantSettingsUpdate,
+        data: TenantUpdate | AdminSettingsUpdate,
         *,
         user_id: str,
     ) -> Tenant:

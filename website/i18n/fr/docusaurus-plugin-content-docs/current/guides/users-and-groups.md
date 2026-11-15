@@ -57,14 +57,14 @@ Les enregistrements n'affichent jamais un identifiant d'utilisateur brut. Chaque
 
 Des mots de passe erronés à répétition verrouillent un compte pendant un certain temps. Une fois atteint le nombre d'échecs fixé par **Échecs de connexion avant verrouillage** pour le même nom d'utilisateur (et le même tenant) sur la durée fixée par **Minutes de verrouillage** (5 échecs en 15 minutes, sauf si le tenant a changé ces valeurs), l'écran de connexion refuse même le mot de passe correct et indique combien de minutes patienter. Le verrou se lève dès que le plus ancien de ces échecs atteint l'ancienneté fixée par **Minutes de verrouillage**.
 
-Chaque tenant définit ses propres valeurs. Pour les changer dans votre tenant, ouvrez **Paramètres du tenant** dans la barre latérale d'administration (le rôle Administrateur est requis) :
+Chaque tenant définit ses propres valeurs. Pour les changer dans votre tenant, ouvrez **Paramètres administrateur** dans la barre latérale d'administration (le rôle Administrateur est requis) :
 
 | Champ | Remarques |
 |---|---|
 | **Échecs de connexion avant verrouillage** | Nombre d'échecs qui verrouille un compte. De 1 à 100 ; 5 par défaut. |
 | **Minutes de verrouillage** | Nombre de minutes sur lequel les échecs sont comptés, et durée pendant laquelle un compte verrouillé le reste. De 1 à 1440 (un jour) ; 15 par défaut. |
 
-Un Super administrateur modifie ces deux mêmes champs sur la page de détail d'un tenant, sous **Tenants**, ou ouvre **Paramètres du tenant** après avoir choisi ce tenant comme tenant actif. Les comptes qui n'appartiennent à aucun tenant, comme `root`, utilisent toujours les valeurs par défaut.
+Un Super administrateur modifie ces deux mêmes champs sur la page de détail d'un tenant, sous **Tenants**, ou ouvre **Paramètres administrateur** après avoir choisi ce tenant comme tenant actif. Les comptes qui n'appartiennent à aucun tenant, comme `root`, utilisent toujours les valeurs par défaut.
 
 Une connexion réussie remet à zéro le compteur d'échecs du compte. Un nom d'utilisateur inexistant est verrouillé après le même nombre d'échecs : un verrouillage ne révèle donc jamais si un compte existe. Personne n'a besoin de déverrouiller un compte : le verrou se lève de lui-même.
 
@@ -79,7 +79,7 @@ flowchart LR
   Q -- non --> G["Le Vault global<br/>Point de montage Vault / Chemin Vault définis sur le secret,<br/>lus avec l'identifiant propre au tenant"]
 ```
 
-Pour connecter le Vault propre au tenant, ouvrez **Paramètres du tenant** dans la barre latérale d'administration (le rôle Administrateur est requis). Un Super administrateur ouvre la même page après avoir choisi ce tenant comme tenant actif.
+Pour connecter le Vault propre au tenant, ouvrez **Paramètres administrateur** dans la barre latérale d'administration (le rôle Administrateur est requis). Un Super administrateur ouvre la même page après avoir choisi ce tenant comme tenant actif.
 
 | Champ | Remarques |
 |---|---|
@@ -168,7 +168,7 @@ L'écriture dans cette section requiert le rôle Administrateur. La lecture rest
 
 Ouvrez **Tenants** dans la barre latérale d'administration pour gérer les tenants, la frontière organisationnelle de plus haut niveau du fonctionnement multi-tenant. Ce que cette frontière implique pour tout le reste, et la façon dont un Super administrateur choisit le tenant à utiliser, sont traités dans [Tenants](../concepts/tenants.md) ; cette section porte sur les enregistrements eux-mêmes.
 
-Contrairement à toutes les autres sections d'administration, celle-ci est **réservée au Super administrateur** (l'administrateur d'un tenant change le verrouillage de connexion, le Vault propre de celui-ci et son [authentification unique](./single-sign-on.md) dans **Paramètres du tenant**). Elle est masquée de la barre latérale et de la page de bienvenue pour tous les autres rôles, et les écritures venant de quiconque d'autre sont refusées.
+Contrairement à toutes les autres sections d'administration, celle-ci est **réservée au Super administrateur** (l'administrateur d'un tenant change le verrouillage de connexion, le Vault propre de celui-ci et son [authentification unique](./single-sign-on.md) dans **Paramètres administrateur**). Elle est masquée de la barre latérale et de la page de bienvenue pour tous les autres rôles, et les écritures venant de quiconque d'autre sont refusées.
 
 | Champ | Remarques |
 |---|---|

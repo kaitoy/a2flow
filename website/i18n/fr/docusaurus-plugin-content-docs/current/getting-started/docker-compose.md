@@ -132,7 +132,7 @@ Il démarre avec ceci déjà en place :
 
 ### 1. Connecter A2Flow {#1-connect-a2flow}
 
-1. Connectez-vous à A2Flow en tant que `admin` et ouvrez **Paramètres du tenant** dans la barre latérale d'administration.
+1. Connectez-vous à A2Flow en tant que `admin` et ouvrez **Paramètres administrateur** dans la barre latérale d'administration.
 2. Dans la section **Authentification unique**, renseignez **URL de l'émetteur**, **ID client** et **Secret client** avec les valeurs du tableau ci-dessus, cochez **Activer l'authentification unique** et enregistrez.
 3. Ouvrez **Groupes d'utilisateurs**, ouvrez un groupe — ou créez-en un — qui porte les rôles voulus, saisissez `a2flow-admins` dans **Groupe IdP** et enregistrez.
 

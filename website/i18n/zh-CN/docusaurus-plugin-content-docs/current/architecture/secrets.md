@@ -29,7 +29,7 @@ sidebar_position: 8
 
 对于由 Vault 支持的密钥，A2Flow 完全不存储值，只存储读取它们所用的挂载点和路径。值和键列表都在每次需要时实时获取，因此在 Vault 中轮换某个值后，无需改动 A2Flow 即可生效。
 
-密钥始终通过其所属租户的 Vault 读取。如果租户管理员已在[租户设置](../guides/users-and-groups.md#tenant-vault)下连接了租户**自有**的 Vault，就使用它；否则使用超级管理员设置的[全局 Vault](../guides/system-settings.md#global-vault)，并使用该租户[自有的凭据](../guides/users-and-groups.md#global-vault-credential)登录。两者都可以通过静态令牌或 AppRole 凭据进行认证；AppRole 令牌会一直复用到租约快要到期，然后重新登录以刷新。在全局 Vault 上，每个租户都有自己的凭据，因此租户之间通过附加在这些凭据上的 Vault 策略相互隔离。两者都没有时，租户的 `vault` 类型密钥将完全无法解析。
+密钥始终通过其所属租户的 Vault 读取。如果租户管理员已在[管理员设置](../guides/users-and-groups.md#tenant-vault)下连接了租户**自有**的 Vault，就使用它；否则使用超级管理员设置的[全局 Vault](../guides/system-settings.md#global-vault)，并使用该租户[自有的凭据](../guides/users-and-groups.md#global-vault-credential)登录。两者都可以通过静态令牌或 AppRole 凭据进行认证；AppRole 令牌会一直复用到租约快要到期，然后重新登录以刷新。在全局 Vault 上，每个租户都有自己的凭据，因此租户之间通过附加在这些凭据上的 Vault 策略相互隔离。两者都没有时，租户的 `vault` 类型密钥将完全无法解析。
 
 ## 解析发生的位置 {#where-resolution-happens}
 

@@ -521,11 +521,11 @@ export const handlers = [
 
   http.delete(`${BASE}/api/v1/tenants/:tenantId`, () => envelope(null)),
 
-  http.get(`${BASE}/api/v1/tenant-settings`, () =>
+  http.get(`${BASE}/api/v1/admin-settings`, () =>
     envelope({ loginMaxFailures: 5, loginLockoutMinutes: 15 })
   ),
 
-  http.patch(`${BASE}/api/v1/tenant-settings`, async ({ request }) =>
+  http.patch(`${BASE}/api/v1/admin-settings`, async ({ request }) =>
     envelope({
       loginMaxFailures: 5,
       loginLockoutMinutes: 15,

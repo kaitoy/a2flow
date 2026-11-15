@@ -28,7 +28,7 @@ sequenceDiagram
 ## Antes de empezar {#before-you-start}
 
 - Necesitas el rol Administrador en el tenant.
-- Un operador debe haber definido la URL base del despliegue al desplegar; consulta [Configuración del servidor](../operations/configuration.md#server-settings). Mientras no esté definida, **Configuración del tenant** muestra un aviso en lugar de la **URI de redirección** y el inicio de sesión único no está disponible.
+- Un operador debe haber definido la URL base del despliegue al desplegar; consulta [Configuración del servidor](../operations/configuration.md#server-settings). Mientras no esté definida, **Configuración de administrador** muestra un aviso en lugar de la **URI de redirección** y el inicio de sesión único no está disponible.
 - A2Flow debe poder llegar a tu IdP en una dirección pública. Un IdP en una red privada solo funciona cuando el operador ha permitido su host; consulta [Inicio de sesión único](../operations/configuration.md#single-sign-on) en la referencia de configuración.
 
 Para probar el inicio de sesión único sin un IdP propio, inicia el Keycloak que incluye la pila de Docker Compose; consulta [Probar el inicio de sesión único con Keycloak](../getting-started/docker-compose.md#keycloak).
@@ -36,7 +36,7 @@ Para probar el inicio de sesión único sin un IdP propio, inicia el Keycloak qu
 ## Configurarlo {#set-it-up}
 
 1. En tu IdP, registra una aplicación nueva para A2Flow: una aplicación web con un secreto de cliente. Anota su URL del emisor, su ID de cliente y su secreto de cliente.
-2. En A2Flow, abre **Configuración del tenant** en la barra lateral de administración y busca la sección **Inicio de sesión único**. Pulsa **Copiar** junto a **URI de redirección** y registra esa dirección como URI de redirección de la aplicación en tu IdP.
+2. En A2Flow, abre **Configuración de administrador** en la barra lateral de administración y busca la sección **Inicio de sesión único**. Pulsa **Copiar** junto a **URI de redirección** y registra esa dirección como URI de redirección de la aplicación en tu IdP.
 3. En tu IdP, haz que el token de ID de la aplicación lleve la lista de grupos de cada persona (el claim de grupos). Olvidarlo quita los roles; consulta [Qué debes saber](#things-to-know).
 4. Rellena la sección con ayuda de la tabla siguiente y marca **Habilitar el inicio de sesión único**.
 5. Guarda. Al guardar se comprueba que la URL del emisor sea una dirección permitida (`https`, o un host que el operador haya permitido) y, si **Habilitar el inicio de sesión único** está marcado, que la URL del emisor, el ID de cliente y el secreto de cliente estén rellenados. No se contacta con el IdP, así que la prueba real es el paso siguiente.

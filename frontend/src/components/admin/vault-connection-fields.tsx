@@ -1,6 +1,6 @@
 /**
  * @module VaultConnectionFields — Shared schema helpers and field set for a
- * HashiCorp Vault connection, edited on the Tenant Settings page (a tenant's
+ * HashiCorp Vault connection, edited on the Admin Settings page (a tenant's
  * own Vault, address included) and on a tenant's detail page (its credential
  * for the global Vault, whose address is a system setting).
  */
@@ -13,7 +13,7 @@ import { FormField } from "@/components/admin/form-field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/segmented-control";
-import { zTenantSettingsUpdate } from "@/generated/api/zod.gen";
+import { zAdminSettingsUpdate } from "@/generated/api/zod.gen";
 import { useT } from "@/i18n/provider";
 import type { VaultAuthMethod } from "@/lib/api";
 
@@ -90,7 +90,7 @@ export function refineVaultConnection(
   savedMethod: VaultAuthMethod | null
 ): void {
   if (values.vaultAddr === "") return;
-  if (!zTenantSettingsUpdate.shape.vaultAddr.safeParse(values.vaultAddr).success) {
+  if (!zAdminSettingsUpdate.shape.vaultAddr.safeParse(values.vaultAddr).success) {
     ctx.addIssue({
       code: "custom",
       path: ["vaultAddr"],

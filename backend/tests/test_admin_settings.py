@@ -1,4 +1,4 @@
-"""Tests for the admin-managed tenant settings routes (``/tenant-settings``)."""
+"""Tests for the Admin Settings routes (``/admin-settings``)."""
 
 from collections.abc import AsyncGenerator
 
@@ -22,7 +22,7 @@ from tests._envelope import assert_err, assert_ok
 from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
 from tests.conftest import _install_auth_overrides
 
-_PATH = "/api/v1/tenant-settings"
+_PATH = "/api/v1/admin-settings"
 
 
 @pytest_asyncio.fixture()

@@ -30,7 +30,7 @@ sidebar_position: 9
 
 값은 어느 유형이든, 평문이든 암호문이든 **반환되지 않습니다**. 그래서 로컬 유형의 상세 페이지에는 키만 표시되고 값은 비어 있습니다. 키는 읽을 수 있으므로 선택기에 나열할 수 있습니다. 로컬 시크릿의 키는 저장된 맵에서 가져오고, Vault 시크릿의 키는 그 시점에 Vault에서 읽어 옵니다.
 
-Vault 시크릿은 **해당 테넌트의** Vault에서 읽으며, 테넌트 관리자가 [테넌트 설정](./users-and-groups.md#tenant-vault)에서 연결합니다. 자체 Vault가 없는 테넌트는 [자체 자격 증명](./users-and-groups.md#global-vault-credential)으로 [전역 Vault](./system-settings.md#global-vault)에서 읽으며, 이 자격 증명의 Vault 정책이 읽을 수 있는 범위를 결정합니다. 둘 다 없으면 Vault 유형 시크릿을 확인할 수 없습니다. 로컬 시크릿을 암호화하는 키는 [구성 참조](../operations/configuration.md#secret-management)에서 한 번만 설정합니다.
+Vault 시크릿은 **해당 테넌트의** Vault에서 읽으며, 테넌트 관리자가 [관리자 설정](./users-and-groups.md#tenant-vault)에서 연결합니다. 자체 Vault가 없는 테넌트는 [자체 자격 증명](./users-and-groups.md#global-vault-credential)으로 [전역 Vault](./system-settings.md#global-vault)에서 읽으며, 이 자격 증명의 Vault 정책이 읽을 수 있는 범위를 결정합니다. 둘 다 없으면 Vault 유형 시크릿을 확인할 수 없습니다. 로컬 시크릿을 암호화하는 키는 [구성 참조](../operations/configuration.md#secret-management)에서 한 번만 설정합니다.
 
 ## 이름 변경과 삭제 {#renaming-and-deleting}
 

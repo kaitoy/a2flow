@@ -5,23 +5,23 @@ import { ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
 import { render, screen, waitFor } from "@/test/test-utils";
-import TenantSettingsPage from "./page";
+import AdminSettingsPage from "./page";
 
 const BASE = "http://localhost:8000";
 
 function renderPage() {
-  return render(<TenantSettingsPage />, { preloadedState: ADMIN });
+  return render(<AdminSettingsPage />, { preloadedState: ADMIN });
 }
 
-describe("TenantSettingsPage", () => {
+describe("AdminSettingsPage", () => {
   it("prefills the form from the saved settings", async () => {
     server.use(
-      http.get(`${BASE}/api/v1/tenant-settings`, () =>
+      http.get(`${BASE}/api/v1/admin-settings`, () =>
         envelope({ loginMaxFailures: 3, loginLockoutMinutes: 45 })
       )
     );
     renderPage();
-    expect(await screen.findByRole("heading", { name: "Tenant Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Admin Settings" })).toBeInTheDocument();
     expect(await screen.findByLabelText(/Failed Sign-ins Before Lockout/)).toHaveValue("3");
     expect(screen.getByLabelText(/Lockout Minutes/)).toHaveValue("45");
   });
@@ -29,7 +29,7 @@ describe("TenantSettingsPage", () => {
   it("saves the edited values as numbers", async () => {
     let captured: unknown = null;
     server.use(
-      http.patch(`${BASE}/api/v1/tenant-settings`, async ({ request }) => {
+      http.patch(`${BASE}/api/v1/admin-settings`, async ({ request }) => {
         captured = await request.json();
         return envelope({ loginMaxFailures: 10, loginLockoutMinutes: 30 });
       })
@@ -50,7 +50,7 @@ describe("TenantSettingsPage", () => {
   it("rejects an out-of-range value without saving", async () => {
     let patched = false;
     server.use(
-      http.patch(`${BASE}/api/v1/tenant-settings`, () => {
+      http.patch(`${BASE}/api/v1/admin-settings`, () => {
         patched = true;
         return envelope({ loginMaxFailures: 5, loginLockoutMinutes: 15 });
       })
@@ -66,12 +66,12 @@ describe("TenantSettingsPage", () => {
 
   it("shows a message when the settings cannot be loaded", async () => {
     server.use(
-      http.get(`${BASE}/api/v1/tenant-settings`, () =>
+      http.get(`${BASE}/api/v1/admin-settings`, () =>
         envelopeErr("FORBIDDEN", "Operation not permitted", 403)
       )
     );
     renderPage();
-    expect(await screen.findByText("The tenant settings could not be loaded.")).toBeInTheDocument();
+    expect(await screen.findByText("The admin settings could not be loaded.")).toBeInTheDocument();
   });
 
   describe("Vault connection", () => {
@@ -89,8 +89,8 @@ describe("TenantSettingsPage", () => {
     function capturePatch(settings: object) {
       const captured: { body: Record<string, unknown> | null } = { body: null };
       server.use(
-        http.get(`${BASE}/api/v1/tenant-settings`, () => envelope(settings)),
-        http.patch(`${BASE}/api/v1/tenant-settings`, async ({ request }) => {
+        http.get(`${BASE}/api/v1/admin-settings`, () => envelope(settings)),
+        http.patch(`${BASE}/api/v1/admin-settings`, async ({ request }) => {
           captured.body = (await request.json()) as Record<string, unknown>;
           return envelope(settings);
         })
@@ -167,8 +167,8 @@ describe("TenantSettingsPage", () => {
     function capturePatch() {
       const captured: { body: Record<string, unknown> | null } = { body: null };
       server.use(
-        http.get(`${BASE}/api/v1/tenant-settings`, () => envelope(OIDC_SETTINGS)),
-        http.patch(`${BASE}/api/v1/tenant-settings`, async ({ request }) => {
+        http.get(`${BASE}/api/v1/admin-settings`, () => envelope(OIDC_SETTINGS)),
+        http.patch(`${BASE}/api/v1/admin-settings`, async ({ request }) => {
           captured.body = (await request.json()) as Record<string, unknown>;
           return envelope(OIDC_SETTINGS);
         })

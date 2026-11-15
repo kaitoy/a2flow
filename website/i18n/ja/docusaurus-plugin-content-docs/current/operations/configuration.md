@@ -86,7 +86,7 @@ CORS_ORIGINS=https://app.example.com,http://localhost:3000
 |---|---|---|
 | `OIDC_ALLOWED_PRIVATE_HOSTS` | 空 | テナントの[シングルサインオン](../guides/single-sign-on.md)の発行者 URL に使えるホスト名で、`keycloak.internal,localhost` のようにカンマで区切ります。プライベートアドレスに解決されるホストでも許可します。オンプレミスの IdP 用です。これ以外の発行者は、パブリックアドレスに解決される必要があります |
 
-シングルサインオンは、デプロイのベース URL である `APP_BASE_URL` にも依存します([サーバーの設定](#server-settings)を参照)。ないとシングルサインオンは使えず、**テナント設定**には **リダイレクト URI** の代わりに警告が表示されます。要件は 2 つです。
+シングルサインオンは、デプロイのベース URL である `APP_BASE_URL` にも依存します([サーバーの設定](#server-settings)を参照)。ないとシングルサインオンは使えず、**管理者設定**には **リダイレクト URI** の代わりに警告が表示されます。要件は 2 つです。
 
 - **ベース URL は origin だけ** — スキーム、ホスト、必要ならポートだけで(例 `https://a2flow.example.com`)、パスは付けません。それ以外の値ではバックエンドが起動しません。
 - **バックエンドには公開オリジンが見えるようにします。** リバースプロキシの背後では、プロキシがリクエストを転送するときに元の `Host` ヘッダーを保ち、`X-Forwarded-Proto` に元のスキームを設定するようにし、プロキシのアドレスを `FORWARDED_ALLOW_IPS` に書いてバックエンドに信頼させます(初期状態で信頼されるのは `127.0.0.1` だけです)。そうしないと、SSO のログインのたびにリダイレクトが 1 回余分に起きます。
@@ -141,7 +141,7 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 **キーはバックアップしてください。** 失うと保存済みのローカルシークレットがすべて復号できなくなり、同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
 
-HashiCorp Vault 用の環境変数はありません。テナント専用の Vault はテナントの管理者が [テナント設定](../guides/users-and-groups.md#tenant-vault) で、グローバル Vault のアドレスは上位管理者が [システム設定](../guides/system-settings.md#global-vault) で、各テナントの[その認証情報](../guides/users-and-groups.md#global-vault-credential)はテナントのページで設定します。テナント専用の Vault のアドレスには、ユーザーが入力するほかの URL と同じ SSRF チェックがかかるので、公開アドレスである必要があります。グローバル Vault のアドレスはこのチェックの対象外です。設定できるのは上位管理者だけで、Vault は通常プライベートアドレスにあるからです。
+HashiCorp Vault 用の環境変数はありません。テナント専用の Vault はテナントの管理者が [管理者設定](../guides/users-and-groups.md#tenant-vault) で、グローバル Vault のアドレスは上位管理者が [システム設定](../guides/system-settings.md#global-vault) で、各テナントの[その認証情報](../guides/users-and-groups.md#global-vault-credential)はテナントのページで設定します。テナント専用の Vault のアドレスには、ユーザーが入力するほかの URL と同じ SSRF チェックがかかるので、公開アドレスである必要があります。グローバル Vault のアドレスはこのチェックの対象外です。設定できるのは上位管理者だけで、Vault は通常プライベートアドレスにあるからです。
 
 ## MCP ツールと承認 {#mcp-tools-and-approvals}
 

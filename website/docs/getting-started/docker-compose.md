@@ -132,7 +132,7 @@ It comes up with this already in place:
 
 ### 1. Connect A2Flow
 
-1. Sign in to A2Flow as `admin` and open **Tenant Settings** in the admin sidebar.
+1. Sign in to A2Flow as `admin` and open **Admin Settings** in the admin sidebar.
 2. In the **Single sign-on** section, fill in **Issuer URL**, **Client ID** and **Client secret** from the table above, tick **Enable single sign-on** and save.
 3. Open **User Groups**, open a group — or create one — that holds the roles you want, enter `a2flow-admins` in **IdP group** and save.
 

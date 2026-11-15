@@ -1,6 +1,6 @@
 /**
  * @module OidcSettingsFields — Shared schema helpers and field set for a
- * tenant's OpenID Connect single sign-on, edited on the Tenant Settings page.
+ * tenant's OpenID Connect single sign-on, edited on the Admin Settings page.
  */
 "use client";
 
@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useT } from "@/i18n/provider";
-import type { TenantSettings, TenantSettingsUpdate } from "@/lib/api";
+import type { AdminSettings, AdminSettingsUpdate } from "@/lib/api";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
 
@@ -41,7 +41,7 @@ export type OidcFormValues = z.infer<z.ZodObject<typeof oidcShape>>;
  * @param settings - The stored settings.
  * @returns The form values.
  */
-export function toOidcFormValues(settings: Partial<TenantSettings>): OidcFormValues {
+export function toOidcFormValues(settings: Partial<AdminSettings>): OidcFormValues {
   return {
     oidcEnabled: settings.oidcEnabled ?? false,
     oidcIssuer: settings.oidcIssuer ?? "",
@@ -60,8 +60,8 @@ export function toOidcFormValues(settings: Partial<TenantSettings>): OidcFormVal
  * @param values - The form values.
  * @returns The SSO fields of the body.
  */
-export function toOidcBody(values: OidcFormValues): TenantSettingsUpdate {
-  const body: TenantSettingsUpdate = {
+export function toOidcBody(values: OidcFormValues): AdminSettingsUpdate {
+  const body: AdminSettingsUpdate = {
     oidcEnabled: values.oidcEnabled,
     oidcIssuer: values.oidcIssuer.trim() || null,
     oidcClientId: values.oidcClientId.trim() || null,
@@ -114,7 +114,7 @@ export function OidcSettingsFields({
     if (redirectUri === null) return;
     try {
       await navigator.clipboard.writeText(redirectUri);
-      dispatch(showToast({ message: t("tenantSettings.oidc.copied") }));
+      dispatch(showToast({ message: t("adminSettings.oidc.copied") }));
     } catch {
       // Clipboard access can be refused; the URI is on screen to select by hand.
     }
@@ -123,21 +123,21 @@ export function OidcSettingsFields({
   return (
     <>
       <h2 className="font-display text-lg font-semibold tracking-tight text-on-surface">
-        {t("tenantSettings.oidc.title")}
+        {t("adminSettings.oidc.title")}
       </h2>
 
-      <Checkbox label={t("tenantSettings.oidc.enable")} {...enabled} />
+      <Checkbox label={t("adminSettings.oidc.enable")} {...enabled} />
 
-      <FormField htmlFor="oidcIssuer" label={t("tenantSettings.oidc.issuerUrl")}>
+      <FormField htmlFor="oidcIssuer" label={t("adminSettings.oidc.issuerUrl")}>
         <Input id="oidcIssuer" placeholder="https://idp.example.com" {...issuer} />
-        <p className="text-xs text-on-surface-variant">{t("tenantSettings.oidc.issuerUrlHint")}</p>
+        <p className="text-xs text-on-surface-variant">{t("adminSettings.oidc.issuerUrlHint")}</p>
       </FormField>
 
-      <FormField htmlFor="oidcClientId" label={t("tenantSettings.oidc.clientId")}>
+      <FormField htmlFor="oidcClientId" label={t("adminSettings.oidc.clientId")}>
         <Input id="oidcClientId" autoComplete="off" {...clientId} />
       </FormField>
 
-      <FormField htmlFor="oidcClientSecret" label={t("tenantSettings.oidc.clientSecret")}>
+      <FormField htmlFor="oidcClientSecret" label={t("adminSettings.oidc.clientSecret")}>
         <PasswordInput
           id="oidcClientSecret"
           autoComplete="new-password"
@@ -146,33 +146,31 @@ export function OidcSettingsFields({
         />
       </FormField>
 
-      <FormField htmlFor="oidcGroupsClaim" label={t("tenantSettings.oidc.groupsClaim")}>
+      <FormField htmlFor="oidcGroupsClaim" label={t("adminSettings.oidc.groupsClaim")}>
         <Input id="oidcGroupsClaim" {...groupsClaim} />
-        <p className="text-xs text-on-surface-variant">
-          {t("tenantSettings.oidc.groupsClaimHint")}
-        </p>
+        <p className="text-xs text-on-surface-variant">{t("adminSettings.oidc.groupsClaimHint")}</p>
       </FormField>
 
       <div className="flex flex-col gap-1">
-        <Checkbox label={t("tenantSettings.oidc.trustEmail")} {...trustEmail} />
+        <Checkbox label={t("adminSettings.oidc.trustEmail")} {...trustEmail} />
         <p className="px-3 text-xs text-on-surface-variant">
-          {t("tenantSettings.oidc.trustEmailHint")}
+          {t("adminSettings.oidc.trustEmailHint")}
         </p>
       </div>
 
-      <FormField htmlFor="oidcRedirectUri" label={t("tenantSettings.oidc.redirectUri")}>
+      <FormField htmlFor="oidcRedirectUri" label={t("adminSettings.oidc.redirectUri")}>
         {redirectUri === null ? (
-          <p className="text-sm text-error">{t("tenantSettings.oidc.baseUrlMissing")}</p>
+          <p className="text-sm text-error">{t("adminSettings.oidc.baseUrlMissing")}</p>
         ) : (
           <>
             <div className="flex items-start gap-2">
               <ReadOnlyField className="min-w-0 flex-1">{redirectUri}</ReadOnlyField>
               <Button type="button" variant="secondary" onClick={copyRedirectUri}>
-                {t("tenantSettings.oidc.copy")}
+                {t("adminSettings.oidc.copy")}
               </Button>
             </div>
             <p className="text-xs text-on-surface-variant">
-              {t("tenantSettings.oidc.redirectUriHint")}
+              {t("adminSettings.oidc.redirectUriHint")}
             </p>
           </>
         )}

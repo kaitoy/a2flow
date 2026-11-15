@@ -29,7 +29,7 @@ sidebar_position: 8
 
 Vault 기반 시크릿의 경우 A2Flow는 값을 전혀 저장하지 않고, 값을 읽어 올 마운트와 경로만 저장합니다. 값과 키 목록은 모두 필요할 때마다 실시간으로 가져오므로, Vault에서 값을 교체하면 A2Flow를 건드리지 않아도 적용됩니다.
 
-시크릿은 항상 그 시크릿이 속한 테넌트의 Vault를 통해 읽습니다. 관리자가 [테넌트 설정](../guides/users-and-groups.md#tenant-vault)에서 연결한 테넌트 **자체** Vault가 있으면 그것을 사용하고, 없으면 슈퍼 관리자가 구성한 [전역 Vault](../guides/system-settings.md#global-vault)에 테넌트의 [자체 자격 증명](../guides/users-and-groups.md#global-vault-credential)으로 로그인해 사용합니다. 어느 쪽이든 정적 토큰이나 AppRole 자격 증명으로 인증하며, AppRole 토큰은 임대 기간이 거의 끝날 때까지 재사용한 뒤 다시 로그인해 갱신합니다. 전역 Vault에서는 테넌트마다 자체 자격 증명을 가지므로, 그 자격 증명에 연결된 Vault 정책으로 테넌트가 서로 분리됩니다. 둘 다 없으면 테넌트의 `vault` 유형 시크릿은 전혀 확인할 수 없습니다.
+시크릿은 항상 그 시크릿이 속한 테넌트의 Vault를 통해 읽습니다. 관리자가 [관리자 설정](../guides/users-and-groups.md#tenant-vault)에서 연결한 테넌트 **자체** Vault가 있으면 그것을 사용하고, 없으면 슈퍼 관리자가 구성한 [전역 Vault](../guides/system-settings.md#global-vault)에 테넌트의 [자체 자격 증명](../guides/users-and-groups.md#global-vault-credential)으로 로그인해 사용합니다. 어느 쪽이든 정적 토큰이나 AppRole 자격 증명으로 인증하며, AppRole 토큰은 임대 기간이 거의 끝날 때까지 재사용한 뒤 다시 로그인해 갱신합니다. 전역 Vault에서는 테넌트마다 자체 자격 증명을 가지므로, 그 자격 증명에 연결된 Vault 정책으로 테넌트가 서로 분리됩니다. 둘 다 없으면 테넌트의 `vault` 유형 시크릿은 전혀 확인할 수 없습니다.
 
 ## 확인이 일어나는 곳 {#where-resolution-happens}
 

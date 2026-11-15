@@ -28,7 +28,7 @@ sequenceDiagram
 ## Before you start {#before-you-start}
 
 - You need the `admin` role in the tenant.
-- An operator must have set the deployment's base URL when deploying — see [Server settings](../operations/configuration.md#server-settings). While it is not set, **Tenant Settings** shows a warning in place of the **Redirect URI** and single sign-on stays unavailable.
+- An operator must have set the deployment's base URL when deploying — see [Server settings](../operations/configuration.md#server-settings). While it is not set, **Admin Settings** shows a warning in place of the **Redirect URI** and single sign-on stays unavailable.
 - Your IdP must be reachable from A2Flow on a public address. An IdP on a private network works only after the operator has allowed its host — see [Single sign-on](../operations/configuration.md#single-sign-on) in the configuration reference.
 
 To try single sign-on without an IdP of your own, start the Keycloak that comes with the Docker Compose stack — see [Try single sign-on with Keycloak](../getting-started/docker-compose.md#keycloak).
@@ -36,7 +36,7 @@ To try single sign-on without an IdP of your own, start the Keycloak that comes 
 ## Set it up {#set-it-up}
 
 1. At your IdP, register a new application for A2Flow — a web application with a client secret. Note its issuer URL, client ID and client secret.
-2. In A2Flow, open **Tenant Settings** in the admin sidebar and find the **Single sign-on** section. Press **Copy** next to **Redirect URI** and register that address as the redirect URI of the application at your IdP.
+2. In A2Flow, open **Admin Settings** in the admin sidebar and find the **Single sign-on** section. Press **Copy** next to **Redirect URI** and register that address as the redirect URI of the application at your IdP.
 3. At your IdP, make the application's ID token carry the list of groups each person belongs to (the groups claim). Forgetting this strips roles — see [Things to know](#things-to-know).
 4. Fill in the section, using the table below, and tick **Enable single sign-on**.
 5. Save. Saving checks that the issuer URL is an allowed address — `https`, or a host the operator has allowed — and, when **Enable single sign-on** is ticked, that the issuer URL, client ID and client secret are filled in. It does not contact the IdP, so the real test is the next step.
