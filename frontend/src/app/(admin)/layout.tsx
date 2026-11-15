@@ -25,6 +25,8 @@ import { Role, useHasRole } from "@/lib/roles";
  * The admin section's navigation link list, shared by the static desktop
  * sidebar and the mobile drawer so the two can't drift apart. Owns its own
  * item-ref map so each instance's sliding active indicator tracks its own DOM.
+ * Takes the height left over by the header and footer and scrolls on its own
+ * when the items outgrow it, so the footer link is never pushed off-screen.
  */
 function AdminNavList({
   collapsed,
@@ -42,7 +44,7 @@ function AdminNavList({
   const activeKey = navItems.find((n) => pathname?.startsWith(n.href))?.href ?? null;
 
   return (
-    <ul className="relative flex flex-col gap-1 px-3 py-3">
+    <ul className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-3">
       {navItems.map((item) => {
         const isActive = pathname?.startsWith(item.href);
         return (
@@ -112,7 +114,7 @@ function AdminNavFooter({
   if (!canViewApiDocs) return null;
 
   return (
-    <div className="mt-auto px-3 py-3">
+    <div className="mt-auto shrink-0 px-3 py-3">
       <Tooltip label={t("admin.apiDocs")} placement="right" disabled={!collapsed}>
         <span className="block">
           <a
