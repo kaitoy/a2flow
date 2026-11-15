@@ -538,6 +538,7 @@ export const ja = {
   "common.enabled": "有効",
   "common.endpoint": "エンドポイント",
   "common.error": "エラー",
+  "common.exampleValue": "例: {value}",
   "common.failed": "失敗",
   "common.firstName": "名",
   "common.generateWorkflow": "ワークフローを生成",

@@ -319,7 +319,7 @@ export function SecretFields(props: SecretFieldsProps) {
                 pairs={field.value}
                 onChange={field.onChange}
                 valueType="password"
-                keyPlaceholder="AWS_ACCESS_KEY_ID"
+                keyPlaceholder={t("common.exampleValue", { value: "AWS_ACCESS_KEY_ID" })}
                 valuePlaceholder={
                   showPlaceholders ? t("admin.valueStoredEncrypted") : t("admin.leaveBlankToKeep")
                 }
@@ -342,7 +342,9 @@ export function SecretFields(props: SecretFieldsProps) {
           >
             <Input
               id="vaultMount"
-              placeholder={showPlaceholders ? "secret" : undefined}
+              placeholder={
+                showPlaceholders ? t("common.exampleValue", { value: "secret" }) : undefined
+              }
               {...register("vaultMount")}
             />
           </FormField>
@@ -354,7 +356,9 @@ export function SecretFields(props: SecretFieldsProps) {
           >
             <Input
               id="vaultPath"
-              placeholder={showPlaceholders ? "myapp/aws" : undefined}
+              placeholder={
+                showPlaceholders ? t("common.exampleValue", { value: "myapp/aws" }) : undefined
+              }
               {...register("vaultPath")}
             />
             <p className="mt-1 text-xs text-on-surface-variant">

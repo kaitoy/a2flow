@@ -475,7 +475,11 @@ export function McpServerFields(props: McpServerFieldsProps) {
           <FormField htmlFor="url" label="URL" required error={errors.url?.message}>
             <Input
               id="url"
-              placeholder={showPlaceholders ? "https://mcp.example.com/mcp" : undefined}
+              placeholder={
+                showPlaceholders
+                  ? t("common.exampleValue", { value: "https://mcp.example.com/mcp" })
+                  : undefined
+              }
               {...register("url")}
             />
           </FormField>
@@ -489,8 +493,8 @@ export function McpServerFields(props: McpServerFieldsProps) {
                   name="headers"
                   pairs={field.value}
                   onChange={field.onChange}
-                  keyPlaceholder="Authorization"
-                  valuePlaceholder="Bearer …"
+                  keyPlaceholder={t("common.exampleValue", { value: "Authorization" })}
+                  valuePlaceholder={t("common.exampleValue", { value: "Bearer …" })}
                 />
               )}
             />
@@ -528,7 +532,7 @@ export function McpServerFields(props: McpServerFieldsProps) {
                       name="args"
                       values={field.value}
                       onChange={field.onChange}
-                      placeholder="-y"
+                      placeholder={t("common.exampleValue", { value: "-y" })}
                       addLabel={t("admin.addArgument")}
                     />
                   )}
@@ -577,7 +581,7 @@ export function McpServerFields(props: McpServerFieldsProps) {
                       name="packages"
                       values={field.value}
                       onChange={field.onChange}
-                      placeholder="boto3==1.40.0"
+                      placeholder={t("common.exampleValue", { value: "boto3==1.40.0" })}
                       addLabel={t("admin.addPackage")}
                     />
                   )}
@@ -598,7 +602,7 @@ export function McpServerFields(props: McpServerFieldsProps) {
                   name="env"
                   pairs={field.value}
                   onChange={field.onChange}
-                  keyPlaceholder="API_KEY"
+                  keyPlaceholder={t("common.exampleValue", { value: "API_KEY" })}
                   valuePlaceholder="…"
                 />
               )}

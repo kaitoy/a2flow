@@ -551,6 +551,7 @@ export const fr = {
   "common.enabled": "Activé",
   "common.endpoint": "Point de terminaison",
   "common.error": "Erreur",
+  "common.exampleValue": "p. ex. {value}",
   "common.failed": "Échec",
   "common.firstName": "Prénom",
   "common.generateWorkflow": "Générer un workflow",

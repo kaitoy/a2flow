@@ -230,7 +230,7 @@ export function KnowledgeSourcesPanel({
           <form onSubmit={handleAddUrl} className="flex min-w-0 flex-1 gap-2">
             <Input
               aria-label={t("admin.webPageUrl")}
-              placeholder="https://example.com/handbook"
+              placeholder={t("common.exampleValue", { value: "https://example.com/handbook" })}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
             />

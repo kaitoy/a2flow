@@ -148,7 +148,11 @@ export default function NewUserPage() {
             required
             error={errors.firstName?.message}
           >
-            <Input id="firstName" placeholder="Alice" {...register("firstName")} />
+            <Input
+              id="firstName"
+              placeholder={t("common.exampleValue", { value: "Alice" })}
+              {...register("firstName")}
+            />
           </FormField>
 
           <FormField
@@ -157,7 +161,11 @@ export default function NewUserPage() {
             required
             error={errors.lastName?.message}
           >
-            <Input id="lastName" placeholder="Smith" {...register("lastName")} />
+            <Input
+              id="lastName"
+              placeholder={t("common.exampleValue", { value: "Smith" })}
+              {...register("lastName")}
+            />
           </FormField>
 
           <FormField
@@ -166,7 +174,12 @@ export default function NewUserPage() {
             required
             error={errors.email?.message}
           >
-            <Input id="email" type="email" placeholder="alice@example.com" {...register("email")} />
+            <Input
+              id="email"
+              type="email"
+              placeholder={t("common.exampleValue", { value: "alice@example.com" })}
+              {...register("email")}
+            />
           </FormField>
 
           <FormField

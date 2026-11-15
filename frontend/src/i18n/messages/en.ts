@@ -539,6 +539,7 @@ export const en = {
   "common.enabled": "Enabled",
   "common.endpoint": "Endpoint",
   "common.error": "Error",
+  "common.exampleValue": "e.g. {value}",
   "common.failed": "Failed",
   "common.firstName": "First Name",
   "common.generateWorkflow": "Generate Workflow",

@@ -129,7 +129,11 @@ export function OidcSettingsFields({
       <Checkbox label={t("adminSettings.oidc.enable")} {...enabled} />
 
       <FormField htmlFor="oidcIssuer" label={t("adminSettings.oidc.issuerUrl")}>
-        <Input id="oidcIssuer" placeholder="https://idp.example.com" {...issuer} />
+        <Input
+          id="oidcIssuer"
+          placeholder={t("common.exampleValue", { value: "https://idp.example.com" })}
+          {...issuer}
+        />
         <p className="text-xs text-on-surface-variant">{t("adminSettings.oidc.issuerUrlHint")}</p>
       </FormField>
 

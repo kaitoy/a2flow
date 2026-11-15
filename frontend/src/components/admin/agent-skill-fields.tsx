@@ -210,7 +210,11 @@ export function AgentSkillFields(props: AgentSkillFieldsProps) {
       >
         <Input
           id="repoUrl"
-          placeholder={showPlaceholders ? "https://github.com/owner/repo" : undefined}
+          placeholder={
+            showPlaceholders
+              ? t("common.exampleValue", { value: "https://github.com/owner/repo" })
+              : undefined
+          }
           {...register("repoUrl")}
         />
       </FormField>

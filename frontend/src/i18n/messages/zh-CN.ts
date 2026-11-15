@@ -510,6 +510,7 @@ export const zhCN = {
   "common.enabled": "已启用",
   "common.endpoint": "端点",
   "common.error": "错误",
+  "common.exampleValue": "例如 {value}",
   "common.failed": "失败",
   "common.firstName": "名",
   "common.generateWorkflow": "生成工作流",

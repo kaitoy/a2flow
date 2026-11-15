@@ -550,6 +550,7 @@ export const es = {
   "common.enabled": "Habilitado",
   "common.endpoint": "Endpoint",
   "common.error": "Error",
+  "common.exampleValue": "p. ej., {value}",
   "common.failed": "Fallido",
   "common.firstName": "Nombre",
   "common.generateWorkflow": "Generar flujo de trabajo",

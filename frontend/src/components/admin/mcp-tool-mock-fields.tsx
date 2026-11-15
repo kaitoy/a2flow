@@ -561,7 +561,11 @@ function McpToolMockEditableFields({
         <Input
           id="name"
           {...register("name")}
-          placeholder={showPlaceholders ? t("admin.jiraSearchReturnsNoHits") : undefined}
+          placeholder={
+            showPlaceholders
+              ? t("common.exampleValue", { value: t("admin.jiraSearchReturnsNoHits") })
+              : undefined
+          }
         />
       </FormField>
 

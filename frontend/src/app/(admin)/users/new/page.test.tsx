@@ -58,6 +58,18 @@ describe("NewUserPage", () => {
     expect(screen.getByRole("textbox", { name: /username/i })).toBeInTheDocument();
   });
 
+  it("marks the sample values in the placeholders as examples", () => {
+    renderPage();
+    expect(screen.getByRole("textbox", { name: /first name/i })).toHaveAttribute(
+      "placeholder",
+      "e.g. Alice"
+    );
+    expect(screen.getByRole("textbox", { name: /email/i })).toHaveAttribute(
+      "placeholder",
+      "e.g. alice@example.com"
+    );
+  });
+
   it("renders enabled and email verified checkboxes", () => {
     renderPage();
     expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeChecked();

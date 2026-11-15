@@ -236,7 +236,11 @@ export function VaultConnectionFields({
     <>
       {addr && (
         <FormField htmlFor="vaultAddr" label={t("admin.vaultAddress")} error={errors.vaultAddr}>
-          <Input id="vaultAddr" placeholder="https://vault.example.com:8200" {...addr} />
+          <Input
+            id="vaultAddr"
+            placeholder={t("common.exampleValue", { value: "https://vault.example.com:8200" })}
+            {...addr}
+          />
           <p className="text-xs text-on-surface-variant">{addrHint}</p>
         </FormField>
       )}
@@ -264,7 +268,11 @@ export function VaultConnectionFields({
             label={t("admin.approleMount")}
             error={errors.vaultApproleMount}
           >
-            <Input id="vaultApproleMount" placeholder="approle" {...approleMount} />
+            <Input
+              id="vaultApproleMount"
+              placeholder={t("common.exampleValue", { value: "approle" })}
+              {...approleMount}
+            />
           </FormField>
         </>
       )}

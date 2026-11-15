@@ -533,6 +533,7 @@ export const ko = {
   "common.enabled": "사용",
   "common.endpoint": "엔드포인트",
   "common.error": "오류",
+  "common.exampleValue": "예: {value}",
   "common.failed": "실패",
   "common.firstName": "이름",
   "common.generateWorkflow": "워크플로 생성",

@@ -363,7 +363,7 @@ export default function SystemSettingsPage() {
           >
             <Input
               id="vaultAddr"
-              placeholder="https://vault.example.com:8200"
+              placeholder={t("common.exampleValue", { value: "https://vault.example.com:8200" })}
               {...register("vaultAddr")}
             />
             <p className="text-xs text-on-surface-variant">
@@ -383,7 +383,11 @@ export default function SystemSettingsPage() {
             label={t("systemSettings.smtpHost")}
             error={errors.smtpHost?.message}
           >
-            <Input id="smtpHost" placeholder="smtp.example.com" {...register("smtpHost")} />
+            <Input
+              id="smtpHost"
+              placeholder={t("common.exampleValue", { value: "smtp.example.com" })}
+              {...register("smtpHost")}
+            />
           </FormField>
 
           <FormField
@@ -440,7 +444,7 @@ export default function SystemSettingsPage() {
           >
             <Input
               id="smtpFromEmail"
-              placeholder="a2flow@example.com"
+              placeholder={t("common.exampleValue", { value: "a2flow@example.com" })}
               {...register("smtpFromEmail")}
             />
           </FormField>
@@ -450,7 +454,11 @@ export default function SystemSettingsPage() {
             label={t("systemSettings.fromName")}
             error={errors.smtpFromName?.message}
           >
-            <Input id="smtpFromName" placeholder="A2Flow" {...register("smtpFromName")} />
+            <Input
+              id="smtpFromName"
+              placeholder={t("common.exampleValue", { value: "A2Flow" })}
+              {...register("smtpFromName")}
+            />
           </FormField>
 
           <div className="flex flex-wrap gap-2">
