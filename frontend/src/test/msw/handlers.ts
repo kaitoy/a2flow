@@ -896,6 +896,7 @@ export const handlers = [
   http.delete(`${BASE}/api/v1/notifications/:notificationId`, () => envelope(null)),
 
   http.post(`${BASE}/api/v1/auth/login`, () => envelope(USER_1)),
+  http.get(`${BASE}/api/v1/auth/login-options`, () => envelope({ tenantName: null, sso: false })),
 
   http.post(`${BASE}/api/v1/auth/logout`, () => envelope(null)),
 

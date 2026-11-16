@@ -34,6 +34,7 @@ from services.oidc_login import (
     SsoErrorCode,
     SsoLoginError,
     normalize_username,
+    safe_next_path,
 )
 from tests._engine import make_test_engine
 from tests._oidc_fake import CLIENT_ID, ISSUER, FakeIdp
@@ -602,3 +603,23 @@ async def test_existing_user_names_not_overwritten(ctx: Ctx) -> None:
     assert result.user.id == alice.id
     assert (result.user.first_name, result.user.last_name) == ("Alice", "Smith")
     assert result.user.email == "alice@x.com"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("/workflows/w1?x=1", "/workflows/w1?x=1"),
+        ("/", "/"),
+        (None, "/"),
+        ("", "/"),
+        ("workflows", "/"),
+        ("//evil.example", "/"),
+        ("/\\evil.example", "/"),
+        ("https://evil.example/", "/"),
+        ("/a\nb", "/"),
+    ],
+)
+def test_safe_next_path_keeps_only_paths_on_this_site(
+    value: str | None, expected: str
+) -> None:
+    assert safe_next_path(value) == expected

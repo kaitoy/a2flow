@@ -43,6 +43,7 @@ from config import get_settings
 from infrastructure.secret_cipher import get_secret_cipher
 from models.notification import Notification, NotificationCreate, NotificationType
 from models.outbound_email import OutboundEmailCreate
+from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
 from repositories._integrity import commit_or_translate_user_fk
 from repositories.notification import NotificationRepository, SqlNotificationRepository
@@ -144,7 +145,7 @@ class NotificationDispatcher:
                     to_email=recipient,
                     subject=notification.title,
                     body=_build_body(
-                        notification, base_url=get_settings().app_base_url
+                        notification, base_url=await self._link_origin(notification)
                     ),
                 ),
                 user_id=user_id,
@@ -155,6 +156,22 @@ class NotificationDispatcher:
                 notification.type,
                 notification.id,
             )
+
+    async def _link_origin(self, notification: Notification) -> str | None:
+        """Return the origin the email's link points at.
+
+        The recipient's tenant's own address (:meth:`config.Settings.tenant_origin`),
+        so the link opens the sign-in page that already knows the tenant; the
+        deployment's ``APP_BASE_URL`` when that address does not exist (an IP
+        host); ``None`` when no base URL is configured.
+
+        Args:
+            notification: The notification being announced.
+        """
+        settings = get_settings()
+        tenant = await self._db.get(Tenant, notification.tenant_id)
+        origin = settings.tenant_origin(tenant.name) if tenant else None
+        return origin or settings.app_base_url
 
     async def _resolve_recipient(self, user_id: str) -> str | None:
         """Return the address to email, or ``None`` when there is nobody to reach.
@@ -185,7 +202,8 @@ def _deep_link(notification: Notification, *, base_url: str) -> str:
 
     Args:
         notification: The notification being delivered.
-        base_url: Base URL of the deployment, without a trailing slash.
+        base_url: Origin the link points at: the tenant's own address or the
+            deployment's base URL.
 
     Returns:
         An absolute URL into the web UI, built from the notification's own
@@ -204,7 +222,7 @@ def _build_body(notification: Notification, *, base_url: str | None) -> str:
 
     Args:
         notification: The notification being delivered.
-        base_url: Base URL of the deployment, or ``None`` when unconfigured — in
+        base_url: Origin the link points at, or ``None`` when unconfigured — in
             which case the message carries no link rather than a broken one.
 
     Returns:

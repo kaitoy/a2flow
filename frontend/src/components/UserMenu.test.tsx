@@ -96,7 +96,7 @@ describe("UserMenu", () => {
 
     await user.click(screen.getByRole("menuitem", { name: "Log out" }));
 
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/signed-out"));
     expect(onClose).toHaveBeenCalled();
     expect(store.getState().auth.user).toBeNull();
     expect(store.getState().auth.status).toBe("unauthenticated");

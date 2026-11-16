@@ -304,6 +304,9 @@ export const es = {
     "Vincula una cuenta existente por dirección de correo aunque el IdP no la marque como verificada.",
   "adminSettings.oidc.redirectUri": "URI de redirección",
   "adminSettings.oidc.redirectUriHint": "Registra esta URL como URI de redirección en tu IdP.",
+  "adminSettings.oidc.subdomainRedirectUri": "URI de redirección (dirección del tenant)",
+  "adminSettings.oidc.subdomainRedirectUriHint":
+    "Regístrala también si tus usuarios abren A2Flow en la dirección propia de tu tenant.",
   "adminSettings.oidc.copy": "Copiar",
   "adminSettings.oidc.copied": "URI de redirección copiada",
   "adminSettings.oidc.baseUrlMissing":
@@ -759,9 +762,11 @@ export const es = {
   "login.eGAcmeCorp": "p. ej., acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "Déjalo en blanco si inicias sesión como administrador de la plataforma.",
+  "login.redirectingToSso": "Redirigiendo al inicio de sesión de tu organización…",
   "login.signIn": "Iniciar sesión",
   "login.signInToA2flow": "Inicia sesión en A2Flow",
   "login.signInWithSso": "Iniciar sesión con SSO",
+  "login.signInWithPassword": "Iniciar sesión con contraseña",
   "login.signingIn": "Iniciando sesión…",
   "login.ssoError.unavailable": "El inicio de sesión único no está disponible para este tenant.",
   "login.ssoError.failed": "Error en el inicio de sesión único. Inténtalo de nuevo.",
@@ -859,6 +864,9 @@ export const es = {
   "session.status.waiting_for_initiator": "Esperando al iniciador",
   "session.status.waiting_for_input": "Esperando entrada",
   "session.statusUntil": "{status} hasta {at}",
+  "signedOut.message": "Has cerrado sesión en A2Flow.",
+  "signedOut.signInAgain": "Volver a iniciar sesión",
+  "signedOut.title": "Has cerrado sesión",
   "status.allowed": "permitido",
   "status.api_error": "error de API",
   "status.approved": "aprobado",

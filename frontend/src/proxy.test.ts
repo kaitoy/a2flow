@@ -31,7 +31,31 @@ describe("proxy", () => {
     const request = new NextRequest("http://localhost:3000/sessions/new");
     const res = proxy(request);
     expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("http://localhost:3000/login?next=%2Fsessions%2Fnew");
+  });
+
+  it("keeps the query of the page asked for in next", () => {
+    const res = proxy(new NextRequest("http://localhost:3000/workflows?tab=a"));
+    expect(res.headers.get("location")).toBe(
+      "http://localhost:3000/login?next=%2Fworkflows%3Ftab%3Da"
+    );
+  });
+
+  it("sends a visitor at the welcome page to a plain /login", () => {
+    const res = proxy(new NextRequest("http://localhost:3000/"));
     expect(res.headers.get("location")).toBe("http://localhost:3000/login");
+  });
+
+  it("sends an authenticated visitor at /login to the page in next", () => {
+    const request = new NextRequest("http://localhost:3000/login?next=%2Fworkflows%3Ftab%3Da");
+    request.cookies.set("a2flow_session", "abc");
+    expect(proxy(request).headers.get("location")).toBe("http://localhost:3000/workflows?tab=a");
+  });
+
+  it("ignores a next that leaves the site", () => {
+    const request = new NextRequest("http://localhost:3000/login?next=%2F%2Fevil.example");
+    request.cookies.set("a2flow_session", "abc");
+    expect(proxy(request).headers.get("location")).toBe("http://localhost:3000/");
   });
 
   it("redirects authenticated visitors away from /login to the welcome page", () => {
@@ -40,6 +64,13 @@ describe("proxy", () => {
     const res = proxy(request);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe("http://localhost:3000/");
+  });
+
+  it.each([false, true])("lets /signed-out through with session=%s", (withSession) => {
+    const request = new NextRequest("http://localhost:3000/signed-out");
+    if (withSession) request.cookies.set("a2flow_session", "abc");
+    const res = proxy(request);
+    expect(res.headers.get("location")).toBeNull();
   });
 
   it("passes through authenticated requests to non-login pages", () => {

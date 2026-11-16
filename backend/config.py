@@ -23,6 +23,8 @@ their own env vars in the test body; going through this module's
 ``monkeypatch.setenv`` calls (e.g. for ``ADMIN_PASSWORD``) take effect.
 """
 
+import ipaddress
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Self
@@ -31,6 +33,16 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+
+def _is_ip(host: str) -> bool:
+    """Return whether ``host`` is an IP address literal rather than a DNS name."""
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
+
 
 #: Fallback sliding idle timeout (8 hours) used when
 #: ``SESSION_IDLE_TIMEOUT_SECONDS`` is unset or not a valid integer.
@@ -583,6 +595,53 @@ class Settings(BaseSettings):
         if "cors_origins" not in self.model_fields_set and self.app_base_url:
             self.cors_origins = [self.app_base_url]
         return self
+
+    def tenant_origin(self, tenant_name: str) -> str | None:
+        """Return the origin of a tenant's own address, a subdomain of ``app_base_url``.
+
+        Every tenant can be opened at ``<tenant name>.<host>`` (same scheme and
+        port) wherever DNS routes it; an SSO sign-in started there also ends
+        there, so its session cookie lands on that host.
+
+        Args:
+            tenant_name: The tenant's name, as typed or as stored.
+
+        Returns:
+            The origin, or ``None`` when ``app_base_url`` is unset, its host is
+            an IP address (which has no subdomains), or ``tenant_name`` is not a
+            valid tenant name -- so input such as ``evil.example/`` can never
+            become a redirect target.
+        """
+        if not self.app_base_url:
+            return None
+        from models.constraints import TENANT_SLUG_PATTERN  # noqa: PLC0415 -- models imports config
+
+        if _is_ip(urlsplit(self.app_base_url).hostname or "") or not (
+            len(tenant_name) <= 63 and re.fullmatch(TENANT_SLUG_PATTERN, tenant_name)
+        ):
+            return None
+        scheme, netloc = self.app_base_url.split("://", 1)
+        return f"{scheme}://{tenant_name}.{netloc}"
+
+    def tenant_from_host(self, hostname: str) -> str | None:
+        """Return the tenant name a tenant's own address names.
+
+        Args:
+            hostname: The host the browser shows, without a port.
+
+        Returns:
+            The leading label when ``hostname`` is ``<label>.<app_base_url
+            host>`` and :meth:`tenant_origin` accepts ``label``, whether or not
+            such a tenant exists; else ``None``.
+        """
+        if not self.app_base_url:
+            return None
+        parent = "." + (urlsplit(self.app_base_url).hostname or "")
+        host = hostname.lower()
+        if not host.endswith(parent):
+            return None
+        label = host[: -len(parent)]
+        return label if self.tenant_origin(label) else None
 
     @field_validator(
         "smtp_enabled",

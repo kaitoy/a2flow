@@ -106,6 +106,7 @@ export default function AdminSettingsPage() {
   // allow (null while the deployment's base URL is unset). Both are read-only.
   const [secretSaved, setSecretSaved] = useState(false);
   const [redirectUri, setRedirectUri] = useState<string | null>(null);
+  const [subdomainRedirectUri, setSubdomainRedirectUri] = useState<string | null>(null);
   // Whether a super admin has handed the tenant's LLM to its admin, and whether
   // a key is stored. Only in that mode are the LLM fields shown or sent.
   const [llmMode, setLlmMode] = useState<LlmMode>("system_default");
@@ -134,6 +135,7 @@ export default function AdminSettingsPage() {
         setSavedMethod(savedVaultMethod(settings));
         setSecretSaved(settings.oidcClientSecretSet ?? false);
         setRedirectUri(settings.oidcRedirectUri ?? null);
+        setSubdomainRedirectUri(settings.oidcSubdomainRedirectUri ?? null);
         setLlmMode(settings.llmMode ?? "system_default");
         setLlmKeySet(settings.llmApiKeySet ?? false);
         reset(toFormValues(settings));
@@ -154,6 +156,7 @@ export default function AdminSettingsPage() {
         setSavedMethod(savedVaultMethod(saved));
         setSecretSaved(saved.oidcClientSecretSet ?? false);
         setRedirectUri(saved.oidcRedirectUri ?? null);
+        setSubdomainRedirectUri(saved.oidcSubdomainRedirectUri ?? null);
         setLlmMode(saved.llmMode ?? "system_default");
         setLlmKeySet(saved.llmApiKeySet ?? false);
         reset(toFormValues(saved));
@@ -241,6 +244,7 @@ export default function AdminSettingsPage() {
             trustEmail={register("oidcTrustEmail")}
             secretSaved={secretSaved}
             redirectUri={redirectUri}
+            subdomainRedirectUri={subdomainRedirectUri}
           />
 
           {llmMode === "tenant_admin" && (

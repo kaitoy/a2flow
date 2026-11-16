@@ -36,7 +36,7 @@ To try single sign-on without an IdP of your own, start the Keycloak that comes 
 ## Set it up {#set-it-up}
 
 1. At your IdP, register a new application for A2Flow — a web application with a client secret. Note its issuer URL, client ID and client secret.
-2. In A2Flow, open **Admin Settings** in the admin sidebar and find the **Single sign-on** section. Press **Copy** next to **Redirect URI** and register that address as the redirect URI of the application at your IdP.
+2. In A2Flow, open **Admin Settings** in the admin sidebar and find the **Single sign-on** section. Press **Copy** next to **Redirect URI** and register that address as the redirect URI of the application at your IdP. If your users open A2Flow at your tenant's own address, register **Redirect URI (tenant address)** too.
 3. At your IdP, make the application's ID token carry the list of groups each person belongs to (the groups claim). Forgetting this strips roles — see [Things to know](#things-to-know).
 4. Fill in the section, using the table below, and tick **Enable single sign-on**.
 5. Save. Saving checks that the issuer URL is an allowed address — `https`, or a host the operator has allowed — and, when **Enable single sign-on** is ticked, that the issuer URL, client ID and client secret are filled in. It does not contact the IdP, so the real test is the next step.
@@ -52,12 +52,28 @@ To try single sign-on without an IdP of your own, start the Keycloak that comes 
 | **Groups claim** | The name of the ID token claim that lists a person's groups. `groups` unless your IdP uses another name. |
 | **Trust e-mail addresses from this IdP** | Off by default. Lets A2Flow link an existing account by e-mail address even when the IdP does not mark the address as verified. Microsoft Entra ID needs it. |
 | **Redirect URI** | Read-only. The address to register at your IdP; every tenant uses the same one. |
+| **Redirect URI (tenant address)** | Read-only. Where a sign-in started at your tenant's own address returns to — see [At your tenant's address](#tenant-address). Register it too if your users open A2Flow there. Not shown when the deployment's address is an IP address. |
 
 ## Signing in {#signing-in}
 
 On the sign-in screen, enter the tenant name in **Tenant** and press **Sign in with SSO**. The button stays disabled while **Tenant** is empty. You are sent to your IdP, sign in there, and come back signed in to A2Flow. Signing in with a username and password works as before.
 
 Signing out of A2Flow does not sign you out of the IdP, so pressing **Sign in with SSO** again may take you straight back in.
+
+### At your tenant's address {#tenant-address}
+
+Each tenant can also be opened at its own address — the tenant name in front of the usual address, such as `acme.a2flow.example.com` — once the operator has set up DNS and a certificate for it. The sign-in screen there has no **Tenant** field:
+
+| Your tenant | What happens |
+|---|---|
+| Single sign-on is on | You are sent straight to your IdP, without seeing the sign-in screen. |
+| Single sign-on is off | The screen asks only for **Username** and **Password**. |
+
+When you sign out, A2Flow shows a page confirming it, with **Sign in again** to return to the sign-in screen. With single sign-on on, that takes you to your IdP, which may sign you straight back in.
+
+When a single sign-on attempt fails, you are not sent to the IdP again. The screen shows **Sign in with SSO** instead, and **Sign in with password** reveals **Username** and **Password** for an account that has a password. You can also sign in with a password at the usual address, entering the tenant name in **Tenant**.
+
+To sign in with a password without being sent to the IdP — for an account that has no IdP identity — add `?local` to the sign-in screen's address, such as `https://acme.a2flow.example.com/login?local`. The screen then opens with **Username** and **Password** shown.
 
 ## Sign-in error messages {#sign-in-errors}
 
@@ -104,3 +120,4 @@ The members of a group with an **IdP group** are managed by the IdP and cannot b
 | You change **Issuer URL** or **Client ID** | Every account in the tenant is unlinked from its IdP identity, because the IdP issues different identities for a different application. People are linked again by e-mail address at their next sign-in, which needs a trusted address (marked verified by the IdP, or **Trust e-mail addresses from this IdP** on). Otherwise the sign-in fails, because the old account still has that address. |
 | Someone is removed at the IdP | They can no longer sign in through SSO, but A2Flow does not disable their account. Clear **Enabled** on it to block password sign-in too. |
 | An account carries the **SSO** badge | It has signed in through single sign-on. The badge appears in the **Users** list and on the account's detail page. |
+| Your users open A2Flow at your tenant's own address | A single sign-on started there returns there, through **Redirect URI (tenant address)**. Until that address is registered at your IdP, the IdP refuses the sign-in. |

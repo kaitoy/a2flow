@@ -11,6 +11,7 @@
 
 import { ApiReference } from "@scalar/nextjs-api-reference";
 import { type NextRequest, NextResponse } from "next/server";
+import { loginPath } from "@/lib/next-path";
 import { hasRole, Role } from "@/lib/roles";
 
 /** Scalar configuration pointing at the backend's live OpenAPI document. */
@@ -34,7 +35,7 @@ const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL ?? "http://localhost:8000"
  * Route handler that serves the Scalar API reference to admins and super
  * admins only. Forwards the incoming session cookie to the backend's
  * `/auth/me` to resolve the caller's roles (no CSRF token is required since
- * this is a `GET`), redirecting to `/login` if the session is missing or
+ * this is a `GET`), redirecting to `/login` (and back here afterwards) if the session is missing or
  * invalid, and responding `403` for any other authenticated role.
  *
  * The redirect is relative on purpose. `request.url` carries the origin the
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     headers: { cookie: request.headers.get("cookie") ?? "" },
   });
   if (!meResponse.ok) {
-    return new NextResponse(null, { status: 307, headers: { location: "/login" } });
+    return new NextResponse(null, { status: 307, headers: { location: loginPath("/api-doc") } });
   }
   const { data } = await meResponse.json();
   if (!hasRole(data.user, Role.ADMIN)) {

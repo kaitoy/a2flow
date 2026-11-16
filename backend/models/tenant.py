@@ -259,7 +259,9 @@ def oidc_redirect_uri(app_base_url: str | None) -> str | None:
     """Return the OIDC callback URL to register at the identity provider.
 
     Args:
-        app_base_url: The platform's public base URL, or ``None`` when unset.
+        app_base_url: The origin the sign-in happens at -- the platform's
+            public base URL or a tenant's own subdomain of it -- or ``None``
+            when there is none.
 
     Returns:
         ``None`` when no base URL is set, else the base URL (without a trailing
@@ -276,7 +278,10 @@ class AdminSettings(SQLModel):
     ``vault_credential_set``, ``oidc_client_secret_set`` and ``llm_api_key_set``
     report only whether a credential is stored, so the form can show it as
     configured without ever receiving it. ``oidc_redirect_uri`` is the callback
-    URL the provider must allow, derived from the deployment's ``APP_BASE_URL``.
+    URL the provider must allow, derived from the deployment's ``APP_BASE_URL``;
+    ``oidc_subdomain_redirect_uri`` is the one for sign-ins started on the
+    tenant's own subdomain of it, which the provider must also allow when the
+    tenant uses that address.
     ``llm_mode`` tells the form whether to offer the LLM fields at all: only
     :attr:`LlmMode.tenant_admin` lets this ``admin`` set them.
     """
@@ -302,10 +307,15 @@ class AdminSettings(SQLModel):
     oidc_groups_claim: str = "groups"
     oidc_trust_email: bool = False
     oidc_redirect_uri: str | None = None
+    oidc_subdomain_redirect_uri: str | None = None
 
     @classmethod
     def from_tenant(
-        cls, tenant: Tenant, *, oidc_redirect_uri: str | None
+        cls,
+        tenant: Tenant,
+        *,
+        oidc_redirect_uri: str | None,
+        oidc_subdomain_redirect_uri: str | None = None,
     ) -> "AdminSettings":
         """Project a tenant into its admin-managed settings.
 
@@ -314,6 +324,8 @@ class AdminSettings(SQLModel):
             oidc_redirect_uri: The OIDC callback URL (see
                 :func:`oidc_redirect_uri`), or ``None`` when the platform has
                 no base URL.
+            oidc_subdomain_redirect_uri: The OIDC callback URL on the
+                tenant's own subdomain, or ``None`` when there is none.
 
         Returns:
             The settings, with ``vault_credential_set`` and
@@ -337,6 +349,7 @@ class AdminSettings(SQLModel):
             oidc_groups_claim=tenant.oidc_groups_claim,
             oidc_trust_email=tenant.oidc_trust_email,
             oidc_redirect_uri=oidc_redirect_uri,
+            oidc_subdomain_redirect_uri=oidc_subdomain_redirect_uri,
         )
 
 

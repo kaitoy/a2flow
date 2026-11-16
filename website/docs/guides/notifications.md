@@ -47,7 +47,7 @@ Notifications are per-user throughout: you see only your own, and one disappears
 
 Once a `super_admin` has configured an SMTP server under [System Settings](./system-settings.md), the same five events are **also emailed** to the recipient, so an approval request does not have to wait for someone to open the app.
 
-The message carries the notification's title as its subject, its body as the text, and a link back to what it is about — the run, or the workflow. The link is built from the deployment's base URL, which an operator sets when deploying (see [Server settings](../operations/configuration.md#server-settings)); when none is set, the message is sent without one.
+The message carries the notification's title as its subject, its body as the text, and a link back to what it is about — the run, or the workflow. The link points at the recipient's tenant address — see [At your tenant's address](./single-sign-on.md#tenant-address) — where the sign-in screen asks for no tenant name. After signing in there, the page the link points to opens. That address is built from the deployment's base URL, which an operator sets when deploying (see [Server settings](../operations/configuration.md#server-settings)); when the base URL is an IP address the link uses it as it is, and when none is set, the message is sent without one.
 
 Recipients who cannot be reached are skipped before any relay is contacted: the internal system user, disabled or deleted accounts, accounts whose address is unverified, and any account without an address. There is no per-user opt-out — email delivery is on or off for the whole platform.
 

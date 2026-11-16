@@ -238,6 +238,144 @@ async def test_start_hops_to_app_base_url_only_once(
 
 
 @pytest.mark.asyncio
+async def test_start_from_a_subdomain_hops_to_that_subdomain(
+    ctx: Ctx, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_app_base_url(monkeypatch, "https://a2.example.com")
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start", params={"tenant": "acme", "subdomain": "true"}
+    )
+    assert resp.headers["location"] == (
+        "https://acme.a2.example.com/api/v1/auth/oidc/start"
+        "?tenant=acme&subdomain=true&hop=1"
+    )
+
+
+@pytest.mark.asyncio
+async def test_sso_started_on_a_subdomain_ends_there(ctx: Ctx) -> None:
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start",
+        params={"tenant": "acme", "subdomain": "true", "hop": "1"},
+    )
+    query = dict(parse_qsl(urlsplit(resp.headers["location"]).query))
+    assert query["redirect_uri"] == "http://acme.test/api/v1/auth/oidc/callback"
+    ctx.fake.next_claims = ctx.fake.claims(
+        nonce=query["nonce"],
+        sub="s1",
+        email="alice@x.com",
+        email_verified=True,
+        groups=["eng"],
+    )
+    cookie = set_cookies(resp)[STATE_COOKIE_NAME].value
+
+    done = await callback(ctx, cookie=cookie, code="code-1", state=query["state"])
+    assert done.headers["location"] == "/"
+    assert ctx.fake.token_forms[-1]["redirect_uri"] == query["redirect_uri"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("asked", "landed"),
+    [
+        (
+            "/workflow-executions/e1/session?tab=chat",
+            "/workflow-executions/e1/session?tab=chat",
+        ),
+        ("https://evil.example/", "/"),
+        ("//evil.example/", "/"),
+    ],
+)
+async def test_sso_returns_to_the_page_it_started_from(
+    ctx: Ctx, asked: str, landed: str
+) -> None:
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start", params={"tenant": "acme", "next": asked}
+    )
+    query = dict(parse_qsl(urlsplit(resp.headers["location"]).query))
+    ctx.fake.next_claims = ctx.fake.claims(
+        nonce=query["nonce"],
+        sub="s1",
+        email="alice@x.com",
+        email_verified=True,
+        groups=["eng"],
+    )
+    cookie = set_cookies(resp)[STATE_COOKIE_NAME].value
+
+    done = await callback(ctx, cookie=cookie, code="code-1", state=query["state"])
+    assert done.headers["location"] == landed
+
+
+@pytest.mark.asyncio
+async def test_a_refused_start_keeps_next_on_the_login_page(ctx: Ctx) -> None:
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start", params={"tenant": "nope", "next": "/workflows?a=1"}
+    )
+    assert resp.headers["location"] == (
+        "/login?sso_error=unavailable&next=%2Fworkflows%3Fa%3D1"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_refused_start_drops_a_next_that_leaves_the_site(ctx: Ctx) -> None:
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start", params={"tenant": "nope", "next": "//evil.example"}
+    )
+    assert resp.headers["location"] == "/login?sso_error=unavailable"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_callback_keeps_next_from_the_state_cookie(ctx: Ctx) -> None:
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start", params={"tenant": "acme", "next": "/workflows"}
+    )
+    cookie = set_cookies(resp)[STATE_COOKIE_NAME].value
+
+    done = await callback(ctx, cookie=cookie, error="access_denied")
+    assert done.headers["location"] == "/login?sso_error=failed&next=%2Fworkflows"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_callback_without_its_cookie_has_no_next(ctx: Ctx) -> None:
+    done = await callback(ctx, cookie=None, error="access_denied")
+    assert done.headers["location"] == "/login?sso_error=failed"
+
+
+@pytest.mark.asyncio
+async def test_sso_started_on_the_main_address_keeps_its_callback(ctx: Ctx) -> None:
+    resp, _, _ = await start(ctx)
+    query = dict(parse_qsl(urlsplit(resp.headers["location"]).query))
+    assert query["redirect_uri"] == "http://test/api/v1/auth/oidc/callback"
+
+
+@pytest.mark.asyncio
+async def test_start_from_a_subdomain_refuses_a_name_that_is_not_a_host_label(
+    ctx: Ctx,
+) -> None:
+    resp = await ctx.client.get(
+        "/api/v1/auth/oidc/start",
+        params={"tenant": "evil.example/", "subdomain": "true"},
+    )
+    assert resp.headers["location"] == "/login?sso_error=unavailable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [
+        ("acme.test", {"tenantName": "acme", "sso": True}),
+        ("nope.test", {"tenantName": "nope", "sso": False}),
+        ("test", {"tenantName": None, "sso": False}),
+    ],
+)
+async def test_login_options_follow_the_host(
+    ctx: Ctx, host: str, expected: dict[str, object]
+) -> None:
+    resp = await ctx.client.get("/api/v1/auth/login-options", params={"host": host})
+    assert resp.status_code == 200
+    assert resp.json()["data"] == expected
+
+
+@pytest.mark.asyncio
 async def test_callback_state_mismatch_is_failed(ctx: Ctx) -> None:
     _, cookie_a, _ = await start(ctx)
     _, _, state_b = await start(ctx)

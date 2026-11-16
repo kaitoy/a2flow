@@ -134,7 +134,11 @@ def test_app_base_url_and_smtp_env_vars_default_to_none(
 
 def _settings_with(monkeypatch: pytest.MonkeyPatch, **env: str) -> Settings:
     """Build Settings from exactly ``env`` for the base-URL-related variables."""
-    for var in ("APP_BASE_URL", "CORS_ORIGINS", "SESSION_COOKIE_SECURE"):
+    for var in (
+        "APP_BASE_URL",
+        "CORS_ORIGINS",
+        "SESSION_COOKIE_SECURE",
+    ):
         monkeypatch.delenv(var, raising=False)
     for var, value in env.items():
         monkeypatch.setenv(var, value)
@@ -203,3 +207,49 @@ def test_explicit_cors_and_cookie_settings_win_over_app_base_url(
 
     assert settings.cors_origins == ["https://a.example.com", "https://b.example.com"]
     assert settings.session_cookie_secure is False
+
+
+@pytest.mark.parametrize(
+    ("base", "name", "expected"),
+    [
+        ("https://a2.example.com", "acme", "https://acme.a2.example.com"),
+        ("http://localhost:3000", "acme-corp", "http://acme-corp.localhost:3000"),
+        ("https://a2.example.com", "evil.example/", None),
+        ("https://a2.example.com", "Acme", None),
+        ("https://a2.example.com", "", None),
+        ("http://192.168.1.10:3000", "acme", None),
+        ("http://[::1]:3000", "acme", None),
+    ],
+)
+def test_tenant_origin_prefixes_a_valid_tenant_name(
+    monkeypatch: pytest.MonkeyPatch, base: str, name: str, expected: str | None
+) -> None:
+    settings = _settings_with(monkeypatch, APP_BASE_URL=base)
+
+    assert settings.tenant_origin(name) == expected
+
+
+def test_tenant_origin_needs_app_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _settings_with(monkeypatch)
+
+    assert settings.tenant_origin("acme") is None
+    assert settings.tenant_from_host("acme.localhost") is None
+
+
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [
+        ("acme.a2.example.com", "acme"),
+        ("ACME.a2.example.com", "acme"),
+        ("a2.example.com", None),
+        ("x.acme.a2.example.com", None),
+        ("acme.other.example.com", None),
+        ("acmea2.example.com", None),
+    ],
+)
+def test_tenant_from_host_reads_the_leading_label(
+    monkeypatch: pytest.MonkeyPatch, host: str, expected: str | None
+) -> None:
+    settings = _settings_with(monkeypatch, APP_BASE_URL="https://a2.example.com")
+
+    assert settings.tenant_from_host(host) == expected

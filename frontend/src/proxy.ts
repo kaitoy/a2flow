@@ -17,6 +17,7 @@
  * invalid back to the login page.
  */
 import { type NextRequest, NextResponse } from "next/server";
+import { loginPath, safeNextPath } from "@/lib/next-path";
 
 /** Name of the HttpOnly session cookie set by the backend at login. */
 const SESSION_COOKIE_NAME = "a2flow_session";
@@ -46,9 +47,23 @@ export function buildBackendRewriteUrl(
 }
 
 /**
+ * Redirect to `target`, a path with an optional query, on the request's own
+ * origin.
+ */
+function redirectTo(request: NextRequest, target: string): NextResponse {
+  const url = request.nextUrl.clone();
+  const [path, query = ""] = target.split("?", 2);
+  url.pathname = path;
+  url.search = query ? `?${query}` : "";
+  return NextResponse.redirect(url);
+}
+
+/**
  * Proxies `/api/*` and `/openapi.json` to the backend, and redirects
- * unauthenticated visitors to `/login` and authenticated visitors away
- * from `/login` for every other path.
+ * unauthenticated visitors to `/login` -- asking it to return to the page they
+ * asked for -- and authenticated visitors away from `/login` for every other
+ * path. `/signed-out`, where signing out
+ * lands, is open to both.
  *
  * @param request - The incoming request.
  * @returns A rewrite or redirect response, or `NextResponse.next()` to continue.
@@ -62,21 +77,21 @@ export function proxy(request: NextRequest): NextResponse {
     );
   }
 
+  if (pathname === "/signed-out") {
+    return NextResponse.next();
+  }
+
   const hasSession = request.cookies.has(SESSION_COOKIE_NAME);
   const isLogin = pathname === "/login";
 
   if (!hasSession && !isLogin) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectTo(request, loginPath(pathname + request.nextUrl.search));
   }
   if (hasSession && isLogin) {
-    const url = request.nextUrl.clone();
-    // Match the post-sign-in destination the login form and the site root both
-    // use (`router.replace("/")`); the welcome page is reachable by every
-    // authenticated role, whereas `/sessions/new` is super_admin-only.
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    // Where the login form would have sent this visitor: the page it was asked
+    // to return to, else the welcome page, which every authenticated role can
+    // reach (whereas `/sessions/new` is super_admin-only).
+    return redirectTo(request, safeNextPath(request.nextUrl.searchParams.get("next")));
   }
   return NextResponse.next();
 }

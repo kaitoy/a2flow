@@ -14,7 +14,8 @@ before the first write, so none leaves a half-provisioned user behind. That
 includes an e-mail that is not a usable address (the admin UI could never save
 such a user) and a new account whose e-mail an existing account already has.
 ``start`` answers ``unavailable`` for every reason SSO cannot begin, so it never
-reveals whether a tenant exists.
+reveals whether a tenant exists. :meth:`OidcLoginService.sso_enabled`, behind a
+tenant subdomain's login page, reveals only which tenants have SSO switched on.
 """
 
 import json
@@ -83,6 +84,39 @@ class SsoLoginError(Exception):
         """
         super().__init__(message)
         self.code = code
+
+
+def safe_next_path(value: str | None) -> str:
+    """Return ``value`` if it is a path on this site, else ``/``.
+
+    Where a sign-in returns to comes from the browser, so only a path that
+    stays on the current origin passes: it must start with one ``/`` and hold
+    no backslash or control character, which rules out ``//evil.example`` and
+    ``/\evil.example`` (both read by browsers as another host).
+
+    Args:
+        value: The path the sign-in was asked to return to.
+    """
+    if (
+        not value
+        or not value.startswith("/")
+        or value.startswith("//")
+        or "\\" in value
+        or any(ord(c) < 0x20 or ord(c) == 0x7F for c in value)
+    ):
+        return "/"
+    return value
+
+
+@dataclass
+class SsoLoginResult(LoginResult):
+    """A finished SSO sign-in: the session, plus where the browser goes next.
+
+    Attributes:
+        next_path: The page the sign-in started from (see :func:`safe_next_path`).
+    """
+
+    next_path: str = "/"
 
 
 @dataclass(frozen=True)
@@ -168,15 +202,37 @@ class OidcLoginService:
         self._cipher = cipher
         self._groups_for_tenant = groups_for_tenant
 
-    def app_base_url(self) -> str | None:
-        """Return the deployment's public base URL (``APP_BASE_URL``), or ``None`` when unset."""
-        return get_settings().app_base_url
+    async def sso_enabled(self, tenant_name: str) -> bool:
+        """Return whether the tenant named ``tenant_name`` offers SSO sign-in.
 
-    async def start(self, tenant_name: str) -> SsoStart:
-        """Begin a sign-in for the tenant named ``tenant_name``.
+        Backs the login page of a tenant subdomain, which sends the visitor
+        straight to the identity provider when this is ``True``. It reveals
+        only what that redirect reveals anyway: an unknown tenant, a disabled
+        one, and one without a complete SSO configuration all read ``False``.
 
         Args:
-            tenant_name: The tenant the user typed on the login screen.
+            tenant_name: The tenant named by the subdomain.
+        """
+        tenant = await self._tenants.get_by_name(tenant_name)
+        return tenant is not None and tenant.enabled and _sso_configured(tenant)
+
+    async def start(
+        self, tenant_name: str, *, on_subdomain: bool = False, next_path: str = "/"
+    ) -> SsoStart:
+        """Begin a sign-in for the tenant named ``tenant_name``.
+
+        The identity provider is told to return to the address the sign-in
+        started at -- the deployment's ``APP_BASE_URL``, or the tenant's own
+        subdomain of it (:meth:`config.Settings.tenant_origin`) -- so the
+        session cookie lands where the user is. That redirect URI rides in the
+        state cookie for :meth:`complete` to repeat.
+
+        Args:
+            tenant_name: The tenant the user typed on the login screen, or the
+                one its subdomain names.
+            on_subdomain: Whether the sign-in started on the tenant's subdomain.
+            next_path: The page to return to once signed in; anything that is
+                not a path on this site becomes ``/``.
 
         Returns:
             The authorization URL and the encrypted state cookie.
@@ -193,11 +249,28 @@ class OidcLoginService:
                 tenant.id if tenant else None,
                 "unknown or disabled tenant",
             )
-        meta, redirect_uri = await self._provider(tenant)
+        meta = await self._provider(tenant)
+        settings = get_settings()
+        redirect_uri = oidc_redirect_uri(
+            settings.tenant_origin(tenant.name)
+            if on_subdomain
+            else settings.app_base_url
+        )
+        if redirect_uri is None:
+            raise _refuse(SsoErrorCode.unavailable, tenant.id, "no sign-in origin")
         state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         verifier, challenge = make_pkce_pair()
         cookie = self._cipher.encrypt(
-            json.dumps({"t": tenant.id, "s": state, "n": nonce, "v": verifier})
+            json.dumps(
+                {
+                    "t": tenant.id,
+                    "s": state,
+                    "n": nonce,
+                    "v": verifier,
+                    "r": redirect_uri,
+                    "x": safe_next_path(next_path),
+                }
+            )
         )
         url = self._oidc.authorization_url(
             meta,
@@ -209,28 +282,38 @@ class OidcLoginService:
         )
         return SsoStart(authorization_url=url, state_cookie=cookie)
 
-    async def _provider(self, tenant: Tenant) -> tuple[OidcProviderMetadata, str]:
-        """Return the tenant's provider metadata and the redirect URI.
+    async def _provider(self, tenant: Tenant) -> OidcProviderMetadata:
+        """Return the tenant's provider metadata.
 
         Raises:
-            SsoLoginError: ``unavailable`` if SSO is off or incomplete,
-                ``app_base_url`` is unset, or discovery fails.
+            SsoLoginError: ``unavailable`` if SSO is off or incomplete, or
+                discovery fails.
         """
-        if not (
-            tenant.oidc_enabled
-            and tenant.oidc_issuer
-            and tenant.oidc_client_id
-            and tenant.oidc_client_secret
-        ):
+        issuer = tenant.oidc_issuer
+        if not (_sso_configured(tenant) and issuer):
             raise _refuse(SsoErrorCode.unavailable, tenant.id, "SSO off or incomplete")
-        redirect_uri = oidc_redirect_uri(self.app_base_url())
-        if redirect_uri is None:
-            raise _refuse(SsoErrorCode.unavailable, tenant.id, "app_base_url unset")
         try:
-            meta = await self._oidc.metadata(tenant.oidc_issuer)
+            return await self._oidc.metadata(issuer)
         except OidcError as exc:
             raise _refuse(SsoErrorCode.unavailable, tenant.id, str(exc)) from exc
-        return meta, redirect_uri
+
+    def next_path_of(self, state_cookie: str | None) -> str:
+        """Return the page a sign-in was to return to, read from its state cookie.
+
+        For a callback that failed: the login page it lands on keeps that page,
+        so signing in again still ends there. The cookie's age is not checked --
+        it only picks a path on this site -- and anything unreadable gives ``/``.
+
+        Args:
+            state_cookie: The cookie :meth:`start` set, if the browser sent it.
+        """
+        if not state_cookie:
+            return "/"
+        try:
+            payload = json.loads(self._cipher.decrypt(state_cookie))
+        except ValueError:
+            return "/"
+        return safe_next_path(payload.get("x") if isinstance(payload, dict) else None)
 
     async def complete(
         self,
@@ -239,7 +322,7 @@ class OidcLoginService:
         state: str | None,
         code: str | None,
         error: str | None,
-    ) -> LoginResult:
+    ) -> SsoLoginResult:
         """Finish a sign-in from the identity provider's callback.
 
         Args:
@@ -249,7 +332,8 @@ class OidcLoginService:
             error: The callback's ``error`` parameter (the IdP refused).
 
         Returns:
-            The session, minted as password login does.
+            The session, minted as password login does, and the page
+            :meth:`start` was asked to return to.
 
         Raises:
             SsoLoginError: With the public reason; see the module docstring.
@@ -265,7 +349,7 @@ class OidcLoginService:
         except ValueError as exc:
             raise _refuse(SsoErrorCode.failed, None, "bad or expired state") from exc
         if not isinstance(payload, dict) or not all(
-            isinstance(payload.get(k), str) for k in ("t", "s", "n", "v")
+            isinstance(payload.get(k), str) for k in ("t", "s", "n", "v", "r")
         ):
             raise _refuse(SsoErrorCode.failed, None, "malformed state")
         if not secrets.compare_digest(state.encode(), payload["s"].encode()):
@@ -276,9 +360,15 @@ class OidcLoginService:
             raise _refuse(SsoErrorCode.failed, payload["t"], "tenant gone")
         if not tenant.enabled:
             raise _refuse(SsoErrorCode.account_disabled, tenant.id, "tenant disabled")
-        meta, redirect_uri = await self._provider(tenant)
-        claims = await self._claims(tenant, meta, redirect_uri, code, payload)
-        return await self._resolve(tenant, claims)
+        meta = await self._provider(tenant)
+        claims = await self._claims(tenant, meta, payload["r"], code, payload)
+        result = await self._resolve(tenant, claims)
+        return SsoLoginResult(
+            user=result.user,
+            session_token=result.session_token,
+            csrf_token=result.csrf_token,
+            next_path=safe_next_path(payload.get("x")),
+        )
 
     async def _claims(
         self,
@@ -440,6 +530,16 @@ class OidcLoginService:
         else:
             await groups_repo.sync_mapped_membership(user.id, idp_groups)
         return await self._auth.start_session(user)
+
+
+def _sso_configured(tenant: Tenant) -> bool:
+    """Return whether ``tenant`` has SSO switched on with every required field set."""
+    return bool(
+        tenant.oidc_enabled
+        and tenant.oidc_issuer
+        and tenant.oidc_client_id
+        and tenant.oidc_client_secret
+    )
 
 
 def _require_active(user: User, tenant_id: str) -> None:

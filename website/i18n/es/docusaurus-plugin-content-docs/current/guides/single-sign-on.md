@@ -36,7 +36,7 @@ Para probar el inicio de sesión único sin un IdP propio, inicia el Keycloak qu
 ## Configurarlo {#set-it-up}
 
 1. En tu IdP, registra una aplicación nueva para A2Flow: una aplicación web con un secreto de cliente. Anota su URL del emisor, su ID de cliente y su secreto de cliente.
-2. En A2Flow, abre **Configuración de administrador** en la barra lateral de administración y busca la sección **Inicio de sesión único**. Pulsa **Copiar** junto a **URI de redirección** y registra esa dirección como URI de redirección de la aplicación en tu IdP.
+2. En A2Flow, abre **Configuración de administrador** en la barra lateral de administración y busca la sección **Inicio de sesión único**. Pulsa **Copiar** junto a **URI de redirección** y registra esa dirección como URI de redirección de la aplicación en tu IdP. Si tus usuarios abren A2Flow en la dirección propia de tu tenant, registra también **URI de redirección (dirección del tenant)**.
 3. En tu IdP, haz que el token de ID de la aplicación lleve la lista de grupos de cada persona (el claim de grupos). Olvidarlo quita los roles; consulta [Qué debes saber](#things-to-know).
 4. Rellena la sección con ayuda de la tabla siguiente y marca **Habilitar el inicio de sesión único**.
 5. Guarda. Al guardar se comprueba que la URL del emisor sea una dirección permitida (`https`, o un host que el operador haya permitido) y, si **Habilitar el inicio de sesión único** está marcado, que la URL del emisor, el ID de cliente y el secreto de cliente estén rellenados. No se contacta con el IdP, así que la prueba real es el paso siguiente.
@@ -52,12 +52,28 @@ Para probar el inicio de sesión único sin un IdP propio, inicia el Keycloak qu
 | **Claim de grupos** | El nombre del claim del token de ID que lista los grupos de una persona. `groups`, salvo que tu IdP use otro nombre. |
 | **Confiar en las direcciones de correo de este IdP** | Desactivado por defecto. Permite que A2Flow vincule una cuenta existente por dirección de correo aunque el IdP no marque la dirección como verificada. Microsoft Entra ID lo necesita. |
 | **URI de redirección** | Solo lectura. La dirección que hay que registrar en tu IdP; todos los tenants usan la misma. |
+| **URI de redirección (dirección del tenant)** | Solo lectura. Adonde vuelve un inicio de sesión que empezó en la dirección propia de tu tenant; consulta [En la dirección de tu tenant](#tenant-address). Regístrala también si tus usuarios abren A2Flow allí. No se muestra cuando la dirección del despliegue es una dirección IP. |
 
 ## Iniciar sesión {#signing-in}
 
 En la pantalla de inicio de sesión, escribe el nombre del tenant en **Tenant** y pulsa **Iniciar sesión con SSO**. El botón permanece deshabilitado mientras **Tenant** esté vacío. Se te envía a tu IdP, inicias sesión allí y vuelves a A2Flow con la sesión iniciada. Iniciar sesión con nombre de usuario y contraseña funciona como antes.
 
 Cerrar sesión en A2Flow no cierra la sesión en el IdP, así que si pulsas **Iniciar sesión con SSO** de nuevo, puede que entres directamente.
+
+### En la dirección de tu tenant {#tenant-address}
+
+Cada tenant puede abrirse también en su propia dirección (el nombre del tenant delante de la dirección habitual, p. ej. `acme.a2flow.example.com`), una vez que el operador ha configurado el DNS y un certificado para ella. La pantalla de inicio de sesión de esa dirección no tiene el campo **Tenant**:
+
+| Tu tenant | Qué ocurre |
+|---|---|
+| Con inicio de sesión único activado | Se te envía directamente a tu IdP, sin ver la pantalla de inicio de sesión. |
+| Con inicio de sesión único desactivado | La pantalla solo pide **Nombre de usuario** y **Contraseña**. |
+
+Al cerrar sesión, A2Flow muestra una página que lo confirma, con **Volver a iniciar sesión** para regresar a la pantalla de inicio de sesión. Con el inicio de sesión único activado, eso te lleva a tu IdP, que puede volver a iniciar tu sesión directamente.
+
+Cuando falla un intento de inicio de sesión único, no se te envía de nuevo al IdP. En su lugar, la pantalla muestra **Iniciar sesión con SSO**, y **Iniciar sesión con contraseña** muestra **Nombre de usuario** y **Contraseña** para una cuenta que tenga contraseña. También puedes iniciar sesión con contraseña en la dirección habitual, escribiendo el nombre del tenant en **Tenant**.
+
+Para iniciar sesión con contraseña sin que se te envíe al IdP (para una cuenta que no tiene identidad en el IdP), añade `?local` a la dirección de la pantalla de inicio de sesión, p. ej. `https://acme.a2flow.example.com/login?local`. La pantalla se abre entonces mostrando **Nombre de usuario** y **Contraseña**.
 
 ## Mensajes de error al iniciar sesión {#sign-in-errors}
 
@@ -104,3 +120,4 @@ Los miembros de un grupo con **Grupo del IdP** los gestiona el IdP y no se puede
 | Cambias **URL del emisor** o **ID de cliente** | Todas las cuentas del tenant se desvinculan de su identidad del IdP, porque el IdP emite identidades distintas para una aplicación distinta. Las personas se vinculan de nuevo por dirección de correo en su siguiente inicio de sesión, lo que requiere una dirección de confianza (marcada como verificada por el IdP, o con **Confiar en las direcciones de correo de este IdP** activado). Si no, el inicio de sesión falla, porque la cuenta anterior sigue teniendo esa dirección. |
 | Alguien se elimina en el IdP | Ya no puede iniciar sesión mediante SSO, pero A2Flow no deshabilita su cuenta. Desmarca **Habilitado** en ella para bloquear también el inicio de sesión con contraseña. |
 | Una cuenta lleva la insignia **SSO** | Ha iniciado sesión mediante inicio de sesión único. La insignia aparece en la lista de **Usuarios** y en la página de detalle de la cuenta. |
+| Tus usuarios abren A2Flow en la dirección propia de tu tenant | Un inicio de sesión único que empieza allí vuelve allí, a través de **URI de redirección (dirección del tenant)**. Hasta que registres esa dirección en tu IdP, tu IdP rechaza el inicio de sesión. |

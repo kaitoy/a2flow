@@ -36,7 +36,7 @@ Pour essayer l'authentification unique sans votre propre IdP, démarrez le Keycl
 ## La mettre en place {#set-it-up}
 
 1. Dans votre IdP, enregistrez une nouvelle application pour A2Flow : une application web dotée d'un secret client. Notez son URL de l'émetteur, son ID client et son secret client.
-2. Dans A2Flow, ouvrez **Paramètres administrateur** dans la barre latérale d'administration et trouvez la section **Authentification unique**. Appuyez sur **Copier** à côté de **URI de redirection** et enregistrez cette adresse comme URI de redirection de l'application dans votre IdP.
+2. Dans A2Flow, ouvrez **Paramètres administrateur** dans la barre latérale d'administration et trouvez la section **Authentification unique**. Appuyez sur **Copier** à côté de **URI de redirection** et enregistrez cette adresse comme URI de redirection de l'application dans votre IdP. Si vos utilisateurs ouvrent A2Flow à l'adresse propre de votre tenant, enregistrez aussi **URI de redirection (adresse du tenant)**.
 3. Dans votre IdP, faites en sorte que le jeton d'ID de l'application porte la liste des groupes de chaque personne (le claim de groupes). L'oublier retire les rôles ; voir [À savoir](#things-to-know).
 4. Remplissez la section à l'aide du tableau ci-dessous et cochez **Activer l'authentification unique**.
 5. Enregistrez. L'enregistrement vérifie que l'URL de l'émetteur est une adresse autorisée (`https`, ou un hôte autorisé par l'opérateur) et, si **Activer l'authentification unique** est cochée, que l'URL de l'émetteur, l'ID client et le secret client sont renseignés. Il ne contacte pas l'IdP, donc le vrai test est l'étape suivante.
@@ -52,12 +52,28 @@ Pour essayer l'authentification unique sans votre propre IdP, démarrez le Keycl
 | **Claim de groupes** | Le nom du claim du jeton d'ID qui liste les groupes d'une personne. `groups`, sauf si votre IdP utilise un autre nom. |
 | **Faire confiance aux adresses e-mail de cet IdP** | Désactivé par défaut. Permet à A2Flow de rattacher un compte existant par adresse e-mail même quand l'IdP ne marque pas l'adresse comme vérifiée. Microsoft Entra ID en a besoin. |
 | **URI de redirection** | En lecture seule. L'adresse à enregistrer dans votre IdP ; tous les tenants utilisent la même. |
+| **URI de redirection (adresse du tenant)** | En lecture seule. L'adresse de retour d'une connexion commencée à l'adresse propre de votre tenant — voir [À l'adresse de votre tenant](#tenant-address). Enregistrez-la aussi si vos utilisateurs ouvrent A2Flow à cette adresse. Absente quand l'adresse du déploiement est une adresse IP. |
 
 ## Se connecter {#signing-in}
 
 Sur l'écran de connexion, saisissez le nom du tenant dans **Tenant** et appuyez sur **Se connecter avec SSO**. Le bouton reste désactivé tant que **Tenant** est vide. Vous êtes envoyé vers votre IdP, vous vous y connectez, puis vous revenez dans A2Flow, connecté. La connexion par nom d'utilisateur et mot de passe fonctionne comme avant.
 
 Se déconnecter d'A2Flow ne vous déconnecte pas de l'IdP : en appuyant de nouveau sur **Se connecter avec SSO**, vous pouvez donc entrer directement.
+
+### À l'adresse de votre tenant {#tenant-address}
+
+Chaque tenant peut aussi être ouvert à sa propre adresse (le nom du tenant devant l'adresse habituelle, p. ex. `acme.a2flow.example.com`), une fois que l'opérateur a mis en place le DNS et un certificat pour elle. L'écran de connexion à cette adresse n'a pas de champ **Tenant** :
+
+| Votre tenant | Ce qui se passe |
+|---|---|
+| Authentification unique activée | Vous êtes envoyé directement vers votre IdP, sans voir l'écran de connexion. |
+| Authentification unique désactivée | L'écran ne demande que **Nom d'utilisateur** et **Mot de passe**. |
+
+Quand vous vous déconnectez, A2Flow affiche une page qui le confirme, avec **Se reconnecter** pour revenir à l'écran de connexion. Avec l'authentification unique activée, ce bouton vous envoie vers votre IdP, qui peut vous reconnecter directement.
+
+Quand une tentative d'authentification unique échoue, vous n'êtes pas renvoyé vers l'IdP. L'écran affiche à la place **Se connecter avec SSO**, et **Se connecter avec un mot de passe** fait apparaître **Nom d'utilisateur** et **Mot de passe** pour un compte qui a un mot de passe. Vous pouvez aussi vous connecter par mot de passe à l'adresse habituelle, en saisissant le nom du tenant dans **Tenant**.
+
+Pour vous connecter par mot de passe sans être envoyé vers l'IdP — pour un compte qui n'a pas d'identité dans l'IdP —, ajoutez `?local` à l'adresse de l'écran de connexion, p. ex. `https://acme.a2flow.example.com/login?local`. L'écran s'ouvre alors avec **Nom d'utilisateur** et **Mot de passe** affichés.
 
 ## Messages d'erreur de connexion {#sign-in-errors}
 
@@ -104,3 +120,4 @@ Les membres d'un groupe doté d'un **Groupe IdP** sont gérés par l'IdP et ne p
 | Vous modifiez **URL de l'émetteur** ou **ID client** | Tous les comptes du tenant sont détachés de leur identité de l'IdP, car l'IdP émet des identités différentes pour une autre application. Les personnes sont rattachées de nouveau par adresse e-mail à leur prochaine connexion, ce qui exige une adresse de confiance (marquée comme vérifiée par l'IdP, ou **Faire confiance aux adresses e-mail de cet IdP** activé). Sinon, la connexion échoue, car l'ancien compte porte encore cette adresse. |
 | Quelqu'un est retiré dans l'IdP | Cette personne ne peut plus se connecter par SSO, mais A2Flow ne désactive pas son compte. Décochez **Activé** sur le compte pour bloquer aussi la connexion par mot de passe. |
 | Un compte porte le badge **SSO** | Il s'est connecté par authentification unique. Le badge apparaît dans la liste **Utilisateurs** et sur la page de détail du compte. |
+| Vos utilisateurs ouvrent A2Flow à l'adresse propre de votre tenant | Une authentification unique commencée là y revient, par **URI de redirection (adresse du tenant)**. Tant que cette adresse n'est pas enregistrée dans votre IdP, votre IdP refuse la connexion. |

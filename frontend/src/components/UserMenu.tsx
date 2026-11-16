@@ -88,7 +88,9 @@ export function UserMenu({ anchorRef, open, onClose, user }: UserMenuProps) {
     }
     dispatch(clearUser());
     onClose();
-    router.replace("/login");
+    // Not `/login`: on a tenant subdomain with SSO that page goes straight to
+    // the identity provider, whose own session would sign the browser back in.
+    router.replace("/signed-out");
   }, [dispatch, router, onClose]);
 
   const transitions = useTransition(open, {

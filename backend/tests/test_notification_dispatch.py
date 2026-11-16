@@ -222,7 +222,10 @@ async def test_body_deep_links_to_the_notification_centre_without_a_target(
     await _seed(session)
     await _enable_smtp(session)
     await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
-    assert "http://localhost:3000/notifications" in (await _queued(session))[0].body
+    assert (
+        f"http://{_TENANT_ID}.localhost:3000/notifications"
+        in (await _queued(session))[0].body
+    )
 
 
 async def test_body_deep_links_an_approval_request_to_the_session_chat(
@@ -237,7 +240,8 @@ async def test_body_deep_links_an_approval_request_to_the_session_chat(
     )
     assert notification.link == f"/workflow-executions/{execution_id}/session"
     assert (
-        f"http://localhost:3000/workflow-executions/{execution_id}/session"
+        f"http://{_TENANT_ID}.localhost:3000"
+        f"/workflow-executions/{execution_id}/session"
         in (await _queued(session))[0].body
     )
 
@@ -308,6 +312,18 @@ def test_deep_link_falls_back_to_the_notification_centre_without_a_link() -> Non
         _deep_link(notification, base_url="http://localhost:3000/")
         == "http://localhost:3000/notifications"
     )
+
+
+async def test_body_links_to_the_base_url_when_it_has_no_tenant_addresses(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An IP-address host has no subdomains, so the link stays on it."""
+    monkeypatch.setenv("APP_BASE_URL", "http://192.168.1.10:3000")
+    get_settings.cache_clear()
+    await _seed(session)
+    await _enable_smtp(session)
+    await _dispatcher(session).create(_payload(), user_id=_RECIPIENT_ID)
+    assert "http://192.168.1.10:3000/notifications" in (await _queued(session))[0].body
 
 
 async def test_body_omits_the_link_when_no_base_url_is_configured(

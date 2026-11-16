@@ -15,7 +15,7 @@ const assignMock = vi.fn();
 beforeEach(() => {
   assignMock.mockClear();
   Object.defineProperty(window, "location", {
-    value: { ...window.location, assign: assignMock, pathname: "/agent-skills" },
+    value: { ...window.location, assign: assignMock, pathname: "/agent-skills", search: "" },
     writable: true,
     configurable: true,
   });
@@ -67,7 +67,7 @@ describe("global API error toast", () => {
 
     await expect(listAgentSkills()).rejects.toThrow();
 
-    expect(assignMock).toHaveBeenCalledWith("/login");
+    expect(assignMock).toHaveBeenCalledWith("/login?next=%2Fagent-skills");
     expect(store.getState().toast.items.length).toBe(beforeCount);
   });
 

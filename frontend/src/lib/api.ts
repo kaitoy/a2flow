@@ -31,6 +31,7 @@ import type {
   KnowledgeSourceRead as KnowledgeSourceModel,
   KnowledgeSourceStatus,
   LlmMode,
+  LoginOptions,
   LoginRequest,
   McpCommand,
   McpElicitationAnswer,
@@ -107,6 +108,7 @@ import { store } from "@/store";
 import { showToast } from "@/store/toastSlice";
 import basicCatalogJson from "../generated/basic_catalog.json";
 import { A2UI_CATALOG_ID } from "./a2uiCatalogId";
+import { loginPath } from "./next-path";
 
 /**
  * API base URL. Empty by default so the browser talks to the frontend origin
@@ -343,7 +345,7 @@ async function unwrap<T>(call: Promise<SdkResult<T>>, options?: CallOptions): Pr
     !response?.url.endsWith("/auth/login") &&
     window.location.pathname !== "/login";
   if (isSessionExpiry) {
-    window.location.assign("/login");
+    window.location.assign(loginPath(window.location.pathname + window.location.search));
   } else if (!(options?.suppressForbiddenToast && isForbiddenError(failure))) {
     reportApiError(failure);
   }
@@ -561,6 +563,17 @@ export async function login(
       },
     })
   ) as Promise<User>;
+}
+
+/**
+ * Ask which tenant the login page at `hostname` signs in to, and whether that
+ * tenant goes straight to its identity provider. Off a tenant subdomain the
+ * answer is `{ tenantName: null, sso: false }`.
+ */
+export async function getLoginOptions(hostname: string): Promise<LoginOptions> {
+  return unwrap(
+    sdk.loginOptionsApiV1AuthLoginOptionsGet({ query: { host: hostname } })
+  ) as Promise<LoginOptions>;
 }
 
 /** Revoke the current session and clear the auth cookies. */

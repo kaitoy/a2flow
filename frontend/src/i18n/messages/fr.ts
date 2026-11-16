@@ -307,6 +307,9 @@ export const fr = {
   "adminSettings.oidc.redirectUri": "URI de redirection",
   "adminSettings.oidc.redirectUriHint":
     "Enregistrez cette URL comme URI de redirection auprès de votre IdP.",
+  "adminSettings.oidc.subdomainRedirectUri": "URI de redirection (adresse du tenant)",
+  "adminSettings.oidc.subdomainRedirectUriHint":
+    "Enregistrez-la aussi si vos utilisateurs ouvrent A2Flow à l'adresse propre de votre tenant.",
   "adminSettings.oidc.copy": "Copier",
   "adminSettings.oidc.copied": "URI de redirection copiée",
   "adminSettings.oidc.baseUrlMissing":
@@ -759,9 +762,11 @@ export const fr = {
   "login.eGAcmeCorp": "p. ex. acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "Laissez vide si vous vous connectez en tant qu'administrateur de la plateforme.",
+  "login.redirectingToSso": "Redirection vers la connexion de votre organisation…",
   "login.signIn": "Se connecter",
   "login.signInToA2flow": "Connectez-vous à A2Flow",
   "login.signInWithSso": "Se connecter avec SSO",
+  "login.signInWithPassword": "Se connecter avec un mot de passe",
   "login.signingIn": "Connexion…",
   "login.ssoError.unavailable": "L'authentification unique n'est pas disponible pour ce tenant.",
   "login.ssoError.failed": "Échec de l'authentification unique. Veuillez réessayer.",
@@ -859,6 +864,9 @@ export const fr = {
   "session.status.waiting_for_initiator": "En attente de l'initiateur",
   "session.status.waiting_for_input": "En attente d'une saisie",
   "session.statusUntil": "{status} jusqu'à {at}",
+  "signedOut.message": "Vous vous êtes déconnecté d'A2Flow.",
+  "signedOut.signInAgain": "Se reconnecter",
+  "signedOut.title": "Vous êtes déconnecté",
   "status.allowed": "autorisé",
   "status.api_error": "erreur d'API",
   "status.approved": "approuvé",

@@ -15,7 +15,7 @@ sidebar_position: 2
 | `PORT` | `8000` | 后端绑定的端口 |
 | `RELOAD` | `false` | 用于本地开发的 uvicorn 自动重载。仅在以 `python -m backend.main` 启动后端时读取；无论取值如何，Docker 镜像自身的启动命令都不受影响 |
 | `TIMEZONE` | `UTC` | 部署所在本地时区的 IANA 名称。它决定[运维指标](./metrics.md)中一个自然日从何时开始（影响“今天”的计数以及前置时间趋势的每日分桶）；当任务的时间要求未注明时区时，工作流代理也按此时区解读。无法识别的名称会回退到 `UTC`，而不会导致启动失败，因此拼写错误只会使本地时间出现偏差，不会让应用停止运行 |
-| `APP_BASE_URL` | — | 用户在浏览器中打开此部署的地址：只包含协议、主机和可选的端口，不带路径，例如 `https://a2flow.example.com`。通知邮件中的链接指向它，[单点登录](#single-sign-on)的**重定向 URI** 也由它生成，`CORS_ORIGINS` 和 `SESSION_COOKIE_SECURE` 的默认值也由它决定。其他形式的值会让后端无法启动。未设置时，邮件发出时不带返回应用的链接，单点登录也无法使用 |
+| `APP_BASE_URL` | — | 用户在浏览器中打开此部署的地址：只包含协议、主机和可选的端口，不带路径，例如 `https://a2flow.example.com`。通知邮件中的链接指向其下收件人所在租户的地址，[单点登录](#single-sign-on)的**重定向 URI** 也由它生成，`CORS_ORIGINS` 和 `SESSION_COOKIE_SECURE` 的默认值也由它决定。其他形式的值会让后端无法启动。未设置时，邮件发出时不带返回应用的链接，单点登录也无法使用。每个租户还可以通过其下的专属地址打开（租户名称、一个点，再加上主机，例如 `acme.a2flow.example.com`），前提是有覆盖该主机下所有名称（`*.a2flow.example.com`）的 DNS 和 TLS 证书（参见[在租户地址登录](../guides/single-sign-on.md#tenant-address)）。主机是 IP 地址时无法使用 |
 
 ## 前端设置 {#frontend-settings}
 

@@ -90,12 +90,19 @@ export interface OidcSettingsFieldsProps {
   secretSaved: boolean;
   /** The callback URL to register at the IdP, or `null` while the deployment's base URL is unset. */
   redirectUri: string | null;
+  /**
+   * The callback URL for sign-ins started at the tenant's own address, or
+   * `null` when the deployment has no such address (no base URL, or one on an
+   * IP address).
+   */
+  subdomainRedirectUri?: string | null;
 }
 
 /**
  * The SSO enable switch, issuer, client id, write-only client secret, groups
- * claim, the trust-e-mail switch, and the read-only redirect URI with a copy
- * button (or a warning while the deployment's base URL is not set).
+ * claim, the trust-e-mail switch, and the read-only redirect URIs -- the
+ * deployment's and the tenant's own address's -- each with a copy button (or a
+ * warning while the deployment's base URL is not set).
  */
 export function OidcSettingsFields({
   enabled,
@@ -106,19 +113,9 @@ export function OidcSettingsFields({
   trustEmail,
   secretSaved,
   redirectUri,
+  subdomainRedirectUri = null,
 }: OidcSettingsFieldsProps) {
   const t = useT();
-  const dispatch = useAppDispatch();
-
-  async function copyRedirectUri() {
-    if (redirectUri === null) return;
-    try {
-      await navigator.clipboard.writeText(redirectUri);
-      dispatch(showToast({ message: t("adminSettings.oidc.copied") }));
-    } catch {
-      // Clipboard access can be refused; the URI is on screen to select by hand.
-    }
-  }
 
   return (
     <>
@@ -162,23 +159,63 @@ export function OidcSettingsFields({
         </p>
       </div>
 
-      <FormField htmlFor="oidcRedirectUri" label={t("adminSettings.oidc.redirectUri")}>
-        {redirectUri === null ? (
+      {redirectUri === null ? (
+        <FormField htmlFor="oidcRedirectUri" label={t("adminSettings.oidc.redirectUri")}>
           <p className="text-sm text-error">{t("adminSettings.oidc.baseUrlMissing")}</p>
-        ) : (
-          <>
-            <div className="flex items-start gap-2">
-              <ReadOnlyField className="min-w-0 flex-1">{redirectUri}</ReadOnlyField>
-              <Button type="button" variant="secondary" onClick={copyRedirectUri}>
-                {t("adminSettings.oidc.copy")}
-              </Button>
-            </div>
-            <p className="text-xs text-on-surface-variant">
-              {t("adminSettings.oidc.redirectUriHint")}
-            </p>
-          </>
-        )}
-      </FormField>
+        </FormField>
+      ) : (
+        <RedirectUriField
+          id="oidcRedirectUri"
+          label={t("adminSettings.oidc.redirectUri")}
+          hint={t("adminSettings.oidc.redirectUriHint")}
+          uri={redirectUri}
+        />
+      )}
+      {redirectUri !== null && subdomainRedirectUri !== null && (
+        <RedirectUriField
+          id="oidcSubdomainRedirectUri"
+          label={t("adminSettings.oidc.subdomainRedirectUri")}
+          hint={t("adminSettings.oidc.subdomainRedirectUriHint")}
+          uri={subdomainRedirectUri}
+        />
+      )}
     </>
+  );
+}
+
+/** One read-only callback URL with a button copying it to the clipboard. */
+function RedirectUriField({
+  id,
+  label,
+  hint,
+  uri,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  uri: string;
+}) {
+  const t = useT();
+  const dispatch = useAppDispatch();
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(uri);
+      dispatch(showToast({ message: t("adminSettings.oidc.copied") }));
+    } catch {
+      // Clipboard access can be refused; the URI is on screen to select by hand.
+    }
+  }
+
+  return (
+    <FormField htmlFor={id} label={label}>
+      <div className="flex items-start gap-2">
+        <ReadOnlyField className="min-w-0 flex-1">{uri}</ReadOnlyField>
+        <Button type="button" variant="secondary" onClick={copy}>
+          {t("adminSettings.oidc.copy")}
+        </Button>
+      </div>
+      <p className="text-xs text-on-surface-variant">{hint}</p>
+    </FormField>
   );
 }

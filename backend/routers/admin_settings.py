@@ -5,7 +5,8 @@ these routes act on the caller's tenant (``CurrentTenantIdDep``: their own, or
 the one a ``super_admin`` selected with ``X-Tenant-Id``) and expose only the
 fields an ``admin`` may change: sign-in throttling, the tenant's own Vault
 connection (without one, the tenant reads the global Vault) and its OIDC single
-sign-on, whose callback URL derives from the deployment's ``APP_BASE_URL``.
+sign-on, whose callback URLs derive from the deployment's ``APP_BASE_URL`` and
+the tenant's own subdomain of it.
 """
 
 from fastapi import APIRouter, Depends
@@ -16,7 +17,12 @@ from dependencies.authz import require_roles
 from dependencies.context import ApiMetaDep
 from dependencies.service import TenantServiceDep
 from models.response import ApiResponse
-from models.tenant import AdminSettings, AdminSettingsUpdate, oidc_redirect_uri
+from models.tenant import (
+    AdminSettings,
+    AdminSettingsUpdate,
+    Tenant,
+    oidc_redirect_uri,
+)
 from models.user import Role
 
 router = APIRouter(prefix="/admin-settings", tags=["admin-settings"])
@@ -25,13 +31,23 @@ router = APIRouter(prefix="/admin-settings", tags=["admin-settings"])
 _requires_admin = [Depends(require_roles(Role.admin))]
 
 
-def _redirect_uri() -> str | None:
-    """Return the OIDC callback URL under the deployment's ``APP_BASE_URL``.
+def _view(tenant: Tenant) -> AdminSettings:
+    """Project ``tenant`` with its OIDC callback URLs on both of its addresses.
+
+    Args:
+        tenant: The tenant whose settings are shown.
 
     Returns:
-        The callback URL, or ``None`` when no base URL is configured.
+        The settings; a callback URL is ``None`` when its address does not exist.
     """
-    return oidc_redirect_uri(get_settings().app_base_url)
+    settings = get_settings()
+    return AdminSettings.from_tenant(
+        tenant,
+        oidc_redirect_uri=oidc_redirect_uri(settings.app_base_url),
+        oidc_subdomain_redirect_uri=oidc_redirect_uri(
+            settings.tenant_origin(tenant.name)
+        ),
+    )
 
 
 @router.get("", response_model=ApiResponse[AdminSettings], dependencies=_requires_admin)
@@ -44,7 +60,7 @@ async def get_admin_settings(
     tenant = await service.get(tenant_id)
     return ApiResponse(
         meta=meta,
-        data=AdminSettings.from_tenant(tenant, oidc_redirect_uri=_redirect_uri()),
+        data=_view(tenant),
     )
 
 
@@ -62,5 +78,5 @@ async def update_admin_settings(
     tenant = await service.update(tenant_id, body, user_id=user_id)
     return ApiResponse(
         meta=meta,
-        data=AdminSettings.from_tenant(tenant, oidc_redirect_uri=_redirect_uri()),
+        data=_view(tenant),
     )

@@ -63,7 +63,7 @@ describe("GET /api-doc", () => {
     );
   });
 
-  it("redirects to /login when the session cookie is missing", async () => {
+  it("redirects to /login, back to /api-doc, when the session cookie is missing", async () => {
     server.use(
       http.get(`${BASE}/api/v1/auth/me`, () =>
         envelopeErr("UNAUTHENTICATED", "Not authenticated", 401)
@@ -78,14 +78,14 @@ describe("GET /api-doc", () => {
 
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.status).toBeLessThan(400);
-    expect(res.headers.get("location")).toBe("/login");
+    expect(res.headers.get("location")).toBe("/login?next=%2Fapi-doc");
 
     const meCall = fetchSpy.mock.calls.find(([input]) => input === `${BASE}/api/v1/auth/me`);
     const init = meCall?.[1] as RequestInit | undefined;
     expect((init?.headers as Record<string, string> | undefined)?.cookie).toBe("");
   });
 
-  it("redirects to /login when the session cookie is invalid", async () => {
+  it("redirects to /login, back to /api-doc, when the session cookie is invalid", async () => {
     server.use(
       http.get(`${BASE}/api/v1/auth/me`, () =>
         envelopeErr("UNAUTHENTICATED", "Not authenticated", 401)
@@ -94,6 +94,6 @@ describe("GET /api-doc", () => {
     const res = await GET(makeRequest());
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.status).toBeLessThan(400);
-    expect(res.headers.get("location")).toBe("/login");
+    expect(res.headers.get("location")).toBe("/login?next=%2Fapi-doc");
   });
 });

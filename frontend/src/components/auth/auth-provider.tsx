@@ -1,7 +1,7 @@
 /**
  * @module AuthProvider — Loads the current user into the auth slice on mount and
  * gates protected routes. While the `getMe` check is pending it shows a spinner;
- * if the session is invalid it redirects to `/login`.
+ * if the session is invalid it redirects to `/login`, asking it to come back here.
  */
 "use client";
 
@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { getMe } from "@/lib/api";
+import { loginPath } from "@/lib/next-path";
 import { clearUser, setMe } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {
         if (cancelled) return;
         dispatch(clearUser());
-        router.replace("/login");
+        router.replace(loginPath(window.location.pathname + window.location.search));
       });
     return () => {
       cancelled = true;

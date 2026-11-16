@@ -303,6 +303,9 @@ export const ja = {
   "adminSettings.oidc.redirectUri": "リダイレクト URI",
   "adminSettings.oidc.redirectUriHint":
     "この URL を IdP のリダイレクト URI として登録してください。",
+  "adminSettings.oidc.subdomainRedirectUri": "リダイレクト URI (テナントのアドレス)",
+  "adminSettings.oidc.subdomainRedirectUriHint":
+    "利用者がテナント専用のアドレスで A2Flow を開く場合は、こちらも登録してください。",
   "adminSettings.oidc.copy": "コピー",
   "adminSettings.oidc.copied": "リダイレクト URI をコピーしました",
   "adminSettings.oidc.baseUrlMissing":
@@ -741,9 +744,11 @@ export const ja = {
   "login.eGAcmeCorp": "例: acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "プラットフォーム管理者としてログインする場合は空欄にしてください。",
+  "login.redirectingToSso": "組織のログイン画面へ移動しています…",
   "login.signIn": "ログイン",
   "login.signInToA2flow": "A2Flow にログイン",
   "login.signInWithSso": "SSO でログイン",
+  "login.signInWithPassword": "パスワードでログイン",
   "login.signingIn": "ログイン中…",
   "login.ssoError.unavailable": "このテナントではシングルサインオンを利用できません。",
   "login.ssoError.failed": "シングルサインオンに失敗しました。もう一度お試しください。",
@@ -839,6 +844,9 @@ export const ja = {
   "session.status.waiting_for_initiator": "開始者待ち",
   "session.status.waiting_for_input": "入力待ち",
   "session.statusUntil": "{status}({at} まで)",
+  "signedOut.message": "A2Flow からログアウトしました。",
+  "signedOut.signInAgain": "もう一度ログイン",
+  "signedOut.title": "ログアウトしました",
   "status.allowed": "許可",
   "status.api_error": "API エラー",
   "status.approved": "承認済み",

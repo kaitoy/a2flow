@@ -40,11 +40,18 @@ async def settings_engine() -> AsyncGenerator[AsyncEngine, None]:
 
 @pytest_asyncio.fixture()
 async def settings_client(
-    settings_engine: AsyncEngine,
+    settings_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> AsyncGenerator[AsyncClient, None]:
-    """Client bound to :func:`settings_engine`."""
+    """Client bound to :func:`settings_engine`, with no ``APP_BASE_URL``.
+
+    Importing ``main`` loads ``backend/.env`` into the environment, so a
+    developer's own ``APP_BASE_URL`` would otherwise reach the redirect URIs.
+    """
     from infrastructure.database import get_session
     from main import app
+
+    monkeypatch.delenv("APP_BASE_URL", raising=False)
+    get_settings.cache_clear()
 
     engine = settings_engine
 
@@ -74,6 +81,7 @@ _NO_OIDC = {
     "oidcGroupsClaim": "groups",
     "oidcTrustEmail": False,
     "oidcRedirectUri": None,
+    "oidcSubdomainRedirectUri": None,
 }
 
 #: The LLM fields of a tenant that runs on the platform's LLM.
@@ -523,6 +531,18 @@ async def test_redirect_uri_follows_app_base_url(
     assert (
         assert_ok(await settings_client.get(_PATH))["oidcRedirectUri"]
         == "https://a2.example.com/api/v1/auth/oidc/callback"
+    )
+
+
+async def test_redirect_uris_cover_both_addresses(
+    settings_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "https://a2.example.com")
+    get_settings.cache_clear()
+    data = assert_ok(await settings_client.get(_PATH))
+    assert data["oidcRedirectUri"] == "https://a2.example.com/api/v1/auth/oidc/callback"
+    assert data["oidcSubdomainRedirectUri"] == (
+        f"https://{DEFAULT_TEST_TENANT_ID}.a2.example.com/api/v1/auth/oidc/callback"
     )
 
 
