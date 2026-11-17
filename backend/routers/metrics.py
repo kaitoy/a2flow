@@ -4,6 +4,8 @@
 active runs, today's completions, recent failures, per-workflow volume and lead
 time — in Prometheus text exposition format, so Grafana and anything else that
 scrapes Prometheus can chart them without a bespoke integration.
+``GET /api/v1/metrics/summary`` returns the same snapshot as JSON, for the
+built-in operations dashboard.
 
 **What is deliberately *not* here.** Anything whose natural key is a user id, an
 execution id, or a free-text error message stays out: those are unbounded label
@@ -39,8 +41,10 @@ from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_l
 from prometheus_client.core import GaugeMetricFamily
 
 from dependencies.auth import CurrentTenantIdDep
-from dependencies.context import BacklogThresholdDep
+from dependencies.context import ApiMetaDep, BacklogThresholdDep
 from dependencies.service import MetricsServiceDep
+from models.metrics import MetricsSummary
+from models.response import ApiResponse
 from services.metrics import RECENT_WINDOW_HOURS, MetricsSnapshot
 
 router = APIRouter()
@@ -210,3 +214,19 @@ async def workflow_metrics(
     snapshot = await service.snapshot(threshold_hours=threshold.threshold_hours)
     body = _render(snapshot, tenant_id, threshold.threshold_hours)
     return PlainTextResponse(content=body, media_type=CONTENT_TYPE_LATEST)
+
+
+@router.get("/metrics/summary", response_model=ApiResponse[MetricsSummary])
+async def workflow_metrics_summary(
+    service: MetricsServiceDep,
+    threshold: BacklogThresholdDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[MetricsSummary]:
+    """Return the same KPIs as ``GET /metrics``, as JSON in the usual envelope.
+
+    Backs the built-in operations dashboard, which wants typed numbers rather
+    than exposition text. It reads the very snapshot the Prometheus route
+    renders, so the two faces always agree.
+    """
+    snapshot = await service.snapshot(threshold_hours=threshold.threshold_hours)
+    return ApiResponse(meta=meta, data=MetricsSummary.model_validate(snapshot))

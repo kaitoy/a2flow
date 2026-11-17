@@ -152,7 +152,7 @@ A2Flow's interface is a calm instrument for AI-driven workflow automation, built
 
 Four principles follow from that rule:
 
-1. **Light means the agent is working.** Glow and travelling light are spent on generative runs only. Hover, selection and success are stated with a border, a ring, a fill or a glyph.
+1. **Light means the agent is working.** Glow and travelling light are spent on generative runs only. Hover, selection and success are stated with a border, a ring, a fill or a glyph. The one exception is the operations dashboard's Mission Control look — see [Mission Control](#mission-control).
 2. **One accent, solid.** The logo's teal carries every interactive signal as a flat fill — never as half of a gradient. Violet is a categorical color only.
 3. **Content is opaque; only what floats is glass.** Text sits on solid surfaces. Translucency is kept for the layers with something underneath them: the header and sidebars, popovers, dialogs.
 4. **Headings speak through the typeface.** No gradient text. The display voice is Archivo's width.
@@ -329,3 +329,46 @@ Choose presets by intent (`useMotionConfig("gentle")`) rather than tuning tensio
 ### Reduced motion
 
 `@media (prefers-reduced-motion: reduce)` collapses every animation/transition to ~0ms in `globals.css`. React Spring code paths also call `useMotionConfig`, which detects the same preference and returns `{ duration: 0 }` so lifecycle callbacks still fire. Never assume animations will run — code defensively around their completion.
+
+## Mission Control
+
+The operations dashboard at `/dashboard` has **two looks**, switched by a button in its header and remembered per browser (`useDashboardLook`):
+
+- **Standard**, the default, obeys every rule in this document like any other screen: it follows the viewer's theme, its panels are the ordinary panel surface, nothing glows, and nothing moves at rest.
+- **Mission Control** — "the console" below — is **the one place exempt from "quiet until it flows"**. Everywhere else, light and motion are spent on a single meaning — an agent is working. A dashboard left open on a wall has the opposite job: it has to be read from across a room, so here everything is lit and something is always moving.
+
+The exemption is a boundary, not a loosening: none of what follows may leave the console. In code the boundary is the **`console:` variant**, which matches only inside the `.console` root that `ConsoleFrame` renders for this look. Both looks share one markup; anything that glows or loops at rest wears `console:`, so the standard look is what remains when the variant does not match.
+
+| Rule elsewhere, and in the standard look | On the console |
+|---|---|
+| Light and dark follow the viewer's theme | **Always dark.** `ConsoleFrame` pins `data-theme="dark"` on the console root, so every token inside resolves to its dark value whichever theme the shell is in. Glow needs a dark ground; in a light app the console reads as a monitor set into the page. |
+| Nothing glows | Figures emit light (`console:glow-text`), lines and arcs carry a `drop-shadow` in their own color, and each `console-panel` pools accent light under its lower edge. |
+| Nothing moves at rest | Loops run at rest: the **Live** dot's pulse and its countdown ring, the backlog gauge's radar sweep, the light travelling the lead-time line, the stripes sliding on a bar's running segment, the failure ring's halo, the ticker. A KPI figure also flares when its value changes. |
+
+In the standard look the **Live** dot is still, the running segment keeps its stripes but they do not slide, and the ticker is a strip scrolled by hand. Motion that plays once and settles — a line drawing itself in, a bar growing from its baseline, a figure counting up — is ordinary entrance motion and runs in both looks.
+
+One thing departs from the rest of the app in **both** looks: where everything else has one accent and keeps violet categorical, a chart needs a **series palette**. It is defined on `.dashboard`, the root in either look, in `globals.css`.
+
+Two rules hold on the console exactly as they do everywhere:
+
+- **The live edge is not used.** It still means "a generative run is in flight behind this surface", and a dashboard counting runs is not that. The console has its own vocabulary of light so the signature keeps its one meaning.
+- **Reduced motion wins.** The global `prefers-reduced-motion` rule stops every loop; the travelling light is hidden outright and the ticker becomes a strip that scrolls by hand.
+
+### Series colors
+
+Text never wears a series color: digits, labels and legends stay in `on-surface` / `on-surface-variant`, and a colored mark beside them carries identity. A KPI tile's *light* takes a tone (`accent`, cyan for work in flight, amber for "worth a look", `error` for "wrong") while its digits stay ink, so the tile reads the same without color vision.
+
+| Token | Meaning | Value |
+|---|---|---|
+| `--series-ok` / `--series-fail` / `--series-run` | A run's outcome: completed, failed, still running | `oklch(0.66 0.13 165)` / `oklch(0.55 0.19 15)` / `oklch(0.6 0.13 245)` |
+| `--kind-*` | One fixed color per task error kind, in the backend's declaration order, plus `other` and `unclassified` as two grays | See `.dashboard` in `globals.css` |
+
+These are mid-lightness steps of the brand hues rather than the tag palette's values, which are tuned as text-on-tint and are too light to fill a mark on a dark panel. Red and green differ in **lightness as well as hue**, which is what keeps them apart under red-green color-vision deficiency; the sets were checked with a palette validator (lightness band, chroma floor, simulated-CVD separation of adjacent slots, contrast against the panel) on both the dark panel and the light one, so a single set serves both looks and both themes. On the light panel `--series-ok` sits just under 3:1 against the surface, which is why the next rule is not optional. A kind keeps its color and its place whichever kinds are present — never assign by rank — and every chart ships a legend or a per-row figure, so no value is carried by color alone.
+
+### Building on it
+
+- A chart sits in a `ConsolePanel`; a headline number in a `KpiTile`. Both live in `frontend/src/components/dashboard/` and only make sense inside a `ConsoleFrame`, which takes the look to draw.
+- Build for both looks at once. Write the quiet version first, then add the console's light and loops with `console:` — `console:glow-text`, `console:animate-comet`, `console:[filter:drop-shadow(…)]`. An element that exists only to glow or move is `hidden console:block`. Never branch on the look in a component.
+- Hand-written CSS inside the console may read `--color-*` variables, but only the ones `.console` re-declares. Tailwind emits each `--color-*` once on `:root`, already resolved to the *app* theme's value, so without the re-declaration a nested dark scope would inherit light colors through them. Utilities are unaffected — `@theme inline` makes them read `--c-*` directly.
+- A floating layer that portals to `<body>` (`Tooltip`, `Select`'s listbox) leaves the dashboard root and takes the app's theme — on the console that is the wrong one. Draw a chart's own readout inline instead, as `LeadTimeChart` does.
+- The `animate-console-*`, `animate-flow-stripes`, `animate-ticker`, `animate-comet`, `animate-countdown` utilities exist for the console only, and are always written with the `console:` prefix.

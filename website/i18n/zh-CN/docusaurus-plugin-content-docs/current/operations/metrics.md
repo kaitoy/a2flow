@@ -7,6 +7,8 @@ sidebar_position: 6
 
 工作流运维数据（审批积压、运行量、失败情况和前置时间）以两种形式开放给第三方仪表板。两种形式都限定在调用方所在的租户内，除下文提到的失败列表外，任何已认证的用户都可以使用。
 
+如果想不做任何配置就查看这些数字，请打开内置的[仪表盘](../guides/dashboard.md)。本页用于在你自己的监控工具中为它们绘制图表。
+
 被[访问控制标签](../guides/tags.md#access-control-tags)对调用方隐藏的运行，不会出现在下面的任何视图中，这与它们不出现在运行列表中的处理方式完全相同，因此指标绝不会提及读者无法打开的运行。
 
 从仍处于 `草稿` 状态的工作流启动的运行（开发人员或超级管理员的[发布前测试运行](../guides/workflows.md#running-a-workflow)）会被记录为 `isDraft: true`，并**从下面所有指标中排除**，包括 Prometheus KPI 和聚合子资源（含审批积压视图），因此一次性的测试数据绝不会使数字失真。这个标志在运行启动时确定；之后发布工作流也不会重新归类已经发生的运行。
@@ -43,6 +45,8 @@ sidebar_position: 6
 | `a2flow_email_queue_oldest_pending_age_seconds` | 等待最久的未投递邮件已等待的时长；无法访问中继时会上升 |
 
 `?thresholdHours=` 可覆盖审批积压的判定阈值。`TIMEZONE`（IANA 名称，默认为 `UTC`；请参阅[服务器设置](./configuration.md#server-settings)）决定“今天”从何时开始；无法识别的名称会回退到 UTC，而不会导致启动失败。
+
+`GET /api/v1/metrics/summary` 以 JSON 返回同样的 KPI，包在通常的 `{meta, data, error}` 信封中，供不想解析文本展示格式的客户端使用。它接受同样的 `?thresholdHours=`，各映射的键与上面对应标签的值完全一致。
 
 该端点由普通的会话 Cookie 保护，因此抓取配置必须携带一个 Cookie。`GET` 是安全方法，因此不需要 CSRF 令牌：
 

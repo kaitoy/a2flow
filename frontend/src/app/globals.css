@@ -3,6 +3,11 @@
 /* Enable explicit light/dark theme switching via [data-theme] on <html>. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* The dashboard's Mission Control look (`.console`, see below). Everything on
+   /dashboard that glows or loops at rest wears this variant, so the standard
+   look stays as quiet as the rest of the app. */
+@custom-variant console (&:where(.console, .console *));
+
 /* Apply hover styles on any pointer type. Tailwind v4 defaults the `hover`
    variant to `@media (hover: hover)`, which Chrome evaluates as false on
    touchscreen Windows laptops (touch is treated as the primary pointer) — that
@@ -89,6 +94,20 @@
   --animate-wiggle: wiggle 0.7s ease-in-out;
   --animate-rocket-launch: rocket-launch 0.9s ease-in-out infinite;
   --animate-spin-y: spin-y 1s linear infinite;
+
+  /* The /dashboard screen only. The loops among these run at rest, which only
+     Mission Control (`.console`) may do — the whole screen is live telemetry
+     there — so apply them through the `console:` variant. `draw-in` and
+     `grow-x` play once on entry and are used in both looks. */
+  --animate-console-pulse: console-pulse 2.4s ease-in-out infinite;
+  --animate-console-flash: console-flash 1.2s var(--motion-ease-standard);
+  --animate-console-radar: live-sweep 6s linear infinite;
+  --animate-flow-stripes: flow-stripes 1.1s linear infinite;
+  --animate-ticker: ticker 60s linear infinite;
+  --animate-draw-in: draw-in 1.4s var(--motion-ease-emphasized) both;
+  --animate-comet: comet 3.6s linear infinite;
+  --animate-countdown: countdown 15s linear both;
+  --animate-grow-x: grow-x 0.9s var(--motion-ease-emphasized) both;
 
   /* Motion tokens (durations & Material You "emphasized" easing). */
   --motion-duration-fast: 150ms;
@@ -514,6 +533,187 @@ body::before {
       background: color-mix(in oklab, var(--color-accent) 45%, transparent);
       animation: none;
     }
+  }
+}
+
+/* ----------------------------------------------------------------
+   The dashboard (/dashboard). `.dashboard` is its root in either look and
+   carries the chart series colors. `.console` is added for Mission Control —
+   the one look that breaks "quiet until it flows" on purpose: glow, gradients
+   and loops at rest. See DESIGN.md → Mission Control. The page pairs
+   `.console` with data-theme="dark" so the console is dark in both themes —
+   its light needs a dark ground.
+   ---------------------------------------------------------------- */
+.dashboard {
+  /* Chart series: mid-lightness steps of the brand hues. Red and green differ
+     in lightness as well as hue, so they stay apart under colour-vision
+     deficiency (checked with the dataviz palette validator against both the
+     dark panel and the light one, so one set serves both looks and both
+     themes). Text never wears these — a mark does, with a label beside it. */
+  --series-ok: oklch(0.66 0.13 165);
+  --series-fail: oklch(0.55 0.19 15);
+  --series-run: oklch(0.6 0.13 245);
+
+  /* One fixed color per task error kind, in the backend's declaration order. */
+  --kind-api-error: oklch(0.66 0.14 80);
+  --kind-timeout: oklch(0.55 0.18 295);
+  --kind-script-error: oklch(0.66 0.13 165);
+  --kind-invalid-input: oklch(0.55 0.19 15);
+  --kind-permission-denied: oklch(0.66 0.12 225);
+  --kind-rejected: oklch(0.56 0.18 335);
+  --kind-other: oklch(0.6 0.02 250);
+  --kind-unclassified: oklch(0.45 0.02 250);
+}
+
+.console {
+  --console-grid: oklch(0.93 0.01 215 / 0.035);
+
+  /* Tailwind declares each `--color-*` theme variable once, on :root, where
+     its `var(--c-*)` is substituted with the *app* theme's value — so in a
+     light app, a nested dark scope would still inherit light colors through
+     them. Utilities are unaffected (`@theme inline` makes them read `--c-*`
+     directly); hand-written CSS that reads `--color-*` is not. The ones used
+     inside the console are therefore re-declared here, where `--c-*` is dark. */
+  --color-surface: var(--c-surface);
+  --color-surface-dim: var(--c-surface-dim);
+  --color-on-surface: var(--c-on-surface);
+  --color-on-surface-variant: var(--c-on-surface-variant);
+  --color-outline: var(--c-outline);
+  --color-outline-variant: var(--c-outline-variant);
+  --color-error: var(--c-error);
+  --color-success: var(--c-success);
+  --color-alert: var(--c-alert);
+  --color-glass: var(--c-glass);
+  --color-glass-strong: var(--c-glass-strong);
+  --color-glass-overlay: var(--c-glass-overlay);
+  --color-glass-border: var(--c-glass-border);
+  --color-glass-highlight: var(--c-glass-highlight);
+  --color-divider: var(--c-divider);
+  --color-accent: var(--c-accent);
+  --color-accent-soft: var(--c-accent-soft);
+
+  color: var(--color-on-surface);
+  background:
+    radial-gradient(
+      60rem 28rem at 12% -10%,
+      color-mix(in oklab, var(--color-accent) 15%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      48rem 24rem at 100% 0%,
+      color-mix(in oklab, var(--series-run) 14%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(var(--console-grid) 1px, transparent 1px) 0 0 / 100% 32px,
+    linear-gradient(90deg, var(--console-grid) 1px, transparent 1px) 0 0 / 32px 100%,
+    var(--color-surface-dim);
+}
+
+/* A dashboard panel. In the standard look it is the app's ordinary panel
+   (`glass-panel`'s fill, hairline and shadow). On the console it is a lit
+   instrument rather than a card — an accent-tinted hairline and a pool of
+   accent light under its lower edge. */
+@utility console-panel {
+  position: relative;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-glass-border);
+  background: var(--c-panel);
+  box-shadow: var(--shadow-glass);
+
+  .console & {
+    border-color: color-mix(in oklab, var(--color-accent) 16%, var(--color-glass-border));
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--c-panel-raised) 94%, transparent),
+      color-mix(in oklab, var(--c-panel) 90%, transparent)
+    );
+    box-shadow:
+      inset 0 1px 0 oklch(0.93 0.01 215 / 0.07),
+      0 18px 40px -26px color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+}
+
+/* Text that emits light — applied as `console:glow-text`. The glyphs keep
+   their ink color; `--glow` (default: the text color) sets the hue of the
+   light around them. */
+@utility glow-text {
+  text-shadow:
+    0 0 2px color-mix(in oklab, var(--glow, currentColor) 45%, transparent),
+    0 0 22px color-mix(in oklab, var(--glow, currentColor) 65%, transparent);
+}
+
+/* Breathing light: the LIVE dot, the failure ring's halo. */
+@keyframes console-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+/* One-shot flare on a KPI whose value just changed. */
+@keyframes console-flash {
+  0% {
+    filter: brightness(2.4);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+/* Diagonal stripes sliding along a bar's "running" segment. */
+@keyframes flow-stripes {
+  to {
+    background-position: 24px 0;
+  }
+}
+
+/* The failure ticker: the list is rendered twice, so sliding it by half its
+   width loops seamlessly. */
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* A line drawing itself in. The path sets pathLength="1" and a dash of 1. */
+@keyframes draw-in {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A short bright dash travelling the length of a path (pathLength="100"). */
+@keyframes comet {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The refresh countdown ring emptying (pathLength="100"). */
+@keyframes countdown {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 100;
+  }
+}
+
+/* A bar growing out of its baseline. */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
   }
 }
 

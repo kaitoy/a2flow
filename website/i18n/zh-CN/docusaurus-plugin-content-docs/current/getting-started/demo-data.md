@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # 演示数据
 
-在后端设置 `DEMO_DATA=true` 后，系统会在预置的 **Default** 租户中注册三个需要审批且会更改状态的示例（“启动 EC2 实例”“重启 GKE Pod”和“轮换 Azure Key Vault 密钥”）所需的全部内容，这样无需逐项手动注册，就有现成的东西可以运行。[工作流](../guides/workflows.md)本身特意不预置：这些记录是生成工作流的原料，而[操作演练](./walkthrough.mdx)会带您实际走一遍生成过程。
+在后端设置 `DEMO_DATA=true` 后，系统会在预置的 **Default** 租户中注册三个需要审批且会更改状态的示例（“启动 EC2 实例”“重启 GKE Pod”和“轮换 Azure Key Vault 密钥”）所需的全部内容，这样无需逐项手动注册，就有现成的东西可以运行。要运行的[工作流](../guides/workflows.md)本身特意不预置：这些记录是生成工作流的原料，而[操作演练](./walkthrough.mdx)会带您实际走一遍生成过程。此外还会注册一段虚构的运行历史，让[仪表盘](../guides/dashboard.md)从一开始就有数字可看。
 
 ## 启用 {#enabling-it}
 
@@ -48,6 +48,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 - **[密钥](../guides/secrets.md) `demo-azure-credentials`**：Azure MCP Server 登录时使用的 Azure 服务主体的租户 ID、客户端 ID 和客户端密钥。
 - **[工具模拟](../guides/tool-mocks.md)**：演示运行中有副作用的工具的桩：AWS MCP Server 上的 `aws___call_aws` 和 `aws___run_script`，都返回启动成功；GKE MCP Server 上的 `patch_k8s_resource` 和 `delete_k8s_resource`，分别返回滚动重启成功和 Pod 删除成功；Azure MCP Server 上的 `keyvault_secret_get` 和 `keyvault_secret_create`，分别返回 Key Vault 的密钥列表和新的密钥版本；以及内置的 `request_approval`，返回已批准。在草稿运行的**运行**对话框中选择它们后，三个工作流中的任何一个都能运行到底，既不会接触 AWS、真实的 GKE 集群或真实的 Key Vault，也不用等待经理。
 - **[标签](../guides/tags.md)** `AWS`、`GCP` 和 `Azure`：它们都是[访问控制标签](../guides/tags.md#access-control-tags)，因此只有 `Demo AWS Group` / `Demo GCP Group` / `Demo Azure Group` 的成员（以及管理员或超级管理员）才能看到上述带有相应提供商标签的记录。`EC2 Cost Estimator` 和 `AWS EC2 Pricing` 知识库带有 `AWS`，`Kubernetes Manifest Toolkit` 带有 `GCP`，`Secret Value Generator` 带有 `Azure`，与它们所协助的提供商记录相同。`Approval Required` 是三个代理技能都带有的普通标签，不限制任何内容。
+- **带运行历史的[工作流](../guides/workflows.md)**：四个已发布的工作流 `Provision Dev EC2 Instance`、`Launch GPU Training Instance`、`Restart Crashlooping GKE Pod` 和 `Rotate Database Password`，以及约 90 天的历史运行及其任务和审批，让[仪表盘](../guides/dashboard.md)有内容可显示。它们仅供展示：没有任务模板，因此运行它们不会做任何有用的事，它们的运行的聊天也是空的。始终有几次运行正在进行并等待演示审批人处理，所以这些审批人在 **审批** 中也能看到请求。历史在每次启动时以当前时刻为终点重新生成，因此仪表盘看起来总是最新的；您自己在这些工作流上启动的运行会被保留。
 - **演示用户和用户组：**
 
 | 用户 | 角色 | 访问控制用户组 | 职责 |

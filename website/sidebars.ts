@@ -35,6 +35,7 @@ const sidebars: SidebarsConfig = {
       label: 'Guides',
       items: [
         'guides/admin-ui',
+        'guides/dashboard',
         'guides/users-and-groups',
         'guides/single-sign-on',
         'guides/workflows',

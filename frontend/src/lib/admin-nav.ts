@@ -1,5 +1,6 @@
 /** @module admin-nav — Shared admin navigation item list used by the admin sidebar and the welcome page. */
 import {
+  Activity,
   BookOpen,
   Building2,
   CheckCircle2,
@@ -46,6 +47,14 @@ export interface AdminNavItem {
  * Entries carrying `roles` are filtered per user by {@link useVisibleAdminNavItems}.
  */
 export const adminNavItems: AdminNavItem[] = [
+  {
+    href: "/dashboard",
+    label: "common.dashboard",
+    icon: Activity,
+    description: "lib.watchRunsApprovalsAndFailuresLive",
+    // The metrics are about runs and approvals, so the entry follows theirs.
+    roles: [Role.ADMIN, Role.DEVELOPER, Role.REQUESTER, Role.APPROVER],
+  },
   {
     href: "/tenants",
     label: "common.tenants",

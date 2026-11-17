@@ -96,6 +96,14 @@ The directory layout and where each kind of code lives is documented in [.claude
 
 For the full end-to-end A2UI flow (build-time schema download → tool injection → LLM call → event conversion → rendering → action feedback loop), see [docs/a2ui-flow.md](../docs/a2ui-flow.md).
 
+### The operations dashboard
+
+`/dashboard` (`app/(admin)/dashboard/page.tsx`) draws the tenant's operations metrics with hand-written SVG — there is no chart library.
+
+- **Data.** `useDashboardMetrics` reads `GET /metrics/summary` and the four aggregate sub-resources in one `Promise.allSettled` every 15 seconds, pauses while the tab is hidden, and keeps the last reading when a request fails (the header then says **Connection lost**). These calls pass `{ silent: true }` to `unwrap`, so a failed poll never raises a toast. The failure list is requested only for an `admin`, the one role the backend serves it to. The tiles' sparklines are not a backend series: the hook keeps the last 40 summaries it read, so a sparkline is the trace of this page view.
+- **Two looks, one markup.** `useDashboardLook` keeps the viewer's choice in localStorage (`a2flow.dashboard.look`, `standard` by default) and reads it with `useSyncExternalStore`, so a client-side navigation paints the chosen look on the first frame; `loading.tsx` reads it too. `ConsoleFrame` takes the look. For `standard` it renders a plain `.dashboard` root that follows the app theme. For `console` (Mission Control) it adds `.console` and `data-theme="dark"`, which re-resolves every `--c-*` token for the subtree; hand-written CSS that reads a `--color-*` variable only works there because `.console` re-declares the ones in use. Components never branch on the look: whatever glows or loops at rest carries the `console:` variant, which matches only under `.console`. See [DESIGN.md → Mission Control](../DESIGN.md#mission-control), which also explains why that look may glow and loop when nothing else in the app does.
+- **Charts.** `LeadTimeChart` measures its plot with a `ResizeObserver` and draws in real pixels, because its draw-in and travelling light are dashed strokes that a stretched `viewBox` would distort. It is a `role="slider"` over the days, so the arrow keys read it one day at a time.
+
 ## Translating the GUI
 
 The screens come in `en`, `ja`, `es`, `zh-CN`, `ko` and `fr`, through a small layer in `src/i18n/` with no i18n library.

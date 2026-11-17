@@ -20,6 +20,7 @@ La ruta de navegación situada sobre cada título refleja ese recorrido (`Inicio
 
 | Sección | Qué contiene | Se muestra en la barra lateral a |
 |---|---|---|
+| **Panel** | Cifras en vivo de ejecuciones, aprobaciones y fallos: consulta [Panel](./dashboard.md) | Administrador, Desarrollador, Solicitante, Aprobador |
 | **Tenants** | Organizaciones tenant | Superadministrador |
 | **Usuarios** | Cuentas y sus roles | Administrador, Desarrollador |
 | **Grupos de usuarios** | Conjuntos con nombre que conceden roles a varias cuentas a la vez | Administrador, Desarrollador |

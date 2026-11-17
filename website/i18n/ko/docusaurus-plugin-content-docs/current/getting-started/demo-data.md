@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # 데모 데이터
 
-백엔드에 `DEMO_DATA=true`를 설정하면, 승인을 거쳐 실제로 상태를 변경하는 세 가지 예제인 "EC2 인스턴스 시작", "GKE Pod 재시작", "Azure Key Vault 시크릿 교체"에 필요한 모든 것이 초기 생성되는 **Default** 테넌트에 등록됩니다. 따라서 항목을 하나하나 직접 등록하지 않아도 바로 실행해 볼 수 있습니다. [워크플로](../guides/workflows.md) 자체는 일부러 등록하지 않습니다. 이 레코드들은 워크플로를 생성하는 재료이며, 실제로 생성하는 과정은 [따라 하기](./walkthrough.mdx)에서 안내합니다.
+백엔드에 `DEMO_DATA=true`를 설정하면, 승인을 거쳐 실제로 상태를 변경하는 세 가지 예제인 "EC2 인스턴스 시작", "GKE Pod 재시작", "Azure Key Vault 시크릿 교체"에 필요한 모든 것이 초기 생성되는 **Default** 테넌트에 등록됩니다. 따라서 항목을 하나하나 직접 등록하지 않아도 바로 실행해 볼 수 있습니다. 실행할 [워크플로](../guides/workflows.md) 자체는 일부러 등록하지 않습니다. 이 레코드들은 워크플로를 생성하는 재료이며, 실제로 생성하는 과정은 [따라 하기](./walkthrough.mdx)에서 안내합니다. 이와 함께 가상의 실행 이력도 등록되므로 [대시보드](../guides/dashboard.md)에 처음부터 수치가 표시됩니다.
 
 ## 활성화 {#enabling-it}
 
@@ -48,6 +48,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 - **[시크릿](../guides/secrets.md) `demo-azure-credentials`** — Azure MCP Server가 로그인할 때 사용하는 Azure 서비스 주체의 테넌트 ID, 클라이언트 ID, 클라이언트 시크릿입니다.
 - **[도구 모의](../guides/tool-mocks.md)** — 데모 실행에서 부작용이 있는 도구를 대신하는 스텁입니다. AWS MCP Server의 `aws___call_aws`와 `aws___run_script`는 각각 시작 성공을 반환하고, GKE MCP Server의 `patch_k8s_resource`와 `delete_k8s_resource`는 각각 롤링 재시작 성공과 Pod 삭제 성공을 반환하며, Azure MCP Server의 `keyvault_secret_get`과 `keyvault_secret_create`는 각각 볼트의 시크릿 목록과 새 시크릿 버전을 반환하고, 내장 `request_approval`은 승인됨을 반환합니다. 초안 실행의 **실행** 대화 상자에서 이 스텁을 선택하면 AWS, 실제 GKE 클러스터, 실제 Key Vault를 건드리지 않고 매니저를 기다리지도 않은 채 세 워크플로 중 어느 것이든 끝까지 진행할 수 있습니다.
 - **[태그](../guides/tags.md)** `AWS`, `GCP`, `Azure` — 각각 [액세스 제어 태그](../guides/tags.md#access-control-tags)이므로, `Demo AWS Group` / `Demo GCP Group` / `Demo Azure Group` 구성원(및 관리자 또는 슈퍼 관리자)만 해당 제공자의 태그가 붙은 위 레코드를 볼 수 있습니다. `EC2 Cost Estimator`와 `AWS EC2 Pricing` 지식 베이스에는 `AWS`, `Kubernetes Manifest Toolkit`에는 `GCP`, `Secret Value Generator`에는 `Azure`가 붙어 있어, 이들이 돕는 제공자 레코드와 나란히 다뤄집니다. `Approval Required`는 세 에이전트 스킬 모두에 붙는 일반 태그로, 아무것도 제한하지 않습니다.
+- **실행 이력이 있는 [워크플로](../guides/workflows.md)** — 게시된 워크플로 4개(`Provision Dev EC2 Instance`, `Launch GPU Training Instance`, `Restart Crashlooping GKE Pod`, `Rotate Database Password`)와 약 90일분의 과거 실행, 그 작업과 승인입니다. [대시보드](../guides/dashboard.md)에 보여 줄 내용을 마련하기 위한 것으로, 표시 전용입니다. 작업 템플릿이 없으므로 실행해도 의미 있는 일은 하지 않으며, 이 실행들의 채팅은 비어 있습니다. 일부 실행은 항상 진행 중이며 데모 승인자를 기다리고 있으므로, 그 승인자의 **승인**에도 요청이 표시됩니다. 이력은 시작할 때마다 현재 시각을 끝으로 다시 만들어지므로 대시보드는 언제나 최신 상태로 보입니다. 이 워크플로에서 직접 시작한 실행은 그대로 남습니다.
 - **데모 사용자와 그룹:**
 
 | 사용자 | 역할 | 액세스 제어 그룹 | 하는 일 |

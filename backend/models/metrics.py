@@ -29,6 +29,57 @@ from models.workflow_task import TaskErrorKind
 _alias_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+class MetricsSummary(BaseModel):
+    """The single-value KPIs as JSON, for the built-in operations dashboard.
+
+    Field for field the same numbers ``GET /metrics`` renders as Prometheus
+    text (``services.metrics.MetricsSnapshot``), so the two can never disagree:
+    this model is validated straight from that snapshot. The mappings are keyed
+    by a status, decision, error kind, or workflow name exactly as the matching
+    Prometheus label would be.
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, from_attributes=True
+    )
+
+    approvals_pending: int
+    """Approval requests awaiting a decision."""
+
+    approvals_pending_over_threshold: int
+    """Of ``approvals_pending``, those waiting longer than the requested threshold."""
+
+    approval_pending_age_seconds_max: float
+    """How long the longest-waiting pending approval has waited; zero when none."""
+
+    approvals_decided_today: dict[str, int]
+    """Approvals decided today, by ``approved`` / ``rejected`` / ``returned``."""
+
+    executions_active: int
+    """Runs currently in progress (``running`` or ``scheduled``)."""
+
+    executions_finished_today: dict[str, int]
+    """Runs that finished today, by terminal status."""
+
+    executions_failed_recently: int
+    """Runs that finished in failure in the last 24 hours."""
+
+    tasks_failed_recently: dict[str, int]
+    """Tasks that failed in the last 24 hours, by error kind."""
+
+    executions_started_recently: dict[str, int]
+    """Runs started in the last 24 hours, by workflow name."""
+
+    lead_time_seconds_avg_recently: dict[str, float]
+    """Mean start-to-finish seconds of runs finishing in the last 24 hours, by workflow name."""
+
+    email_queue_depth: dict[str, int]
+    """Notification emails in the outgoing queue, by delivery status."""
+
+    email_queue_oldest_pending_age_seconds: float
+    """How long the longest-waiting undelivered email has waited; zero when none."""
+
+
 class WorkflowVolumeEntry(BaseModel):
     """Run volume and average lead time for one workflow over a time window.
 

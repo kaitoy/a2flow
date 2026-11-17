@@ -92,6 +92,7 @@ from infrastructure.demo_data import (
 from infrastructure.password import verify_password
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill, SkillSyncStatus
+from models.approval import Approval
 from models.knowledge import (
     KnowledgeBase,
     KnowledgeSource,
@@ -119,7 +120,13 @@ from models.tag import (
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
+from models.workflow import Workflow, WorkflowStatus
+from models.workflow_execution import WorkflowExecution
+from models.workflow_task import WorkflowTask
 from repositories.effective_roles import SqlEffectiveRoleRepository
+from repositories.metrics import SqlMetricsRepository
+from repositories.outbound_email import SqlOutboundEmailRepository
+from services.metrics import MetricsService
 from tests._engine import make_test_engine
 
 #: Fixed id of the ``Default`` tenant the fixture seeds, so tests can assert on
@@ -274,6 +281,7 @@ async def test_sync_demo_data_seeds_the_full_dataset(
     assert len(await _rows(engine, UserGroup)) == 7
     assert len(await _rows(engine, KnowledgeBase)) == 1
     assert len(await _rows(engine, KnowledgeSource)) == 1
+    assert len(await _rows(engine, Workflow)) == 4
 
 
 async def test_sync_demo_data_returns_the_new_skill_ids(
@@ -1206,6 +1214,10 @@ async def test_disabling_removes_the_full_dataset(
     assert await _rows(engine, KnowledgeBase) == []
     assert await _rows(engine, KnowledgeSource) == []
     assert await _rows(engine, KnowledgeBaseTag) == []
+    assert await _rows(engine, Workflow) == []
+    assert await _rows(engine, WorkflowExecution) == []
+    assert await _rows(engine, WorkflowTask) == []
+    assert await _rows(engine, Approval) == []
 
 
 async def test_removal_on_a_database_without_demo_data_is_a_noop(
@@ -1418,3 +1430,85 @@ async def test_disabling_removes_tool_mocks_before_the_mcp_server(
     assert await _sync(engine) == []
     assert await _rows(engine, MCPToolMock) == []
     assert await _rows(engine, MCPServer) == []
+
+
+# ---------- workflows and run history ----------
+
+
+async def _snapshot(engine: AsyncEngine) -> Any:
+    """Return the Default tenant's metrics snapshot, as the dashboard reads it."""
+    async with AsyncSession(engine) as session:
+        service = MetricsService(
+            SqlMetricsRepository(session, tenant_id=TENANT_ID),
+            SqlOutboundEmailRepository(session, tenant_id=TENANT_ID),
+            timezone="UTC",
+        )
+        return await service.snapshot(threshold_hours=24)
+
+
+async def test_demo_workflows_are_published(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    workflows = await _rows(engine, Workflow)
+    assert {w.status for w in workflows} == {WorkflowStatus.published}
+    assert {w.name for w in workflows}.isdisjoint(
+        {DEMO_AGENT_SKILL_NAME, DEMO_GKE_SKILL_NAME, DEMO_AZURE_SKILL_NAME}
+    )
+
+
+async def test_demo_run_history_fills_every_dashboard_kpi(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    snapshot = await _snapshot(engine)
+    assert snapshot.executions_active > 0
+    assert snapshot.executions_failed_recently > 0
+    assert snapshot.approvals_pending > 0
+    assert snapshot.approvals_pending_over_threshold > 0
+    assert len(snapshot.tasks_failed_recently) >= 2
+    assert len(snapshot.executions_started_recently) >= 2
+
+
+async def test_demo_run_history_is_regenerated_not_accumulated(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(monkeypatch)
+    await _sync(engine)
+    first = len(await _rows(engine, WorkflowExecution))
+    await _sync(engine)
+    assert len(await _rows(engine, WorkflowExecution)) == first
+    assert first > 100
+
+
+async def test_regenerating_keeps_a_real_run_of_a_demo_workflow(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only runs carrying the history marker are replaced on restart."""
+    from infrastructure.demo_data import DEMO_EC2_WORKFLOW_ID
+
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        session.add(
+            WorkflowExecution(
+                id="real-run",
+                tenant_id=TENANT_ID,
+                workflow_id=DEMO_EC2_WORKFLOW_ID,
+                session_id="real-session",
+                name="Provision Dev EC2 Instance",
+                agent_skill_id=DEMO_AGENT_SKILL_ID,
+                agent_skill_name=DEMO_AGENT_SKILL_NAME,
+                agent_skill_repo_url="https://github.com/kaitoy/a2flow",
+                agent_skill_repo_path="sample_skills/aws-ec2-launch",
+                initiator_id=DEMO_AWS_REQUESTER_USER_ID,
+                created_by=DEMO_AWS_REQUESTER_USER_ID,
+                updated_by=DEMO_AWS_REQUESTER_USER_ID,
+            )
+        )
+        await session.commit()
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        assert await session.get(WorkflowExecution, "real-run") is not None

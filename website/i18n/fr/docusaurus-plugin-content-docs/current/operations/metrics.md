@@ -7,6 +7,8 @@ sidebar_position: 6
 
 Les données d'exploitation des workflows (arriéré d'approbations, volume d'exécutions, échecs et délai d'exécution) sont exposées aux tableaux de bord tiers sous deux formes, toutes deux limitées au tenant de l'appelant et, à l'exception de la liste des échecs signalée plus bas, accessibles à tout utilisateur authentifié.
 
+Pour suivre ces chiffres sans rien configurer, ouvrez le [Tableau de bord](../guides/dashboard.md) intégré. Cette page sert à les tracer dans votre propre outil de supervision.
+
 Les exécutions qu'une [étiquette de contrôle d'accès](../guides/tags.md#access-control-tags) masque à l'appelant sont exclues de toutes les vues ci-dessous, exactement comme elles sont absentes de la liste des exécutions : une métrique ne nomme donc jamais une exécution que son lecteur ne pourrait pas ouvrir.
 
 Les exécutions lancées depuis un workflow encore à l'état `brouillon` (une [exécution de test avant publication](../guides/workflows.md#running-a-workflow) par un développeur ou un super administrateur) sont enregistrées avec `isDraft: true` et **exclues de toutes les métriques ci-dessous**, aussi bien des KPI Prometheus que des sous-ressources agrégées, vues de l'arriéré d'approbations comprises, afin que des données de test jetables ne faussent jamais les chiffres. L'indicateur est fixé au démarrage de l'exécution : publier le workflow par la suite ne reclasse pas les exécutions déjà passées.
@@ -43,6 +45,8 @@ E-mails de notification :
 | `a2flow_email_queue_oldest_pending_age_seconds` | Durée d'attente de l'e-mail non remis le plus ancien ; elle augmente lorsque le relais est injoignable |
 
 `?thresholdHours=` remplace le seuil des approbations bloquées. `TIMEZONE` (un nom IANA, `UTC` par défaut ; consultez [Paramètres du serveur](./configuration.md#server-settings)) détermine où commence « aujourd'hui » ; un nom non reconnu se rabat sur UTC au lieu de faire échouer le démarrage.
+
+`GET /api/v1/metrics/summary` renvoie les mêmes KPI en JSON, dans l'enveloppe habituelle `{meta, data, error}`, pour un client qui préfère ne pas analyser le texte d'exposition. Il accepte le même `?thresholdHours=`, et les clés de ses correspondances sont exactement les valeurs des étiquettes correspondantes ci-dessus.
 
 Le point de terminaison est protégé par le cookie de session ordinaire : une configuration de collecte doit donc en fournir un. `GET` étant une méthode sûre, aucun jeton CSRF n'est nécessaire :
 

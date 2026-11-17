@@ -7,6 +7,8 @@ sidebar_position: 6
 
 Los datos de operaciones de los flujos de trabajo (acumulación de aprobaciones, volumen de ejecuciones, fallos y tiempo de entrega) se exponen para paneles de terceros de dos formas, ambas limitadas al tenant del llamante y, salvo la lista de fallos que se indica más abajo, disponibles para cualquier usuario autenticado.
 
+Para seguir estas cifras sin configurar nada, abre el [Panel](../guides/dashboard.md) integrado. Esta página sirve para representarlas en una herramienta de monitorización propia.
+
 Las ejecuciones que una [etiqueta de control de acceso](../guides/tags.md#access-control-tags) oculta al llamante quedan fuera de todas las vistas siguientes, igual que no aparecen en la propia lista de ejecuciones, de modo que una métrica nunca nombra una ejecución que su lector no podría abrir.
 
 Las ejecuciones iniciadas desde un flujo de trabajo todavía en `borrador` (una [ejecución de prueba previa a la publicación](../guides/workflows.md#running-a-workflow) de un Desarrollador o Superadministrador) se registran con `isDraft: true` y **quedan excluidas de todas las métricas siguientes**, tanto los KPI de Prometheus como los subrecursos agregados, incluidas las vistas de aprobaciones acumuladas, para que los datos de prueba desechables nunca distorsionen las cifras. El indicador se fija cuando empieza la ejecución; publicar el flujo de trabajo después no reclasifica las ejecuciones que ya ocurrieron.
@@ -43,6 +45,8 @@ Correo de notificación:
 | `a2flow_email_queue_oldest_pending_age_seconds` | Cuánto lleva esperando el correo sin entregar más antiguo; aumenta cuando el relé no está accesible |
 
 `?thresholdHours=` anula el límite de las aprobaciones estancadas. `TIMEZONE` (un nombre IANA, `UTC` de forma predeterminada; consulta [Configuración del servidor](./configuration.md#server-settings)) determina dónde empieza «hoy»; un nombre no reconocido se sustituye por UTC en lugar de impedir el arranque.
+
+`GET /api/v1/metrics/summary` devuelve los mismos KPI como JSON, en el envoltorio habitual `{meta, data, error}`, para un cliente que prefiera no analizar el texto de exposición. Acepta el mismo `?thresholdHours=`, y las claves de sus mapas son exactamente los valores de las etiquetas correspondientes de arriba.
 
 El endpoint está protegido por la cookie de sesión normal, así que la configuración de scraping debe incluir una. `GET` es un método seguro, por lo que no hace falta un token CSRF:
 

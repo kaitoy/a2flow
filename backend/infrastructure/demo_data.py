@@ -88,10 +88,16 @@ seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
   AC group instead and that provider's records disappear from what they can
   see.
 
-The Workflow itself is deliberately *not* seeded — these records are the
-ingredients an operator assembles one into. Every tag stays unattached to any
-workflow for the same reason; an operator is free to attach one once they
-build one.
+The workflows the walkthrough has an operator generate are *not* seeded --
+these records are the ingredients they are assembled from. What is seeded is
+a set of four **display-only** workflows (``Provision Dev EC2 Instance``,
+``Launch GPU Training Instance``, ``Restart Crashlooping GKE Pod``,
+``Rotate Database Password``): published, but with no task templates or design
+conversation, they exist so that ninety days of generated run history -- runs,
+their tasks, and their approvals -- gives the operations dashboard something to
+show. That history is regenerated on every startup, laid out backwards from
+the present, because the dashboard reads it through windows anchored on now.
+No tag is attached to any workflow; an operator is free to attach one.
 
 The flag is declarative in both directions: ``DEMO_DATA=true`` guarantees the
 records exist, and leaving it unset (the default) guarantees they do not, so
@@ -111,13 +117,16 @@ validation models the API uses. That is deliberate: ``AgentSkillCreate``'s
 make application startup depend on working name resolution.
 """
 
+import itertools
 import logging
+import random
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
 
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import SQLModel, col, select
+from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
@@ -125,6 +134,7 @@ from infrastructure.bootstrap import DEFAULT_TENANT_NAME, resolve_seed_password
 from infrastructure.password import hash_password
 from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
+from models.approval import Approval, ApprovalStatus
 from models.knowledge import (
     KnowledgeBase,
     KnowledgeSource,
@@ -148,6 +158,9 @@ from models.tag import (
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.user_group import UserGroup, UserGroupMember
+from models.workflow import Workflow, WorkflowStatus
+from models.workflow_execution import WorkflowExecution, WorkflowExecutionStatus
+from models.workflow_task import TaskErrorKind, WorkflowTask, WorkflowTaskStatus
 from repositories.user import SqlUserRepository
 
 logger = logging.getLogger(__name__)
@@ -311,6 +324,18 @@ DEMO_PRICING_KB_ID = "00000000-0000-0000-0000-00000000d701"
 #: Fixed identifier of the price-sheet PDF registered as that knowledge base's
 #: source.
 DEMO_PRICING_SOURCE_ID = "00000000-0000-0000-0000-00000000d702"
+
+#: Fixed identifier of the display-only ``Provision Dev EC2 Instance`` workflow.
+DEMO_EC2_WORKFLOW_ID = "00000000-0000-0000-0000-00000000d801"
+
+#: Fixed identifier of the display-only ``Launch GPU Training Instance`` workflow.
+DEMO_GPU_WORKFLOW_ID = "00000000-0000-0000-0000-00000000d802"
+
+#: Fixed identifier of the display-only ``Restart Crashlooping GKE Pod`` workflow.
+DEMO_GKE_WORKFLOW_ID = "00000000-0000-0000-0000-00000000d803"
+
+#: Fixed identifier of the display-only ``Rotate Database Password`` workflow.
+DEMO_ROTATION_WORKFLOW_ID = "00000000-0000-0000-0000-00000000d804"
 
 #: Name of the demo knowledge base as shown in the admin UI.
 DEMO_PRICING_KB_NAME = "AWS EC2 Pricing"
@@ -1349,13 +1374,16 @@ async def _seed_demo_data(session: AsyncSession) -> list[str]:
         if skill_id is not None
     ]
     await _seed_demo_tags(session, tenant_id)
+    await _seed_demo_workflows(session, tenant_id)
+    await _seed_demo_run_history(session, tenant_id)
     return new_skill_ids
 
 
 async def _remove_demo_data(session: AsyncSession) -> None:
     """Delete every demo record that is still present.
 
-    Deletion follows the direction of the foreign keys — tool mocks, then agent
+    Deletion follows the direction of the foreign keys — the generated run
+    history and the display-only workflows, then tool mocks, then agent
     skills, then MCP servers, then secrets, then the knowledge base (its source
     and any workflow links cascade with it), then tags, then user groups, then
     users — so a record is never orphaned by the removal of something it points
@@ -1381,6 +1409,16 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     Args:
         session: Database session used to read and delete records.
     """
+    # The generated runs and the demo workflows go first: a run restricts the
+    # deletion of its initiator, and a workflow that of its agent skill.
+    await _delete_demo_run_history(session)
+    for workflow_spec in _DEMO_WORKFLOWS:
+        await _delete_demo_row(
+            session,
+            Workflow,
+            workflow_spec.id,
+            label=f"workflow {workflow_spec.name!r}",
+        )
     for mock_spec in _DEMO_TOOL_MOCKS:
         await _delete_demo_row(
             session, MCPToolMock, mock_spec.id, label=f"tool mock {mock_spec.name!r}"
@@ -2722,3 +2760,524 @@ async def _link_tag(
     await _insert(
         session, link_model(resource_id=resource_id, tag_id=tag_id), label=label
     )
+
+
+# ---------- workflows and run history (for the operations dashboard) ----------
+
+#: ``session_id`` prefix marking a demo history run. Regenerating the history
+#: deletes only runs carrying it, so a run someone really started on one of the
+#: demo workflows survives a restart.
+_HISTORY_SESSION_PREFIX = "demo-history-"
+
+#: How far back the generated history reaches -- the dashboard's longest range.
+_HISTORY_DAYS = 90
+
+#: Seed of the history's random generator, so every startup draws the same
+#: shape; only the dates move, since they are laid out backwards from now.
+_HISTORY_SEED = 20261117
+
+#: How much of a run's lead time the approval step takes, relative to one for
+#: every other task: waiting on a person dominates any run that needs one.
+_APPROVAL_WEIGHT = 4
+
+#: Weekend days carry this fraction of a weekday's volume.
+_WEEKEND_FACTOR = 0.3
+
+
+@dataclass(frozen=True)
+class _DemoWorkflowSpec:
+    """One display-only demo workflow and the shape of its generated history.
+
+    The workflow has no task templates and no design conversation: it exists
+    so its runs group under a name on the dashboard. Each run copies
+    :attr:`tasks` as its task list, one of which (:attr:`approval_task`) waits
+    on an approval.
+
+    Attributes:
+        id: Fixed primary key, so the workflow can be found again for removal.
+        name: Workflow name, unique within the tenant. Deliberately not a demo
+            skill's name, which the Generate dialog proposes by default.
+        description: Sentence shown on the workflow list.
+        skill_id: Id of the demo agent skill the workflow is built on.
+        skill_name: That skill's name, snapshotted onto every run.
+        skill_repo_path: That skill's path in the repository, likewise.
+        developer_id: Demo developer recorded as the workflow's author.
+        requester_id: Demo requester recorded as every run's initiator.
+        tasks: Titles of the tasks every run works through, in order.
+        approval_task: Index into :attr:`tasks` of the step that waits on an
+            approval; never the first.
+        approval_title: Title of that approval request.
+        runs_per_day: Average weekday runs at the end of the history window.
+        lead_minutes: Median start-to-finish minutes of a run.
+        failure_rate: Fraction of runs that end ``failed``.
+    """
+
+    id: str
+    name: str
+    description: str
+    skill_id: str
+    skill_name: str
+    skill_repo_path: str
+    developer_id: str
+    requester_id: str
+    tasks: tuple[str, ...]
+    approval_task: int
+    approval_title: str
+    runs_per_day: float
+    lead_minutes: float
+    failure_rate: float
+
+
+_DEMO_EC2_WORKFLOW = _DemoWorkflowSpec(
+    id=DEMO_EC2_WORKFLOW_ID,
+    name="Provision Dev EC2 Instance",
+    description="Launch a development EC2 instance once a manager approves the cost.",
+    skill_id=DEMO_AGENT_SKILL_ID,
+    skill_name=DEMO_AGENT_SKILL_NAME,
+    skill_repo_path=_DEMO_AWS_SKILL_REPO_PATH,
+    developer_id=DEMO_AWS_DEVELOPER_USER_ID,
+    requester_id=DEMO_AWS_REQUESTER_USER_ID,
+    tasks=(
+        "Estimate the monthly cost",
+        "Get manager approval",
+        "Launch the EC2 instance",
+        "Report the instance details",
+    ),
+    approval_task=1,
+    approval_title="Approve launching a t3.medium in us-east-1",
+    runs_per_day=3.0,
+    lead_minutes=45,
+    failure_rate=0.08,
+)
+
+_DEMO_GPU_WORKFLOW = _DemoWorkflowSpec(
+    id=DEMO_GPU_WORKFLOW_ID,
+    name="Launch GPU Training Instance",
+    description="Launch a GPU instance for a model-training job, after approval.",
+    skill_id=DEMO_AGENT_SKILL_ID,
+    skill_name=DEMO_AGENT_SKILL_NAME,
+    skill_repo_path=_DEMO_AWS_SKILL_REPO_PATH,
+    developer_id=DEMO_AWS_DEVELOPER_USER_ID,
+    requester_id=DEMO_AWS_REQUESTER_USER_ID,
+    tasks=(
+        "Check GPU capacity in the region",
+        "Estimate the monthly cost",
+        "Get manager approval",
+        "Launch the GPU instance",
+    ),
+    approval_task=2,
+    approval_title="Approve launching a g5.2xlarge for model training",
+    runs_per_day=0.7,
+    lead_minutes=180,
+    failure_rate=0.18,
+)
+
+_DEMO_GKE_WORKFLOW = _DemoWorkflowSpec(
+    id=DEMO_GKE_WORKFLOW_ID,
+    name="Restart Crashlooping GKE Pod",
+    description="Rolling-restart the deployment behind a crashlooping pod.",
+    skill_id=DEMO_GKE_SKILL_ID,
+    skill_name=DEMO_GKE_SKILL_NAME,
+    skill_repo_path=_DEMO_GKE_SKILL_REPO_PATH,
+    developer_id=DEMO_GCP_DEVELOPER_USER_ID,
+    requester_id=DEMO_GCP_REQUESTER_USER_ID,
+    tasks=(
+        "Find the crashlooping pods",
+        "Get manager approval",
+        "Rolling-restart the deployment",
+        "Verify the pods are ready",
+    ),
+    approval_task=1,
+    approval_title="Approve restarting deployment api in prod",
+    runs_per_day=4.0,
+    lead_minutes=20,
+    failure_rate=0.06,
+)
+
+_DEMO_ROTATION_WORKFLOW = _DemoWorkflowSpec(
+    id=DEMO_ROTATION_WORKFLOW_ID,
+    name="Rotate Database Password",
+    description="Rotate the database password kept in Azure Key Vault.",
+    skill_id=DEMO_AZURE_SKILL_ID,
+    skill_name=DEMO_AZURE_SKILL_NAME,
+    skill_repo_path=_DEMO_AZURE_SKILL_REPO_PATH,
+    developer_id=DEMO_AZURE_DEVELOPER_USER_ID,
+    requester_id=DEMO_AZURE_REQUESTER_USER_ID,
+    tasks=(
+        "List the vault's secrets",
+        "Generate a new password",
+        "Get manager approval",
+        "Write the new secret version",
+    ),
+    approval_task=2,
+    approval_title="Approve rotating db-password",
+    runs_per_day=1.5,
+    lead_minutes=90,
+    failure_rate=0.1,
+)
+
+#: The display-only demo workflows, in creation order.
+_DEMO_WORKFLOWS = (
+    _DEMO_EC2_WORKFLOW,
+    _DEMO_GPU_WORKFLOW,
+    _DEMO_GKE_WORKFLOW,
+    _DEMO_ROTATION_WORKFLOW,
+)
+
+#: Where an approval request goes, in turn: one of the two demo approvers, or
+#: the ``Demo Approvers`` group. As ``(approver, approver_group_id)``.
+_APPROVAL_DESTINATIONS: tuple[tuple[str | None, str | None], ...] = (
+    (DEMO_APPROVER_USER_ID, None),
+    (DEMO_APPROVER_2_USER_ID, None),
+    (None, DEMO_APPROVERS_GROUP_ID),
+)
+
+#: How a random failure is distributed over causes, with the messages each
+#: may carry. ``rejected`` fails the approval step; every other kind fails one
+#: of the other steps.
+_FAILURES: tuple[tuple[TaskErrorKind, int, tuple[str, ...]], ...] = (
+    (
+        TaskErrorKind.api_error,
+        4,
+        (
+            "The provider API answered 503 Service Unavailable.",
+            "InsufficientInstanceCapacity: not enough capacity in the zone.",
+        ),
+    ),
+    (
+        TaskErrorKind.timeout,
+        3,
+        ("Timed out after 300 s waiting for the operation to finish.",),
+    ),
+    (TaskErrorKind.rejected, 3, ("The approver rejected the request.",)),
+    (
+        TaskErrorKind.permission_denied,
+        1,
+        ("The credential lacks permission for this operation (403 Forbidden).",),
+    ),
+    (TaskErrorKind.script_error, 1, ("The script exited with status 1.",)),
+    (
+        TaskErrorKind.invalid_input,
+        1,
+        ("The requested instance type is not offered in this region.",),
+    ),
+)
+
+
+@dataclass(frozen=True)
+class _Failure:
+    """How a run fails: which task, and why.
+
+    Attributes:
+        task: Index of the failing task.
+        kind: The error kind recorded on it.
+        message: The error message recorded on it.
+    """
+
+    task: int
+    kind: TaskErrorKind
+    message: str
+
+
+#: Runs placed by hand on top of the random history, so the "right now"
+#: figures are never zero: two waiting on an approval (one well past the
+#: 24-hour backlog threshold), one mid-way through, and two recent failures.
+#: As ``(workflow, started hours ago, lead hours, failure)``.
+_NOW_SCENARIO: tuple[tuple[_DemoWorkflowSpec, float, float, _Failure | None], ...] = (
+    (_DEMO_EC2_WORKFLOW, 25 / 60, 1, None),
+    (_DEMO_ROTATION_WORKFLOW, 45, 60, None),
+    (_DEMO_GKE_WORKFLOW, 20 / 60, 25 / 60, None),
+    (
+        _DEMO_GPU_WORKFLOW,
+        5,
+        2,
+        _Failure(
+            3,
+            TaskErrorKind.api_error,
+            "InsufficientInstanceCapacity: no g5.2xlarge capacity in us-east-1a.",
+        ),
+    ),
+    (
+        _DEMO_GKE_WORKFLOW,
+        3,
+        0.25,
+        _Failure(
+            2,
+            TaskErrorKind.permission_denied,
+            "The service account lacks container.deployments.update in prod.",
+        ),
+    ),
+)
+
+
+async def _seed_demo_workflows(session: AsyncSession, tenant_id: str) -> None:
+    """Create the display-only demo workflows, already published.
+
+    Args:
+        session: Database session used to read and insert the workflows.
+        tenant_id: Id of the ``Default`` tenant the workflows belong to.
+    """
+    for spec in _DEMO_WORKFLOWS:
+        if await session.get(Workflow, spec.id) is not None:
+            continue
+        await _insert(
+            session,
+            Workflow(
+                id=spec.id,
+                tenant_id=tenant_id,
+                name=spec.name,
+                description=spec.description,
+                agent_skill_id=spec.skill_id,
+                session_id=f"demo-workflow-design-{spec.id[-4:]}",
+                # ponytail: no clone exists at seed time and nothing runs this
+                # design, so a placeholder pin; a real run pins the skill's own.
+                agent_skill_commit_sha="0" * 40,
+                status=WorkflowStatus.published,
+                created_by=spec.developer_id,
+                updated_by=spec.developer_id,
+            ),
+            label=f"workflow {spec.name!r}",
+        )
+
+
+async def _delete_demo_run_history(session: AsyncSession) -> None:
+    """Delete every generated demo run; their tasks and approvals cascade.
+
+    Args:
+        session: Database session used to delete the runs.
+    """
+    await session.exec(
+        delete(WorkflowExecution).where(
+            col(WorkflowExecution.session_id).startswith(_HISTORY_SESSION_PREFIX)
+        )
+    )
+    await session.commit()
+
+
+async def _seed_demo_run_history(session: AsyncSession, tenant_id: str) -> None:
+    """Replace the demo workflows' run history with a fresh one ending now.
+
+    The history is regenerated on every startup rather than kept, because the
+    dashboard reads it through windows anchored on the present ("today", "the
+    last 24 hours", "the last 90 days"): rows written once would slide out of
+    them. A fixed seed keeps the shape the same from one start to the next,
+    and :data:`_NOW_SCENARIO` is added on top.
+
+    Args:
+        session: Database session used to delete and insert the rows.
+        tenant_id: Id of the ``Default`` tenant the rows belong to.
+    """
+    await _delete_demo_run_history(session)
+    specs = [s for s in _DEMO_WORKFLOWS if await session.get(Workflow, s.id)]
+    if not specs:
+        return
+    rng = random.Random(_HISTORY_SEED)
+    now = datetime.now(UTC)
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    destinations = itertools.cycle(_APPROVAL_DESTINATIONS)
+    rows: list[SQLModel] = []
+
+    def add(
+        spec: _DemoWorkflowSpec,
+        start: datetime,
+        lead: timedelta,
+        failure: _Failure | None,
+    ) -> None:
+        rows.extend(
+            _demo_run(
+                spec,
+                tenant_id=tenant_id,
+                serial=len(rows),
+                start=start,
+                lead=lead,
+                now=now,
+                destination=next(destinations),
+                failure=failure,
+            )
+        )
+
+    for days_ago in range(_HISTORY_DAYS, -1, -1):
+        day = today - timedelta(days=days_ago)
+        # Volume grows towards the present, so the trend has somewhere to go.
+        growth = 0.6 + 0.4 * (1 - days_ago / _HISTORY_DAYS)
+        weekend = _WEEKEND_FACTOR if day.weekday() >= 5 else 1.0
+        for spec in specs:
+            expected = spec.runs_per_day * growth * weekend * rng.uniform(0.6, 1.4)
+            for _ in range(int(expected + rng.random())):
+                start = day + timedelta(hours=min(max(rng.gauss(13, 3), 6), 22))
+                lead = timedelta(minutes=spec.lead_minutes * rng.lognormvariate(0, 0.6))
+                failure = _random_failure(spec, rng)
+                if start < now:
+                    add(spec, start, lead, failure)
+
+    for spec, ago, lead_hours, failure in _NOW_SCENARIO:
+        if spec in specs:
+            add(spec, now - timedelta(hours=ago), timedelta(hours=lead_hours), failure)
+
+    try:
+        # One flush per table, parents first: the models declare no ORM
+        # relationships, so the unit of work cannot order the inserts itself.
+        for model in (WorkflowExecution, WorkflowTask, Approval):
+            session.add_all(row for row in rows if isinstance(row, model))
+            await session.flush()
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        logger.warning(
+            "Skipped generating the demo run history: a demo user or group it "
+            "refers to is missing."
+        )
+
+
+def _random_failure(spec: _DemoWorkflowSpec, rng: random.Random) -> _Failure | None:
+    """Decide whether a generated run fails, and if so where and why.
+
+    Args:
+        spec: The workflow the run belongs to.
+        rng: The history's random generator.
+
+    Returns:
+        The failure, or ``None`` for a run that completes.
+    """
+    if rng.random() >= spec.failure_rate:
+        return None
+    weights = [weight for _, weight, _ in _FAILURES]
+    kind, _, messages = rng.choices(_FAILURES, weights=weights)[0]
+    if kind is TaskErrorKind.rejected:
+        task = spec.approval_task
+    else:
+        others = [i for i in range(len(spec.tasks)) if i != spec.approval_task]
+        task = rng.choice(others)
+    return _Failure(task, kind, rng.choice(messages))
+
+
+def _demo_run(
+    spec: _DemoWorkflowSpec,
+    *,
+    tenant_id: str,
+    serial: int,
+    start: datetime,
+    lead: timedelta,
+    now: datetime,
+    destination: tuple[str | None, str | None],
+    failure: _Failure | None,
+) -> list[SQLModel]:
+    """Build one demo run with its tasks and, once reached, its approval.
+
+    The run's lead time is split across its tasks, the approval step taking
+    :data:`_APPROVAL_WEIGHT` shares and every other step one. A run whose
+    last step (or failing step) would end after ``now`` is still in progress:
+    the steps already past are completed, the current one is in progress, and
+    an approval it is waiting on is pending.
+
+    Args:
+        spec: The workflow the run belongs to.
+        tenant_id: Id of the ``Default`` tenant.
+        serial: Number making the run's ``session_id`` unique.
+        start: When the run started.
+        lead: How long it takes from start to finish (or to failing).
+        now: The present; steps ending later have not happened yet.
+        destination: Who the approval goes to, as ``(approver, group id)``.
+        failure: How the run fails, or ``None`` for a run that completes.
+
+    Returns:
+        The execution, its tasks, and its approval if any, in insert order.
+    """
+    weights = [
+        _APPROVAL_WEIGHT if i == spec.approval_task else 1
+        for i in range(len(spec.tasks))
+    ]
+    ends: list[datetime] = []
+    elapsed = 0
+    for weight in weights:
+        elapsed += weight
+        ends.append(start + lead * (elapsed / sum(weights)))
+    last = len(spec.tasks) - 1 if failure is None else failure.task
+    running = ends[last] > now
+    if running:
+        status = WorkflowExecutionStatus.running
+    elif failure is None:
+        status = WorkflowExecutionStatus.completed
+    else:
+        status = WorkflowExecutionStatus.failed
+
+    execution = WorkflowExecution(
+        tenant_id=tenant_id,
+        workflow_id=spec.id,
+        session_id=f"{_HISTORY_SESSION_PREFIX}{serial:06d}",
+        name=spec.name,
+        agent_skill_id=spec.skill_id,
+        agent_skill_name=spec.skill_name,
+        agent_skill_repo_url=_DEMO_SKILL_REPO_URL,
+        agent_skill_repo_path=spec.skill_repo_path,
+        initiator_id=spec.requester_id,
+        workflow_version=1,
+        status=status,
+        finished_at=None if running else ends[last],
+        created_at=start,
+        updated_at=start if running else ends[last],
+        created_by=spec.requester_id,
+        updated_by=spec.requester_id,
+    )
+    tasks: list[WorkflowTask] = []
+    for index, title in enumerate(spec.tasks):
+        task_start = start if index == 0 else ends[index - 1]
+        task_status = WorkflowTaskStatus.completed
+        updated = ends[index]
+        if running and ends[index] > now:
+            if task_start <= now:
+                task_status, updated = WorkflowTaskStatus.in_progress, task_start
+            else:
+                task_status, updated = WorkflowTaskStatus.pending, start
+        elif failure is not None and index == failure.task:
+            task_status = WorkflowTaskStatus.failed
+        elif failure is not None and index > failure.task:
+            task_status, updated = WorkflowTaskStatus.skipped, ends[failure.task]
+        failed = task_status is WorkflowTaskStatus.failed and failure is not None
+        tasks.append(
+            WorkflowTask(
+                tenant_id=tenant_id,
+                workflow_execution_id=execution.id,
+                title=title,
+                status=task_status,
+                error_kind=failure.kind if failed and failure else None,
+                error_message=failure.message if failed and failure else None,
+                created_at=start,
+                updated_at=updated,
+                created_by=spec.requester_id,
+                updated_by=spec.requester_id,
+            )
+        )
+    rows: list[SQLModel] = [execution, *tasks]
+
+    step = spec.approval_task
+    asked_at = ends[step - 1]
+    if asked_at > now or (failure is not None and failure.task < step):
+        return rows
+    approver, group_id = destination
+    decider = approver or DEMO_APPROVER_USER_ID
+    decided = not (running and ends[step] > now)
+    if not decided:
+        approval_status = ApprovalStatus.pending
+    elif failure is not None and failure.task == step:
+        approval_status = ApprovalStatus.rejected
+    else:
+        approval_status = ApprovalStatus.approved
+    rows.append(
+        Approval(
+            tenant_id=tenant_id,
+            workflow_execution_id=execution.id,
+            workflow_task_id=tasks[step].id,
+            title=spec.approval_title,
+            approver=approver,
+            approver_group_id=group_id,
+            status=approval_status,
+            decided_at=ends[step] if decided else None,
+            decided_by=decider if decided else None,
+            created_at=asked_at,
+            updated_at=ends[step] if decided else asked_at,
+            created_by=spec.requester_id,
+            updated_by=decider if decided else spec.requester_id,
+        )
+    )
+    return rows

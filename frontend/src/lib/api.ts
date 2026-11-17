@@ -12,6 +12,7 @@ import type {
   AgentSkillUpdate,
   ApiError,
   ApiMeta,
+  ApprovalBacklogEntry,
   Approval as ApprovalModel,
   ApprovalRead as ApprovalReadModel,
   ApprovalStatus,
@@ -21,6 +22,8 @@ import type {
   CertificateGrant,
   ExecuteWorkflowRequest,
   ExecutionSession as ExecutionSessionModel,
+  FailedExecutionEntry,
+  FailedTaskEntry,
   GenerateWorkflowRequest,
   ImpersonationEventRead,
   KnowledgeBaseCreate,
@@ -30,6 +33,7 @@ import type {
   KnowledgePageSummary,
   KnowledgeSourceRead as KnowledgeSourceModel,
   KnowledgeSourceStatus,
+  LeadTimeBucket,
   LlmMode,
   LoginOptions,
   LoginRequest,
@@ -50,6 +54,7 @@ import type {
   McpToolMockRead as McpToolMockModel,
   McpToolMockUpdate,
   McpTransport,
+  MetricsSummary,
   MockResponse,
   MockResponseKind,
   Notification as NotificationModel,
@@ -100,6 +105,7 @@ import type {
   WorkflowTaskUpdate,
   WorkflowUpdate,
   WorkflowVersionRead as WorkflowVersionModel,
+  WorkflowVolumeEntry,
 } from "@/generated/api/types.gen";
 import { DEFAULT_LOCALE } from "@/i18n/config";
 import type { MessageKey } from "@/i18n/messages/en";
@@ -292,6 +298,13 @@ export interface CallOptions {
    * normally. See {@link isForbiddenError}.
    */
   suppressForbiddenToast?: boolean;
+  /**
+   * When true, skip the global error toast for any failure of this request.
+   * For background polling that renders its own stale state — a toast per
+   * poll would bury the screen during an outage. Session expiry still
+   * redirects to the login page.
+   */
+  silent?: boolean;
 }
 
 /**
@@ -346,7 +359,7 @@ async function unwrap<T>(call: Promise<SdkResult<T>>, options?: CallOptions): Pr
     window.location.pathname !== "/login";
   if (isSessionExpiry) {
     window.location.assign(loginPath(window.location.pathname + window.location.search));
-  } else if (!(options?.suppressForbiddenToast && isForbiddenError(failure))) {
+  } else if (!options?.silent && !(options?.suppressForbiddenToast && isForbiddenError(failure))) {
     reportApiError(failure);
   }
   throw failure;
@@ -414,11 +427,14 @@ export type {
   AgentSkillContent,
   AgentSkillCreate,
   AgentSkillUpdate,
+  ApprovalBacklogEntry,
   ApprovalStatus,
   ApprovalUpdate,
   ApprovedCall,
   AvatarConfig,
   CertificateGrant,
+  FailedExecutionEntry,
+  FailedTaskEntry,
   GenerateWorkflowRequest,
   ImpersonationEventRead,
   KnowledgeBaseCreate,
@@ -426,6 +442,7 @@ export type {
   KnowledgePageContent,
   KnowledgePageSummary,
   KnowledgeSourceStatus,
+  LeadTimeBucket,
   LlmMode,
   LoginRequest,
   McpCommand,
@@ -441,6 +458,7 @@ export type {
   McpToolMockCreate,
   McpToolMockUpdate,
   McpTransport,
+  MetricsSummary,
   MockResponse,
   MockResponseKind,
   NotificationType,
@@ -475,6 +493,7 @@ export type {
   WorkflowTaskTemplateUpdate,
   WorkflowTaskUpdate,
   WorkflowUpdate,
+  WorkflowVolumeEntry,
 };
 
 /** A single server-side sort directive: order by `field`, descending when set. */
@@ -2155,6 +2174,86 @@ export async function listApprovals(query: ListQuery = {}): Promise<ApprovalDeta
   return unwrap(sdk.listApprovalsApiV1ApprovalsGet({ query: listQuery(query) })) as Promise<
     ApprovalDetail[]
   >;
+}
+
+/**
+ * Options shared by the operations-metrics reads below. They are polled by the
+ * dashboard, which shows its own stale state, so a failure never toasts.
+ */
+const METRICS_CALL: CallOptions = { silent: true };
+
+/** Fetch the tenant's single-value operations KPIs (`GET /metrics/summary`). */
+export async function getMetricsSummary(): Promise<MetricsSummary> {
+  return unwrap(sdk.workflowMetricsSummaryApiV1MetricsSummaryGet(), METRICS_CALL);
+}
+
+/**
+ * Fetch per-workflow run volume and average lead time, busiest first.
+ *
+ * @param since - ISO-8601 start of the window, applied to each run's start time.
+ * @param limit - Maximum number of workflows to return.
+ */
+export async function getWorkflowVolume(
+  since: string,
+  limit: number
+): Promise<WorkflowVolumeEntry[]> {
+  return unwrap(
+    sdk.workflowExecutionVolumeByWorkflowApiV1WorkflowExecutionsByWorkflowGet({
+      query: { since, limit },
+    }),
+    METRICS_CALL
+  );
+}
+
+/**
+ * Fetch the daily average lead time of runs finishing since `since`, one
+ * bucket per calendar day including empty ones.
+ *
+ * @param since - ISO-8601 start of the window, applied to each run's finish time.
+ */
+export async function getLeadTimeTrend(since: string): Promise<LeadTimeBucket[]> {
+  return unwrap(
+    sdk.workflowExecutionLeadTimeTrendApiV1WorkflowExecutionsLeadTimeTrendGet({
+      query: { since },
+    }),
+    METRICS_CALL
+  );
+}
+
+/**
+ * Fetch the runs with failed tasks since `since`, newest failure first.
+ * Admin-only on the backend; do not call it for other roles.
+ *
+ * @param since - ISO-8601 start of the window, applied to each task's failure time.
+ * @param limit - Maximum number of runs to return.
+ */
+export async function listFailedExecutions(
+  since: string,
+  limit: number
+): Promise<FailedExecutionEntry[]> {
+  return unwrap(
+    sdk.listFailedWorkflowExecutionsApiV1WorkflowExecutionsFailuresGet({
+      query: { since, limit },
+    }),
+    METRICS_CALL
+  );
+}
+
+/**
+ * Fetch the pending-approval backlog, longest single wait first.
+ *
+ * @param axis - Group by approval destination (`"approver"`) or by workflow.
+ * @param limit - Maximum number of groups to return.
+ */
+export async function getApprovalBacklog(
+  axis: "approver" | "workflow",
+  limit: number
+): Promise<ApprovalBacklogEntry[]> {
+  const call =
+    axis === "approver"
+      ? sdk.approvalBacklogByApproverApiV1ApprovalsByApproverGet
+      : sdk.approvalBacklogByWorkflowApiV1ApprovalsByWorkflowGet;
+  return unwrap(call({ query: { limit } }), METRICS_CALL);
 }
 
 /** Fetch a single approval request by ID. */

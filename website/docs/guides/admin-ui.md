@@ -20,6 +20,7 @@ The breadcrumb trail above every title mirrors that path — `Home › Workflows
 
 | Section | What it holds | Shown in the sidebar to |
 |---|---|---|
+| **Dashboard** | Live figures for runs, approvals and failures — see [Dashboard](./dashboard.md) | Admin, Developer, Requester, Approver |
 | **Tenants** | Tenant organizations | Super Admin |
 | **Users** | Accounts and their roles | Admin, Developer |
 | **User Groups** | Named bundles that grant roles to several accounts at once | Admin, Developer |

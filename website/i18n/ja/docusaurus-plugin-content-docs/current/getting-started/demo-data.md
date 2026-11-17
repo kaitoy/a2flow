@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # デモデータ
 
-バックエンドで `DEMO_DATA=true` を設定すると、承認つきで状態を変える 3 つの例 — 「EC2 インスタンスを起動する」例、「GKE の Pod を再起動する」例、「Azure Key Vault のシークレットをローテーションする」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、実際に生成するところからの手順が[ウォークスルー](./walkthrough.mdx)です。
+バックエンドで `DEMO_DATA=true` を設定すると、承認つきで状態を変える 3 つの例 — 「EC2 インスタンスを起動する」例、「GKE の Pod を再起動する」例、「Azure Key Vault のシークレットをローテーションする」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。実行する[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、実際に生成するところからの手順が[ウォークスルー](./walkthrough.mdx)です。そのほかに架空の実行履歴も登録されるので、[ダッシュボード](../guides/dashboard.md)には最初から数値が表示されます。
 
 ## 有効にする {#enabling-it}
 
@@ -48,6 +48,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 - **[シークレット](../guides/secrets.md) `demo-azure-credentials`** — Azure MCP Server がサインインに使う、Azure サービスプリンシパルのテナント ID・クライアント ID・クライアントシークレットです。
 - **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws___run_script`(どちらも起動成功を返す)、GKE MCP Server の `patch_k8s_resource`(ローリング再起動成功を返す)と `delete_k8s_resource`(Pod 削除成功を返す)、Azure MCP Server の `keyvault_secret_get`(Key Vault のシークレット一覧を返す)と `keyvault_secret_create`(新しいシークレットバージョンを返す)、および組み込みの `request_approval`(承認済みを返す)。下書きの実行の**実行**ダイアログで選ぶと、AWS や実際の GKE クラスタ、実際の Key Vault に触れることも管理職の承認を待つこともなく、3 つのワークフローのどれも最後まで動きます。
 - **[タグ](../guides/tags.md)** `AWS`・`GCP`・`Azure` — それぞれ[アクセス制御タグ](../guides/tags.md#access-control-tags)です。`Demo AWS Group`/`Demo GCP Group`/`Demo Azure Group` のメンバー(および管理者、上位管理者)以外には、そのプロバイダのタグが付いた上記のレコードは見えません。`EC2 Cost Estimator` と `AWS EC2 Pricing` ナレッジベースには `AWS`、`Kubernetes Manifest Toolkit` には `GCP`、`Secret Value Generator` には `Azure` が付いており、それぞれが補助するプロバイダのレコードと同じ扱いになります。`Approval Required` は 3 つのエージェントスキルすべてに付く普通のタグで、何も制限しません。
+- **実行履歴つきの[ワークフロー](../guides/workflows.md)** — 公開済みのワークフロー 4 件（`Provision Dev EC2 Instance`、`Launch GPU Training Instance`、`Restart Crashlooping GKE Pod`、`Rotate Database Password`）と、その約 90 日分の過去の実行・タスク・承認です。[ダッシュボード](../guides/dashboard.md)に表示する中身を用意するためのもので、表示専用です。タスクテンプレートがないので実行しても意味のある処理は行われず、これらの実行のチャットは空です。いくつかの実行は常に進行中でデモの承認者を待っているため、その承認者の **承認** にも依頼が並びます。履歴は起動のたびに現在時刻を終点として作り直されるので、ダッシュボードはいつ見ても最新に見えます。これらのワークフローで自分で開始した実行は消えずに残ります。
 - **デモユーザーとグループ:**
 
 | ユーザー | ロール | アクセス制御グループ | 役割 |

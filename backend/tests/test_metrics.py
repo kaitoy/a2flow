@@ -281,6 +281,43 @@ async def test_metrics_exposes_pending_approvals_and_active_runs(
     assert _samples(body, "a2flow_workflow_executions_active") == {_labels(): 1.0}
 
 
+async def test_metrics_summary_returns_the_same_kpis_as_json(
+    metrics_env: tuple[AsyncClient, AsyncEngine],
+) -> None:
+    """The dashboard's JSON face is validated from the Prometheus snapshot."""
+    client, eng = metrics_env
+    workflow_id = await _seed_workflow(eng, name="Onboarding")
+    execution_id = await _seed_execution(eng, workflow_id=workflow_id)
+    await _seed_approval(
+        eng,
+        execution_id=execution_id,
+        approver="alice",
+        created_at=datetime.now(UTC) - timedelta(hours=30),
+    )
+    await _seed_outbound_email(eng, status=OutboundEmailStatus.pending)
+
+    res = await client.get("/api/v1/metrics/summary", headers={"X-User-Id": "owner"})
+
+    data = assert_ok(res)
+    assert data["approvalsPending"] == 1
+    assert data["approvalsPendingOverThreshold"] == 1
+    assert data["approvalPendingAgeSecondsMax"] > 29 * 3600
+    assert data["approvalsDecidedToday"] == {
+        "approved": 0,
+        "rejected": 0,
+        "returned": 0,
+    }
+    assert data["executionsActive"] == 1
+    assert data["executionsStartedRecently"] == {"Onboarding": 1}
+    assert data["emailQueueDepth"]["pending"] == 1
+
+    # The threshold is the same query parameter the Prometheus route takes.
+    res = await client.get(
+        "/api/v1/metrics/summary?thresholdHours=48", headers={"X-User-Id": "owner"}
+    )
+    assert assert_ok(res)["approvalsPendingOverThreshold"] == 0
+
+
 async def test_metrics_exposes_the_outgoing_email_backlog(
     metrics_env: tuple[AsyncClient, AsyncEngine],
 ) -> None:

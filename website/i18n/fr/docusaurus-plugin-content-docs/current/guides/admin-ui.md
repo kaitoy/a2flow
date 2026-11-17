@@ -20,6 +20,7 @@ Le fil d'Ariane au-dessus de chaque titre reflète ce parcours, par exemple `Acc
 
 | Section | Contenu | Affichée dans la barre latérale pour |
 |---|---|---|
+| **Tableau de bord** | Les chiffres en direct des exécutions, des approbations et des échecs : voir [Tableau de bord](./dashboard.md) | Administrateur, Développeur, Demandeur, Approbateur |
 | **Tenants** | Les organisations de tenants | Super administrateur |
 | **Utilisateurs** | Les comptes et leurs rôles | Administrateur, Développeur |
 | **Groupes d'utilisateurs** | Des ensembles nommés qui accordent des rôles à plusieurs comptes à la fois | Administrateur, Développeur |

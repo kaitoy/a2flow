@@ -7,6 +7,8 @@ sidebar_position: 6
 
 Workflow operations data — approval backlog, run volume, failures, and lead time — is exposed for third-party dashboards in two shapes, both scoped to the caller's tenant and, apart from the failure list noted below, both available to any authenticated user.
 
+To watch these figures without setting anything up, open the built-in [Dashboard](../guides/dashboard.md). This page is for charting them in a monitoring tool of your own.
+
 Runs an [access-control tag](../guides/tags.md#access-control-tags) hides from the caller are left out of every view below, exactly as they are absent from the run list itself, so a metric never names a run its reader could not open.
 
 Runs started from a still-`draft` workflow (a `developer`/`super_admin` [pre-publish test run](../guides/workflows.md#running-a-workflow)) are recorded with `isDraft: true` and **excluded from every metric below** — both the Prometheus KPIs and the aggregate sub-resources, including the approval-backlog views — so throwaway test data never skews the numbers. The flag is fixed when the run starts; publishing the workflow afterwards does not reclassify runs that already happened.
@@ -43,6 +45,8 @@ Notification email:
 | `a2flow_email_queue_oldest_pending_age_seconds` | How long the longest-waiting undelivered email has waited — rises when the relay is unreachable |
 
 `?thresholdHours=` overrides the stalled-approval cutoff. `TIMEZONE` (an IANA name, default `UTC`; see [Server settings](./configuration.md#server-settings)) decides where "today" starts; an unrecognized name falls back to UTC rather than failing startup.
+
+`GET /api/v1/metrics/summary` returns the same KPIs as JSON, in the usual `{meta, data, error}` envelope, for a client that would rather not parse the exposition text. It takes the same `?thresholdHours=`, and its mappings are keyed exactly as the matching labels above.
 
 The endpoint is protected by the ordinary session cookie, so a scrape config has to carry one. `GET` is a safe method, so no CSRF token is needed:
 
