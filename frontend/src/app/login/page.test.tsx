@@ -157,6 +157,22 @@ describe("LoginPage", () => {
     );
   });
 
+  it.each([
+    [true, true],
+    [false, false],
+  ])("links to the sign-up page only when offered (signup=%s)", async (signup, shown) => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/auth/login-options", () =>
+        envelope({ tenantName: null, sso: false, signup })
+      )
+    );
+    render(<LoginPage />);
+    await screen.findByTestId("login-username");
+    const link = screen.queryByTestId("login-signup");
+    if (shown) expect(link).toHaveAttribute("href", "/signup");
+    else expect(link).not.toBeInTheDocument();
+  });
+
   describe("single sign-on", () => {
     const originalLocation = window.location;
     afterEach(() => {

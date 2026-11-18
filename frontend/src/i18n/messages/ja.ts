@@ -713,6 +713,10 @@ export const ja = {
   "errors.SKILL_CLONE_FAILED": "スキルのリポジトリをクローンできませんでした。",
   "errors.SKILL_NOT_READY": "スキルに公開済みのリビジョンがまだありません。",
   "errors.SUMMARIZATION_FAILED": "要約を生成できませんでした。",
+  "errors.INVALID_SIGNUP_LINK":
+    "このサインアップのリンクは無効か、期限が切れています。もう一度サインアップしてください。",
+  "errors.TOO_MANY_SIGNUP_REQUESTS":
+    "このアドレスには確認メールを送ったばかりです。1 分ほど待ってからやり直してください。",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "ログインの失敗が多すぎます。しばらく待ってから、もう一度お試しください。",
   "errors.UNAUTHENTICATED": "ユーザー名またはパスワードが正しくありません。",
@@ -789,6 +793,7 @@ export const ja = {
   "llm.modeSystemDefaultHint": "このテナントは、システム設定で指定した LLM を使います。",
   "llm.modeSuperAdminHint": "このテナントの LLM は、上位管理者が下で設定します。",
   "llm.modeTenantAdminHint": "このテナントの LLM は、テナントの管理者が管理者設定で設定します。",
+  "login.createAccount": "アカウントを作成",
   "login.eGAcmeCorp": "例: acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "プラットフォーム管理者としてログインする場合は空欄にしてください。",
@@ -895,6 +900,28 @@ export const ja = {
   "signedOut.message": "A2Flow からログアウトしました。",
   "signedOut.signInAgain": "もう一度ログイン",
   "signedOut.title": "ログアウトしました",
+  "signup.backToSignIn": "ログインに戻る",
+  "signup.checkEmailMessage":
+    "{email} にリンクを送りました。24 時間以内に開いて、サインアップを完了してください。",
+  "signup.checkEmailTitle": "メールを確認してください",
+  "signup.completeSignup": "サインアップを完了",
+  "signup.completingSignup": "完了処理中…",
+  "signup.linkIncomplete":
+    "このリンクは不完全です。メールのリンクをもう一度開くか、サインアップをやり直してください。",
+  "signup.signUpAgain": "サインアップをやり直す",
+  "signup.verifyMessage": "下のボタンを押すと、テナントを作成し、その管理者としてログインします。",
+  "signup.verifyTitle": "サインアップを完了する",
+  "signup.continue": "続ける",
+  "signup.createAccount": "アカウントを作成",
+  "signup.creatingAccount": "作成中…",
+  "signup.doneMessage":
+    "テナントを作成し、あなたをその管理者にしました。次回からはこのテナントとユーザー名でログインしてください。",
+  "signup.doneTitle": "A2Flow へようこそ",
+  "signup.haveAccount": "アカウントをお持ちの方はログイン",
+  "signup.passwordHint": "12〜72 文字。",
+  "signup.tenantAddress": "テナントのアドレス",
+  "signup.title": "A2Flow のアカウントを作成",
+  "signup.usernameHint": "3〜64 文字の英数字、ドット、ハイフン、アンダースコア。",
   "status.allowed": "許可",
   "status.api_error": "API エラー",
   "status.approved": "承認済み",

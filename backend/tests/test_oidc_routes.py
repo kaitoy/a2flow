@@ -362,9 +362,9 @@ async def test_start_from_a_subdomain_refuses_a_name_that_is_not_a_host_label(
 @pytest.mark.parametrize(
     ("host", "expected"),
     [
-        ("acme.test", {"tenantName": "acme", "sso": True}),
-        ("nope.test", {"tenantName": "nope", "sso": False}),
-        ("test", {"tenantName": None, "sso": False}),
+        ("acme.test", {"tenantName": "acme", "sso": True, "signup": False}),
+        ("nope.test", {"tenantName": "nope", "sso": False, "signup": False}),
+        ("test", {"tenantName": None, "sso": False, "signup": False}),
     ],
 )
 async def test_login_options_follow_the_host(

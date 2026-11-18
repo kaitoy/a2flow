@@ -73,6 +73,8 @@ import type {
   SessionFileRead as SessionFileModel,
   SessionFileOrigin,
   Session as SessionModel,
+  SignupRequest,
+  SignupResponse,
   SkillSyncStatus,
   SmtpSecurity,
   SystemSettingsRead as SystemSettingsModel,
@@ -471,6 +473,7 @@ export type {
   SecretType,
   SecretUpdate,
   SessionFileOrigin,
+  SignupRequest,
   SkillSyncStatus,
   SmtpSecurity,
   SystemSettingsUpdate,
@@ -586,13 +589,39 @@ export async function login(
 
 /**
  * Ask which tenant the login page at `hostname` signs in to, and whether that
- * tenant goes straight to its identity provider. Off a tenant subdomain the
- * answer is `{ tenantName: null, sso: false }`.
+ * tenant goes straight to its identity provider, and whether to offer the
+ * sign-up page (`signup`, only off a tenant subdomain). Off a tenant subdomain
+ * `tenantName` is `null` and `sso` is `false`.
  */
 export async function getLoginOptions(hostname: string): Promise<LoginOptions> {
   return unwrap(
     sdk.loginOptionsApiV1AuthLoginOptionsGet({ query: { host: hostname } })
   ) as Promise<LoginOptions>;
+}
+
+/** What a successful sign-up returns: the new admin, and their tenant. */
+export type SignupResult = Omit<SignupResponse, "user"> & { user: User };
+
+/**
+ * Submit the sign-up form. Nothing is created yet: the backend mails a
+ * confirmation link to `body.email`, whose page calls {@link completeSignup}.
+ * Refused (403) unless the deployment offers sign-up, which
+ * {@link getLoginOptions} reports, and (429) when a link just went to the
+ * same address.
+ */
+export async function signup(body: SignupRequest): Promise<void> {
+  await unwrap(sdk.signupApiV1AuthSignupPost({ body }));
+}
+
+/**
+ * Finish a sign-up with the token from its confirmation link: the backend
+ * creates the tenant with the visitor as its admin and, like {@link login},
+ * sets the session and CSRF cookies.
+ */
+export async function completeSignup(token: string): Promise<SignupResult> {
+  return unwrap(
+    sdk.completeSignupApiV1AuthSignupCompletePost({ body: { token } })
+  ) as Promise<SignupResult>;
 }
 
 /** Revoke the current session and clear the auth cookies. */

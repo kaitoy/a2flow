@@ -37,6 +37,7 @@ from services.oidc_login import OidcLoginService
 from services.outbound_email import OutboundEmailService
 from services.secret import SecretService
 from services.session_file import SessionFileService, SessionFileStore
+from services.signup import SignupService
 from services.system_settings import SystemSettingsService
 from services.tag import TagService
 from services.tenant import TenantService
@@ -90,6 +91,7 @@ from .repository import (
 )
 from .singletons import (
     AgentRegistryDep,
+    EmailSenderDep,
     OidcClientDep,
     SecretCipherDep,
     SessionServiceDep,
@@ -274,6 +276,19 @@ def get_system_settings_service(
 SystemSettingsServiceDep = Annotated[
     SystemSettingsService, Depends(get_system_settings_service)
 ]
+
+
+def get_signup_service(
+    db: DBSessionDep,
+    auth: AuthServiceDep,
+    system_settings: SystemSettingsServiceDep,
+    sender: EmailSenderDep,
+) -> SignupService:
+    """Create a SignupService writing through the request's database session."""
+    return SignupService(db, auth, system_settings, sender)
+
+
+SignupServiceDep = Annotated[SignupService, Depends(get_signup_service)]
 
 
 def get_notification_dispatcher(

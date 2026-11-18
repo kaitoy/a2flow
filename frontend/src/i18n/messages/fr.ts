@@ -735,6 +735,10 @@ export const fr = {
   "errors.SKILL_CLONE_FAILED": "Impossible de cloner le dépôt de la compétence.",
   "errors.SKILL_NOT_READY": "La compétence n'a pas encore de révision publiée.",
   "errors.SUMMARIZATION_FAILED": "Impossible de générer le résumé.",
+  "errors.INVALID_SIGNUP_LINK":
+    "Ce lien d'inscription est invalide ou a expiré. Inscrivez-vous à nouveau.",
+  "errors.TOO_MANY_SIGNUP_REQUESTS":
+    "Un e-mail de confirmation vient d'être envoyé à cette adresse. Patientez une minute et réessayez.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "Trop de tentatives de connexion échouées. Patientez un moment, puis réessayez.",
   "errors.UNAUTHENTICATED": "Nom d'utilisateur ou mot de passe incorrect.",
@@ -816,6 +820,7 @@ export const fr = {
   "llm.modeSuperAdminHint": "Un super administrateur configure le LLM de ce tenant, ci-dessous.",
   "llm.modeTenantAdminHint":
     "Les administrateurs de ce tenant configurent son LLM dans Paramètres administrateur.",
+  "login.createAccount": "Créer un compte",
   "login.eGAcmeCorp": "p. ex. acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "Laissez vide si vous vous connectez en tant qu'administrateur de la plateforme.",
@@ -924,6 +929,29 @@ export const fr = {
   "signedOut.message": "Vous vous êtes déconnecté d'A2Flow.",
   "signedOut.signInAgain": "Se reconnecter",
   "signedOut.title": "Vous êtes déconnecté",
+  "signup.backToSignIn": "Retour à la connexion",
+  "signup.checkEmailMessage":
+    "Nous avons envoyé un lien à {email}. Ouvrez-le dans les 24 heures pour terminer votre inscription.",
+  "signup.checkEmailTitle": "Consultez vos e-mails",
+  "signup.completeSignup": "Terminer l'inscription",
+  "signup.completingSignup": "Finalisation de l'inscription…",
+  "signup.linkIncomplete":
+    "Ce lien est incomplet. Rouvrez le lien de votre e-mail ou inscrivez-vous à nouveau.",
+  "signup.signUpAgain": "S'inscrire à nouveau",
+  "signup.verifyMessage":
+    "Choisissez le bouton ci-dessous pour créer votre tenant et vous connecter en tant qu'administrateur.",
+  "signup.verifyTitle": "Terminer l'inscription",
+  "signup.continue": "Continuer",
+  "signup.createAccount": "Créer le compte",
+  "signup.creatingAccount": "Création du compte…",
+  "signup.doneMessage":
+    "Votre tenant est prêt et vous en êtes l'administrateur. La prochaine fois, connectez-vous avec ce tenant et ce nom d'utilisateur.",
+  "signup.doneTitle": "Bienvenue dans A2Flow",
+  "signup.haveAccount": "Vous avez déjà un compte ? Se connecter",
+  "signup.passwordHint": "De 12 à 72 caractères.",
+  "signup.tenantAddress": "Adresse du tenant",
+  "signup.title": "Créer votre compte A2Flow",
+  "signup.usernameHint": "De 3 à 64 lettres, chiffres, points, tirets ou traits de soulignement.",
   "status.allowed": "autorisé",
   "status.api_error": "erreur d'API",
   "status.approved": "approuvé",

@@ -57,6 +57,16 @@ El **usuario del sistema** oculto es el propietario de los registros de arranque
 
 Si alguna no está definida (o está vacía), se genera una contraseña aleatoria y se registra **una sola vez**, con nivel `WARNING`, al crear ese usuario; no se puede recuperar una vez que esa línea del registro haya pasado. Para cualquier uso que vaya más allá de las pruebas locales, define ambas explícitamente antes del primer arranque, o copia las contraseñas generadas de los registros de arranque de inmediato y cámbialas después. Los nombres de usuario son fijos: `root` y `admin`.
 
+## Registro {#sign-up}
+
+| Variable | Valor predeterminado | Qué hace |
+|---|---|---|
+| `SIGNUP_ENABLED` | `false` | Permite que los visitantes creen su propio tenant desde la pantalla de inicio de sesión y se conviertan en su Administrador; consulta [Registrarse](../getting-started/sign-up.md). El enlace solo aparece en la dirección principal, no en la dirección propia de un tenant |
+
+El registro envía a cada visitante un enlace de confirmación, así que también necesita `APP_BASE_URL` (el enlace se construye a partir de ella) y el envío de correo activado con **Enviar notificaciones por correo electrónico** en [Configuración del sistema](../guides/system-settings.md) o con las variables de [correo de notificaciones](#notification-email). Hasta que las tres cosas estén listas, la pantalla de inicio de sesión no ofrece el registro.
+
+Así, cualquiera que llegue al despliegue y reciba correo puede crear tenants. Una dirección recibe como máximo un correo de confirmación por minuto, lo que impide usar el formulario para inundar el buzón de otra persona, pero no hay ningún otro límite, así que actívalo solo donde eso sea aceptable.
+
 ## Duración de la sesión {#session-lifetime}
 
 | Variable | Valor predeterminado | Qué hace |

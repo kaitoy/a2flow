@@ -95,6 +95,43 @@ class TooManyLoginAttemptsError(HttpMappedError):
         self.retry_after_seconds = retry_after_seconds
 
 
+class TooManySignupRequestsError(HttpMappedError):
+    """Raised when a sign-up confirmation was mailed to the same address too recently.
+
+    Mapped to HTTP 429 with the ``TOO_MANY_SIGNUP_REQUESTS`` error code. Raised
+    by ``SignupService.request`` so the unauthenticated sign-up form cannot be
+    used to flood someone else's inbox.
+    """
+
+    code = "TOO_MANY_SIGNUP_REQUESTS"
+    http_status = 429
+
+    def __init__(self) -> None:
+        """Initialize the error with its fixed message."""
+        super().__init__(
+            "A confirmation email was just sent to this address. "
+            "Wait a minute and try again."
+        )
+
+
+class InvalidSignupLinkError(HttpMappedError):
+    """Raised when a sign-up confirmation link is unknown, already used, or expired.
+
+    Mapped to HTTP 422 with the ``INVALID_SIGNUP_LINK`` error code. The three
+    cases share one message: none of them can be completed, and the remedy --
+    signing up again -- is the same.
+    """
+
+    code = "INVALID_SIGNUP_LINK"
+    http_status = 422
+
+    def __init__(self) -> None:
+        """Initialize the error with its fixed message."""
+        super().__init__(
+            "This sign-up link is invalid or has expired. Please sign up again."
+        )
+
+
 class ForbiddenError(HttpMappedError):
     """Raised when an authenticated user is not allowed to perform an action.
 

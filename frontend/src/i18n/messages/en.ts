@@ -713,6 +713,10 @@ export const en = {
   "errors.SKILL_CLONE_FAILED": "The skill repository could not be cloned.",
   "errors.SKILL_NOT_READY": "The skill has no published revision yet.",
   "errors.SUMMARIZATION_FAILED": "The summary could not be generated.",
+  "errors.INVALID_SIGNUP_LINK":
+    "This sign-up link is invalid or has expired. Please sign up again.",
+  "errors.TOO_MANY_SIGNUP_REQUESTS":
+    "A confirmation email was just sent to this address. Wait a minute and try again.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS": "Too many failed sign-in attempts. Wait a while and try again.",
   "errors.UNAUTHENTICATED": "Invalid username or password.",
   "errors.VALIDATION_ERROR": "The request is not valid. Check what you entered.",
@@ -788,6 +792,7 @@ export const en = {
   "llm.modeSystemDefaultHint": "This tenant uses the LLM set in System Settings.",
   "llm.modeSuperAdminHint": "A Super Admin sets this tenant's LLM, below.",
   "llm.modeTenantAdminHint": "This tenant's Admins set its LLM in Admin Settings.",
+  "login.createAccount": "Create an account",
   "login.eGAcmeCorp": "e.g. acme-corp",
   "login.leaveBlankIfYouSignInAs": "Leave blank if you sign in as a platform administrator.",
   "login.redirectingToSso": "Redirecting to your organization's sign-in…",
@@ -893,6 +898,29 @@ export const en = {
   "signedOut.message": "You have signed out of A2Flow.",
   "signedOut.signInAgain": "Sign in again",
   "signedOut.title": "You have signed out",
+  "signup.backToSignIn": "Back to sign in",
+  "signup.checkEmailMessage":
+    "We sent a link to {email}. Open it within 24 hours to finish signing up.",
+  "signup.checkEmailTitle": "Check your email",
+  "signup.completeSignup": "Complete sign-up",
+  "signup.completingSignup": "Completing sign-up…",
+  "signup.linkIncomplete":
+    "This link is incomplete. Open the link in your email again, or sign up again.",
+  "signup.signUpAgain": "Sign up again",
+  "signup.verifyMessage":
+    "Choose the button below to create your tenant and sign in as its administrator.",
+  "signup.verifyTitle": "Finish signing up",
+  "signup.continue": "Continue",
+  "signup.createAccount": "Create account",
+  "signup.creatingAccount": "Creating account…",
+  "signup.doneMessage":
+    "Your tenant is ready, and you are its administrator. Next time, sign in with this tenant and username.",
+  "signup.doneTitle": "Welcome to A2Flow",
+  "signup.haveAccount": "Already have an account? Sign in",
+  "signup.passwordHint": "12 to 72 characters.",
+  "signup.tenantAddress": "Tenant address",
+  "signup.title": "Create your A2Flow account",
+  "signup.usernameHint": "3 to 64 letters, digits, dots, hyphens, or underscores.",
   "status.allowed": "allowed",
   "status.api_error": "api error",
   "status.approved": "approved",

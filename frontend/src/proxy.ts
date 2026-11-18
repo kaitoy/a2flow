@@ -61,9 +61,10 @@ function redirectTo(request: NextRequest, target: string): NextResponse {
 /**
  * Proxies `/api/*` and `/openapi.json` to the backend, and redirects
  * unauthenticated visitors to `/login` -- asking it to return to the page they
- * asked for -- and authenticated visitors away from `/login` for every other
- * path. `/signed-out`, where signing out
- * lands, is open to both.
+ * asked for -- and authenticated visitors away from `/login` and `/signup`
+ * (which are open only without a session) for every other path.
+ * `/signed-out`, where signing out lands, and `/signup/verify`, where a
+ * sign-up confirmation link lands in whatever browser opens it, are open to both.
  *
  * @param request - The incoming request.
  * @returns A rewrite or redirect response, or `NextResponse.next()` to continue.
@@ -77,12 +78,12 @@ export function proxy(request: NextRequest): NextResponse {
     );
   }
 
-  if (pathname === "/signed-out") {
+  if (pathname === "/signed-out" || pathname === "/signup/verify") {
     return NextResponse.next();
   }
 
   const hasSession = request.cookies.has(SESSION_COOKIE_NAME);
-  const isLogin = pathname === "/login";
+  const isLogin = pathname === "/login" || pathname === "/signup";
 
   if (!hasSession && !isLogin) {
     return redirectTo(request, loginPath(pathname + request.nextUrl.search));

@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/llm-configuration',
         'getting-started/demo-data',
         'getting-started/walkthrough',
+        'getting-started/sign-up',
       ],
     },
     {

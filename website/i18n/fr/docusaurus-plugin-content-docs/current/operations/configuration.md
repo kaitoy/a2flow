@@ -57,6 +57,16 @@ L'**utilisateur système** caché est propriétaire des enregistrements d'amorç
 
 Si l'une de ces variables n'est pas définie (ou est vide), un mot de passe aléatoire est généré à la place et consigné **une seule fois**, au niveau `WARNING`, à la création de l'utilisateur. Il ne peut plus être récupéré une fois cette ligne de journal disparue. Au-delà d'un simple essai en local, définissez explicitement les deux avant le premier démarrage, ou relevez aussitôt les mots de passe générés dans les journaux de démarrage et modifiez-les ensuite. Les noms d'utilisateur sont fixés à `root` et `admin`.
 
+## Inscription {#sign-up}
+
+| Variable | Valeur par défaut | Rôle |
+|---|---|---|
+| `SIGNUP_ENABLED` | `false` | Permet aux visiteurs de créer leur propre tenant depuis l'écran de connexion et d'en devenir l'Administrateur : voir [S'inscrire](../getting-started/sign-up.md). Le lien n'apparaît qu'à l'adresse principale, pas à l'adresse propre d'un tenant |
+
+L'inscription envoie à chaque visiteur un lien de confirmation : il faut donc aussi `APP_BASE_URL` (le lien est construit à partir de cette adresse) et l'envoi d'e-mails activé avec **Envoyer les notifications par e-mail** dans les [Paramètres système](../guides/system-settings.md) ou avec les variables d'[e-mail de notification](#notification-email). Tant que ces trois conditions ne sont pas réunies, l'écran de connexion ne propose pas l'inscription.
+
+Toute personne qui atteint le déploiement et reçoit des e-mails peut alors créer des tenants. Une adresse reçoit au plus un e-mail de confirmation par minute, ce qui empêche d'utiliser le formulaire pour inonder la boîte de quelqu'un d'autre, mais il n'y a aucune autre limite : ne l'activez que là où c'est acceptable.
+
 ## Durée de vie des sessions {#session-lifetime}
 
 | Variable | Valeur par défaut | Rôle |

@@ -14,7 +14,7 @@ export interface AuthCardProps {
 
 /**
  * Full-page card with the logo and a heading, used by the screens a visitor
- * sees without a session: the sign-in page and the signed-out page.
+ * sees without a session: the sign-in, sign-up, and signed-out pages.
  */
 export function AuthCard({ title, onSubmit, children }: AuthCardProps) {
   const className = "glass-panel flex w-full max-w-sm flex-col gap-5 rounded-2xl p-8";
@@ -22,7 +22,7 @@ export function AuthCard({ title, onSubmit, children }: AuthCardProps) {
     <>
       <div className="flex flex-col items-center gap-3">
         <Logo className="size-12" />
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-on-surface">
+        <h1 className="text-center font-display text-2xl font-semibold tracking-tight text-on-surface">
           {title}
         </h1>
       </div>

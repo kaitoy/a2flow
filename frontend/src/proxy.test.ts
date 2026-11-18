@@ -66,8 +66,25 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBe("http://localhost:3000/");
   });
 
-  it.each([false, true])("lets /signed-out through with session=%s", (withSession) => {
-    const request = new NextRequest("http://localhost:3000/signed-out");
+  it("lets an unauthenticated visitor open /signup", () => {
+    const res = proxy(new NextRequest("http://localhost:3000/signup"));
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("redirects authenticated visitors away from /signup to the welcome page", () => {
+    const request = new NextRequest("http://localhost:3000/signup");
+    request.cookies.set("a2flow_session", "abc");
+    const res = proxy(request);
+    expect(res.headers.get("location")).toBe("http://localhost:3000/");
+  });
+
+  it.each([
+    ["/signed-out", false],
+    ["/signed-out", true],
+    ["/signup/verify", false],
+    ["/signup/verify", true],
+  ])("lets %s through with session=%s", (path, withSession) => {
+    const request = new NextRequest(`http://localhost:3000${path}`);
     if (withSession) request.cookies.set("a2flow_session", "abc");
     const res = proxy(request);
     expect(res.headers.get("location")).toBeNull();

@@ -301,6 +301,11 @@ class Settings(BaseSettings):
         session_cookie_secure: Whether auth/CSRF cookies carry the ``Secure``
             attribute. Left unset, it follows ``app_base_url``'s scheme: on
             for ``https``, off otherwise (including when that is unset).
+        signup_enabled: Whether a visitor may create their own tenant on the
+            sign-up page, becoming its ``admin`` once they confirm the link
+            mailed to them. Off by default: the endpoint is unauthenticated,
+            so a deployment opts in. Takes effect only with ``app_base_url``
+            set and email delivery configured (``services/signup.py``).
         session_idle_timeout_seconds: Sliding idle timeout, in seconds, for a
             login session.
         timezone: IANA name of the deployment's local timezone: where a
@@ -445,6 +450,7 @@ class Settings(BaseSettings):
 
     session_cookie_secure: bool = False
     session_idle_timeout_seconds: int = _DEFAULT_IDLE_TIMEOUT_SECONDS
+    signup_enabled: bool = False
 
     timezone: str = _DEFAULT_TIMEZONE
 

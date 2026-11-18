@@ -734,6 +734,10 @@ export const es = {
   "errors.SKILL_CLONE_FAILED": "No se pudo clonar el repositorio de la skill.",
   "errors.SKILL_NOT_READY": "La skill aún no tiene una revisión publicada.",
   "errors.SUMMARIZATION_FAILED": "No se pudo generar el resumen.",
+  "errors.INVALID_SIGNUP_LINK":
+    "Este enlace de registro no es válido o ha caducado. Vuelve a registrarte.",
+  "errors.TOO_MANY_SIGNUP_REQUESTS":
+    "Se acaba de enviar un correo de confirmación a esta dirección. Espera un minuto e inténtalo de nuevo.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "Demasiados intentos de inicio de sesión fallidos. Espera un momento e inténtalo de nuevo.",
   "errors.UNAUTHENTICATED": "El nombre de usuario o la contraseña no son válidos.",
@@ -816,6 +820,7 @@ export const es = {
   "llm.modeSuperAdminHint": "Un superadministrador configura el LLM de este tenant, más abajo.",
   "llm.modeTenantAdminHint":
     "Los administradores de este tenant configuran su LLM en Configuración de administrador.",
+  "login.createAccount": "Crear una cuenta",
   "login.eGAcmeCorp": "p. ej., acme-corp",
   "login.leaveBlankIfYouSignInAs":
     "Déjalo en blanco si inicias sesión como administrador de la plataforma.",
@@ -924,6 +929,29 @@ export const es = {
   "signedOut.message": "Has cerrado sesión en A2Flow.",
   "signedOut.signInAgain": "Volver a iniciar sesión",
   "signedOut.title": "Has cerrado sesión",
+  "signup.backToSignIn": "Volver a iniciar sesión",
+  "signup.checkEmailMessage":
+    "Hemos enviado un enlace a {email}. Ábrelo en las próximas 24 horas para terminar el registro.",
+  "signup.checkEmailTitle": "Revisa tu correo",
+  "signup.completeSignup": "Completar el registro",
+  "signup.completingSignup": "Completando el registro…",
+  "signup.linkIncomplete":
+    "Este enlace está incompleto. Vuelve a abrir el enlace de tu correo o regístrate de nuevo.",
+  "signup.signUpAgain": "Registrarse de nuevo",
+  "signup.verifyMessage":
+    "Elige el botón de abajo para crear tu tenant e iniciar sesión como su administrador.",
+  "signup.verifyTitle": "Termina el registro",
+  "signup.continue": "Continuar",
+  "signup.createAccount": "Crear cuenta",
+  "signup.creatingAccount": "Creando cuenta…",
+  "signup.doneMessage":
+    "Tu tenant está listo y eres su administrador. La próxima vez, inicia sesión con este tenant y este nombre de usuario.",
+  "signup.doneTitle": "Te damos la bienvenida a A2Flow",
+  "signup.haveAccount": "¿Ya tienes una cuenta? Inicia sesión",
+  "signup.passwordHint": "Entre 12 y 72 caracteres.",
+  "signup.tenantAddress": "Dirección del tenant",
+  "signup.title": "Crea tu cuenta de A2Flow",
+  "signup.usernameHint": "Entre 3 y 64 letras, dígitos, puntos, guiones o guiones bajos.",
   "status.allowed": "permitido",
   "status.api_error": "error de API",
   "status.approved": "aprobado",

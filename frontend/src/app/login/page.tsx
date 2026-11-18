@@ -26,6 +26,8 @@ interface HostOptions {
   tenantName: string | null;
   /** Whether that tenant signs in through its identity provider. */
   sso: boolean;
+  /** Whether to link to the sign-up page (main host, sign-up enabled). */
+  signup: boolean;
   /** Set while the browser is on its way to the identity provider. */
   redirecting: boolean;
 }
@@ -55,7 +57,8 @@ function startSso(tenant: string, onSubdomain: boolean, next: string) {
  * (`?sso_error`): then the page offers the SSO button, with the password fields
  * behind a link. `?local` stays too, with the password fields already open,
  * for an account that has only a password. A tenant without SSO shows only the
- * password fields. Signing out lands on `/signed-out`, not here, so it never
+ * password fields. On the main host of a deployment that enables sign-up, a
+ * link leads to `/signup`. Signing out lands on `/signed-out`, not here, so it never
  * bounces off the identity provider's own session straight back in.
  */
 export default function LoginPage() {
@@ -83,11 +86,11 @@ export default function LoginPage() {
     setNextPath(next);
     let cancelled = false;
     getLoginOptions(window.location.hostname)
-      .catch(() => ({ tenantName: null, sso: false }))
-      .then(({ tenantName = null, sso = false }) => {
+      .catch(() => ({ tenantName: null, sso: false, signup: false }))
+      .then(({ tenantName = null, sso = false, signup = false }) => {
         if (cancelled) return;
         const redirecting = tenantName !== null && sso && !stay;
-        setOptions({ tenantName, sso, redirecting });
+        setOptions({ tenantName, sso, signup, redirecting });
         if (redirecting) startSso(tenantName, true, next);
       });
     return () => {
@@ -218,6 +221,12 @@ export default function LoginPage() {
               onClick={() => setShowPassword(true)}
             >
               {t("login.signInWithPassword")}
+            </Button>
+          )}
+
+          {options.signup && (
+            <Button href="/signup" variant="ghost" className="w-full" data-testid="login-signup">
+              {t("login.createAccount")}
             </Button>
           )}
         </>

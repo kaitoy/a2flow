@@ -14,7 +14,7 @@ sidebar_position: 2
 | **租户级** | 代理技能、工作流及其设计会话、任务模板、工作流执行及其工作流会话、审批、密钥、MCP 服务器、工具模拟、标签、用户组，以及大多数用户 |
 | **平台级** | 租户记录本身、[系统设置](../guides/system-settings.md)、超级管理员账户，以及预置的系统用户 |
 
-一位[用户](../guides/users-and-groups.md#users)**最多**属于一个租户。一个[用户组](../guides/users-and-groups.md#user-groups)**恰好**属于一个租户，这正是用户组永远无法授予超级管理员角色的原因：该角色按定义就是平台级的（请参阅[有效角色](./authorization.md#effective-roles)）。首次启动时会创建 **Default** 租户，初始的 `admin` 用户就在其中；初始的 `root` 用户属于平台级，完全没有租户。
+一位[用户](../guides/users-and-groups.md#users)**最多**属于一个租户。一个[用户组](../guides/users-and-groups.md#user-groups)**恰好**属于一个租户，这正是用户组永远无法授予超级管理员角色的原因：该角色按定义就是平台级的（请参阅[有效角色](./authorization.md#effective-roles)）。首次启动时会创建 **Default** 租户，初始的 `admin` 用户就在其中；初始的 `root` 用户属于平台级，完全没有租户。如果部署允许，访问者也可以创建自己的租户并成为其管理员，请参阅[注册](../getting-started/sign-up.md)。
 
 每个租户还可以接入自己的身份提供商，让员工用公司账号而不是密码登录。这一连接属于该租户：其他租户的身份提供商永远无法让人登录到本租户。请参阅[单点登录](../guides/single-sign-on.md)。
 

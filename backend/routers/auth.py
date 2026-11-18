@@ -1,4 +1,4 @@
-"""Authentication endpoints: login, logout, current-user lookup, and OIDC sign-in.
+"""Authentication endpoints: login, sign-up, logout, current-user lookup, and OIDC sign-in.
 
 Login establishes a server-side session and sets two cookies: an HttpOnly
 ``a2flow_session`` cookie carrying the opaque session token, and a readable
@@ -33,7 +33,7 @@ from dependencies.auth import (
 from dependencies.authz import require_actor_roles
 from dependencies.context import ApiMetaDep
 from dependencies.repository import EffectiveRoleRepositoryDep
-from dependencies.service import OidcLoginServiceDep
+from dependencies.service import OidcLoginServiceDep, SignupServiceDep
 from models.constraints import TenantSlug
 from models.response import ApiResponse
 from models.user import Role, User, UserRead
@@ -45,6 +45,7 @@ from services.oidc_login import (
     SsoLoginError,
     safe_next_path,
 )
+from services.signup import SignupCompletion, SignupRequest
 
 logger = logging.getLogger(__name__)
 
@@ -92,11 +93,28 @@ class LoginOptions(BaseModel):
     ``tenant_name`` is set on a tenant's own subdomain of ``APP_BASE_URL``,
     whether or not that tenant exists, so the page drops its tenant field.
     ``sso`` says the page should go straight to the tenant's identity provider.
+    ``signup`` says the page may offer the sign-up page: only on the main host,
+    and only while sign-up is available (``SIGNUP_ENABLED`` and ``APP_BASE_URL``
+    set, email delivery configured).
     """
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     tenant_name: str | None = None
     sso: bool = False
+    signup: bool = False
+
+
+class SignupResponse(BaseModel):
+    """The new admin, and where they sign in from now on.
+
+    ``tenant_url`` is the tenant's own subdomain address, or ``None`` when
+    ``APP_BASE_URL`` gives it none.
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    user: UserRead
+    tenant_name: str
+    tenant_url: str | None = None
 
 
 class MeResponse(BaseModel):
@@ -184,6 +202,51 @@ async def login(
         csrf_token=result.csrf_token,
     )
     return ApiResponse(meta=meta, data=await _to_read(effective_roles, result.user))
+
+
+@router.post("/signup", response_model=ApiResponse[None])
+async def signup(
+    body: SignupRequest, service: SignupServiceDep, meta: ApiMetaDep
+) -> ApiResponse[None]:
+    """Mail a confirmation link for a sign-up form; nothing is created yet.
+
+    Unguarded, like ``/login``. Raises ``ForbiddenError`` (HTTP 403) while
+    sign-up is unavailable, ``TooManySignupRequestsError`` (HTTP 429) when a
+    confirmation just went to the same address, and ``EmailSendError``
+    (HTTP 502) when the relay fails.
+    """
+    await service.request(body)
+    return ApiResponse(meta=meta, data=None)
+
+
+@router.post("/signup/complete", response_model=ApiResponse[SignupResponse])
+async def complete_signup(
+    body: SignupCompletion,
+    response: Response,
+    service: SignupServiceDep,
+    effective_roles: EffectiveRoleRepositoryDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[SignupResponse]:
+    """Create the tenant and admin a confirmation link stands for, and sign them in.
+
+    Unguarded. Sets the session and CSRF cookies on success; raises
+    ``InvalidSignupLinkError`` (HTTP 422) for an unknown, used, or expired
+    token, and ``ForbiddenError`` (HTTP 403) while ``SIGNUP_ENABLED`` is off.
+    """
+    result, tenant = await service.complete(body.token)
+    _set_auth_cookies(
+        response,
+        session_token=result.session_token,
+        csrf_token=result.csrf_token,
+    )
+    return ApiResponse(
+        meta=meta,
+        data=SignupResponse(
+            user=await _to_read(effective_roles, result.user),
+            tenant_name=tenant.name,
+            tenant_url=get_settings().tenant_origin(tenant.name),
+        ),
+    )
 
 
 @router.post("/logout", response_model=ApiResponse[None])
@@ -310,7 +373,10 @@ def _sso_error(code: SsoErrorCode, next_path: str = "/") -> str:
 
 @router.get("/login-options", response_model=ApiResponse[LoginOptions])
 async def login_options(
-    host: str, service: OidcLoginServiceDep, meta: ApiMetaDep
+    host: str,
+    service: OidcLoginServiceDep,
+    signup_service: SignupServiceDep,
+    meta: ApiMetaDep,
 ) -> ApiResponse[LoginOptions]:
     """Tell the login page at ``host`` which tenant it signs in to, and how.
 
@@ -320,11 +386,16 @@ async def login_options(
     Args:
         host: The hostname the browser shows, without a port.
         service: The sign-in service.
+        signup_service: Says whether sign-up is available.
         meta: The envelope's request metadata.
     """
     tenant_name = get_settings().tenant_from_host(host)
     sso = tenant_name is not None and await service.sso_enabled(tenant_name)
-    return ApiResponse(meta=meta, data=LoginOptions(tenant_name=tenant_name, sso=sso))
+    signup = tenant_name is None and await signup_service.available()
+    return ApiResponse(
+        meta=meta,
+        data=LoginOptions(tenant_name=tenant_name, sso=sso, signup=signup),
+    )
 
 
 @router.get(

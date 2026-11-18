@@ -57,6 +57,16 @@ The hidden **system user** owns the bootstrap records (it cannot log in and is e
 
 If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them afterwards. The usernames are fixed to `root` and `admin`.
 
+## Sign-up {#sign-up}
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SIGNUP_ENABLED` | `false` | Lets visitors create a tenant of their own from the sign-in page and become its Admin — see [Signing up](../getting-started/sign-up.md). The link appears only at the main address, not at a tenant's own address |
+
+Sign-up mails each visitor a confirmation link, so it also needs `APP_BASE_URL` (the link is built from it) and email delivery switched on with **Send notifications by email** in [System Settings](../guides/system-settings.md) or the [notification email](#notification-email) variables. Until all three are in place, the sign-in page offers no sign-up.
+
+Anyone who can reach the deployment and receive mail can then create tenants. One address gets at most one confirmation email a minute, which keeps the form from being used to flood someone's inbox, but there is no other limit, so turn sign-up on only where that is acceptable.
+
 ## Session lifetime
 
 | Variable | Default | What it does |
