@@ -710,6 +710,7 @@ export const ko = {
   "errors.INVALID_SIGNUP_LINK": "이 가입 링크는 유효하지 않거나 만료되었습니다. 다시 가입하세요.",
   "errors.TOO_MANY_SIGNUP_REQUESTS":
     "이 주소로 방금 확인 이메일을 보냈습니다. 1분 정도 기다린 후 다시 시도하세요.",
+  "errors.TENANT_LIMIT_REACHED": "테넌트 수가 최대치에 도달했습니다.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS": "로그인 실패 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
   "errors.UNAUTHENTICATED": "사용자 이름 또는 비밀번호가 올바르지 않습니다.",
   "errors.VALIDATION_ERROR": "요청이 올바르지 않습니다. 입력한 내용을 확인해 주세요.",
@@ -950,6 +951,10 @@ export const ko = {
   "systemSettings.hostIsRequiredWhenEmailDeliveryIs":
     "이메일 전송을 사용할 때는 호스트가 필요합니다",
   "systemSettings.leaveEmptyForARelayThatDoes": "인증이 필요 없는 릴레이는 비워 두세요.",
+  "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
+    "비워 두면 제한이 없습니다. 비활성화된 테넌트도 포함해 셉니다. 한도에 도달하면 관리자 생성도 가입도 받지 않으며, 가입 링크도 표시되지 않습니다.",
+  "systemSettings.maximumNumberOfTenants": "최대 테넌트 수",
+  "systemSettings.maximumNumberOfTenantsMustBeAWhole": "최대 테넌트 수는 1 이상의 정수여야 합니다",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":
     "사용자 이름을 설정하면 비밀번호가 필요합니다",
   "systemSettings.portMustBeAWholeNumberBetween": "포트는 1에서 65535 사이의 정수여야 합니다",

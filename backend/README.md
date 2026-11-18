@@ -571,6 +571,8 @@ The dispatcher also exposes `exists_for_session` as a pass-through, which is wha
 
 `smtp_host` uses its own constraint alias rather than `HttpUrl`, whose `assert_public_http_url` SSRF guard would reject exactly the value it legitimately holds: a relay on `localhost` or a private subnet. It is never fetched server-side on a caller's behalf.
 
+`max_tenants` caps how many tenants the deployment holds (`null` is no limit, and the column is `ge=1`). `SqlTenantRepository.at_capacity` compares it with the number of every `tenants` row, disabled ones included, and raises nothing itself: `TenantService.create` and `SignupService.request` / `complete` turn it into `409 TENANT_LIMIT_REACHED`, and `SignupService.available` reports sign-up as unavailable at the limit, which hides the sign-in page's link. The check is count-then-insert, so two creations racing can overshoot by one. The default tenant seeded at startup (`seed_default_tenant_and_admin_user`) skips it, and lowering the limit below the current count removes nothing.
+
 The deployment's base URL is not a system setting. `APP_BASE_URL` is read from the environment only (`config.Settings.app_base_url`), validated as a bare http(s) origin at startup, and also supplies the defaults of `CORS_ORIGINS` and `SESSION_COOKIE_SECURE`.
 
 ---

@@ -65,7 +65,7 @@ If either is unset (or empty), a random password is generated instead and logged
 
 Sign-up mails each visitor a confirmation link, so it also needs `APP_BASE_URL` (the link is built from it) and email delivery switched on with **Send notifications by email** in [System Settings](../guides/system-settings.md) or the [notification email](#notification-email) variables. Until all three are in place, the sign-in page offers no sign-up.
 
-Anyone who can reach the deployment and receive mail can then create tenants. One address gets at most one confirmation email a minute, which keeps the form from being used to flood someone's inbox, but there is no other limit, so turn sign-up on only where that is acceptable.
+Anyone who can reach the deployment and receive mail can then create tenants. One address gets at most one confirmation email a minute, which keeps the form from being used to flood someone's inbox, but the only other limit is the **Maximum Number of Tenants** in [System Settings](../guides/system-settings.md#tenant-limit). It is empty by default, meaning no limit, so set one before turning sign-up on anywhere an unbounded number of tenants would be a problem.
 
 ## Session lifetime
 

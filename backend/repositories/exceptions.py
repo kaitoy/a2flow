@@ -114,6 +114,22 @@ class TooManySignupRequestsError(HttpMappedError):
         )
 
 
+class TenantLimitReachedError(HttpMappedError):
+    """Raised when creating a tenant would exceed the deployment's tenant limit.
+
+    Mapped to HTTP 409 with the ``TENANT_LIMIT_REACHED`` error code. The limit
+    is ``system_settings.max_tenants``; raised by ``TenantService.create`` and
+    by ``SignupService`` (both ``request`` and ``complete``).
+    """
+
+    code = "TENANT_LIMIT_REACHED"
+    http_status = 409
+
+    def __init__(self) -> None:
+        """Initialize the error with its fixed message."""
+        super().__init__("The maximum number of tenants has been reached.")
+
+
 class InvalidSignupLinkError(HttpMappedError):
     """Raised when a sign-up confirmation link is unknown, already used, or expired.
 

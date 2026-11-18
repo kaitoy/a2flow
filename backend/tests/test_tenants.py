@@ -5,7 +5,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.bootstrap import seed_system_user
+from infrastructure.bootstrap import seed_system_settings, seed_system_user
 from models.user import SYSTEM_USER_ID
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
@@ -22,6 +22,7 @@ async def tenant_client() -> AsyncGenerator[AsyncClient, None]:
     mem_engine = await make_test_engine()
     async with AsyncSession(mem_engine) as session:
         await seed_system_user(session)
+        await seed_system_settings(session)
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSession(mem_engine) as session:
@@ -42,6 +43,51 @@ async def tenant_client() -> AsyncGenerator[AsyncClient, None]:
 
 
 _CREATE_BODY = {"displayName": "Acme Corp", "name": "acme-corp"}
+_SETTINGS_PATH = "/api/v1/system-settings"
+
+
+# ---------- tenant limit ----------
+
+
+async def test_create_tenant_is_refused_at_the_tenant_limit(
+    tenant_client: AsyncClient,
+) -> None:
+    assert_ok(
+        await tenant_client.patch(_SETTINGS_PATH, json={"maxTenants": 1}), status=200
+    )
+    assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    resp = await tenant_client.post(
+        "/api/v1/tenants", json={"displayName": "Beta", "name": "beta"}
+    )
+    assert_err(resp, "TENANT_LIMIT_REACHED", 409)
+
+
+async def test_clearing_the_tenant_limit_allows_creation_again(
+    tenant_client: AsyncClient,
+) -> None:
+    assert_ok(await tenant_client.patch(_SETTINGS_PATH, json={"maxTenants": 1}))
+    assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+    body = assert_ok(
+        await tenant_client.patch(_SETTINGS_PATH, json={"maxTenants": None})
+    )
+    assert body["maxTenants"] is None
+    resp = await tenant_client.post(
+        "/api/v1/tenants", json={"displayName": "Beta", "name": "beta"}
+    )
+    assert resp.status_code == 201
+
+
+async def test_tenant_limit_defaults_to_unlimited(tenant_client: AsyncClient) -> None:
+    assert assert_ok(await tenant_client.get(_SETTINGS_PATH))["maxTenants"] is None
+
+
+async def test_tenant_limit_must_be_at_least_one(tenant_client: AsyncClient) -> None:
+    resp = await tenant_client.patch(_SETTINGS_PATH, json={"maxTenants": 0})
+    assert_err(resp, "VALIDATION_ERROR", 422)
 
 
 # ---------- create ----------

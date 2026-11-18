@@ -45,6 +45,12 @@ path "secret/data/tenants/acme/*" {
 }
 ```
 
+## Le nombre maximal de Tenants {#tenant-limit}
+
+Le **Nombre maximal de Tenants** limite le nombre de tenants que le déploiement peut contenir. Tous les tenants comptent, y compris les tenants désactivés. Laissez le champ vide pour ne fixer aucune limite, ce qui est l'état d'une installation neuve.
+
+Une fois la limite atteinte, aucun tenant de plus ne peut être créé : un Super administrateur qui en crée un sous [Tenants](./users-and-groups.md#tenants) est refusé avec « Le nombre maximal de Tenants est atteint. », et il en va de même pour un visiteur qui [s'inscrit](../getting-started/sign-up.md). L'écran de connexion cesse aussi de proposer **Créer un compte**. Abaisser la limite sous le nombre actuel ne supprime aucun tenant ; cela empêche seulement d'en créer de nouveaux. Relevez-la ou videz le champ pour refaire de la place.
+
 ## Le LLM {#llm}
 
 Le LLM est le modèle sur lequel s'exécute chaque agent, et la clé avec laquelle on l'atteint. Ce qui est défini ici est le LLM **du système** : un tenant l'utilise, sauf si un Super administrateur lui en a donné un qui lui est propre ; voir [Le LLM du tenant](./users-and-groups.md#tenant-llm).

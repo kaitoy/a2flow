@@ -94,6 +94,7 @@ function buildSchema(passwordSet: boolean) {
       smtpFromEmail: z.string(),
       smtpFromName: z.string(),
       vaultAddr: z.string(),
+      maxTenants: z.string(),
       ...llmShape,
     })
     .superRefine((values, ctx) => {
@@ -152,6 +153,18 @@ function buildSchema(passwordSet: boolean) {
       }
 
       validateOptional(values.vaultAddr, zSystemSettingsUpdate.shape.vaultAddr, ctx, "vaultAddr");
+
+      // Empty means "no limit"; otherwise a whole number of at least 1.
+      if (values.maxTenants !== "") {
+        const max = Number(values.maxTenants);
+        if (!Number.isInteger(max) || max < 1) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["maxTenants"],
+            message: "systemSettings.maximumNumberOfTenantsMustBeAWhole",
+          });
+        }
+      }
     });
 }
 
@@ -185,6 +198,7 @@ function toFormValues(settings: Partial<SystemSettings>): FormValues {
     smtpFromEmail: settings.smtpFromEmail ?? "",
     smtpFromName: settings.smtpFromName ?? "",
     vaultAddr: settings.vaultAddr ?? "",
+    maxTenants: settings.maxTenants == null ? "" : String(settings.maxTenants),
     ...toLlmFormValues(settings),
   };
 }
@@ -206,6 +220,7 @@ function toBody(values: FormValues): SystemSettingsUpdate {
     smtpFromEmail: values.smtpFromEmail || null,
     smtpFromName: values.smtpFromName || null,
     vaultAddr: values.vaultAddr || null,
+    maxTenants: values.maxTenants === "" ? null : Number(values.maxTenants),
     ...toLlmBody(values),
   };
   if (values.smtpPassword !== "") {
@@ -381,6 +396,19 @@ export default function SystemSettingsPage() {
             />
             <p className="text-xs text-on-surface-variant">
               {t("systemSettings.theHashicorpVaultEveryTenantWithoutA")}
+            </p>
+          </FormField>
+
+          <hr className="border-outline-variant" />
+
+          <FormField
+            htmlFor="maxTenants"
+            label={t("systemSettings.maximumNumberOfTenants")}
+            error={errors.maxTenants?.message}
+          >
+            <Input id="maxTenants" inputMode="numeric" {...register("maxTenants")} />
+            <p className="text-xs text-on-surface-variant">
+              {t("systemSettings.leaveEmptyForNoLimitEveryTenantCounts")}
             </p>
           </FormField>
 

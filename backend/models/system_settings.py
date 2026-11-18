@@ -105,6 +105,11 @@ class SystemSettingsUpdate(SQLModel):
     #: empty string keeps the stored key, ``null`` clears it). Empty falls back
     #: to the provider's own environment variable (``GOOGLE_API_KEY`` ...).
     llm_api_key: str | None = Field(default=None, max_length=4096)
+    #: Most tenants the deployment may hold, counting every row of ``tenants``
+    #: (disabled ones too). ``null`` means no limit. Enforced when a tenant is
+    #: created, by a ``super_admin`` or through self-service sign-up; lowering it
+    #: below the current count stops new tenants but removes none.
+    max_tenants: int | None = Field(default=None, ge=1)
 
 
 class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
@@ -156,6 +161,7 @@ class SystemSettingsRead(BaseEntity):
     llm_model: str | None = None
     #: Whether an LLM API key is stored. The key itself is never serialized.
     llm_api_key_set: bool = False
+    max_tenants: int | None = None
 
     @classmethod
     def from_settings(cls, settings: SystemSettings) -> "SystemSettingsRead":

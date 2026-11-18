@@ -686,6 +686,7 @@ export const zhCN = {
   "errors.SUMMARIZATION_FAILED": "无法生成摘要。",
   "errors.INVALID_SIGNUP_LINK": "此注册链接无效或已过期。请重新注册。",
   "errors.TOO_MANY_SIGNUP_REQUESTS": "刚刚已向此地址发送确认邮件。请等待一分钟后重试。",
+  "errors.TENANT_LIMIT_REACHED": "租户数量已达上限。",
   "errors.TOO_MANY_LOGIN_ATTEMPTS": "登录失败次数过多，请稍后重试。",
   "errors.UNAUTHENTICATED": "用户名或密码无效。",
   "errors.VALIDATION_ERROR": "请求无效，请检查您输入的内容。",
@@ -916,6 +917,10 @@ export const zhCN = {
   "systemSettings.globalVaultAddress": "全局 Vault 地址",
   "systemSettings.hostIsRequiredWhenEmailDeliveryIs": "启用邮件投递时必须填写主机",
   "systemSettings.leaveEmptyForARelayThatDoes": "如果中继不需要认证，请留空。",
+  "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
+    "留空表示不限制。已停用的租户也计入。达到上限后，无论是管理员创建还是自助注册都无法再创建租户，注册链接也会隐藏。",
+  "systemSettings.maximumNumberOfTenants": "租户数量上限",
+  "systemSettings.maximumNumberOfTenantsMustBeAWhole": "租户数量上限必须是不小于 1 的整数",
   "systemSettings.passwordIsRequiredWhenAUsernameIs": "设置用户名时必须填写密码",
   "systemSettings.portMustBeAWholeNumberBetween": "端口必须是 1 到 65535 之间的整数",
   "systemSettings.security": "安全性",

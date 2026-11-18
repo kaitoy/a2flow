@@ -65,7 +65,7 @@ Si l'une de ces variables n'est pas définie (ou est vide), un mot de passe alé
 
 L'inscription envoie à chaque visiteur un lien de confirmation : il faut donc aussi `APP_BASE_URL` (le lien est construit à partir de cette adresse) et l'envoi d'e-mails activé avec **Envoyer les notifications par e-mail** dans les [Paramètres système](../guides/system-settings.md) ou avec les variables d'[e-mail de notification](#notification-email). Tant que ces trois conditions ne sont pas réunies, l'écran de connexion ne propose pas l'inscription.
 
-Toute personne qui atteint le déploiement et reçoit des e-mails peut alors créer des tenants. Une adresse reçoit au plus un e-mail de confirmation par minute, ce qui empêche d'utiliser le formulaire pour inonder la boîte de quelqu'un d'autre, mais il n'y a aucune autre limite : ne l'activez que là où c'est acceptable.
+Toute personne qui atteint le déploiement et reçoit des e-mails peut alors créer des tenants. Une adresse reçoit au plus un e-mail de confirmation par minute, ce qui empêche d'utiliser le formulaire pour inonder la boîte de quelqu'un d'autre, mais la seule autre limite est le **Nombre maximal de Tenants** des [paramètres système](../guides/system-settings.md#tenant-limit). Il est vide par défaut, ce qui signifie aucune limite : fixez-en un avant d'activer l'inscription là où un nombre illimité de tenants poserait problème.
 
 ## Durée de vie des sessions {#session-lifetime}
 

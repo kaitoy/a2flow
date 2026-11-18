@@ -17,6 +17,7 @@ from infrastructure.email_sender import SmtpConfig
 from main import app
 from models.system_settings import SmtpSecurity
 from repositories.exceptions import EmailSendError
+from repositories.tenant import SqlTenantRepository
 from services.signup import tenant_name_for
 from tests._envelope import assert_err, assert_ok
 
@@ -210,6 +211,54 @@ async def test_signup_retries_a_taken_tenant_name(
     second = assert_ok(await _complete(auth_client, tokens[1]))
     assert first["tenantName"] == "new-user-aaaaaa"
     assert second["tenantName"] == "new-user-bbbbbb"
+
+
+@pytest.fixture()
+def tenants_full(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make every tenant-limit check report the deployment as full."""
+
+    async def full(_self: SqlTenantRepository) -> bool:
+        return True
+
+    monkeypatch.setattr(SqlTenantRepository, "at_capacity", full)
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("tenants_full")
+async def test_signup_is_refused_at_the_tenant_limit(
+    auth_client: AsyncClient, mail: FakeMail
+) -> None:
+    resp = await auth_client.post("/api/v1/auth/signup", json=FORM)
+    assert_err(resp, "TENANT_LIMIT_REACHED", 409)
+    assert mail.sent == []
+
+
+@pytest.mark.asyncio
+async def test_a_link_is_refused_once_the_limit_is_reached_and_works_after_it_is_lifted(
+    auth_client: AsyncClient, mail: FakeMail, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert_ok(await auth_client.post("/api/v1/auth/signup", json=FORM))
+    token = mail.token()
+    with monkeypatch.context() as m:
+
+        async def full(_self: SqlTenantRepository) -> bool:
+            return True
+
+        m.setattr(SqlTenantRepository, "at_capacity", full)
+        assert_err(await _complete(auth_client, token), "TENANT_LIMIT_REACHED", 409)
+    # The pending sign-up was kept, so the same link works once there is room.
+    assert_ok(await _complete(auth_client, token))
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("mail", "tenants_full")
+async def test_login_options_hide_signup_at_the_tenant_limit(
+    auth_client: AsyncClient,
+) -> None:
+    resp = await auth_client.get(
+        "/api/v1/auth/login-options", params={"host": "a2.test"}
+    )
+    assert assert_ok(resp)["signup"] is False
 
 
 @pytest.mark.asyncio

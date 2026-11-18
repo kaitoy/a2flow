@@ -27,6 +27,7 @@ from models.tenant import (
 from repositories.exceptions import (
     ForbiddenError,
     NotFoundError,
+    TenantLimitReachedError,
     TenantValidationError,
 )
 from repositories.query import FilterSpec, SortSpec
@@ -200,8 +201,14 @@ class TenantService:
             The created Tenant.
 
         Raises:
+            TenantLimitReachedError: If the deployment already holds its
+                maximum number of tenants (``system_settings.max_tenants``).
             TenantValidationError: If the Vault connection would be unusable.
         """
+        # ponytail: count-then-insert, so creations racing within a few
+        # milliseconds can overshoot the limit by one; take a lock if that matters.
+        if await self._repo.at_capacity():
+            raise TenantLimitReachedError()
         payload = data.model_dump()
         self._prepare(None, payload)
         return await self._repo.create(

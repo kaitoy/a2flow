@@ -739,6 +739,7 @@ export const fr = {
     "Ce lien d'inscription est invalide ou a expiré. Inscrivez-vous à nouveau.",
   "errors.TOO_MANY_SIGNUP_REQUESTS":
     "Un e-mail de confirmation vient d'être envoyé à cette adresse. Patientez une minute et réessayez.",
+  "errors.TENANT_LIMIT_REACHED": "Le nombre maximal de Tenants est atteint.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "Trop de tentatives de connexion échouées. Patientez un moment, puis réessayez.",
   "errors.UNAUTHENTICATED": "Nom d'utilisateur ou mot de passe incorrect.",
@@ -994,6 +995,11 @@ export const fr = {
     "L'hôte est requis lorsque l'envoi d'e-mails est activé",
   "systemSettings.leaveEmptyForARelayThatDoes":
     "Laissez vide pour un relais sans authentification.",
+  "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
+    "Laissez vide pour ne fixer aucune limite. Tous les Tenants comptent, y compris les Tenants désactivés. Une fois la limite atteinte, aucun Tenant ne peut être créé, ni par vous ni par l'inscription, et le lien d'inscription est masqué.",
+  "systemSettings.maximumNumberOfTenants": "Nombre maximal de Tenants",
+  "systemSettings.maximumNumberOfTenantsMustBeAWhole":
+    "Le nombre maximal de Tenants doit être un entier d'au moins 1",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":
     "Le mot de passe est requis lorsqu'un nom d'utilisateur est défini",
   "systemSettings.portMustBeAWholeNumberBetween":

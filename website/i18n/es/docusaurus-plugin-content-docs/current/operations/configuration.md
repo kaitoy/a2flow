@@ -65,7 +65,7 @@ Si alguna no está definida (o está vacía), se genera una contraseña aleatori
 
 El registro envía a cada visitante un enlace de confirmación, así que también necesita `APP_BASE_URL` (el enlace se construye a partir de ella) y el envío de correo activado con **Enviar notificaciones por correo electrónico** en [Configuración del sistema](../guides/system-settings.md) o con las variables de [correo de notificaciones](#notification-email). Hasta que las tres cosas estén listas, la pantalla de inicio de sesión no ofrece el registro.
 
-Así, cualquiera que llegue al despliegue y reciba correo puede crear tenants. Una dirección recibe como máximo un correo de confirmación por minuto, lo que impide usar el formulario para inundar el buzón de otra persona, pero no hay ningún otro límite, así que actívalo solo donde eso sea aceptable.
+Así, cualquiera que llegue al despliegue y reciba correo puede crear tenants. Una dirección recibe como máximo un correo de confirmación por minuto, lo que impide usar el formulario para inundar el buzón de otra persona, pero el único otro límite es el **Número máximo de Tenants** de los [ajustes del sistema](../guides/system-settings.md#tenant-limit). Está vacío por defecto, lo que significa que no hay límite, así que fija uno antes de activar el registro donde un número ilimitado de tenants sería un problema.
 
 ## Duración de la sesión {#session-lifetime}
 

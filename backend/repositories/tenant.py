@@ -3,10 +3,12 @@
 from collections.abc import Sequence
 from typing import Protocol
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from models.system_settings import SystemSettings
 from models.tenant import (
     AdminSettingsUpdate,
     Tenant,
@@ -54,6 +56,8 @@ class TenantRepository(Protocol):
 
     async def exists(self, tenant_id: str) -> bool: ...
 
+    async def at_capacity(self) -> bool: ...
+
 
 class SqlTenantRepository:
     """SQLModel-backed implementation of TenantRepository.
@@ -73,6 +77,22 @@ class SqlTenantRepository:
 
     async def exists(self, tenant_id: str) -> bool:
         return (await self._db.get(Tenant, tenant_id)) is not None
+
+    async def at_capacity(self) -> bool:
+        """Return whether the deployment already holds its maximum number of tenants.
+
+        Compares every row of ``tenants`` (disabled ones included) with
+        ``system_settings.max_tenants``. No limit set, or no settings row yet,
+        means there is room.
+
+        Returns:
+            ``True`` if no further tenant may be created.
+        """
+        limit = (await self._db.exec(select(SystemSettings.max_tenants))).first()
+        if limit is None:
+            return False
+        count = (await self._db.exec(select(func.count()).select_from(Tenant))).one()
+        return count >= limit
 
     async def get_by_name(self, name: str) -> Tenant | None:
         """Return the tenant with the given name, or ``None`` if no match exists.

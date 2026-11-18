@@ -5,7 +5,7 @@ sidebar_position: 6
 
 # Signing up
 
-When the deployment allows it, anyone can create a tenant of their own from the sign-in page and start using A2Flow as its Admin. No Super Admin has to create the tenant or the account first. Sign-up is off until the operator turns it on — see [Sign-up](../operations/configuration.md#sign-up) in the configuration reference.
+When the deployment allows it, anyone can create a tenant of their own from the sign-in page and start using A2Flow as its Admin. No Super Admin has to create the tenant or the account first. Sign-up is off until the operator turns it on — see [Sign-up](../operations/configuration.md#sign-up) in the configuration reference. The sign-in page offers **Create an account** only while the deployment still has room for another tenant — see [The tenant limit](../guides/system-settings.md#tenant-limit).
 
 ## Creating your account {#creating-your-account}
 
@@ -39,6 +39,7 @@ sequenceDiagram
 |---|---|
 | No email arrives | Check your spam folder. After a minute, fill in the form again to get a new email |
 | "This sign-up link is invalid or has expired" | The link was already used or is older than 24 hours. Fill in the form again |
+| "The maximum number of tenants has been reached" | The deployment is full. Ask the operator to raise the limit under **Maximum Number of Tenants** in System Settings; the link keeps working until it expires |
 | "This link is incomplete" | Your mail program cut the link short. Copy the whole link from the email into the browser |
 
 ## Your new tenant {#your-new-tenant}

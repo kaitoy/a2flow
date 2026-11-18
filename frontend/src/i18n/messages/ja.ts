@@ -717,6 +717,7 @@ export const ja = {
     "このサインアップのリンクは無効か、期限が切れています。もう一度サインアップしてください。",
   "errors.TOO_MANY_SIGNUP_REQUESTS":
     "このアドレスには確認メールを送ったばかりです。1 分ほど待ってからやり直してください。",
+  "errors.TENANT_LIMIT_REACHED": "テナント数が上限に達しています。",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "ログインの失敗が多すぎます。しばらく待ってから、もう一度お試しください。",
   "errors.UNAUTHENTICATED": "ユーザー名またはパスワードが正しくありません。",
@@ -962,6 +963,11 @@ export const ja = {
   "systemSettings.globalVaultAddress": "グローバル Vault のアドレス",
   "systemSettings.hostIsRequiredWhenEmailDeliveryIs": "メール配信を有効にするにはホストが必須です",
   "systemSettings.leaveEmptyForARelayThatDoes": "認証が不要なリレーの場合は空欄にしてください。",
+  "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
+    "空欄にすると無制限です。無効化したテナントも数えます。上限に達すると、管理者による作成もサインアップも受け付けず、サインアップのリンクも表示されなくなります。",
+  "systemSettings.maximumNumberOfTenants": "テナント数の上限",
+  "systemSettings.maximumNumberOfTenantsMustBeAWhole":
+    "テナント数の上限は 1 以上の整数にしてください",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":
     "ユーザー名を設定する場合はパスワードが必須です",
   "systemSettings.portMustBeAWholeNumberBetween": "ポートは 1 から 65535 までの整数にしてください",

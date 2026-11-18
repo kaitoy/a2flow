@@ -738,6 +738,7 @@ export const es = {
     "Este enlace de registro no es válido o ha caducado. Vuelve a registrarte.",
   "errors.TOO_MANY_SIGNUP_REQUESTS":
     "Se acaba de enviar un correo de confirmación a esta dirección. Espera un minuto e inténtalo de nuevo.",
+  "errors.TENANT_LIMIT_REACHED": "Se ha alcanzado el número máximo de Tenants.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "Demasiados intentos de inicio de sesión fallidos. Espera un momento e inténtalo de nuevo.",
   "errors.UNAUTHENTICATED": "El nombre de usuario o la contraseña no son válidos.",
@@ -994,6 +995,11 @@ export const es = {
     "El host es obligatorio cuando la entrega de correo está habilitada",
   "systemSettings.leaveEmptyForARelayThatDoes":
     "Déjalo vacío si el relé no requiere autenticación.",
+  "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
+    "Déjelo vacío para no imponer ningún límite. Cuentan todos los Tenants, también los desactivados. Al alcanzar el límite no se puede crear ningún Tenant, ni usted ni mediante el registro, y el enlace de registro se oculta.",
+  "systemSettings.maximumNumberOfTenants": "Número máximo de Tenants",
+  "systemSettings.maximumNumberOfTenantsMustBeAWhole":
+    "El número máximo de Tenants debe ser un entero de al menos 1",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":
     "La contraseña es obligatoria si se define un nombre de usuario",
   "systemSettings.portMustBeAWholeNumberBetween":

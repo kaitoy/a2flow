@@ -717,6 +717,7 @@ export const en = {
     "This sign-up link is invalid or has expired. Please sign up again.",
   "errors.TOO_MANY_SIGNUP_REQUESTS":
     "A confirmation email was just sent to this address. Wait a minute and try again.",
+  "errors.TENANT_LIMIT_REACHED": "The maximum number of tenants has been reached.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS": "Too many failed sign-in attempts. Wait a while and try again.",
   "errors.UNAUTHENTICATED": "Invalid username or password.",
   "errors.VALIDATION_ERROR": "The request is not valid. Check what you entered.",
@@ -963,6 +964,11 @@ export const en = {
     "Host is required when email delivery is enabled",
   "systemSettings.leaveEmptyForARelayThatDoes":
     "Leave empty for a relay that does not require authentication.",
+  "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
+    "Leave empty for no limit. Every tenant counts, disabled ones too. Once the limit is reached, no tenant can be created, by you or through sign-up, and the sign-up link is hidden.",
+  "systemSettings.maximumNumberOfTenants": "Maximum Number of Tenants",
+  "systemSettings.maximumNumberOfTenantsMustBeAWhole":
+    "Maximum number of tenants must be a whole number of at least 1",
   "systemSettings.passwordIsRequiredWhenAUsernameIs": "Password is required when a username is set",
   "systemSettings.portMustBeAWholeNumberBetween": "Port must be a whole number between 1 and 65535",
   "systemSettings.security": "Security",

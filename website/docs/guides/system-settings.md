@@ -45,6 +45,12 @@ path "secret/data/tenants/acme/*" {
 }
 ```
 
+## The tenant limit {#tenant-limit}
+
+The **Maximum Number of Tenants** caps how many tenants the deployment may hold. Every tenant counts, disabled ones too. Leave the field empty for no limit, which is how a fresh install starts.
+
+Once the limit is reached, no further tenant can be created: a Super Admin creating one under [Tenants](./users-and-groups.md#tenants) is refused with "The maximum number of tenants has been reached.", and a visitor [signing up](../getting-started/sign-up.md) is refused the same way. The sign-in page also stops offering **Create an account**. Lowering the limit below the current number removes no tenant; it only stops new ones. Raise it or empty the field to make room again.
+
 ## The LLM {#llm}
 
 The LLM is the model every agent runs on, and the key it is reached with. What is set here is the **system's** LLM: a tenant uses it unless a Super Admin has given the tenant one of its own — see [The tenant's LLM](./users-and-groups.md#tenant-llm).

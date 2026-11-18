@@ -5,7 +5,7 @@ sidebar_position: 6
 
 # S'inscrire
 
-Si le déploiement l'autorise, n'importe qui peut créer son propre tenant depuis l'écran de connexion et commencer à utiliser A2Flow en tant qu'Administrateur. Aucun Super administrateur n'a besoin de créer le tenant ni le compte au préalable. L'inscription reste désactivée tant que l'opérateur ne l'active pas : voir [Inscription](../operations/configuration.md#sign-up) dans la référence de configuration.
+Si le déploiement l'autorise, n'importe qui peut créer son propre tenant depuis l'écran de connexion et commencer à utiliser A2Flow en tant qu'Administrateur. Aucun Super administrateur n'a besoin de créer le tenant ni le compte au préalable. L'inscription reste désactivée tant que l'opérateur ne l'active pas : voir [Inscription](../operations/configuration.md#sign-up) dans la référence de configuration. L'écran de connexion ne propose **Créer un compte** que tant que le déploiement a encore de la place pour un tenant de plus : voir [Le nombre maximal de Tenants](../guides/system-settings.md#tenant-limit).
 
 ## Créer votre compte {#creating-your-account}
 
@@ -39,6 +39,7 @@ sequenceDiagram
 |---|---|
 | Aucun e-mail n'arrive | Vérifiez votre dossier de spam. Après une minute, remplissez à nouveau le formulaire pour recevoir un nouvel e-mail |
 | « Ce lien d'inscription est invalide ou a expiré » | Le lien a déjà servi ou date de plus de 24 heures. Remplissez à nouveau le formulaire |
+| « Le nombre maximal de Tenants est atteint » | Le déploiement est plein. Demandez à l'opérateur de relever le **Nombre maximal de Tenants** dans les paramètres système ; le lien reste utilisable jusqu'à son expiration |
 | « Ce lien est incomplet » | Votre messagerie a tronqué le lien. Copiez le lien complet de l'e-mail dans le navigateur |
 
 ## Votre nouveau tenant {#your-new-tenant}

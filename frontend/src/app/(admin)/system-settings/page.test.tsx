@@ -380,3 +380,58 @@ describe("SystemSettingsPage LLM", () => {
     expect(captured.body).toBeNull();
   });
 });
+
+describe("SystemSettingsPage tenant limit", () => {
+  /** Serve `settings` and capture the PATCH body the page sends. */
+  function capturePatch(settings: object) {
+    const captured: { body: Record<string, unknown> | null } = { body: null };
+    server.use(
+      http.get(`${BASE}/api/v1/system-settings`, () => envelope(settings)),
+      http.patch(`${BASE}/api/v1/system-settings`, async ({ request }) => {
+        captured.body = (await request.json()) as Record<string, unknown>;
+        return envelope(settings);
+      })
+    );
+    return captured;
+  }
+
+  it("prefills the saved limit", async () => {
+    capturePatch({ ...CONFIGURED, maxTenants: 25 });
+    renderPage();
+    expect(await screen.findByLabelText("Maximum Number of Tenants")).toHaveValue("25");
+  });
+
+  it("shows an empty field when there is no limit", async () => {
+    capturePatch({ ...CONFIGURED, maxTenants: null });
+    renderPage();
+    expect(await screen.findByLabelText("Maximum Number of Tenants")).toHaveValue("");
+  });
+
+  it("sends the limit as a number", async () => {
+    const captured = capturePatch({ ...CONFIGURED, maxTenants: null });
+    renderPage();
+    await userEvent.type(await screen.findByLabelText("Maximum Number of Tenants"), "10");
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(captured.body).toMatchObject({ maxTenants: 10 }));
+  });
+
+  it("sends null when the field is emptied, which lifts the limit", async () => {
+    const captured = capturePatch({ ...CONFIGURED, maxTenants: 25 });
+    renderPage();
+    await userEvent.clear(await screen.findByLabelText("Maximum Number of Tenants"));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(captured.body).toMatchObject({ maxTenants: null }));
+  });
+
+  it.each(["0", "-3", "1.5", "many"])("rejects %s without saving", async (value) => {
+    const captured = capturePatch({ ...CONFIGURED, maxTenants: null });
+    renderPage();
+    await userEvent.type(await screen.findByLabelText("Maximum Number of Tenants"), value);
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(await screen.findByText(/whole number of at least 1/i)).toBeInTheDocument();
+    expect(captured.body).toBeNull();
+  });
+});

@@ -53,8 +53,10 @@ from models.user import SYSTEM_USER_ID, Role, User
 from repositories.exceptions import (
     ForbiddenError,
     InvalidSignupLinkError,
+    TenantLimitReachedError,
     TooManySignupRequestsError,
 )
+from repositories.tenant import SqlTenantRepository
 from services.auth import AuthService, LoginResult
 from services.system_settings import SystemSettingsService
 
@@ -153,8 +155,15 @@ class SignupService:
         return await self._system_settings.resolve_smtp()
 
     async def available(self) -> bool:
-        """Return whether visitors can sign up on this deployment."""
-        return await self._smtp() is not None
+        """Return whether visitors can sign up on this deployment.
+
+        ``False`` while sign-up is off or not configured, and once the tenant
+        limit (``system_settings.max_tenants``) is reached.
+        """
+        return (
+            await self._smtp() is not None
+            and not await SqlTenantRepository(self._session).at_capacity()
+        )
 
     async def request(self, data: SignupRequest) -> None:
         """Store a sign-up form and mail its confirmation link.
@@ -164,6 +173,8 @@ class SignupService:
 
         Raises:
             ForbiddenError: If sign-up is not available (see :meth:`available`).
+            TenantLimitReachedError: If the tenant limit is already reached, so
+                a link mailed now could not be used.
             TooManySignupRequestsError: If a confirmation went to this address
                 within :data:`RESEND_INTERVAL`.
             EmailSendError: If the relay rejected the message or could not be
@@ -172,6 +183,8 @@ class SignupService:
         config = await self._smtp()
         if config is None:
             raise ForbiddenError("Sign-up is disabled")
+        if await SqlTenantRepository(self._session).at_capacity():
+            raise TenantLimitReachedError()
         now = datetime.now(UTC)
         # ponytail: check-then-insert, so two requests racing within a few
         # milliseconds can both pass; the throttle is against flooding, not exact.
@@ -216,12 +229,19 @@ class SignupService:
 
         Raises:
             ForbiddenError: If ``SIGNUP_ENABLED`` has been turned off since.
+            TenantLimitReachedError: If the tenant limit was reached since the
+                link was mailed. The pending sign-up is kept, so the link works
+                again if the limit is raised before it expires.
             InvalidSignupLinkError: If the token is unknown, already used, or
                 expired.
             IntegrityError: If every generated tenant name was taken.
         """
         if not get_settings().signup_enabled:
             raise ForbiddenError("Sign-up is disabled")
+        # ponytail: count-then-insert, so completions racing within a few
+        # milliseconds can overshoot the limit by one; take a lock if that matters.
+        if await SqlTenantRepository(self._session).at_capacity():
+            raise TenantLimitReachedError()
         stmt = select(PendingSignup).where(
             col(PendingSignup.token_hash) == hash_token(token),
             col(PendingSignup.expires_at) > datetime.now(UTC),

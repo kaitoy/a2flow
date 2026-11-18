@@ -5,7 +5,7 @@ sidebar_position: 6
 
 # Registrarse
 
-Si el despliegue lo permite, cualquiera puede crear su propio tenant desde la pantalla de inicio de sesión y empezar a usar A2Flow como su Administrador. Ningún Superadministrador tiene que crear antes el tenant ni la cuenta. El registro está desactivado hasta que el operador lo activa; consulta [Registro](../operations/configuration.md#sign-up) en la referencia de configuración.
+Si el despliegue lo permite, cualquiera puede crear su propio tenant desde la pantalla de inicio de sesión y empezar a usar A2Flow como su Administrador. Ningún Superadministrador tiene que crear antes el tenant ni la cuenta. El registro está desactivado hasta que el operador lo activa; consulta [Registro](../operations/configuration.md#sign-up) en la referencia de configuración. La pantalla de inicio de sesión ofrece **Crear una cuenta** solo mientras el despliegue tenga sitio para otro tenant; consulta [El límite de tenants](../guides/system-settings.md#tenant-limit).
 
 ## Crear tu cuenta {#creating-your-account}
 
@@ -39,6 +39,7 @@ sequenceDiagram
 |---|---|
 | No llega ningún correo | Revisa la carpeta de spam. Pasado un minuto, vuelve a rellenar el formulario para recibir un correo nuevo |
 | "Este enlace de registro no es válido o ha caducado" | El enlace ya se usó o tiene más de 24 horas. Vuelve a rellenar el formulario |
+| «Se ha alcanzado el número máximo de Tenants» | El despliegue está lleno. Pide al operador que suba el límite en **Número máximo de Tenants**, en los ajustes del sistema; el enlace sigue funcionando hasta que caduque |
 | "Este enlace está incompleto" | Tu programa de correo cortó el enlace. Copia el enlace completo del correo en el navegador |
 
 ## Tu nuevo tenant {#your-new-tenant}
