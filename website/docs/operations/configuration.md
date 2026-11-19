@@ -140,8 +140,9 @@ Session files are stored in the database rather than on disk, so they need no di
 
 | Variable | Default | What it does |
 |---|---|---|
-| `SECRET_ENCRYPTION_KEY` | — | Fernet key used to encrypt `local` [secrets](../guides/secrets.md) before storage |
+| `SECRET_ENCRYPTION_KEY` | — | The master key. It encrypts each tenant's own data key, which in turn encrypts that tenant's `local` [secrets](../guides/secrets.md) and stored credentials (see [Secret storage](../architecture/secrets.md#local-secrets)) |
 | `SECRET_KEY_FILE` | `.secret_key` | Path to the on-disk key file, next to the SQLite database file. Under `docker compose` it is `/var/lib/a2flow/secret-key/.secret_key`, backed by the `secret-key` named volume that the backend and the email worker share |
+| `SECRET_ENCRYPTION_KEY_FALLBACKS` | — | Previous master keys, comma-separated. Used only to decrypt, while a [rotation](#rotating-the-master-key) is under way |
 
 The encryption key is resolved at first use, in order:
 
@@ -149,13 +150,22 @@ The encryption key is resolved at first use, in order:
 2. The key file at `SECRET_KEY_FILE`.
 3. Failing both, a key is generated, saved to that file, and a WARNING is logged.
 
-**Back the key up.** Losing it makes every stored local secret undecryptable, and the same key protects the [approval CA](../architecture/approvals.md)'s signing key.
+**Back the key up.** Losing it makes every tenant's data key undecryptable, and with them every stored local secret and credential. The same key protects the [approval CA](../architecture/approvals.md)'s signing key.
 
 There is no environment variable for HashiCorp Vault: a tenant's own Vault is set by its admin under [Admin Settings](../guides/users-and-groups.md#tenant-vault), and the global Vault's address by a Super Admin under [System Settings](../guides/system-settings.md#global-vault), with each tenant's [credential for it](../guides/users-and-groups.md#global-vault-credential) on the tenant's page. A tenant's own Vault address goes through the same SSRF checks as other user-supplied URLs, so it must be public. The global Vault address is exempt, since only a Super Admin can set it and a Vault typically lives on a private address.
 
+### Rotating the master key
+
+1. Generate a new key with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+2. Make it the master key — set it as `SECRET_ENCRYPTION_KEY`, or write it into the key file — and put the old key in `SECRET_ENCRYPTION_KEY_FALLBACKS`. Set both on the backend and on the email worker.
+3. Restart. At startup the backend re-encrypts everything under the new key and logs a WARNING with the number of values it re-encrypted. Values still under the old key keep decrypting until then, so nothing stops working along the way.
+4. Once every replica runs with the new key, remove `SECRET_ENCRYPTION_KEY_FALLBACKS` and restart again.
+
+Back up the new key, and keep the old one for as long as you keep database backups taken before the rotation: those still need it. A rotation takes seconds however many secrets there are, because the tenants' data keys stay the same — only their encryption changes.
+
 ## MCP tools and approvals {#mcp-tools-and-approvals}
 
-Every MCP tool call must present a short-lived X.509 certificate issued for the task making it — granted when the task's [approval](../guides/approvals.md#human-approval) is, or when a task nobody was asked to approve starts. The signing root is generated on first use and stored encrypted with the same key as local secrets, so nothing here needs configuring for the feature to work.
+Every MCP tool call must present a short-lived X.509 certificate issued for the task making it — granted when the task's [approval](../guides/approvals.md#human-approval) is, or when a task nobody was asked to approve starts. The signing root is generated on first use and stored encrypted with the master key above, so nothing here needs configuring for the feature to work.
 
 | Variable | Default | What it bounds |
 |---|---|---|

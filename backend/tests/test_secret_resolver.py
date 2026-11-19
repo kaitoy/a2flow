@@ -7,6 +7,7 @@ from cryptography.fernet import Fernet
 
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.secret_resolver import SecretResolver, split_secret_ref
+from infrastructure.tenant_cipher import TenantCiphers
 from infrastructure.vault_client import VaultClient, VaultError
 from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
@@ -14,6 +15,17 @@ from repositories.exceptions import SecretResolutionError
 from repositories.secret import SecretRepository
 
 _CIPHER = SecretCipher(Fernet.generate_key())
+
+
+class _FakeCiphers:
+    """Stand-in TenantCiphers: tenant ``t-1`` holds :data:`_CIPHER`, others a fresh key."""
+
+    def __init__(self) -> None:
+        self.asked: list[str] = []
+
+    async def for_tenant(self, tenant_id: str) -> SecretCipher:
+        self.asked.append(tenant_id)
+        return _CIPHER if tenant_id == "t-1" else SecretCipher(Fernet.generate_key())
 
 
 class _FakeRepo:
@@ -86,7 +98,7 @@ def _resolver(
     repo = _FakeRepo(secrets)
     resolver = SecretResolver(
         cast(SecretRepository, repo),
-        _CIPHER,
+        cast(TenantCiphers, _FakeCiphers()),
         _FakeVaults({} if vault is None else {"t-1": vault}),
     )
     return resolver, repo
@@ -109,6 +121,27 @@ async def test_resolve_value_picks_the_requested_entry() -> None:
     resolver, _ = _resolver([_local_secret("aws", ID="the-id", KEY="the-key")])
     assert await resolver.resolve_value("aws", "ID") == "the-id"
     assert await resolver.resolve_value("aws", "KEY") == "the-key"
+
+
+async def test_resolve_value_decrypts_with_the_secrets_own_tenant_key() -> None:
+    """A local value is decrypted with its own tenant's data key, no other."""
+    ciphers = _FakeCiphers()
+    resolver = SecretResolver(
+        cast(SecretRepository, _FakeRepo([_local_secret("api-key", token="p")])),
+        cast(TenantCiphers, ciphers),
+        _FakeVaults({}),
+    )
+    assert await resolver.resolve_value("api-key", "token") == "p"
+    assert ciphers.asked == ["t-1"]
+
+
+async def test_resolve_value_under_another_tenants_key_raises() -> None:
+    """A ciphertext moved into another tenant's secret does not decrypt there."""
+    moved = _local_secret("api-key", token="p")
+    moved.tenant_id = "t-2"
+    resolver, _ = _resolver([moved])
+    with pytest.raises(SecretResolutionError, match="api-key"):
+        await resolver.resolve_value("api-key", "token")
 
 
 async def test_resolve_value_unknown_name_raises() -> None:
@@ -142,7 +175,9 @@ async def test_resolve_value_reads_vault_of_the_secrets_own_tenant() -> None:
     """A secret is read with its own tenant's Vault, never another tenant's."""
     vaults = _FakeVaults({"t-2": _FakeVault()})
     resolver = SecretResolver(
-        cast(SecretRepository, _FakeRepo([_vault_secret("gh")])), _CIPHER, vaults
+        cast(SecretRepository, _FakeRepo([_vault_secret("gh")])),
+        cast(TenantCiphers, _FakeCiphers()),
+        vaults,
     )
     with pytest.raises(SecretResolutionError, match="Vault"):
         await resolver.resolve_value("gh", "token")

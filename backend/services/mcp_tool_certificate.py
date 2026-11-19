@@ -71,7 +71,7 @@ from infrastructure.mcp_certificate import (
     build_tool_urn,
     extract_claims,
 )
-from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
+from infrastructure.tenant_cipher import TenantCiphers
 from models.approval import Approval, ApprovalStatus
 from models.mcp_tool_certificate import (
     CertificateGrant,
@@ -146,7 +146,7 @@ def build_mcp_tool_certificate_service(
             tenant_id=tenant_id,
         ),
         SqlMcpCertificateAuthorityRepository(db),
-        get_secret_cipher(),
+        TenantCiphers(db),
         SqlApprovalRepository(db, executions, groups, tenant_id=tenant_id),
     )
 
@@ -159,7 +159,7 @@ class McpToolCertificateService:
         certificates: McpToolCertificateRepository,
         tasks: WorkflowTaskRepository,
         authorities: McpCertificateAuthorityRepository,
-        cipher: SecretCipher,
+        ciphers: TenantCiphers,
         approvals: ApprovalRepository,
     ) -> None:
         """Initialize the service.
@@ -168,8 +168,8 @@ class McpToolCertificateService:
             certificates: Repository providing certificate persistence.
             tasks: Repository the granted tool set is read from.
             authorities: Repository the signing root is loaded through.
-            cipher: Cipher the leaf's private key is encrypted with before it
-                is persisted.
+            ciphers: Source of the tenant data-key cipher the leaf's private
+                key is encrypted with before it is persisted.
             approvals: Repository the run's approvals are read from, so
                 :mod:`infrastructure.approval_scope` can tell the two issuance
                 paths apart -- a task an approval governs is the approver's to
@@ -179,7 +179,7 @@ class McpToolCertificateService:
         self._approvals = approvals
         self._tasks = tasks
         self._authorities = authorities
-        self._cipher = cipher
+        self._ciphers = ciphers
 
     async def _run_scope(
         self, execution_id: str
@@ -473,7 +473,8 @@ class McpToolCertificateService:
         The half both issuance paths share: everything from "which tools, whose
         authority, valid from when" onwards is identical, and keeping it in one
         place is what stops an initiator grant from drifting into a weaker
-        certificate than an approval-backed one.
+        certificate than an approval-backed one. The leaf's private key is
+        stored encrypted with the tenant's data key.
 
         Args:
             task: The task whose ``tool_bindings`` become the signed grant.
@@ -518,6 +519,7 @@ class McpToolCertificateService:
             not_after=not_after,
         )
 
+        cipher = await self._ciphers.for_tenant(tenant_id)
         certificate = await self._certificates.create(
             McpToolCertificateCreate(
                 grant_kind=grant_kind,
@@ -528,9 +530,7 @@ class McpToolCertificateService:
                 ca_id=ca.ca_id,
                 serial_number=str(leaf.serial_number),
                 certificate_pem=certificate_to_pem(leaf),
-                private_key_encrypted=self._cipher.encrypt(
-                    private_key_to_pem(leaf_key)
-                ),
+                private_key_encrypted=cipher.encrypt(private_key_to_pem(leaf_key)),
                 not_before=not_before,
                 not_after=not_after,
             ),

@@ -13,7 +13,7 @@ sidebar_position: 4
 | Agent skill store | A copy of the `SKILLS_DIR` tree | Extract it back into place |
 | Secret encryption key | The value of `SECRET_ENCRYPTION_KEY`, or the file at `SECRET_KEY_FILE` | Set the same value, or put the same file back |
 
-**Restore the database and the key together.** The key decrypts the local secrets *and* the approval CA's signing key, both of which are stored in the database. A database restored next to a different key comes up with every secret unreadable.
+**Restore the database and the key together.** The key unlocks each tenant's data key, which decrypts that tenant's local secrets and stored credentials, *and* it decrypts the approval CA's signing key. All of them are stored in the database. A database restored next to a different key comes up with every secret unreadable.
 
 ## The database
 
@@ -66,7 +66,7 @@ Under Docker Compose the file is in the `secret-key` named volume:
 docker run --rm -v a2flow_secret-key:/key -v "$PWD:/backup" alpine   cp /key/.secret_key /backup/secret_key-$(date +%F)
 ```
 
-Rotating the key is not supported: the existing secrets are encrypted with the old one. See [Secret management](./configuration.md#secret-management).
+To rotate the key, follow [Rotating the master key](./configuration.md#rotating-the-master-key). A database backup needs the key that was current when it was taken, so keep an old key for as long as you keep backups from before the rotation.
 
 ## Checking a restore
 

@@ -128,6 +128,8 @@ services:
       # the image, and never mounted into `mcp-proxy`.
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       SECRET_KEY_FILE: /var/lib/a2flow/secret-key/.secret_key
+      # Previous keys, only while a rotation is under way.
+      SECRET_ENCRYPTION_KEY_FALLBACKS: ${SECRET_ENCRYPTION_KEY_FALLBACKS:-}
       # Lets a tenant's SSO issuer be the `keycloak` service below, which is
       # on a private address and speaks plain http.
       OIDC_ALLOWED_PRIVATE_HOSTS: ${OIDC_ALLOWED_PRIVATE_HOSTS:-keycloak.localhost}
@@ -169,6 +171,7 @@ services:
       # Same key as the backend: the worker decrypts the SMTP password.
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       SECRET_KEY_FILE: /var/lib/a2flow/secret-key/.secret_key
+      SECRET_ENCRYPTION_KEY_FALLBACKS: ${SECRET_ENCRYPTION_KEY_FALLBACKS:-}
     volumes:
       - secret-key:/var/lib/a2flow/secret-key
     depends_on:

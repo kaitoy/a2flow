@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
-from infrastructure.secret_cipher import get_secret_cipher
+from infrastructure.secret_cipher import SecretCipher
+from infrastructure.tenant_cipher import TenantCiphers
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
 from models.secret import SecretCreate, SecretType
 from models.tenant import Tenant
@@ -67,6 +68,22 @@ async def seed_tenant(
             await session.commit()
 
 
+async def tenant_cipher(
+    engine: AsyncEngine, tenant_id: str = DEFAULT_TEST_TENANT_ID
+) -> SecretCipher:
+    """Return the data-key cipher a seeded tenant's values are encrypted with.
+
+    Args:
+        engine: The async engine bound to the test database.
+        tenant_id: The seeded tenant.
+
+    Returns:
+        The cipher of that tenant's data key.
+    """
+    async with AsyncSession(engine) as session:
+        return await TenantCiphers(session).for_tenant(tenant_id)
+
+
 async def seed_local_secret(
     engine: AsyncEngine,
     name: str,
@@ -81,7 +98,7 @@ async def seed_local_secret(
         entries: Plaintext entry values by key.
         tenant_id: Tenant the secret belongs to.
     """
-    cipher = get_secret_cipher()
+    cipher = await tenant_cipher(engine, tenant_id)
     async with AsyncSession(engine) as session:
         await SqlSecretRepository(session, tenant_id=tenant_id).create(
             SecretCreate(

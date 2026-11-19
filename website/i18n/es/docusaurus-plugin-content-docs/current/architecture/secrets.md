@@ -19,11 +19,20 @@ Un [secreto](../guides/secrets.md) es un conjunto con nombre de entradas de clav
 
 ## Secretos locales {#local-secrets}
 
-Los valores se cifran con una única clave que pertenece al despliegue. Las claves de las entradas se quedan en texto plano junto a ellos, lo que permite que un selector las liste sin descifrar nada, y ningún valor se devuelve nunca a un cliente en ninguna forma; por eso la página de detalle de un secreto local muestra sus claves con los valores en blanco.
+Los valores se cifran en dos capas. El despliegue tiene una única **clave maestra**, y cada tenant tiene su propia **clave de datos**, creada junto con el tenant y almacenada cifrada con la clave maestra. Los valores de un tenant se cifran con su propia clave de datos, así que un valor copiado en un secreto de otro tenant no puede descifrarse allí.
 
-La clave de cifrado se resuelve una vez por proceso: se toma del entorno si está definida ahí; si no, se lee de un archivo de clave; y, si tampoco existe, se genera en el primer uso y se escribe en ese archivo, con una advertencia en el registro.
+| Clave | Qué cifra |
+|---|---|
+| La clave maestra | La clave de datos de cada tenant; los ajustes propios de la plataforma (la contraseña SMTP y la clave de API del LLM de la plataforma); la clave de firma de la autoridad que emite los [certificados de herramientas](./approvals.md) |
+| La clave de datos de un tenant | Los valores de los secretos locales de ese tenant; las credenciales guardadas en el tenant (sus credenciales de Vault, el secreto de cliente del inicio de sesión único y su clave de API del LLM); las claves privadas de sus certificados de herramientas |
 
-**Haz una copia de seguridad de esa clave.** Si se pierde, ningún secreto local guardado puede descifrarse y, como la misma clave protege la clave de firma de la autoridad que emite los [certificados de herramientas](./approvals.md), tampoco pueden emitirse ni verificarse certificados, lo que detiene todas las llamadas a herramientas MCP. Ambas se describen en la [referencia de configuración](../operations/configuration.md#secret-management).
+Las claves de las entradas se quedan en texto plano junto a ellos, lo que permite que un selector las liste sin descifrar nada, y ningún valor se devuelve nunca a un cliente en ninguna forma; por eso la página de detalle de un secreto local muestra sus claves con los valores en blanco.
+
+La clave maestra se resuelve una vez por proceso: se toma del entorno si está definida ahí; si no, se lee de un archivo de clave; y, si tampoco existe, se genera en el primer uso y se escribe en ese archivo, con una advertencia en el registro.
+
+La clave maestra se puede [rotar](../operations/configuration.md#rotating-the-master-key): las claves anteriores siguen descifrando mientras el backend vuelve a cifrar, al arrancar, lo que protegen. Las claves de datos de los tenants no cambian, así que no hay que volver a cifrar nada de lo que posee un tenant.
+
+**Haz una copia de seguridad de esa clave.** Si se pierde, la clave de datos de ningún tenant puede descifrarse, y con ellas ningún secreto local ni credencial guardados; y, como la misma clave protege la clave de firma de la autoridad de certificación, tampoco pueden emitirse ni verificarse certificados, lo que detiene todas las llamadas a herramientas MCP. Ambas se describen en la [referencia de configuración](../operations/configuration.md#secret-management).
 
 ## Secretos de HashiCorp Vault {#hashicorp-vault-secrets}
 

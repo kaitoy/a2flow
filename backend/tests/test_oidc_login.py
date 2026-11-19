@@ -17,8 +17,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from infrastructure.oidc_client import OidcClient
 from infrastructure.password import hash_password
-from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_cipher import SecretCipher, data_key_cipher
 from infrastructure.secret_resolver import SecretResolver
+from infrastructure.tenant_cipher import TenantCiphers
 from infrastructure.vault_client import TenantVaults
 from models.secret import Secret, SecretType
 from models.tenant import Tenant
@@ -51,13 +52,16 @@ PASSWORD = "correct-horse-battery"
 
 @dataclass
 class Ctx:
-    """Everything a test needs: the service, its session, the fake IdP, the key."""
+    """Everything a test needs: the service, its session, the fake IdP, the keys."""
 
     svc: OidcLoginService
     auth: AuthService
     db: AsyncSession
     fake: FakeIdp
+    #: The master key the state cookie is encrypted with.
     key: bytes
+    #: The cipher of ``acme``'s data key, which its stored secrets are under.
+    data_key: SecretCipher
 
 
 @pytest_asyncio.fixture()
@@ -68,20 +72,20 @@ async def ctx(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Ctx, None]:
     key = Fernet.generate_key()
     cipher = SecretCipher(key)
     async with AsyncSession(engine, expire_on_commit=False) as db:
-        db.add(
-            Tenant(
-                id=TENANT_ID,
-                name="acme",
-                display_name="Acme",
-                enabled=True,
-                oidc_enabled=True,
-                oidc_issuer=ISSUER,
-                oidc_client_id=CLIENT_ID,
-                oidc_client_secret=cipher.encrypt("s3cret"),
-                created_by=SYSTEM_USER_ID,
-                updated_by=SYSTEM_USER_ID,
-            )
+        tenant = Tenant(
+            id=TENANT_ID,
+            name="acme",
+            display_name="Acme",
+            enabled=True,
+            oidc_enabled=True,
+            oidc_issuer=ISSUER,
+            oidc_client_id=CLIENT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
         )
+        data_key = data_key_cipher(tenant.data_key)
+        tenant.oidc_client_secret = data_key.encrypt("s3cret")
+        db.add(tenant)
         monkeypatch.setenv("APP_BASE_URL", BASE_URL)
         get_settings.cache_clear()
         db.add(
@@ -117,11 +121,13 @@ async def ctx(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Ctx, None]:
                 db, SqlUserRepository(db), tenant_id=t
             ),
             secrets_for_tenant=lambda t: SecretResolver(
-                SqlSecretRepository(db, tenant_id=t), cipher, TenantVaults(db, cipher)
+                SqlSecretRepository(db, tenant_id=t),
+                TenantCiphers(db),
+                TenantVaults(db),
             ),
         )
         try:
-            yield Ctx(svc=svc, auth=auth, db=db, fake=fake, key=key)
+            yield Ctx(svc=svc, auth=auth, db=db, fake=fake, key=key, data_key=data_key)
         finally:
             await engine.dispose()
 
@@ -531,7 +537,7 @@ async def test_start_unavailable_is_uniform(
     tenant.oidc_client_secret = None
     await save(tenant)
     assert await code_for("acme") == SsoErrorCode.unavailable
-    tenant.oidc_client_secret = SecretCipher(ctx.key).encrypt("s3cret")
+    tenant.oidc_client_secret = ctx.data_key.encrypt("s3cret")
 
     monkeypatch.setenv("APP_BASE_URL", "")
     get_settings.cache_clear()
@@ -559,7 +565,7 @@ async def test_a_referenced_client_secret_is_sent_to_the_idp(ctx: Ctx) -> None:
         Secret(
             name="idp",
             type=SecretType.local,
-            entries={"client-secret": SecretCipher(ctx.key).encrypt("from-secret")},
+            entries={"client-secret": ctx.data_key.encrypt("from-secret")},
             tenant_id=TENANT_ID,
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,

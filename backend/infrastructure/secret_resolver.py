@@ -21,7 +21,8 @@ the services package would create an import cycle through
 
 A secret holds a map of entries, so every reference must name a key — even when
 the secret has exactly one entry. ``local`` entries are decrypted from the
-database; ``vault`` entries are read live from the HashiCorp Vault the
+database with the data key of the secret's own tenant
+(:class:`infrastructure.tenant_cipher.TenantCiphers`); ``vault`` entries are read live from the HashiCorp Vault the
 **secret's own tenant** reads from, with that tenant's credential -- its own
 Vault, or the global one logged in to with the tenant's credential for it
 (:class:`infrastructure.vault_client.TenantVaults`) -- so a secret never reads
@@ -38,7 +39,7 @@ from typing import Protocol
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
+from infrastructure.tenant_cipher import TenantCiphers
 from infrastructure.vault_client import TenantVaults, VaultClient, VaultError
 from models.secret import Secret, SecretType
 from repositories.exceptions import SecretResolutionError
@@ -83,21 +84,22 @@ class SecretResolver:
     def __init__(
         self,
         repo: SecretRepository,
-        cipher: SecretCipher,
+        ciphers: TenantCiphers,
         vaults: VaultLookup,
     ) -> None:
         """Initialize the resolver.
 
         Args:
             repo: Repository used to look secrets up by name.
-            cipher: Cipher used to decrypt local secret values.
+            ciphers: Source of the data-key cipher of each secret's tenant,
+                which decrypts its local values.
             vaults: Source of the Vault client each tenant reads
                 ``vault``-type secrets with. A tenant with neither its own
                 Vault nor a credential for the global one makes resolving its
                 vault secrets fail with :class:`SecretResolutionError`.
         """
         self._repo = repo
-        self._cipher = cipher
+        self._ciphers = ciphers
         self._vaults = vaults
 
     async def is_visible(self, name: str) -> bool:
@@ -134,7 +136,7 @@ class SecretResolver:
         if secret is None:
             raise SecretResolutionError(name, "no secret with this name exists")
         if secret.type is SecretType.local:
-            return self._decrypt(secret, key)
+            return await self._decrypt(secret, key)
         return await self._read_vault(secret, key)
 
     async def resolve_ref(self, ref: str) -> str:
@@ -240,8 +242,8 @@ class SecretResolver:
         """
         return await self.resolve_mapping(headers)
 
-    def _decrypt(self, secret: Secret, key: str) -> str:
-        """Decrypt one entry of a local secret.
+    async def _decrypt(self, secret: Secret, key: str) -> str:
+        """Decrypt one entry of a local secret with its tenant's data key.
 
         Args:
             secret: A ``local``-type secret row.
@@ -260,7 +262,8 @@ class SecretResolver:
                 secret.name, "the secret has no entry with this key"
             )
         try:
-            return self._cipher.decrypt(ciphertext)
+            cipher = await self._ciphers.for_tenant(secret.tenant_id)
+            return cipher.decrypt(ciphertext)
         except ValueError as exc:
             raise SecretResolutionError(secret.name, str(exc)) from exc
 
@@ -331,7 +334,8 @@ def tenant_secret_resolver(db: AsyncSession, tenant_id: str) -> SecretResolver:
     Returns:
         A resolver reading that tenant's secrets through its Vault.
     """
-    cipher = get_secret_cipher()
     return SecretResolver(
-        SqlSecretRepository(db, tenant_id=tenant_id), cipher, TenantVaults(db, cipher)
+        SqlSecretRepository(db, tenant_id=tenant_id),
+        TenantCiphers(db),
+        TenantVaults(db),
     )

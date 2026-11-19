@@ -13,6 +13,7 @@ from fastapi import Depends
 from config import get_settings
 from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.secret_resolver import SecretResolver, tenant_secret_resolver
+from infrastructure.tenant_cipher import TenantCiphers
 from infrastructure.vault_client import TenantVaults
 from repositories.secret import SqlSecretRepository
 from repositories.session_file import SessionFileRepository
@@ -129,9 +130,9 @@ def get_skill_sync_job() -> SkillSyncJob:
 SkillSyncJobDep = Annotated[SkillSyncJob, Depends(get_skill_sync_job)]
 
 
-def get_tenant_vaults(db: DBSessionDep, cipher: SecretCipherDep) -> TenantVaults:
+def get_tenant_vaults(db: DBSessionDep) -> TenantVaults:
     """Create the per-request source of the Vault client each tenant reads with."""
-    return TenantVaults(db, cipher)
+    return TenantVaults(db)
 
 
 TenantVaultsDep = Annotated[TenantVaults, Depends(get_tenant_vaults)]
@@ -149,29 +150,40 @@ LlmSettingsResolverDep = Annotated[
 ]
 
 
+def get_tenant_ciphers(db: DBSessionDep) -> TenantCiphers:
+    """Create the per-request source of each tenant's data-key cipher."""
+    return TenantCiphers(db)
+
+
+TenantCiphersDep = Annotated[TenantCiphers, Depends(get_tenant_ciphers)]
+
+
 def get_secret_resolver(
     repo: SecretRepositoryDep,
-    cipher: SecretCipherDep,
+    ciphers: TenantCiphersDep,
     vaults: TenantVaultsDep,
 ) -> SecretResolver:
-    """Create a SecretResolver wiring the repository, cipher, and tenant Vaults."""
-    return SecretResolver(repo, cipher, vaults)
+    """Create a SecretResolver wiring the repository, tenant ciphers and Vaults."""
+    return SecretResolver(repo, ciphers, vaults)
 
 
 SecretResolverDep = Annotated[SecretResolver, Depends(get_secret_resolver)]
 
 
 def get_secret_service(
-    repo: SecretRepositoryDep, cipher: SecretCipherDep, resolver: SecretResolverDep
+    repo: SecretRepositoryDep,
+    ciphers: TenantCiphersDep,
+    resolver: SecretResolverDep,
+    tenant_id: CurrentTenantScopeDep,
 ) -> SecretService:
-    """Create a SecretService wiring the repository, cipher, and resolver.
+    """Create a SecretService wiring the repository, tenant ciphers, and resolver.
 
     Declared after :func:`get_secret_resolver` because it annotates against
     ``SecretResolverDep``. FastAPI caches ``Depends()`` per request, so the
     resolver's repository is the very same tenant-scoped instance the service
     holds.
     """
-    return SecretService(repo, cipher, resolver)
+    return SecretService(repo, ciphers, resolver, tenant_id=tenant_id)
 
 
 SecretServiceDep = Annotated[SecretService, Depends(get_secret_service)]
@@ -334,10 +346,9 @@ OutboundEmailServiceDep = Annotated[
 def get_tenant_service(
     db: DBSessionDep,
     repo: TenantRepositoryDep,
-    cipher: SecretCipherDep,
     users: UserRepositoryDep,
 ) -> TenantService:
-    """Create a TenantService backed by the request's repositories and the cipher.
+    """Create a TenantService backed by the request's repositories.
 
     The secret repository is built per tenant rather than injected: tenant
     routes address a tenant by id, not by the caller's acting tenant, and only
@@ -346,7 +357,6 @@ def get_tenant_service(
     """
     return TenantService(
         repo,
-        cipher,
         users,
         secrets_for_tenant=lambda tenant_id: SqlSecretRepository(
             db, tenant_id=tenant_id
@@ -678,12 +688,12 @@ def get_mcp_tool_certificate_service(
     certificates: McpToolCertificateRepositoryDep,
     tasks: WorkflowTaskRepositoryDep,
     authorities: McpCertificateAuthorityRepositoryDep,
-    cipher: SecretCipherDep,
+    ciphers: TenantCiphersDep,
     approvals: ApprovalRepositoryDep,
 ) -> McpToolCertificateService:
     """Create an McpToolCertificateService backed by the request's repositories."""
     return McpToolCertificateService(
-        certificates, tasks, authorities, cipher, approvals
+        certificates, tasks, authorities, ciphers, approvals
     )
 
 

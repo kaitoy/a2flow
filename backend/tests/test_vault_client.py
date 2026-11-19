@@ -174,16 +174,13 @@ async def test_approle_uses_custom_login_mount() -> None:
 
 
 async def _tenant_vaults_env() -> tuple[Any, Any]:
-    """Return an engine with the default test tenant seeded, plus a cipher."""
-    from cryptography.fernet import Fernet
-
-    from infrastructure.secret_cipher import SecretCipher
+    """Return an engine with the default test tenant seeded, plus its data-key cipher."""
     from tests._engine import make_test_engine
-    from tests._seed import seed_users
+    from tests._seed import seed_users, tenant_cipher
 
     engine = await make_test_engine()
     await seed_users(engine)
-    return engine, SecretCipher(Fernet.generate_key())
+    return engine, await tenant_cipher(engine)
 
 
 async def _configure(engine: Any, **fields: Any) -> None:
@@ -228,7 +225,7 @@ async def test_tenant_vaults_follow_each_tenants_own_settings() -> None:
     engine, cipher = await _tenant_vaults_env()
     try:
         async with AsyncSession(engine) as db:
-            vaults = TenantVaults(db, cipher)
+            vaults = TenantVaults(db)
             assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
             assert await vaults.client_for("no-such-tenant") is None
 
@@ -239,14 +236,14 @@ async def test_tenant_vaults_follow_each_tenants_own_settings() -> None:
             vault_credential=cipher.encrypt("tok"),
         )
         async with AsyncSession(engine) as db:
-            vaults = TenantVaults(db, cipher)
+            vaults = TenantVaults(db)
             first = await vaults.client_for(DEFAULT_TEST_TENANT_ID)
             assert isinstance(first, VaultClient)
             assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is first
 
         await _configure(engine, vault_addr="https://other-vault.example.com")
         async with AsyncSession(engine) as db:
-            second = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+            second = await TenantVaults(db).client_for(DEFAULT_TEST_TENANT_ID)
             assert second is not None and second is not first
     finally:
         await engine.dispose()
@@ -271,7 +268,7 @@ async def test_tenant_vaults_refuse_an_undecryptable_credential() -> None:
             vault_credential=SecretCipher(Fernet.generate_key()).encrypt("tok"),
         )
         async with AsyncSession(engine) as db:
-            vaults = TenantVaults(db, cipher)
+            vaults = TenantVaults(db)
             assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
     finally:
         await engine.dispose()
@@ -294,7 +291,7 @@ async def test_global_vault_logs_in_with_the_tenants_own_credential() -> None:
     try:
         await _configure_global(engine, vault_addr=_GLOBAL_ADDR)
         async with AsyncSession(engine) as db:
-            vaults = TenantVaults(db, cipher)
+            vaults = TenantVaults(db)
             assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
 
         await _configure(
@@ -303,7 +300,7 @@ async def test_global_vault_logs_in_with_the_tenants_own_credential() -> None:
             global_vault_credential=cipher.encrypt("tenant-tok"),
         )
         async with AsyncSession(engine) as db:
-            client = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+            client = await TenantVaults(db).client_for(DEFAULT_TEST_TENANT_ID)
         assert client is not None
         assert client._addr == _GLOBAL_ADDR
         assert isinstance(client._auth, TokenAuth)
@@ -327,7 +324,7 @@ async def test_a_credential_without_a_global_address_is_not_used() -> None:
             global_vault_credential=cipher.encrypt("tenant-tok"),
         )
         async with AsyncSession(engine) as db:
-            vaults = TenantVaults(db, cipher)
+            vaults = TenantVaults(db)
             assert await vaults.client_for(DEFAULT_TEST_TENANT_ID) is None
     finally:
         await engine.dispose()
@@ -352,7 +349,7 @@ async def test_a_tenants_own_vault_wins_over_the_global_one() -> None:
             global_vault_credential=cipher.encrypt("tenant-tok"),
         )
         async with AsyncSession(engine) as db:
-            client = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+            client = await TenantVaults(db).client_for(DEFAULT_TEST_TENANT_ID)
         assert client is not None
         assert client._addr == _ADDR
     finally:
@@ -376,7 +373,7 @@ async def test_a_tenants_own_vault_refuses_a_private_peer() -> None:
             vault_credential=cipher.encrypt("tok"),
         )
         async with AsyncSession(engine) as db:
-            client = await TenantVaults(db, cipher).client_for(DEFAULT_TEST_TENANT_ID)
+            client = await TenantVaults(db).client_for(DEFAULT_TEST_TENANT_ID)
         assert client is not None
         with pytest.raises(VaultError):
             await client.read_kv2("secret", "app/db")

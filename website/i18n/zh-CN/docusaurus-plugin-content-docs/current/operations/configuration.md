@@ -140,8 +140,9 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 | 变量 | 默认值 | 作用 |
 |---|---|---|
-| `SECRET_ENCRYPTION_KEY` | — | Fernet 加密密钥，用于在存储前加密 `local` 类型的[密钥](../guides/secrets.md) |
+| `SECRET_ENCRYPTION_KEY` | — | 主加密密钥。它加密每个租户各自的数据加密密钥，再由数据加密密钥加密该租户 `local` 类型的[密钥](../guides/secrets.md)和已保存的凭据（请参阅[密钥存储](../architecture/secrets.md#local-secrets)） |
 | `SECRET_KEY_FILE` | `.secret_key` | 磁盘上加密密钥文件的路径，与 SQLite 数据库文件相邻。在 `docker compose` 下为 `/var/lib/a2flow/secret-key/.secret_key`，由后端和邮件工作进程共享的命名卷 `secret-key` 提供 |
+| `SECRET_ENCRYPTION_KEY_FALLBACKS` | — | 以前的主加密密钥，以逗号分隔。仅在[轮换](#rotating-the-master-key)进行期间用于解密 |
 
 加密密钥在首次使用时按以下顺序确定：
 
@@ -149,13 +150,22 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 2. `SECRET_KEY_FILE` 指向的密钥文件。
 3. 如果两者都不可用，则生成一个密钥并保存到该文件，同时记录一条 WARNING 日志。
 
-**请备份加密密钥**。一旦丢失，所有已存储的本地密钥都将无法解密，而且[审批 CA](../architecture/approvals.md) 的签名密钥也由同一个加密密钥保护。
+**请备份加密密钥**。一旦丢失，所有租户的数据加密密钥都将无法解密，所有已存储的本地密钥和凭据也随之无法解密。而且[审批 CA](../architecture/approvals.md) 的签名密钥也由同一个加密密钥保护。
 
 HashiCorp Vault 没有对应的环境变量：租户自己的 Vault 由其管理员在[管理员设置](../guides/users-and-groups.md#tenant-vault)中配置，全局 Vault 的地址由超级管理员在[系统设置](../guides/system-settings.md#global-vault)中配置，每个租户[访问全局 Vault 的凭据](../guides/users-and-groups.md#global-vault-credential)则在该租户的页面上配置。租户自己的 Vault 地址与其他用户提供的 URL 一样要经过 SSRF 检查，因此必须是公网地址。全局 Vault 地址不受此限制，因为只有超级管理员才能设置它，而且 Vault 通常位于私有地址上。
 
+### 轮换主加密密钥 {#rotating-the-master-key}
+
+1. 使用 `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成新的加密密钥。
+2. 把它设为主加密密钥（设置为 `SECRET_ENCRYPTION_KEY`，或写入密钥文件），并把旧的加密密钥放入 `SECRET_ENCRYPTION_KEY_FALLBACKS`。后端和邮件 worker 都要设置这两项。
+3. 重启。后端在启动时会用新的加密密钥重新加密所有内容，并以 WARNING 日志记录重新加密的值的数量。在此之前，仍由旧加密密钥加密的值照样可以解密，因此过程中不会有功能停止工作。
+4. 所有副本都使用新的加密密钥运行后，移除 `SECRET_ENCRYPTION_KEY_FALLBACKS` 并再次重启。
+
+请备份新的加密密钥；只要还保留着轮换前的数据库备份，就要保留旧的加密密钥，因为那些备份仍然需要它。无论有多少密钥，轮换都只需几秒钟，因为各租户的数据加密密钥本身不变，变的只是对它们的加密。
+
 ## MCP 工具与审批 {#mcp-tools-and-approvals}
 
-每次调用 MCP 工具都必须出示为发起调用的任务签发的短期 X.509 证书。证书在任务的[审批](../guides/approvals.md#human-approval)获得批准时授予，或者在无需任何人审批的任务启动时授予。签名根证书在首次使用时生成，并使用与本地密钥相同的加密密钥加密存储，因此无需在此配置任何内容，该功能即可工作。
+每次调用 MCP 工具都必须出示为发起调用的任务签发的短期 X.509 证书。证书在任务的[审批](../guides/approvals.md#human-approval)获得批准时授予，或者在无需任何人审批的任务启动时授予。签名根证书在首次使用时生成，并使用上述主加密密钥加密存储，因此无需在此配置任何内容，该功能即可工作。
 
 | 变量 | 默认值 | 限制的内容 |
 |---|---|---|

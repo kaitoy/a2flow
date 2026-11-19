@@ -140,8 +140,9 @@ Los archivos de sesión se guardan en la base de datos y no en disco, por lo que
 
 | Variable | Valor predeterminado | Qué hace |
 |---|---|---|
-| `SECRET_ENCRYPTION_KEY` | — | Clave Fernet con la que se cifran los [secretos](../guides/secrets.md) de tipo `local` antes de almacenarlos |
+| `SECRET_ENCRYPTION_KEY` | — | La clave maestra. Cifra la clave de datos propia de cada tenant, que a su vez cifra los [secretos](../guides/secrets.md) de tipo `local` y las credenciales guardadas de ese tenant (consulta [Almacenamiento de secretos](../architecture/secrets.md#local-secrets)) |
 | `SECRET_KEY_FILE` | `.secret_key` | Ruta del archivo de clave en disco, junto al archivo de la base de datos SQLite. Con `docker compose` es `/var/lib/a2flow/secret-key/.secret_key`, respaldado por el volumen con nombre `secret-key` que comparten el backend y el worker de correo |
+| `SECRET_ENCRYPTION_KEY_FALLBACKS` | — | Claves maestras anteriores, separadas por comas. Solo se usan para descifrar, mientras hay una [rotación](#rotating-the-master-key) en curso |
 
 La clave de cifrado se resuelve en el primer uso, en este orden:
 
@@ -149,13 +150,22 @@ La clave de cifrado se resuelve en el primer uso, en este orden:
 2. El archivo de clave de `SECRET_KEY_FILE`.
 3. Si ninguna de las dos existe, se genera una clave, se guarda en ese archivo y se registra un WARNING.
 
-**Haz copia de seguridad de la clave.** Perderla hace indescifrables todos los secretos locales almacenados, y esa misma clave protege la clave de firma de la [CA de aprobaciones](../architecture/approvals.md).
+**Haz copia de seguridad de la clave.** Perderla hace indescifrable la clave de datos de cada tenant, y con ellas todos los secretos locales y credenciales almacenados. Esa misma clave protege la clave de firma de la [CA de aprobaciones](../architecture/approvals.md).
 
 No hay ninguna variable de entorno para HashiCorp Vault: el administrador de un tenant configura el Vault propio de este en [Configuración de administrador](../guides/users-and-groups.md#tenant-vault), y un Superadministrador configura la dirección del Vault global en [Configuración del sistema](../guides/system-settings.md#global-vault), con la [credencial de cada tenant para él](../guides/users-and-groups.md#global-vault-credential) en la página del tenant. La dirección del Vault propio de un tenant pasa por las mismas comprobaciones SSRF que las demás URL que introducen los usuarios, así que debe ser pública. La dirección del Vault global está exenta, ya que solo un Superadministrador puede establecerla y un Vault suele estar en una dirección privada.
 
+### Rotar la clave maestra {#rotating-the-master-key}
+
+1. Genera una clave nueva con `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+2. Conviértela en la clave maestra (defínela como `SECRET_ENCRYPTION_KEY` o escríbela en el archivo de clave) y pon la clave antigua en `SECRET_ENCRYPTION_KEY_FALLBACKS`. Define ambas en el backend y en el worker de correo.
+3. Reinicia. Al arrancar, el backend vuelve a cifrar todo con la clave nueva y registra un WARNING con el número de valores que ha vuelto a cifrar. Hasta entonces, los valores que siguen bajo la clave antigua se pueden descifrar, así que nada deja de funcionar por el camino.
+4. Cuando todas las réplicas funcionen con la clave nueva, quita `SECRET_ENCRYPTION_KEY_FALLBACKS` y vuelve a reiniciar.
+
+Haz una copia de seguridad de la clave nueva y conserva la antigua mientras conserves copias de seguridad de la base de datos anteriores a la rotación: esas copias la siguen necesitando. Una rotación tarda segundos sin importar cuántos secretos haya, porque las claves de datos de los tenants no cambian; solo cambia su cifrado.
+
 ## Herramientas MCP y aprobaciones {#mcp-tools-and-approvals}
 
-Cada llamada a una herramienta MCP debe presentar un certificado X.509 de corta duración emitido para la tarea que la realiza, que se concede cuando se concede la [aprobación](../guides/approvals.md#human-approval) de la tarea o cuando empieza una tarea para la que no se pidió aprobación a nadie. La raíz de firma se genera en el primer uso y se almacena cifrada con la misma clave que los secretos locales, así que no hay que configurar nada aquí para que esto funcione.
+Cada llamada a una herramienta MCP debe presentar un certificado X.509 de corta duración emitido para la tarea que la realiza, que se concede cuando se concede la [aprobación](../guides/approvals.md#human-approval) de la tarea o cuando empieza una tarea para la que no se pidió aprobación a nadie. La raíz de firma se genera en el primer uso y se almacena cifrada con la clave maestra anterior, así que no hay que configurar nada aquí para que esto funcione.
 
 | Variable | Valor predeterminado | Qué limita |
 |---|---|---|

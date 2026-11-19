@@ -140,8 +140,9 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 | 変数 | 既定値 | 役割 |
 |---|---|---|
-| `SECRET_ENCRYPTION_KEY` | — | `local` タイプの[シークレット](../guides/secrets.md)を保存前に暗号化する Fernet キー |
+| `SECRET_ENCRYPTION_KEY` | — | マスターキー。各テナント専用のデータキーを暗号化し、そのデータキーがテナントの `local` タイプの[シークレット](../guides/secrets.md)と保存済みの資格情報を暗号化します（[シークレットの保管](../architecture/secrets.md#local-secrets)を参照） |
 | `SECRET_KEY_FILE` | `.secret_key` | ディスク上のキーファイルのパス。SQLite のデータベースファイルの隣です。`docker compose` では `/var/lib/a2flow/secret-key/.secret_key` で、バックエンドとメールワーカーが共有する `secret-key` という名前付きボリュームに置かれます |
+| `SECRET_ENCRYPTION_KEY_FALLBACKS` | — | 以前のマスターキー（カンマ区切り）。[ローテーション](#rotating-the-master-key)の途中だけ、復号にのみ使われます |
 
 暗号化キーは最初の使用時に、次の順で解決されます。
 
@@ -149,13 +150,22 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 2. `SECRET_KEY_FILE` のキーファイル。
 3. どちらもなければ、キーを生成してそのファイルに保存し、WARNING をログに出します。
 
-**キーはバックアップしてください。** 失うと保存済みのローカルシークレットがすべて復号できなくなり、同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
+**キーはバックアップしてください。** 失うとすべてのテナントのデータキーが復号できなくなり、保存済みのローカルシークレットと資格情報もすべて復号できなくなります。同じキーが守っている[承認 CA](../architecture/approvals.md) の署名キーも使えなくなります。
 
 HashiCorp Vault 用の環境変数はありません。テナント専用の Vault はテナントの管理者が [管理者設定](../guides/users-and-groups.md#tenant-vault) で、グローバル Vault のアドレスは上位管理者が [システム設定](../guides/system-settings.md#global-vault) で、各テナントの[その認証情報](../guides/users-and-groups.md#global-vault-credential)はテナントのページで設定します。テナント専用の Vault のアドレスには、ユーザーが入力するほかの URL と同じ SSRF チェックがかかるので、公開アドレスである必要があります。グローバル Vault のアドレスはこのチェックの対象外です。設定できるのは上位管理者だけで、Vault は通常プライベートアドレスにあるからです。
 
+### マスターキーのローテーション {#rotating-the-master-key}
+
+1. `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` で新しいキーを生成します。
+2. 新しいキーをマスターキーにします（`SECRET_ENCRYPTION_KEY` に設定するか、キーファイルに書き込みます）。古いキーは `SECRET_ENCRYPTION_KEY_FALLBACKS` に設定します。どちらもバックエンドとメールワーカーの両方に設定してください。
+3. 再起動します。バックエンドは起動時にすべてを新しいキーで暗号化し直し、暗号化し直した値の件数を WARNING でログに出します。それまでの間も古いキーの値は復号できるので、途中で止まる機能はありません。
+4. すべてのレプリカが新しいキーで動くようになったら、`SECRET_ENCRYPTION_KEY_FALLBACKS` を外してもう一度再起動します。
+
+新しいキーをバックアップしてください。古いキーは、ローテーション前に取ったデータベースのバックアップを残しておく間は保管してください。そのバックアップを戻すには古いキーが必要です。各テナントのデータキーそのものは変わらず、変わるのはその暗号化だけなので、シークレットがいくつあってもローテーションは数秒で終わります。
+
 ## MCP ツールと承認 {#mcp-tools-and-approvals}
 
-MCP ツールの呼び出しはどれも、そのタスク向けに発行された短命の X.509 証明書を提示しなければなりません。証明書が出るのは、そのタスクの[承認](../guides/approvals.md#human-approval)が許可されたとき、あるいは誰にも承認を求めないタスクが始まったときです。署名のルートは最初の使用時に生成され、ローカルシークレットと同じキーで暗号化して保存されるので、この機能を動かすためにここを設定する必要はありません。
+MCP ツールの呼び出しはどれも、そのタスク向けに発行された短命の X.509 証明書を提示しなければなりません。証明書が出るのは、そのタスクの[承認](../guides/approvals.md#human-approval)が許可されたとき、あるいは誰にも承認を求めないタスクが始まったときです。署名のルートは最初の使用時に生成され、上記のマスターキーで暗号化して保存されるので、この機能を動かすためにここを設定する必要はありません。
 
 | 変数 | 既定値 | 何を決めるか |
 |---|---|---|

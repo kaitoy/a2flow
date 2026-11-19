@@ -24,6 +24,7 @@ from tests._seed import (
     seed_local_secret,
     seed_tenant,
     seed_users,
+    tenant_cipher,
 )
 from tests.conftest import _install_auth_overrides
 
@@ -313,7 +314,9 @@ async def test_oidc_secret_is_encrypted_and_never_returned(
     assert "s3cret" not in response.text
     stored = (await _tenant(settings_engine)).oidc_client_secret
     assert stored is not None and stored != "s3cret"
-    assert get_secret_cipher().decrypt(stored) == "s3cret"
+    assert (await tenant_cipher(settings_engine)).decrypt(stored) == "s3cret"
+    with pytest.raises(ValueError):
+        get_secret_cipher().decrypt(stored)
 
 
 async def test_oidc_secret_blank_clears_and_omitted_keeps(
@@ -673,7 +676,8 @@ async def test_admin_can_set_the_llm_once_handed_to_them(
         tenant = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
     assert tenant is not None and tenant.llm_api_key is not None
     assert tenant.llm_api_key != "sk-tenant"
-    assert get_secret_cipher().decrypt(tenant.llm_api_key) == "sk-tenant"
+    cipher = await tenant_cipher(settings_engine)
+    assert cipher.decrypt(tenant.llm_api_key) == "sk-tenant"
 
 
 async def test_empty_llm_key_keeps_the_stored_one_and_null_clears_it(

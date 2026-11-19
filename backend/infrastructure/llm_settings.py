@@ -17,7 +17,8 @@ the tenant runs on the platform's LLM unchanged -- otherwise an admin could
 pick any model and bill it to the platform, or send the platform's key to
 another provider.
 
-The tenant's key is either stored encrypted (``llm_api_key``) or referenced
+The tenant's key is either stored encrypted with the tenant's data key
+(``llm_api_key``, see :mod:`infrastructure.secret_cipher`) or referenced
 from one of its secrets (``llm_api_key_ref``, set only by its ``admin``), which
 is read on every resolution so a key rotated in Vault takes effect at once.
 
@@ -33,7 +34,7 @@ from dataclasses import dataclass, field
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_cipher import SecretCipher, data_key_cipher
 from infrastructure.secret_resolver import tenant_secret_resolver
 from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import LlmMode, Tenant
@@ -69,7 +70,8 @@ class LlmSettingsResolver:
 
         Args:
             session: The SQLModel async session to read the rows with.
-            cipher: Cipher that decrypts the stored API keys.
+            cipher: The master cipher, which decrypts the platform-wide API
+                key. A tenant's own key is decrypted with its data key.
         """
         self._db = session
         self._cipher = cipher
@@ -92,8 +94,8 @@ class LlmSettingsResolver:
             one).
 
         Raises:
-            ValueError: If the stored key no longer decrypts because the Fernet
-                key changed. Deliberately not swallowed: falling back to the
+            ValueError: If the stored key (or the tenant's data key) no longer
+                decrypts because the master key changed. Deliberately not swallowed: falling back to the
                 platform's key would silently bill the wrong account.
             SecretResolutionError: If the tenant's key is referenced from a
                 secret that cannot be resolved -- not swallowed either, for the
@@ -115,7 +117,9 @@ class LlmSettingsResolver:
                 resolver = tenant_secret_resolver(self._db, tenant.id)
                 key = await resolver.resolve_ref(tenant.llm_api_key_ref)
                 return ResolvedLlm(model=model or DEFAULT_LLM_MODEL, api_key=key)
-            api_key = tenant.llm_api_key or api_key
+            if tenant.llm_api_key:
+                key = data_key_cipher(tenant.data_key).decrypt(tenant.llm_api_key)
+                return ResolvedLlm(model=model or DEFAULT_LLM_MODEL, api_key=key)
         return ResolvedLlm(
             model=model or DEFAULT_LLM_MODEL,
             api_key=self._cipher.decrypt(api_key) if api_key else None,

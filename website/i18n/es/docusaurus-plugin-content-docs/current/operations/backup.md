@@ -13,7 +13,7 @@ sidebar_position: 4
 | Almacén de skills de agente | Una copia del árbol de `SKILLS_DIR` | Extráelo de nuevo en su sitio |
 | Clave de cifrado de secretos | El valor de `SECRET_ENCRYPTION_KEY`, o el archivo de `SECRET_KEY_FILE` | Establece el mismo valor, o vuelve a colocar el mismo archivo |
 
-**Restaura la base de datos y la clave a la vez.** La clave descifra los secretos locales *y* la clave de firma de la CA de aprobaciones, ambos almacenados en la base de datos. Una base de datos restaurada junto a otra clave arranca con todos los secretos ilegibles.
+**Restaura la base de datos y la clave a la vez.** La clave desbloquea la clave de datos de cada tenant, que descifra los secretos locales y las credenciales guardadas de ese tenant, *y* descifra la clave de firma de la CA de aprobaciones. Todo ello se almacena en la base de datos. Una base de datos restaurada junto a otra clave arranca con todos los secretos ilegibles.
 
 ## La base de datos {#the-database}
 
@@ -66,7 +66,7 @@ Con Docker Compose, el archivo está en el volumen con nombre `secret-key`:
 docker run --rm -v a2flow_secret-key:/key -v "$PWD:/backup" alpine   cp /key/.secret_key /backup/secret_key-$(date +%F)
 ```
 
-No se admite la rotación de la clave: los secretos existentes están cifrados con la antigua. Consulta [Gestión de secretos](./configuration.md#secret-management).
+Para rotar la clave, sigue [Rotar la clave maestra](./configuration.md#rotating-the-master-key). Una copia de seguridad de la base de datos necesita la clave que estaba vigente cuando se hizo, así que conserva la clave antigua mientras conserves copias anteriores a la rotación.
 
 ## Comprobar una restauración {#checking-a-restore}
 

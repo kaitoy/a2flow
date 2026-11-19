@@ -21,7 +21,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from infrastructure.oidc_client import OidcClient
-from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_cipher import SecretCipher, data_key_cipher
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID
 from models.user_group import UserGroup
@@ -54,20 +54,21 @@ async def ctx(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Ctx, None]:
     await seed_users(engine, ids=())
     cipher = SecretCipher(Fernet.generate_key())
     async with AsyncSession(engine, expire_on_commit=False) as db:
-        db.add(
-            Tenant(
-                id=TENANT_ID,
-                name="acme",
-                display_name="Acme",
-                enabled=True,
-                oidc_enabled=True,
-                oidc_issuer=ISSUER,
-                oidc_client_id=CLIENT_ID,
-                oidc_client_secret=cipher.encrypt("s3cret"),
-                created_by=SYSTEM_USER_ID,
-                updated_by=SYSTEM_USER_ID,
-            )
+        tenant = Tenant(
+            id=TENANT_ID,
+            name="acme",
+            display_name="Acme",
+            enabled=True,
+            oidc_enabled=True,
+            oidc_issuer=ISSUER,
+            oidc_client_id=CLIENT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
         )
+        # The client secret is under the tenant's data key; ``cipher`` is the
+        # master the state cookie is encrypted with.
+        tenant.oidc_client_secret = data_key_cipher(tenant.data_key).encrypt("s3cret")
+        db.add(tenant)
         monkeypatch.setenv("APP_BASE_URL", "http://test")
         get_settings.cache_clear()
         db.add(

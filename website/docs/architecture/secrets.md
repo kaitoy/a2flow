@@ -19,11 +19,20 @@ A [secret](../guides/secrets.md) is a named bundle of key/value entries, and eve
 
 ## Local secrets
 
-Values are encrypted with a single key belonging to the deployment. The entry keys stay in plaintext beside them, which is what lets a picker list them without decrypting anything, and no value is ever handed back to a client in any form — which is why a local secret's detail page shows its keys with blank values.
+Values are encrypted in two layers. The deployment has one **master key**, and every tenant has its own **data key**, made when the tenant is created and stored encrypted with the master key. A tenant's values are encrypted with its own data key, so a value copied into another tenant's secret cannot be decrypted there.
 
-The encryption key is resolved once per process: taken from the environment if it is set there, otherwise read from a key file, otherwise generated on first use and written to that file with a warning in the log.
+| Key | Encrypts |
+|---|---|
+| The master key | Every tenant's data key; the platform's own settings — the SMTP password and the platform's LLM API key; the signing key of the authority that issues [tool certificates](./approvals.md) |
+| A tenant's data key | That tenant's local secret values; the credentials stored on the tenant — its Vault credentials, its single sign-on client secret and its LLM API key; the private keys of its tool certificates |
 
-**Back that key up.** Losing it makes every stored local secret undecryptable — and, because the same key protects the signing key of the authority that issues [tool certificates](./approvals.md), it also stops certificates from being issued or verified — which stops every MCP tool call. Both live in the [configuration reference](../operations/configuration.md#secret-management).
+The entry keys stay in plaintext beside them, which is what lets a picker list them without decrypting anything, and no value is ever handed back to a client in any form — which is why a local secret's detail page shows its keys with blank values.
+
+The master key is resolved once per process: taken from the environment if it is set there, otherwise read from a key file, otherwise generated on first use and written to that file with a warning in the log.
+
+The master key can be [rotated](../operations/configuration.md#rotating-the-master-key): previous keys keep decrypting while the backend re-encrypts, at startup, what they protect. The tenants' data keys do not change, so nothing a tenant owns is re-encrypted.
+
+**Back that key up.** Losing it makes every tenant's data key undecryptable, and with them every stored local secret and credential — and, because the same key protects the signing key of the certificate authority, it also stops certificates from being issued or verified — which stops every MCP tool call. Both live in the [configuration reference](../operations/configuration.md#secret-management).
 
 ## HashiCorp Vault secrets
 

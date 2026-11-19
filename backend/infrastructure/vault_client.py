@@ -31,7 +31,7 @@ from typing import Protocol
 import httpx
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_cipher import SecretCipher, data_key_cipher
 from infrastructure.url_safety import guard_peer_address
 from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import DEFAULT_VAULT_APPROLE_MOUNT, Tenant, VaultAuthMethod
@@ -287,15 +287,16 @@ class TenantVaults:
     of :class:`models.system_settings.SystemSettings` with its own credential.
     """
 
-    def __init__(self, session: AsyncSession, cipher: SecretCipher) -> None:
-        """Store the session the settings rows are read through and the cipher.
+    def __init__(self, session: AsyncSession) -> None:
+        """Store the session the settings rows are read through.
+
+        The stored Vault credentials are decrypted with the tenant's own data
+        key (see :mod:`infrastructure.secret_cipher`).
 
         Args:
             session: The SQLModel async session to read the rows with.
-            cipher: Cipher that decrypts the stored Vault credentials.
         """
         self._db = session
-        self._cipher = cipher
 
     async def client_for(self, tenant_id: str) -> VaultClient | None:
         """Return the Vault client ``tenant_id`` reads with, or ``None`` if none.
@@ -313,8 +314,18 @@ class TenantVaults:
         tenant = await self._db.get(Tenant, tenant_id)
         if tenant is None:
             return None
+        try:
+            cipher = data_key_cipher(tenant.data_key)
+        except ValueError:
+            logger.error(
+                "The data key of tenant %s could not be unwrapped; its "
+                "vault-type secrets fail until the master key is restored.",
+                tenant_id,
+            )
+            return None
         if tenant.vault_addr:
             return self._client(
+                cipher,
                 tenant_id,
                 tenant.vault_addr,
                 tenant.vault_auth_method,
@@ -327,6 +338,7 @@ class TenantVaults:
         if settings is None or not settings.vault_addr:
             return None
         return self._client(
+            cipher,
             f"global:{tenant_id}",
             settings.vault_addr,
             tenant.global_vault_auth_method,
@@ -338,6 +350,7 @@ class TenantVaults:
 
     def _client(
         self,
+        cipher: SecretCipher,
         key: str,
         addr: str,
         method: VaultAuthMethod | None,
@@ -350,6 +363,8 @@ class TenantVaults:
         """Return the cached client of a connection, rebuilding it on a change.
 
         Args:
+            cipher: The tenant's data-key cipher the credential is encrypted
+                with.
             key: :data:`_clients` key of the connection.
             addr: The Vault address.
             method: How to log in.
@@ -371,7 +386,7 @@ class TenantVaults:
         if cached is not None and cached[0] == config:
             return cached[1]
         try:
-            plaintext = self._cipher.decrypt(credential)
+            plaintext = cipher.decrypt(credential)
         except ValueError:
             logger.error(
                 "Stored Vault credential (%s) could not be decrypted; its "

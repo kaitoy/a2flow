@@ -90,7 +90,6 @@ from infrastructure.demo_data import (
     sync_demo_data,
 )
 from infrastructure.password import verify_password
-from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill, SkillSyncStatus
 from models.approval import Approval
 from models.knowledge import (
@@ -128,6 +127,7 @@ from repositories.metrics import SqlMetricsRepository
 from repositories.outbound_email import SqlOutboundEmailRepository
 from services.metrics import MetricsService
 from tests._engine import make_test_engine
+from tests._seed import tenant_cipher
 
 #: Fixed id of the ``Default`` tenant the fixture seeds, so tests can assert on
 #: the ``tenant_id`` the demo records land in without re-querying it.
@@ -728,7 +728,7 @@ async def test_demo_secrets_store_the_configured_values_encrypted(
     ]
     access_key = secret.entries[DEMO_ACCESS_KEY_ENTRY_KEY]
     assert access_key != "AKIAEXAMPLE"  # stored as ciphertext
-    cipher = get_secret_cipher()
+    cipher = await tenant_cipher(engine, TENANT_ID)
     assert cipher.decrypt(access_key) == "AKIAEXAMPLE"
     assert cipher.decrypt(secret.entries[DEMO_SECRET_KEY_ENTRY_KEY]) == "s3cr3t-key"
 
@@ -741,8 +741,26 @@ async def test_demo_secrets_fall_back_to_a_placeholder(
     async with AsyncSession(engine) as session:
         secret = await session.get(Secret, DEMO_AWS_SECRET_ID)
     assert secret is not None
-    decrypted = get_secret_cipher().decrypt(secret.entries[DEMO_ACCESS_KEY_ENTRY_KEY])
+    decrypted = (await tenant_cipher(engine, TENANT_ID)).decrypt(
+        secret.entries[DEMO_ACCESS_KEY_ENTRY_KEY]
+    )
     assert decrypted == "REPLACE_ME"
+
+
+async def test_a_restart_with_every_demo_secret_seeded_needs_no_data_key(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A data key that no longer unwraps must not fail startup over secrets that exist."""
+    _enable(monkeypatch)
+    await _sync(engine)
+    async with AsyncSession(engine) as session:
+        tenant = await session.get(Tenant, TENANT_ID)
+        assert tenant is not None
+        tenant.data_key = "not-under-the-master-key"
+        session.add(tenant)
+        await session.commit()
+
+    await _sync(engine)
 
 
 async def test_demo_gcp_secret_stores_the_configured_credential_encrypted(
@@ -762,7 +780,7 @@ async def test_demo_gcp_secret_stores_the_configured_credential_encrypted(
     assert sorted(secret.entries) == [DEMO_GCP_CREDENTIALS_ENTRY_KEY]
     ciphertext = secret.entries[DEMO_GCP_CREDENTIALS_ENTRY_KEY]
     assert ciphertext != credential  # stored as ciphertext
-    assert get_secret_cipher().decrypt(ciphertext) == credential
+    assert (await tenant_cipher(engine, TENANT_ID)).decrypt(ciphertext) == credential
 
 
 async def test_demo_gcp_secret_falls_back_to_a_placeholder(
@@ -773,7 +791,7 @@ async def test_demo_gcp_secret_falls_back_to_a_placeholder(
     async with AsyncSession(engine) as session:
         secret = await session.get(Secret, DEMO_GCP_SECRET_ID)
     assert secret is not None
-    decrypted = get_secret_cipher().decrypt(
+    decrypted = (await tenant_cipher(engine, TENANT_ID)).decrypt(
         secret.entries[DEMO_GCP_CREDENTIALS_ENTRY_KEY]
     )
     assert decrypted == "REPLACE_ME"
@@ -949,7 +967,7 @@ async def test_demo_azure_secret_stores_the_configured_principal_encrypted(
     assert secret.description
     assert secret.type is SecretType.local
     assert secret.tenant_id == TENANT_ID
-    cipher = get_secret_cipher()
+    cipher = await tenant_cipher(engine, TENANT_ID)
     assert {key: cipher.decrypt(value) for key, value in secret.entries.items()} == {
         DEMO_AZURE_TENANT_ENTRY_KEY: "tenant-guid",
         DEMO_AZURE_CLIENT_ID_ENTRY_KEY: "client-guid",
@@ -966,7 +984,7 @@ async def test_demo_azure_secret_falls_back_to_a_placeholder(
     async with AsyncSession(engine) as session:
         secret = await session.get(Secret, DEMO_AZURE_SECRET_ID)
     assert secret is not None
-    cipher = get_secret_cipher()
+    cipher = await tenant_cipher(engine, TENANT_ID)
     assert {cipher.decrypt(value) for value in secret.entries.values()} == {
         "REPLACE_ME"
     }

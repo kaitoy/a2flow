@@ -19,11 +19,20 @@ Un [secret](../guides/secrets.md) est un ensemble nommé d'entrées clé/valeur,
 
 ## Secrets locaux {#local-secrets}
 
-Les valeurs sont chiffrées avec une clé unique propre au déploiement. Les clés des entrées restent en clair à côté d'elles, ce qui permet à un sélecteur de les lister sans rien déchiffrer. Aucune valeur n'est jamais renvoyée à un client, sous quelque forme que ce soit : c'est pourquoi la page de détail d'un secret local affiche ses clés avec des valeurs vides.
+Les valeurs sont chiffrées en deux couches. Le déploiement a une seule **clé maître**, et chaque tenant a sa propre **clé de données**, créée avec le tenant et stockée chiffrée avec la clé maître. Les valeurs d'un tenant sont chiffrées avec sa propre clé de données : une valeur copiée dans un secret d'un autre tenant ne peut donc pas y être déchiffrée.
 
-La clé de chiffrement est résolue une fois par processus : elle est prise dans l'environnement si elle y est définie, sinon lue dans un fichier de clé, sinon générée à la première utilisation et écrite dans ce fichier, avec un avertissement dans le journal.
+| Clé | Ce qu'elle chiffre |
+|---|---|
+| La clé maître | La clé de données de chaque tenant ; les paramètres propres à la plateforme (le mot de passe SMTP et la clé d'API du LLM de la plateforme) ; la clé de signature de l'autorité qui émet les [certificats d'outils](./approvals.md) |
+| La clé de données d'un tenant | Les valeurs des secrets locaux de ce tenant ; les identifiants enregistrés sur le tenant (ses identifiants Vault, le secret client de l'authentification unique et sa clé d'API du LLM) ; les clés privées de ses certificats d'outils |
 
-**Sauvegardez cette clé.** Sa perte rend indéchiffrables tous les secrets locaux stockés. Et comme cette même clé protège la clé de signature de l'autorité qui émet les [certificats d'outils](./approvals.md), sa perte empêche aussi d'émettre ou de vérifier des certificats, ce qui bloque tous les appels d'outils MCP. Ces deux éléments figurent dans la [référence de configuration](../operations/configuration.md#secret-management).
+Les clés des entrées restent en clair à côté d'elles, ce qui permet à un sélecteur de les lister sans rien déchiffrer. Aucune valeur n'est jamais renvoyée à un client, sous quelque forme que ce soit : c'est pourquoi la page de détail d'un secret local affiche ses clés avec des valeurs vides.
+
+La clé maître est résolue une fois par processus : elle est prise dans l'environnement si elle y est définie, sinon lue dans un fichier de clé, sinon générée à la première utilisation et écrite dans ce fichier, avec un avertissement dans le journal.
+
+La clé maître peut être [renouvelée par rotation](../operations/configuration.md#rotating-the-master-key) : les anciennes clés continuent de déchiffrer pendant que le backend rechiffre, au démarrage, ce qu'elles protègent. Les clés de données des tenants ne changent pas : rien de ce que possède un tenant n'est rechiffré.
+
+**Sauvegardez cette clé.** Sa perte rend indéchiffrable la clé de données de chaque tenant, et avec elles tous les secrets locaux et identifiants stockés. Et comme cette même clé protège la clé de signature de l'autorité de certification, sa perte empêche aussi d'émettre ou de vérifier des certificats, ce qui bloque tous les appels d'outils MCP. Ces deux éléments figurent dans la [référence de configuration](../operations/configuration.md#secret-management).
 
 ## Secrets HashiCorp Vault {#hashicorp-vault-secrets}
 

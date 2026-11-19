@@ -1,8 +1,8 @@
 """Use case service for Secret resources.
 
 Wraps the :class:`SecretRepository` with the two business rules the routers
-need: plaintext entry values are encrypted before they reach the repository (so
-the persistence layer never sees them), and partial updates are validated
+need: plaintext entry values are encrypted with the owning tenant's data key
+before they reach the repository (so the persistence layer never sees them), and partial updates are validated
 against the *merged* per-type shape — ``SecretCreate``'s validator covers POST
 bodies, but only the service can combine a PATCH body with the stored record.
 
@@ -16,6 +16,7 @@ from collections.abc import Sequence
 
 from infrastructure.secret_cipher import SecretCipher
 from infrastructure.secret_resolver import SecretResolver
+from infrastructure.tenant_cipher import TenantCiphers
 from models.secret import Secret, SecretCreate, SecretRead, SecretType, SecretUpdate
 from repositories.exceptions import NotFoundError, SecretValidationError
 from repositories.query import FilterSpec, SortSpec
@@ -34,19 +35,29 @@ class SecretService:
     """Application service orchestrating Secret operations."""
 
     def __init__(
-        self, repo: SecretRepository, cipher: SecretCipher, resolver: SecretResolver
+        self,
+        repo: SecretRepository,
+        ciphers: TenantCiphers,
+        resolver: SecretResolver,
+        *,
+        tenant_id: str | None,
     ) -> None:
         """Initialize the service.
 
         Args:
             repo: Repository providing Secret persistence.
-            cipher: Cipher used to encrypt local secret values before storage.
+            ciphers: Source of the tenant data-key cipher local secret values
+                are encrypted with before storage.
             resolver: Resolver used to enumerate a secret's entry keys, which
                 for a ``vault`` secret means a live read of its KV v2 path.
+            tenant_id: The tenant ``repo`` is scoped to, whose data key a new
+                secret is encrypted with; ``None`` only in the read-only
+                all-tenants scope, which never creates anything.
         """
         self._repo = repo
-        self._cipher = cipher
+        self._ciphers = ciphers
         self._resolver = resolver
+        self._tenant_id = tenant_id
 
     async def get(self, secret_id: str) -> Secret:
         """Return the Secret with the given ID.
@@ -158,10 +169,16 @@ class SecretService:
 
         Returns:
             The created Secret.
+
+        Raises:
+            ValueError: If the service has no tenant to create the secret in.
         """
         if data.type is SecretType.local and data.entries:
+            if self._tenant_id is None:
+                raise ValueError("Creating a secret requires a concrete tenant")
+            cipher = await self._ciphers.for_tenant(self._tenant_id)
             encrypted = {
-                key: self._cipher.encrypt(value) for key, value in data.entries.items()
+                key: cipher.encrypt(value) for key, value in data.entries.items()
             }
             data = data.model_copy(update={"entries": encrypted})
         return await self._repo.create(data, user_id=user_id)
@@ -205,7 +222,8 @@ class SecretService:
             if provided_vault:
                 raise SecretValidationError("A local secret must not set Vault fields")
             if data.entries is not None:
-                updates["entries"] = self._merge_entries(data.entries, existing)
+                cipher = await self._ciphers.for_tenant(existing.tenant_id)
+                updates["entries"] = self._merge_entries(data.entries, existing, cipher)
             elif existing.type is not SecretType.local:
                 raise SecretValidationError(
                     "Switching to a local secret requires at least one entry"
@@ -246,8 +264,9 @@ class SecretService:
         """
         await self._repo.delete(secret_id)
 
+    @staticmethod
     def _merge_entries(
-        self, submitted: dict[str, str], existing: Secret
+        submitted: dict[str, str], existing: Secret, cipher: SecretCipher
     ) -> dict[str, str]:
         """Build the replacement entry map, encrypting every new value.
 
@@ -255,6 +274,7 @@ class SecretService:
             submitted: The plaintext map from the PATCH body, where an empty
                 value means "keep the stored ciphertext for this key".
             existing: The stored secret supplying those retained ciphertexts.
+            cipher: The data-key cipher of the secret's tenant.
 
         Returns:
             The full replacement map of key to ciphertext.
@@ -273,5 +293,5 @@ class SecretService:
                     raise SecretValidationError("A new entry requires a value")
                 merged[key] = stored[key]
             else:
-                merged[key] = self._cipher.encrypt(value)
+                merged[key] = cipher.encrypt(value)
         return merged

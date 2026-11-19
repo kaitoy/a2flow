@@ -7,6 +7,7 @@ Responses expose only the entry ``keys``.
 
 from collections.abc import AsyncGenerator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -17,7 +18,7 @@ from models.secret import Secret
 from models.user import SYSTEM_USER_ID
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
-from tests._seed import seed_tenant, seed_users
+from tests._seed import seed_tenant, seed_users, tenant_cipher
 from tests.conftest import _install_auth_overrides
 
 #: Headers selecting a plain (non-super-admin) admin of the default tenant.
@@ -141,10 +142,13 @@ async def test_create_multi_entry_secret_stores_each_value_encrypted(
         await secrets_client.post("/api/v1/secrets", json=_MULTI_BODY), status=201
     )
     stored = await _db_secret(mem_engine, body["id"])
-    cipher = get_secret_cipher()
+    cipher = await tenant_cipher(mem_engine)
     assert stored.entries["AWS_ACCESS_KEY_ID"] != "AKIA1"
     assert cipher.decrypt(stored.entries["AWS_ACCESS_KEY_ID"]) == "AKIA1"
     assert cipher.decrypt(stored.entries["AWS_SECRET_ACCESS_KEY"]) == "sk-1"
+    # Encrypted with the tenant's data key, never with the master key itself.
+    with pytest.raises(ValueError):
+        get_secret_cipher().decrypt(stored.entries["AWS_ACCESS_KEY_ID"])
 
 
 async def test_create_local_secret_without_entries_returns_422(
@@ -311,7 +315,9 @@ async def test_update_entries_replaces_ciphertext(
     )
     stored = await _db_secret(mem_engine, created["id"])
     assert stored.entries["token"] != before
-    assert get_secret_cipher().decrypt(stored.entries["token"]) == "tok-456"
+    assert (await tenant_cipher(mem_engine)).decrypt(
+        stored.entries["token"]
+    ) == "tok-456"
 
 
 async def test_update_omitting_entries_keeps_the_stored_map(
@@ -363,7 +369,7 @@ async def test_update_empty_entry_value_keeps_the_stored_ciphertext(
         )
     )
     stored = await _db_secret(mem_engine, created["id"])
-    cipher = get_secret_cipher()
+    cipher = await tenant_cipher(mem_engine)
     assert cipher.decrypt(stored.entries["AWS_ACCESS_KEY_ID"]) == "AKIA2"
     assert stored.entries["AWS_SECRET_ACCESS_KEY"] == before["AWS_SECRET_ACCESS_KEY"]
 
@@ -463,7 +469,9 @@ async def test_update_switch_vault_to_local_clears_vault_fields(
     assert body["vaultPath"] is None
     assert body["keys"] == ["token"]
     stored = await _db_secret(mem_engine, created["id"])
-    assert get_secret_cipher().decrypt(stored.entries["token"]) == "tok-789"
+    assert (await tenant_cipher(mem_engine)).decrypt(
+        stored.entries["token"]
+    ) == "tok-789"
 
 
 async def test_update_switch_vault_to_local_without_entries_returns_422(

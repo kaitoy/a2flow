@@ -140,8 +140,9 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `SECRET_ENCRYPTION_KEY` | — | `local` [시크릿](../guides/secrets.md)을 저장하기 전에 암호화하는 데 쓰는 Fernet 키 |
+| `SECRET_ENCRYPTION_KEY` | — | 마스터 키입니다. 테넌트마다 있는 데이터 키를 암호화하고, 그 데이터 키가 해당 테넌트의 `local` [시크릿](../guides/secrets.md)과 저장된 자격 증명을 암호화합니다([시크릿 저장소](../architecture/secrets.md#local-secrets) 참조) |
 | `SECRET_KEY_FILE` | `.secret_key` | 디스크의 키 파일 경로로, SQLite 데이터베이스 파일 옆에 있습니다. `docker compose`에서는 `/var/lib/a2flow/secret-key/.secret_key`이며, 백엔드와 이메일 워커가 공유하는 `secret-key` 명명된 볼륨을 사용합니다 |
+| `SECRET_ENCRYPTION_KEY_FALLBACKS` | — | 이전 마스터 키(쉼표로 구분). [교체](#rotating-the-master-key)가 진행되는 동안 복호화에만 쓰입니다 |
 
 암호화 키는 처음 사용할 때 다음 순서로 결정됩니다.
 
@@ -149,13 +150,22 @@ $SKILLS_DIR/<agent_skill_id>/<commit_sha>/
 2. `SECRET_KEY_FILE`의 키 파일.
 3. 둘 다 없으면 키를 생성해 그 파일에 저장하고 WARNING을 로그에 남깁니다.
 
-**키를 백업하세요.** 키를 잃으면 저장된 로컬 시크릿을 모두 복호화할 수 없으며, [승인 CA](../architecture/approvals.md)의 서명 키도 같은 키로 보호됩니다.
+**키를 백업하세요.** 키를 잃으면 모든 테넌트의 데이터 키를 복호화할 수 없게 되고, 그에 따라 저장된 로컬 시크릿과 자격 증명도 모두 복호화할 수 없습니다. [승인 CA](../architecture/approvals.md)의 서명 키도 같은 키로 보호됩니다.
 
 HashiCorp Vault용 환경 변수는 없습니다. 테넌트 전용 Vault는 해당 테넌트의 관리자가 [관리자 설정](../guides/users-and-groups.md#tenant-vault)에서, 전역 Vault의 주소는 슈퍼 관리자가 [시스템 설정](../guides/system-settings.md#global-vault)에서 설정하며, 전역 Vault에 대한 각 테넌트의 [자격 증명](../guides/users-and-groups.md#global-vault-credential)은 테넌트 페이지에서 설정합니다. 테넌트 전용 Vault 주소는 사용자가 입력하는 다른 URL과 같은 SSRF 검사를 거치므로 공개 주소여야 합니다. 전역 Vault 주소는 슈퍼 관리자만 설정할 수 있고 Vault는 보통 사설 주소에 있으므로 이 검사에서 제외됩니다.
 
+### 마스터 키 교체 {#rotating-the-master-key}
+
+1. `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`로 새 키를 생성합니다.
+2. 새 키를 마스터 키로 지정하고(`SECRET_ENCRYPTION_KEY`에 설정하거나 키 파일에 씁니다), 이전 키는 `SECRET_ENCRYPTION_KEY_FALLBACKS`에 넣습니다. 둘 다 백엔드와 이메일 워커 모두에 설정하세요.
+3. 다시 시작합니다. 백엔드는 시작할 때 모든 값을 새 키로 다시 암호화하고, 다시 암호화한 값의 개수를 WARNING 로그로 남깁니다. 그때까지 이전 키로 암호화된 값도 계속 복호화되므로 도중에 멈추는 기능은 없습니다.
+4. 모든 레플리카가 새 키로 실행되면 `SECRET_ENCRYPTION_KEY_FALLBACKS`를 제거하고 한 번 더 다시 시작합니다.
+
+새 키를 백업하고, 교체 전에 만든 데이터베이스 백업을 보관하는 동안에는 이전 키도 보관하세요. 그 백업에는 여전히 이전 키가 필요합니다. 테넌트의 데이터 키 자체는 바뀌지 않고 그 암호화만 바뀌므로, 시크릿이 몇 개든 교체는 몇 초면 끝납니다.
+
 ## MCP 도구와 승인 {#mcp-tools-and-approvals}
 
-모든 MCP 도구 호출은 호출하는 작업을 위해 발급된 수명이 짧은 X.509 인증서를 제시해야 합니다. 인증서는 작업의 [승인](../guides/approvals.md#human-approval)이 부여될 때, 또는 아무도 승인을 요청받지 않은 작업이 시작될 때 부여됩니다. 서명 루트는 처음 사용할 때 생성되어 로컬 시크릿과 같은 키로 암호화되어 저장되므로, 이 기능을 쓰기 위해 여기서 구성할 것은 없습니다.
+모든 MCP 도구 호출은 호출하는 작업을 위해 발급된 수명이 짧은 X.509 인증서를 제시해야 합니다. 인증서는 작업의 [승인](../guides/approvals.md#human-approval)이 부여될 때, 또는 아무도 승인을 요청받지 않은 작업이 시작될 때 부여됩니다. 서명 루트는 처음 사용할 때 생성되어 위의 마스터 키로 암호화되어 저장되므로, 이 기능을 쓰기 위해 여기서 구성할 것은 없습니다.
 
 | 변수 | 기본값 | 제한 대상 |
 |---|---|---|

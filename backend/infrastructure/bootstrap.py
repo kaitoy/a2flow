@@ -9,7 +9,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
 from infrastructure.password import hash_password
-from infrastructure.secret_cipher import get_secret_cipher
+from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
+from models.mcp_ca import MCPCertificateAuthority
 from models.system_settings import (
     SYSTEM_SETTINGS_ID,
     SystemSettings,
@@ -181,6 +182,71 @@ _GENERATED_PASSWORD_BYTES = 16
 #: ``admin`` user. Also the tenant the demo dataset is registered in — see
 #: :mod:`infrastructure.demo_data`.
 DEFAULT_TENANT_NAME = "default"
+
+
+async def rotate_master_key(
+    session: AsyncSession, cipher: SecretCipher | None = None
+) -> int:
+    """Re-encrypt every master-key ciphertext under the current master key.
+
+    Runs only while ``SECRET_ENCRYPTION_KEY_FALLBACKS`` lists previous keys:
+    the wrapped data key of every tenant, the SMTP password and LLM API key in
+    system settings, and the MCP certificate authority's private key. A value
+    already under the current key is left alone, so a restart before the
+    fallbacks are removed rewrites nothing. A value no configured key decrypts
+    is logged and left as it is -- it was unreadable already.
+
+    Must run after the migrations, which create the columns it reads, and
+    under the startup lock, since it reads and rewrites shared rows.
+
+    Args:
+        session: Database session used to read and rewrite the rows.
+        cipher: The master cipher; defaults to the process-wide one.
+
+    Returns:
+        How many values were re-encrypted.
+    """
+    cipher = cipher or get_secret_cipher()
+    if not cipher.has_fallbacks:
+        return 0
+
+    rotated = 0
+
+    def rotate(row: object, field: str, label: str) -> None:
+        nonlocal rotated
+        value = getattr(row, field)
+        if not value:
+            return
+        try:
+            new = cipher.rotate(value)
+        except ValueError:
+            logger.error(
+                "%s does not decrypt under the master key or any fallback; left "
+                "as it is",
+                label,
+            )
+            return
+        if new is not None:
+            setattr(row, field, new)
+            session.add(row)
+            rotated += 1
+
+    for tenant in (await session.exec(select(Tenant))).all():
+        rotate(tenant, "data_key", f"The data key of tenant {tenant.name}")
+    settings = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
+    if settings is not None:
+        rotate(settings, "smtp_password", "The SMTP password")
+        rotate(settings, "llm_api_key", "The platform LLM API key")
+    for ca in (await session.exec(select(MCPCertificateAuthority))).all():
+        rotate(ca, "private_key_encrypted", f"The key of certificate authority {ca.id}")
+    await session.commit()
+    logger.warning(
+        "Master key rotation: re-encrypted %d value(s) under the current key. "
+        "Once every replica runs with the new key, remove "
+        "SECRET_ENCRYPTION_KEY_FALLBACKS.",
+        rotated,
+    )
+    return rotated
 
 
 async def seed_system_user(session: AsyncSession) -> None:

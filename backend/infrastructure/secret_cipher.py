@@ -12,15 +12,34 @@ The symmetric key is resolved once per process with the following precedence:
    (permissions restricted best-effort), and a WARNING is logged reminding the
    operator to back it up: losing the key makes every stored local secret
    undecryptable.
+
+That key is the *master* key of an envelope scheme. It encrypts platform-owned
+values (SMTP password, platform LLM key, the MCP CA key, the OIDC state cookie)
+directly, and otherwise only wraps per-tenant data keys: every tenant row
+carries ``data_key``, a random Fernet key encrypted with the master
+(:func:`new_data_key`), and everything a tenant owns -- its secrets, its stored
+credentials, its MCP tool certificates' private keys -- is encrypted with that
+tenant's data key (:func:`data_key_cipher`). A ciphertext of one tenant
+therefore never decrypts under another tenant's key.
+
+Rotating the master key: the new key becomes ``SECRET_ENCRYPTION_KEY`` (or the
+key file) and the old one moves to ``SECRET_ENCRYPTION_KEY_FALLBACKS``. The
+process-wide cipher then encrypts with the new key only but still decrypts with
+either (:func:`load_fallback_keys`), and the next startup re-encrypts every
+master-encrypted value under the new key
+(:func:`infrastructure.bootstrap.rotate_master_key`). Tenant data keys
+themselves are unchanged -- only their wrapping is -- so nothing a tenant owns
+needs re-encrypting.
 """
 
 import contextlib
 import logging
 import os
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from config import get_settings
 from infrastructure.database import DB_URL, is_sqlite_url
@@ -98,16 +117,49 @@ def load_or_create_key() -> bytes:
     return key
 
 
-class SecretCipher:
-    """Encrypts and decrypts local secret values with a Fernet key."""
+def load_fallback_keys() -> list[bytes]:
+    """Return the previous master keys still accepted for decryption.
 
-    def __init__(self, key: bytes) -> None:
-        """Wrap the given Fernet key.
+    Read from ``SECRET_ENCRYPTION_KEY_FALLBACKS``, a comma-separated list;
+    blanks are ignored.
+
+    Returns:
+        The fallback keys, in the order given; empty when none is set.
+
+    Raises:
+        ValueError: If any listed key is not a valid Fernet key.
+    """
+    raw = get_settings().secret_encryption_key_fallbacks or ""
+    return [
+        _validate_key(
+            part.strip().encode("ascii", errors="replace"),
+            f"entry {index} of SECRET_ENCRYPTION_KEY_FALLBACKS",
+        )
+        for index, part in enumerate(raw.split(","), start=1)
+        if part.strip()
+    ]
+
+
+class SecretCipher:
+    """Encrypts and decrypts values with a Fernet key, accepting older keys too."""
+
+    def __init__(self, key: bytes, fallbacks: Sequence[bytes] = ()) -> None:
+        """Wrap the given Fernet key, plus any keys it replaced.
 
         Args:
             key: A valid Fernet key, typically from :func:`load_or_create_key`.
+                Every new ciphertext is encrypted with it.
+            fallbacks: Previous keys, used only to decrypt values that have
+                not been re-encrypted under ``key`` yet.
         """
-        self._fernet = Fernet(key)
+        self._primary = Fernet(key)
+        self._fernet = MultiFernet([self._primary, *(Fernet(k) for k in fallbacks)])
+        self._has_fallbacks = bool(fallbacks)
+
+    @property
+    def has_fallbacks(self) -> bool:
+        """Whether previous keys are configured, i.e. a rotation is under way."""
+        return self._has_fallbacks
 
     def encrypt(self, plain: str) -> str:
         """Encrypt a plaintext value.
@@ -140,14 +192,69 @@ class SecretCipher:
         except (InvalidToken, UnicodeEncodeError) as exc:
             raise ValueError("Failed to decrypt stored secret value") from exc
 
+    def rotate(self, token: str) -> str | None:
+        """Re-encrypt a ciphertext under the primary key, if it is not already.
+
+        Args:
+            token: A ciphertext produced under the primary key or a fallback.
+
+        Returns:
+            The ciphertext re-encrypted under the primary key, or ``None`` when
+            ``token`` already is under it and needs no rewrite.
+
+        Raises:
+            ValueError: If no configured key decrypts ``token``.
+        """
+        try:
+            encoded = token.encode("ascii")
+            try:
+                self._primary.decrypt(encoded)
+                return None
+            except InvalidToken:
+                return self._fernet.rotate(encoded).decode("ascii")
+        except (InvalidToken, UnicodeEncodeError) as exc:
+            raise ValueError("Failed to decrypt stored secret value") from exc
+
 
 @lru_cache(maxsize=1)
 def get_secret_cipher() -> SecretCipher:
-    """Return the process-wide SecretCipher singleton.
+    """Return the process-wide master-key SecretCipher singleton.
+
+    It encrypts with the current master key and also decrypts with the
+    ``SECRET_ENCRYPTION_KEY_FALLBACKS`` it replaced.
 
     Lives here (not in :mod:`dependencies.singletons`, which re-exports it) so
     the agent proxy tools in :mod:`infrastructure.mcp_tools` can use it without
     importing the dependencies package, which would create an import cycle
     through :mod:`infrastructure.agent`.
     """
-    return SecretCipher(load_or_create_key())
+    return SecretCipher(load_or_create_key(), load_fallback_keys())
+
+
+def new_data_key() -> str:
+    """Generate a tenant data key, wrapped with the master key for storage.
+
+    Returns:
+        A fresh Fernet key, encrypted by :func:`get_secret_cipher`.
+    """
+    return get_secret_cipher().encrypt(Fernet.generate_key().decode("ascii"))
+
+
+@lru_cache(maxsize=1024)
+def data_key_cipher(wrapped: str) -> SecretCipher:
+    """Return the cipher of a tenant data key wrapped by :func:`new_data_key`.
+
+    Cached by the wrapped value itself, so a replaced data key simply misses
+    the cache and nothing ever needs invalidating.
+
+    Args:
+        wrapped: The ``tenants.data_key`` value.
+
+    Returns:
+        A cipher encrypting and decrypting with the unwrapped data key.
+
+    Raises:
+        ValueError: If ``wrapped`` was not produced under the current master
+            key.
+    """
+    return SecretCipher(get_secret_cipher().decrypt(wrapped).encode("ascii"))

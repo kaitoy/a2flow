@@ -25,10 +25,8 @@ from infrastructure.mcp_gateway import (
     PrincipalKind,
 )
 from infrastructure.mcp_tools import call_mcp_tool, list_mcp_tools
-from infrastructure.secret_cipher import get_secret_cipher
 from models.agent_skill import AgentSkill
 from models.mcp_server import McpCommand, MCPServer, McpTransport
-from models.secret import Secret, SecretType
 from models.user import SYSTEM_USER_ID
 from models.workflow import Workflow
 from models.workflow_execution import WorkflowExecution
@@ -42,6 +40,7 @@ from tests._engine import make_test_engine
 from tests._seed import (
     DEFAULT_TEST_TENANT_ID,
     grant_tool_certificate,
+    seed_local_secret,
     seed_tenant,
     seed_users,
 )
@@ -535,19 +534,8 @@ async def test_list_mcp_tools_aggregates_and_isolates_failures(
 
 
 async def _seed_local_secret(eng: AsyncEngine, name: str, value: str) -> None:
-    """Insert a local Secret holding one ``k`` entry encrypted with the process cipher."""
-    async with AsyncSession(eng) as db:
-        db.add(
-            Secret(
-                name=name,
-                type=SecretType.local,
-                entries={"k": get_secret_cipher().encrypt(value)},
-                tenant_id=DEFAULT_TEST_TENANT_ID,
-                created_by=SYSTEM_USER_ID,
-                updated_by=SYSTEM_USER_ID,
-            )
-        )
-        await db.commit()
+    """Insert a local Secret holding one ``k`` entry encrypted with the tenant's data key."""
+    await seed_local_secret(eng, name, {"k": value})
 
 
 async def test_call_resolves_secret_placeholder_in_headers(

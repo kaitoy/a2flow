@@ -16,20 +16,27 @@ below sees exactly what the migrations built and nothing else.
 
 import asyncio
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypeVar
 
 import pytest
 from alembic.config import Config
-from sqlalchemy import Connection, inspect, make_url, text
+from sqlalchemy import Connection, column, inspect, make_url, text
+from sqlalchemy import table as sql_table
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
 from alembic import command
 from infrastructure.database import to_async_url
+from infrastructure.secret_cipher import SecretCipher, load_or_create_key
+from models.base import JSONColumn
 from tests._engine import PG_URL_ENV, pg_url
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+T = TypeVar("T")
 
 #: Reflected alongside the model tables but owned by Alembic, not by the models.
 _ALEMBIC_TABLE = "alembic_version"
@@ -195,3 +202,140 @@ def test_upgrade_head_makes_user_password_nullable(migration_db: str) -> None:
     command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
 
     assert asyncio.run(_users_password_nullable(migration_db)) is True
+
+
+#: The revision before tenants had data keys, and the one that adds them.
+_BEFORE_DATA_KEYS = "6e76a03c1493"
+_DATA_KEYS = "9f4b2d7e1c08"
+
+
+async def _run(url: str, fn: Callable[[Connection], T]) -> T:
+    """Run ``fn`` on a synchronous connection to ``url``, in one transaction.
+
+    Args:
+        url: The database to connect to.
+        fn: The work to run, handed the connection by ``run_sync``.
+
+    Returns:
+        Whatever ``fn`` returns.
+    """
+    engine = create_async_engine(to_async_url(url))
+    try:
+        async with engine.begin() as conn:
+            return await conn.run_sync(fn)
+    finally:
+        await engine.dispose()
+
+
+def _seed_master_encrypted(conn: Connection, master: SecretCipher) -> None:
+    """Insert a user, a tenant and a secret as the pre-data-key schema stored them.
+
+    Args:
+        conn: Connection to a database at :data:`_BEFORE_DATA_KEYS`.
+        master: The master cipher every value is encrypted with.
+    """
+    now = datetime.now(UTC)
+    audit = {"created_at": now, "updated_at": now, "created_by": "u", "updated_by": "u"}
+    users = sql_table(
+        "users",
+        *(column(n) for n in ("id", "first_name", "last_name", "email", "enabled")),
+        *(column(n) for n in ("email_verified", "username", *audit)),
+        column("roles", JSONColumn),
+    )
+    conn.execute(
+        users.insert().values(
+            id="u",
+            first_name="A",
+            last_name="B",
+            email="a@example.com",
+            enabled=True,
+            email_verified=True,
+            username="a",
+            # Platform-scoped, so the user needs no tenant of its own.
+            roles=["super_admin"],
+            **audit,
+        )
+    )
+    tenants = sql_table(
+        "tenants",
+        *(column(n) for n in ("id", "display_name", "name", "enabled", "llm_api_key")),
+        *(column(n) for n in audit),
+    )
+    conn.execute(
+        tenants.insert().values(
+            id="t",
+            display_name="T",
+            name="t",
+            enabled=True,
+            llm_api_key=master.encrypt("sk-tenant"),
+            **audit,
+        )
+    )
+    secrets = sql_table(
+        "secrets",
+        *(column(n) for n in ("id", "tenant_id", "name", "type", *audit)),
+        column("entries", JSONColumn),
+    )
+    conn.execute(
+        secrets.insert().values(
+            id="s",
+            tenant_id="t",
+            name="s",
+            type="local",
+            entries={"k": master.encrypt("v")},
+            **audit,
+        )
+    )
+
+
+def _read_tenant_values(conn: Connection) -> tuple[str | None, str, str]:
+    """Return the tenant's data key (if the column exists) and its two ciphertexts.
+
+    Args:
+        conn: Connection to the migrated database.
+
+    Returns:
+        ``(data_key, llm_api_key, the secret entry's ciphertext)``.
+    """
+    has_data_key = any(
+        c["name"] == "data_key" for c in inspect(conn).get_columns("tenants")
+    )
+    data_key = (
+        conn.execute(text("SELECT data_key FROM tenants WHERE id = 't'")).scalar_one()
+        if has_data_key
+        else None
+    )
+    llm_api_key = conn.execute(
+        text("SELECT llm_api_key FROM tenants WHERE id = 't'")
+    ).scalar_one()
+    entries = conn.execute(
+        sql_table("secrets", column("entries", JSONColumn)).select()
+    ).scalar_one()
+    return data_key, llm_api_key, entries["k"]
+
+
+def test_data_key_migration_moves_tenant_ciphertexts_and_back(
+    migration_db: str,
+) -> None:
+    """Upgrading re-encrypts a tenant's values under its own data key; downgrading undoes it."""
+    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
+    command.upgrade(cfg, _BEFORE_DATA_KEYS)
+    # The key the migration loads: the per-test key file, not the process-wide
+    # cached cipher, which an earlier test may have built from another file.
+    master = SecretCipher(load_or_create_key())
+    asyncio.run(_run(migration_db, lambda c: _seed_master_encrypted(c, master)))
+
+    command.upgrade(cfg, _DATA_KEYS)
+    wrapped, llm_api_key, entry = asyncio.run(_run(migration_db, _read_tenant_values))
+    assert wrapped is not None
+    data_key = SecretCipher(master.decrypt(wrapped).encode("ascii"))
+    assert data_key.decrypt(llm_api_key) == "sk-tenant"
+    assert data_key.decrypt(entry) == "v"
+    with pytest.raises(ValueError):
+        master.decrypt(entry)
+
+    command.downgrade(cfg, _BEFORE_DATA_KEYS)
+    wrapped, llm_api_key, entry = asyncio.run(_run(migration_db, _read_tenant_values))
+    assert wrapped is None
+    assert master.decrypt(llm_api_key) == "sk-tenant"
+    assert master.decrypt(entry) == "v"
