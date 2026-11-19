@@ -13,7 +13,7 @@ sidebar_position: 4
 | 에이전트 스킬 스토어 | `SKILLS_DIR` 트리 복사 | 원래 위치에 다시 압축 해제 |
 | 시크릿 암호화 키 | `SECRET_ENCRYPTION_KEY`의 값 또는 `SECRET_KEY_FILE`의 파일 | 같은 값을 설정하거나 같은 파일을 되돌리기 |
 
-**데이터베이스와 키는 반드시 함께 복원하세요.** 이 키는 로컬 시크릿과 승인 CA의 서명 키를 *모두* 복호화하며, 둘 다 데이터베이스에 저장되어 있습니다. 다른 키와 함께 복원한 데이터베이스는 모든 시크릿을 읽을 수 없는 상태로 시작됩니다.
+**데이터베이스와 키는 반드시 함께 복원하세요.** 이 키는 각 테넌트의 데이터 키를 풀고, 그 데이터 키가 해당 테넌트의 로컬 시크릿과 저장된 자격 증명을 복호화합니다. 이 키는 승인 CA의 서명 키*도* 복호화합니다. 모두 데이터베이스에 저장되어 있습니다. 다른 키와 함께 복원한 데이터베이스는 모든 시크릿을 읽을 수 없는 상태로 시작됩니다.
 
 ## 데이터베이스 {#the-database}
 
@@ -66,7 +66,7 @@ Docker Compose에서 이 파일은 `secret-key` 명명된 볼륨에 있습니다
 docker run --rm -v a2flow_secret-key:/key -v "$PWD:/backup" alpine   cp /key/.secret_key /backup/secret_key-$(date +%F)
 ```
 
-키 교체는 지원되지 않습니다. 기존 시크릿이 이전 키로 암호화되어 있기 때문입니다. [시크릿 관리](./configuration.md#secret-management)를 참조하세요.
+키를 교체하려면 [마스터 키 교체](./configuration.md#rotating-the-master-key) 절차를 따르세요. 데이터베이스 백업을 복원하려면 백업할 당시의 키가 필요하므로, 교체 전의 백업을 보관하는 동안에는 이전 키도 보관하세요.
 
 ## 복원 확인 {#checking-a-restore}
 

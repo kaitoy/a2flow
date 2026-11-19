@@ -13,7 +13,7 @@ sidebar_position: 4
 | 代理技能存储库 | 复制 `SKILLS_DIR` 目录树 | 解压回原处 |
 | 密钥加密密钥 | `SECRET_ENCRYPTION_KEY` 的值，或 `SECRET_KEY_FILE` 指向的文件 | 设置相同的值，或放回同一个文件 |
 
-**数据库和加密密钥必须一起恢复**。这个加密密钥既用于解密本地密钥，*也*用于解密审批 CA 的签名密钥，而这两者都存放在数据库中。如果恢复的数据库搭配了另一个加密密钥，启动后所有密钥都将无法读取。
+**数据库和加密密钥必须一起恢复**。这个加密密钥用于解开每个租户的数据加密密钥，再由数据加密密钥解密该租户的本地密钥和已保存的凭据；它*也*用于解密审批 CA 的签名密钥。这些都存放在数据库中。如果恢复的数据库搭配了另一个加密密钥，启动后所有密钥都将无法读取。
 
 ## 数据库 {#the-database}
 
@@ -66,7 +66,7 @@ docker run --rm -v a2flow_skills:/skills -v "$PWD:/backup" alpine \
 docker run --rm -v a2flow_secret-key:/key -v "$PWD:/backup" alpine   cp /key/.secret_key /backup/secret_key-$(date +%F)
 ```
 
-不支持轮换加密密钥，因为现有的密钥都是用旧加密密钥加密的。请参阅[密钥管理](./configuration.md#secret-management)。
+要轮换加密密钥，请按照[轮换主加密密钥](./configuration.md#rotating-the-master-key)操作。恢复数据库备份需要备份时正在使用的加密密钥，因此只要还保留着轮换前的备份，就要保留旧的加密密钥。
 
 ## 检查恢复结果 {#checking-a-restore}
 

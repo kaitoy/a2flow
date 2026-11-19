@@ -76,6 +76,6 @@ API と並んで、デプロイでは [MCP プロキシ](../architecture/mcp-gat
 |---|---|---|
 | **データベース** | `DB_URL` が指すデータベース | すべてです。あらゆるレコードがここに入っています。[データベース](../architecture/database.md)を参照してください |
 | **エージェントスキルストア** | `SKILLS_DIR` | 実行が固定しているスキルのリビジョンを読み込めなくなります(HTTP 409 `SKILL_NOT_READY`)。キャッシュではなく永続的な状態です。[エージェントスキルストア](./configuration.md#agent-skill-store)を参照してください |
-| **シークレット暗号化キー** | `SECRET_ENCRYPTION_KEY`、または `SECRET_KEY_FILE` のファイル | 保存済みのローカルシークレットがすべて復号できなくなり、認証局も、MCP ツール呼び出しに必要な証明書を発行も検証もできなくなります。[シークレットの管理](./configuration.md#secret-management)を参照してください |
+| **シークレット暗号化キー** | `SECRET_ENCRYPTION_KEY`、または `SECRET_KEY_FILE` のファイル | すべてのテナントのデータキーが復号できなくなり、保存済みのローカルシークレットと資格情報もすべて復号できなくなります。認証局も、MCP ツール呼び出しに必要な証明書を発行も検証もできなくなります。[シークレットの管理](./configuration.md#secret-management)を参照してください |
 
 3 つそれぞれの取り方と戻し方は[バックアップと復旧](./backup.md)にあります。

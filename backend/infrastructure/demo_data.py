@@ -132,7 +132,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from infrastructure.bootstrap import DEFAULT_TENANT_NAME, resolve_seed_password
 from infrastructure.password import hash_password
-from infrastructure.secret_cipher import get_secret_cipher
+from infrastructure.tenant_cipher import TenantCiphers
 from models.agent_skill import AgentSkill
 from models.approval import Approval, ApprovalStatus
 from models.knowledge import (
@@ -1779,19 +1779,28 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
     ``DEMO_AZURE_TENANT_ID`` / ``DEMO_AZURE_CLIENT_ID`` /
     ``DEMO_AZURE_CLIENT_SECRET`` when set, so a fully working demo is one
     restart away, and fall back to a placeholder otherwise.
-    They are stored as Fernet ciphertext, the same as any secret created through
-    the API — the encryption lives in the service layer, which this
-    out-of-request caller cannot use, so the cipher is applied directly here.
-    Each secret is guarded by its own id check, so an operator's own record
-    under one demo name never blocks seeding the other.
+    They are stored as Fernet ciphertext under the tenant's data key, the same
+    as any secret created through the API — the encryption lives in the
+    service layer, which this out-of-request caller cannot use, so the cipher
+    is applied directly here. Each secret is guarded by its own id check, so an
+    operator's own record under one demo name never blocks seeding the other.
+    The data key is unwrapped only when a secret is actually missing: a
+    restart that finds all three must not depend on it.
 
     Args:
         session: Database session used to read and insert secrets.
         tenant_id: Id of the ``Default`` tenant the secrets belong to.
     """
     settings = get_settings()
-    cipher = get_secret_cipher()
-    if await session.get(Secret, DEMO_AWS_SECRET_ID) is None:
+    missing = {
+        secret_id
+        for secret_id in (DEMO_AWS_SECRET_ID, DEMO_GCP_SECRET_ID, DEMO_AZURE_SECRET_ID)
+        if await session.get(Secret, secret_id) is None
+    }
+    if not missing:
+        return
+    cipher = await TenantCiphers(session).for_tenant(tenant_id)
+    if DEMO_AWS_SECRET_ID in missing:
         await _insert(
             session,
             Secret(
@@ -1813,7 +1822,7 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
             ),
             label=f"secret '{DEMO_AWS_SECRET_NAME}'",
         )
-    if await session.get(Secret, DEMO_GCP_SECRET_ID) is None:
+    if DEMO_GCP_SECRET_ID in missing:
         await _insert(
             session,
             Secret(
@@ -1832,7 +1841,7 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
             ),
             label=f"secret '{DEMO_GCP_SECRET_NAME}'",
         )
-    if await session.get(Secret, DEMO_AZURE_SECRET_ID) is None:
+    if DEMO_AZURE_SECRET_ID in missing:
         await _insert(
             session,
             Secret(

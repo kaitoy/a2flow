@@ -271,6 +271,10 @@ class Settings(BaseSettings):
             (first in the resolution precedence handled by ``secret_cipher.py``).
         secret_key_file: Path to the on-disk Fernet key file (second in that
             precedence).
+        secret_encryption_key_fallbacks: Comma-separated previous master
+            keys, accepted for decryption only while a master-key rotation
+            re-encrypts what they protect (see
+            :func:`infrastructure.bootstrap.rotate_master_key`).
         mcp_registry_url: Base URL of the official MCP registry.
         mcp_proxy_url: Base URL of the MCP proxy, the container that actually
             reaches registered MCP servers. Left unset — the default — the
@@ -426,6 +430,7 @@ class Settings(BaseSettings):
 
     secret_encryption_key: str | None = None
     secret_key_file: Path | None = None
+    secret_encryption_key_fallbacks: str | None = None
 
     mcp_registry_url: str = "https://registry.modelcontextprotocol.io"
 

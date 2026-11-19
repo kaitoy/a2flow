@@ -42,7 +42,9 @@ class TenantRepository(Protocol):
         filters: Sequence[FilterSpec] = (),
     ) -> list[Tenant]: ...
 
-    async def create(self, data: TenantCreate, *, user_id: str) -> Tenant: ...
+    async def create(
+        self, data: TenantCreate, *, user_id: str, data_key: str | None = None
+    ) -> Tenant: ...
 
     async def update(
         self,
@@ -130,9 +132,28 @@ class SqlTenantRepository:
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
-    async def create(self, data: TenantCreate, *, user_id: str) -> Tenant:
+    async def create(
+        self, data: TenantCreate, *, user_id: str, data_key: str | None = None
+    ) -> Tenant:
+        """Insert a tenant.
+
+        Args:
+            data: Fields of the new tenant.
+            user_id: Identifier of the acting user, recorded as the creator.
+            data_key: The tenant's wrapped data key, when the caller already
+                encrypted credentials in ``data`` with it; a fresh one is
+                generated otherwise.
+
+        Returns:
+            The created tenant.
+
+        Raises:
+            ForeignKeyViolationError: If ``user_id`` names no user.
+            UniqueViolationError: If the name or display name is taken.
+        """
+        extra = {"data_key": data_key} if data_key else {}
         tenant = Tenant.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {**data.model_dump(), "created_by": user_id, "updated_by": user_id, **extra}
         )
         self._db.add(tenant)
         try:

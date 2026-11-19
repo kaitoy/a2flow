@@ -140,8 +140,9 @@ Les fichiers de session sont stockés dans la base de données et non sur le dis
 
 | Variable | Valeur par défaut | Rôle |
 |---|---|---|
-| `SECRET_ENCRYPTION_KEY` | — | Clé Fernet utilisée pour chiffrer les [secrets](../guides/secrets.md) `local` avant leur stockage |
+| `SECRET_ENCRYPTION_KEY` | — | La clé maître. Elle chiffre la clé de données propre à chaque tenant, qui chiffre à son tour les [secrets](../guides/secrets.md) `local` et les identifiants enregistrés de ce tenant (voir [Stockage des secrets](../architecture/secrets.md#local-secrets)) |
 | `SECRET_KEY_FILE` | `.secret_key` | Chemin du fichier de clé sur le disque, à côté du fichier de base de données SQLite. Sous `docker compose`, il s'agit de `/var/lib/a2flow/secret-key/.secret_key`, porté par le volume nommé `secret-key` que partagent le backend et le worker d'e-mails |
+| `SECRET_ENCRYPTION_KEY_FALLBACKS` | — | Anciennes clés maîtres, séparées par des virgules. Utilisées uniquement pour déchiffrer, pendant une [rotation](#rotating-the-master-key) |
 
 La clé de chiffrement est déterminée à la première utilisation, dans cet ordre :
 
@@ -149,13 +150,22 @@ La clé de chiffrement est déterminée à la première utilisation, dans cet or
 2. Le fichier de clé indiqué par `SECRET_KEY_FILE`.
 3. À défaut, une clé est générée et enregistrée dans ce fichier, et un WARNING est consigné.
 
-**Sauvegardez la clé.** Sa perte rend indéchiffrables tous les secrets locaux stockés, et cette même clé protège la clé de signature de la [CA d'approbation](../architecture/approvals.md).
+**Sauvegardez la clé.** Sa perte rend indéchiffrable la clé de données de chaque tenant, et avec elles tous les secrets locaux et identifiants stockés. Cette même clé protège la clé de signature de la [CA d'approbation](../architecture/approvals.md).
 
 Il n'existe aucune variable d'environnement pour HashiCorp Vault : le Vault propre à un tenant est défini par son administrateur dans [Paramètres administrateur](../guides/users-and-groups.md#tenant-vault), l'adresse du Vault global par un super administrateur dans [Paramètres système](../guides/system-settings.md#global-vault), et l'[identifiant de chaque tenant pour ce Vault](../guides/users-and-groups.md#global-vault-credential) sur la page du tenant. L'adresse du Vault propre à un tenant subit les mêmes contrôles SSRF que les autres URL fournies par les utilisateurs et doit donc être publique. L'adresse du Vault global en est exemptée, car seul un super administrateur peut la définir et un Vault se trouve généralement sur une adresse privée.
 
+### Faire tourner la clé maître {#rotating-the-master-key}
+
+1. Générez une nouvelle clé avec `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+2. Faites-en la clé maître (définissez-la comme `SECRET_ENCRYPTION_KEY`, ou écrivez-la dans le fichier de clé) et placez l'ancienne clé dans `SECRET_ENCRYPTION_KEY_FALLBACKS`. Définissez les deux sur le backend et sur le worker d'e-mail.
+3. Redémarrez. Au démarrage, le backend rechiffre tout avec la nouvelle clé et journalise un WARNING indiquant le nombre de valeurs rechiffrées. Jusque-là, les valeurs encore chiffrées avec l'ancienne clé restent déchiffrables : rien ne cesse de fonctionner en cours de route.
+4. Une fois que toutes les répliques tournent avec la nouvelle clé, retirez `SECRET_ENCRYPTION_KEY_FALLBACKS` et redémarrez de nouveau.
+
+Sauvegardez la nouvelle clé, et conservez l'ancienne tant que vous conservez des sauvegardes de la base de données antérieures à la rotation : elles en ont toujours besoin. Une rotation prend quelques secondes quel que soit le nombre de secrets, car les clés de données des tenants ne changent pas ; seul leur chiffrement change.
+
 ## Outils MCP et approbations {#mcp-tools-and-approvals}
 
-Chaque appel d'outil MCP doit présenter un certificat X.509 de courte durée émis pour la tâche qui l'effectue, accordé lorsque l'[approbation](../guides/approvals.md#human-approval) de la tâche l'est, ou lorsque démarre une tâche pour laquelle aucune approbation n'a été demandée. La racine de signature est générée à la première utilisation et stockée chiffrée avec la même clé que les secrets locaux : il n'y a donc rien à configurer ici pour que la fonctionnalité marche.
+Chaque appel d'outil MCP doit présenter un certificat X.509 de courte durée émis pour la tâche qui l'effectue, accordé lorsque l'[approbation](../guides/approvals.md#human-approval) de la tâche l'est, ou lorsque démarre une tâche pour laquelle aucune approbation n'a été demandée. La racine de signature est générée à la première utilisation et stockée chiffrée avec la clé maître ci-dessus : il n'y a donc rien à configurer ici pour que la fonctionnalité marche.
 
 | Variable | Valeur par défaut | Ce qu'elle borne |
 |---|---|---|

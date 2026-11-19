@@ -22,6 +22,11 @@ write-only pattern of :class:`models.system_settings.SystemSettings`: they are
 stored as Fernet ciphertext (encrypted in :class:`services.tenant.TenantService`)
 and never serialized; the read views replace them with ``*_credential_set``
 flags.
+
+Every tenant also carries ``data_key``, its own Fernet key wrapped with the
+deployment's master key (see :mod:`infrastructure.secret_cipher`). The
+credentials above, the tenant's local secrets and its MCP tool certificates'
+private keys are all encrypted with it, never with the master key directly.
 """
 
 from enum import StrEnum
@@ -32,6 +37,7 @@ from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
+from infrastructure.secret_cipher import new_data_key
 from models.base import BaseEntity
 from models.constraints import (
     EntityName,
@@ -242,6 +248,10 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
         Index("ix_tenants_name", "name"),
     )
 
+    #: The tenant's data key, wrapped with the master key: every ciphertext
+    #: the tenant owns is encrypted with it. Generated with the row and never
+    #: exposed through the API.
+    data_key: str = Field(default_factory=new_data_key)
     #: Fernet ciphertext, never exposed through the API (every route responds
     #: with :class:`TenantRead`). Longer than the plaintext the update payload
     #: caps, so it is redeclared without that cap.
@@ -435,6 +445,7 @@ class TenantRead(BaseEntity):
             stored key or a reference alike).
         """
         exclude = set(TenantVaultFields.model_fields) | {
+            "data_key",
             "global_vault_credential",
             "llm_api_key",
             "llm_api_key_ref",

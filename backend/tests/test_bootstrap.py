@@ -21,6 +21,7 @@ from typing import get_args
 
 import pytest
 import pytest_asyncio
+from cryptography.fernet import Fernet
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -28,13 +29,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from infrastructure.bootstrap import (
     apply_system_settings_env_overrides,
+    rotate_master_key,
     seed_default_tenant_and_admin_user,
     seed_root_user,
     seed_system_settings,
     seed_system_user,
 )
 from infrastructure.password import verify_password
-from infrastructure.secret_cipher import get_secret_cipher
+from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
 from models.constraints import Password
 from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import Tenant
@@ -287,7 +289,9 @@ async def test_seed_default_tenant_and_admin_user_honours_env_password(
     async with AsyncSession(engine) as session:
         admin = (await _real_users(session))[0]
     assert verify_password("super-secret-pw", admin.password)
-    assert caplog.records == []
+    # Filtered by logger name: creating the tenant generates its data key, and
+    # the first use of the master key in a process may log a key-file warning.
+    assert [r for r in caplog.records if r.name == _BOOTSTRAP_LOGGER] == []
 
 
 async def test_seed_default_tenant_and_admin_user_generates_random_password_when_unset(
@@ -315,7 +319,8 @@ async def test_seed_default_tenant_and_admin_user_logs_generated_password_only_o
         async with AsyncSession(engine) as session:
             await seed_default_tenant_and_admin_user(session)
             await seed_default_tenant_and_admin_user(session)
-    assert len(caplog.records) == 1
+    # Filtered by logger name, for the same reason as the test above.
+    assert len([r for r in caplog.records if r.name == _BOOTSTRAP_LOGGER]) == 1
 
 
 async def test_seed_default_tenant_and_admin_user_is_idempotent(
@@ -747,3 +752,73 @@ async def test_a_bad_smtp_variable_does_not_hold_back_the_llm(
     row = await _settings_row(settings_engine)
     assert row.smtp_host is None
     assert row.llm_model == "gemini-3.8-flash"
+
+
+# ---------- master key rotation ----------
+
+
+async def test_rotate_master_key_rewraps_what_the_old_key_protects(
+    engine: AsyncEngine, caplog: pytest.LogCaptureFixture
+) -> None:
+    old_key, new_key = Fernet.generate_key(), Fernet.generate_key()
+    old = SecretCipher(old_key)
+    rotating = SecretCipher(new_key, [old_key])
+    new_only = SecretCipher(new_key)
+    data_key = Fernet.generate_key().decode()
+    async with AsyncSession(engine) as session:
+        await seed_system_settings(session)
+        settings = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
+        assert settings is not None
+        settings.smtp_password = old.encrypt("hunter2hunter2")
+        # Under neither key: reported and left alone, not a startup failure.
+        settings.llm_api_key = SecretCipher(Fernet.generate_key()).encrypt("sk")
+        unreadable = settings.llm_api_key
+        session.add(settings)
+        session.add(
+            Tenant(
+                id="t-rot",
+                name="t-rot",
+                display_name="Rotated",
+                data_key=old.encrypt(data_key),
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+
+        with caplog.at_level(logging.ERROR, logger="infrastructure.bootstrap"):
+            assert await rotate_master_key(session, rotating) == 2
+        assert "platform LLM API key does not decrypt" in caplog.text
+
+        tenant = await session.get(Tenant, "t-rot")
+        settings = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
+        assert tenant is not None and settings is not None
+        assert new_only.decrypt(tenant.data_key) == data_key
+        assert settings.smtp_password is not None
+        assert new_only.decrypt(settings.smtp_password) == "hunter2hunter2"
+        assert settings.llm_api_key == unreadable
+
+        # Everything is under the new key now, so a restart rewrites nothing.
+        assert await rotate_master_key(session, rotating) == 0
+
+
+async def test_rotate_master_key_does_nothing_without_fallbacks(
+    engine: AsyncEngine,
+) -> None:
+    old = SecretCipher(Fernet.generate_key())
+    async with AsyncSession(engine) as session:
+        session.add(
+            Tenant(
+                id="t-keep",
+                name="t-keep",
+                display_name="Kept",
+                data_key=old.encrypt(Fernet.generate_key().decode()),
+                created_by=SYSTEM_USER_ID,
+                updated_by=SYSTEM_USER_ID,
+            )
+        )
+        await session.commit()
+
+        assert (
+            await rotate_master_key(session, SecretCipher(Fernet.generate_key())) == 0
+        )

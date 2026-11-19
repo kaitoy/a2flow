@@ -76,6 +76,6 @@ Tres cosas sobreviven a un contenedor y deben estar en almacenamiento duradero p
 |---|---|---|
 | **La base de datos** | La base de datos indicada en `DB_URL` | Todo: ahí está cada registro. Consulta [Base de datos](../architecture/database.md) |
 | **El almacén de skills de agente** | `SKILLS_DIR` | Las ejecuciones no pueden cargar la revisión de la skill a la que están fijadas (HTTP 409 `SKILL_NOT_READY`). Es estado duradero, no una caché; consulta [Almacén de skills de agente](./configuration.md#agent-skill-store) |
-| **La clave de cifrado de secretos** | `SECRET_ENCRYPTION_KEY`, o el archivo de `SECRET_KEY_FILE` | Todos los secretos locales almacenados se vuelven indescifrables, y la autoridad de certificación ya no puede emitir ni verificar los certificados que necesita cada llamada a una herramienta MCP. Consulta [Gestión de secretos](./configuration.md#secret-management) |
+| **La clave de cifrado de secretos** | `SECRET_ENCRYPTION_KEY`, o el archivo de `SECRET_KEY_FILE` | La clave de datos de cada tenant se vuelve indescifrable, y con ellas todos los secretos locales y credenciales almacenados; la autoridad de certificación ya no puede emitir ni verificar los certificados que necesita cada llamada a una herramienta MCP. Consulta [Gestión de secretos](./configuration.md#secret-management) |
 
 Cómo copiar y restaurar cada una de ellas se explica en [Copia de seguridad y restauración](./backup.md).

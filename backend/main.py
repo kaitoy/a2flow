@@ -19,6 +19,7 @@ from dependencies.context import APP_NAME
 from dependencies.singletons import get_agent_registry, get_session_service
 from infrastructure.bootstrap import (
     apply_system_settings_env_overrides,
+    rotate_master_key,
     seed_default_tenant_and_admin_user,
     seed_root_user,
     seed_system_settings,
@@ -66,9 +67,9 @@ _BOOTSTRAP_WAIT_SECONDS = 600.0
 
 
 async def _bootstrap() -> list[str]:
-    """Migrate the schema and seed the baseline data, one replica at a time.
+    """Migrate the schema, finish any master-key rotation, and seed the baseline data.
 
-    Both steps are check-then-write: a migration reads ``alembic_version`` and
+    One replica at a time. Every step is check-then-write: a migration reads ``alembic_version`` and
     every seed function looks for its row before inserting it. Replicas
     starting together on a fresh database would all pass the checks and then
     collide on DDL or primary keys, so the whole sequence runs under the
@@ -86,6 +87,10 @@ async def _bootstrap() -> list[str]:
     async with advisory_lock(BOOTSTRAP_LOCK_KEY, wait_seconds=_BOOTSTRAP_WAIT_SECONDS):
         await run_migrations()
         async with AsyncSession(engine) as session:
+            # Before anything reads a master-key ciphertext: everything still
+            # decrypts during a rotation, but the sooner the rewrite lands, the
+            # sooner the old key can be dropped.
+            await rotate_master_key(session)
             await seed_system_user(session)
             # Before anything that could take a while: the MCP proxy waits on
             # this process reporting healthy to find its certificate on the

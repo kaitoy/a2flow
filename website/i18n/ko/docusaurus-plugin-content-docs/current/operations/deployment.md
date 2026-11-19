@@ -76,6 +76,6 @@ HTTPS 뒤에 두는 배포에 필요한 설정은 하나입니다. `APP_BASE_URL
 |---|---|---|
 | **데이터베이스** | `DB_URL`이 가리키는 데이터베이스 | 전부 잃습니다. 모든 레코드가 여기에 있습니다. [데이터베이스](../architecture/database.md)를 참조하세요 |
 | **에이전트 스킬 스토어** | `SKILLS_DIR` | 실행이 고정된 스킬 리비전을 로드할 수 없습니다(HTTP 409 `SKILL_NOT_READY`). 캐시가 아니라 지속되는 상태입니다. [에이전트 스킬 스토어](./configuration.md#agent-skill-store)를 참조하세요 |
-| **시크릿 암호화 키** | `SECRET_ENCRYPTION_KEY` 또는 `SECRET_KEY_FILE`의 파일 | 저장된 로컬 시크릿을 모두 복호화할 수 없게 되고, 인증 기관이 모든 MCP 도구 호출에 필요한 인증서를 더 이상 발급하거나 검증할 수 없습니다. [시크릿 관리](./configuration.md#secret-management)를 참조하세요 |
+| **시크릿 암호화 키** | `SECRET_ENCRYPTION_KEY` 또는 `SECRET_KEY_FILE`의 파일 | 모든 테넌트의 데이터 키를 복호화할 수 없게 되어 저장된 로컬 시크릿과 자격 증명도 모두 복호화할 수 없게 되고, 인증 기관이 모든 MCP 도구 호출에 필요한 인증서를 더 이상 발급하거나 검증할 수 없습니다. [시크릿 관리](./configuration.md#secret-management)를 참조하세요 |
 
 각각을 백업하고 복원하는 방법은 [백업 및 복원](./backup.md)에 있습니다.

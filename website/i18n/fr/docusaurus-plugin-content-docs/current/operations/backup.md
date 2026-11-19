@@ -13,7 +13,7 @@ sidebar_position: 4
 | Magasin de compétences d'agent | Une copie de l'arborescence `SKILLS_DIR` | Extraction à son emplacement d'origine |
 | Clé de chiffrement des secrets | La valeur de `SECRET_ENCRYPTION_KEY`, ou le fichier indiqué par `SECRET_KEY_FILE` | Définition de la même valeur, ou remise en place du même fichier |
 
-**Restaurez toujours ensemble la base de données et la clé.** La clé déchiffre les secrets locaux *et* la clé de signature de la CA d'approbation, tous deux stockés dans la base de données. Une base de données restaurée avec une autre clé démarre avec des secrets entièrement illisibles.
+**Restaurez toujours ensemble la base de données et la clé.** La clé déverrouille la clé de données de chaque tenant, qui déchiffre les secrets locaux et les identifiants enregistrés de ce tenant, *et* elle déchiffre la clé de signature de la CA d'approbation. Tout cela est stocké dans la base de données. Une base de données restaurée avec une autre clé démarre avec des secrets entièrement illisibles.
 
 ## La base de données {#the-database}
 
@@ -66,7 +66,7 @@ Avec Docker Compose, le fichier se trouve dans le volume nommé `secret-key` :
 docker run --rm -v a2flow_secret-key:/key -v "$PWD:/backup" alpine   cp /key/.secret_key /backup/secret_key-$(date +%F)
 ```
 
-La rotation de la clé n'est pas prise en charge : les secrets existants sont chiffrés avec l'ancienne. Consultez [Gestion des secrets](./configuration.md#secret-management).
+Pour faire tourner la clé, suivez [Faire tourner la clé maître](./configuration.md#rotating-the-master-key). Une sauvegarde de la base de données a besoin de la clé en vigueur au moment où elle a été prise : conservez donc l'ancienne clé tant que vous conservez des sauvegardes antérieures à la rotation.
 
 ## Vérifier une restauration {#checking-a-restore}
 

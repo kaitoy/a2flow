@@ -13,12 +13,17 @@ from infrastructure.llm_settings import (
     LlmSettingsResolver,
     ResolvedLlm,
 )
-from infrastructure.secret_cipher import get_secret_cipher
+from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
 from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import LlmMode, Tenant
 from repositories.exceptions import SecretResolutionError
 from tests._engine import make_test_engine
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_local_secret, seed_users
+from tests._seed import (
+    DEFAULT_TEST_TENANT_ID,
+    seed_local_secret,
+    seed_users,
+    tenant_cipher,
+)
 
 
 @pytest_asyncio.fixture()
@@ -44,20 +49,28 @@ async def _configure(
         None,
     ),
 ) -> None:
-    """Store the platform's and the default tenant's LLM, encrypting the keys."""
-    cipher = get_secret_cipher()
+    """Store the platform's and the default tenant's LLM, encrypting the keys.
 
-    def encrypted(key: str | None) -> str | None:
+    The platform's key is encrypted with the master key, the tenant's with its
+    own data key -- as the settings services store them.
+    """
+    master = get_secret_cipher()
+    data_key = await tenant_cipher(engine)
+
+    def encrypted(key: str | None, cipher: SecretCipher) -> str | None:
         return cipher.encrypt(key) if key else None
 
     async with AsyncSession(engine) as session:
         settings = await session.get(SystemSettings, SYSTEM_SETTINGS_ID)
         tenant_row = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
         assert settings is not None and tenant_row is not None
-        settings.llm_model, settings.llm_api_key = system[0], encrypted(system[1])
+        settings.llm_model, settings.llm_api_key = (
+            system[0],
+            encrypted(system[1], master),
+        )
         tenant_row.llm_mode = tenant[0]
         tenant_row.llm_model = tenant[1]
-        tenant_row.llm_api_key = encrypted(tenant[2])
+        tenant_row.llm_api_key = encrypted(tenant[2], data_key)
         session.add(settings)
         session.add(tenant_row)
         await session.commit()

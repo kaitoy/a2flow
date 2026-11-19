@@ -51,7 +51,8 @@ from infrastructure.mcp_certificate import (
     sign_pop_digest,
 )
 from infrastructure.mcp_policies import _in_progress_tasks
-from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
+from infrastructure.secret_cipher import SecretCipher
+from infrastructure.tenant_cipher import TenantCiphers
 from models.mcp_tool_certificate import McpToolCertificate
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
 from repositories.tenant_bootstrap import resolve_workflow_execution_tenant
@@ -83,18 +84,15 @@ class ApprovalCredentialProvider:
         self,
         *,
         session_factory: SessionFactory | None = None,
-        cipher: SecretCipher | None = None,
     ) -> None:
         """Initialize the provider.
 
         Args:
             session_factory: Opens the database session used to find the
-                certificate. Defaults to a session on the application engine.
-            cipher: Decrypts the stored private key. Defaults to the
-                process-wide cipher.
+                certificate and its tenant's data key. Defaults to a session on
+                the application engine.
         """
         self._session_factory = session_factory or _default_session
-        self._cipher = cipher or get_secret_cipher()
 
     async def credential_for(
         self,
@@ -121,12 +119,13 @@ class ApprovalCredentialProvider:
         Returns:
             The credential to present, or ``None``.
         """
-        certificate = await self._find(session_id, mcp_server_id, tool_name)
-        if certificate is None:
+        found = await self._find(session_id, mcp_server_id, tool_name)
+        if found is None:
             return None
+        certificate, cipher = found
 
         try:
-            key_pem = self._cipher.decrypt(certificate.private_key_encrypted)
+            key_pem = cipher.decrypt(certificate.private_key_encrypted)
             key = private_key_from_pem(key_pem)
         except (ValueError, McpCaError):
             # A rotated Fernet key or a corrupt row. Presenting nothing gets a
@@ -165,7 +164,7 @@ class ApprovalCredentialProvider:
 
     async def _find(
         self, session_id: str, mcp_server_id: str, tool_name: str
-    ) -> McpToolCertificate | None:
+    ) -> tuple[McpToolCertificate, SecretCipher] | None:
         """Pick the calling session's live certificate that best covers the target tool.
 
         Only certificates of tasks the calling session is working on are
@@ -180,8 +179,10 @@ class ApprovalCredentialProvider:
             tool_name: Name of the tool being called.
 
         Returns:
-            The chosen certificate, or ``None`` when the session maps to no run
-            or none of its in-progress tasks holds a live certificate.
+            The chosen certificate with the data-key cipher of its tenant, or
+            ``None`` when the session maps to no run or none of its in-progress
+            tasks holds a live certificate, or the tenant's data key cannot
+            be unwrapped.
         """
         async with self._session_factory() as db:
             resolved = await resolve_workflow_execution_tenant(db, session_id)
@@ -200,9 +201,22 @@ class ApprovalCredentialProvider:
                 for certificate in await repo.list_live_for_execution(execution_id)
                 if certificate.workflow_task_id in own_task_ids
             ]
+            if not candidates:
+                return None
+            try:
+                cipher = await TenantCiphers(db).for_tenant(tenant_id)
+            except ValueError:
+                # The master key changed under the stored data key: as with an
+                # undecryptable private key, present nothing and let the
+                # policy layer deny the call.
+                logger.warning(
+                    "Cannot unwrap the data key of tenant %s; proceeding "
+                    "without a credential",
+                    tenant_id,
+                    exc_info=True,
+                )
+                return None
 
-        if not candidates:
-            return None
         for candidate in candidates:
             try:
                 claims = extract_claims(certificate_from_pem(candidate.certificate_pem))
@@ -215,8 +229,8 @@ class ApprovalCredentialProvider:
                 )
                 continue
             if claims.grants(mcp_server_id, tool_name):
-                return candidate
-        return candidates[0]
+                return candidate, cipher
+        return candidates[0], cipher
 
 
 @lru_cache(maxsize=1)
@@ -229,7 +243,7 @@ def get_approval_credential_provider() -> ApprovalCredentialProvider:
     cycle back through :mod:`infrastructure.agent`.
 
     Note for tests: this is ``lru_cache``d, so a test that needs a different
-    session factory or cipher must construct
+    session factory must construct
     :class:`ApprovalCredentialProvider` directly or call
     ``get_approval_credential_provider.cache_clear()``.
     """

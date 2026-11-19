@@ -76,6 +76,6 @@ Trois éléments survivent à un conteneur et doivent résider sur un stockage d
 |---|---|---|
 | **La base de données** | La base désignée par `DB_URL` | Tout est perdu : chaque enregistrement s'y trouve. Consultez [Base de données](../architecture/database.md) |
 | **Le magasin de compétences d'agent** | `SKILLS_DIR` | Les exécutions ne peuvent plus charger la révision de compétence à laquelle elles sont liées (HTTP 409 `SKILL_NOT_READY`). Il s'agit d'un état durable, et non d'un cache ; consultez [Magasin de compétences d'agent](./configuration.md#agent-skill-store) |
-| **La clé de chiffrement des secrets** | `SECRET_ENCRYPTION_KEY`, ou le fichier indiqué par `SECRET_KEY_FILE` | Tous les secrets locaux stockés deviennent indéchiffrables, et l'autorité de certification ne peut plus émettre ni vérifier les certificats dont chaque appel d'outil MCP a besoin. Consultez [Gestion des secrets](./configuration.md#secret-management) |
+| **La clé de chiffrement des secrets** | `SECRET_ENCRYPTION_KEY`, ou le fichier indiqué par `SECRET_KEY_FILE` | La clé de données de chaque tenant devient indéchiffrable, et avec elles tous les secrets locaux et identifiants stockés ; l'autorité de certification ne peut plus émettre ni vérifier les certificats dont chaque appel d'outil MCP a besoin. Consultez [Gestion des secrets](./configuration.md#secret-management) |
 
 La sauvegarde et la restauration de chacun de ces éléments sont décrites dans [Sauvegarde et restauration](./backup.md).

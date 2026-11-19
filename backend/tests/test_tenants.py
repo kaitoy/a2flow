@@ -6,6 +6,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
+from infrastructure.secret_cipher import data_key_cipher, get_secret_cipher
+from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
@@ -388,6 +390,49 @@ async def test_global_vault_credential_is_stored_encrypted_and_never_returned(
     listed = await tenant_client.get("/api/v1/tenants")
     assert "hvs.tenant-token" not in listed.text
     assert assert_ok(listed)[0]["globalVaultCredentialSet"] is True
+
+
+async def _stored_tenant(tenant_id: str) -> Tenant:
+    """Read a tenant row through the session the test app is bound to."""
+    from infrastructure.database import get_session
+    from main import app
+
+    async for db in app.dependency_overrides[get_session]():
+        session: AsyncSession = db
+        tenant = await session.get(Tenant, tenant_id)
+        assert tenant is not None
+        return tenant
+    raise AssertionError("no session")
+
+
+async def test_a_new_tenants_credentials_are_under_its_own_data_key(
+    tenant_client: AsyncClient,
+) -> None:
+    """Each tenant gets its own data key; its credentials are never under the master."""
+    first = assert_ok(
+        await tenant_client.post(
+            "/api/v1/tenants", json={**_CREATE_BODY, **_GLOBAL_VAULT}
+        ),
+        status=201,
+    )
+    second = assert_ok(
+        await tenant_client.post(
+            "/api/v1/tenants", json={"displayName": "Other", "name": "other"}
+        ),
+        status=201,
+    )
+    assert "dataKey" not in first
+
+    stored = await _stored_tenant(first["id"])
+    other = await _stored_tenant(second["id"])
+    credential = stored.global_vault_credential
+    assert credential is not None
+    assert stored.data_key != other.data_key
+    assert data_key_cipher(stored.data_key).decrypt(credential) == "hvs.tenant-token"
+    with pytest.raises(ValueError):
+        data_key_cipher(other.data_key).decrypt(credential)
+    with pytest.raises(ValueError):
+        get_secret_cipher().decrypt(credential)
 
 
 async def test_blank_global_vault_credential_keeps_the_stored_one(

@@ -76,6 +76,6 @@ SSE 代理路由（`POST /api/v1/workflow-executions/{id}/agent` 和 `POST /api/
 |---|---|---|
 | **数据库** | `DB_URL` 指定的数据库 | 丢失一切，因为所有记录都在其中。请参阅[数据库](../architecture/database.md) |
 | **代理技能存储库** | `SKILLS_DIR` | 执行无法加载其固定使用的技能修订版本（HTTP 409 `SKILL_NOT_READY`）。这是持久状态，不是缓存，请参阅[代理技能存储库](./configuration.md#agent-skill-store) |
-| **密钥加密密钥** | `SECRET_ENCRYPTION_KEY`，或 `SECRET_KEY_FILE` 指向的文件 | 所有已存储的本地密钥都将无法解密，证书颁发机构也无法再签发或验证每次 MCP 工具调用所需的证书。请参阅[密钥管理](./configuration.md#secret-management) |
+| **密钥加密密钥** | `SECRET_ENCRYPTION_KEY`，或 `SECRET_KEY_FILE` 指向的文件 | 所有租户的数据加密密钥都将无法解密，所有已存储的本地密钥和凭据也随之无法解密；证书颁发机构也无法再签发或验证每次 MCP 工具调用所需的证书。请参阅[密钥管理](./configuration.md#secret-management) |
 
 每一项的备份和恢复方法，请参阅[备份与恢复](./backup.md)。

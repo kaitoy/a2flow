@@ -1,8 +1,9 @@
 """Use case service for Tenant resources.
 
 Wraps the :class:`TenantRepository` with the business rules the routers need:
-raising :class:`NotFoundError` when a tenant is missing, encrypting the
-tenant's Vault credentials (for its own Vault and for the global one) before
+raising :class:`NotFoundError` when a tenant is missing, encrypting (with the
+tenant's own data key, see :mod:`infrastructure.secret_cipher`) the tenant's
+Vault credentials (for its own Vault and for the global one) before
 they are stored, refusing a Vault connection that could never authenticate,
 validating and encrypting the OIDC single sign-on settings, keeping each stored
 credential (OIDC client secret, LLM API key) exclusive with the secret reference
@@ -17,7 +18,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from config import get_settings
-from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_cipher import SecretCipher, data_key_cipher, new_data_key
 from infrastructure.secret_resolver import split_secret_ref
 from infrastructure.url_safety import assert_public_http_url
 from models.tenant import (
@@ -65,7 +66,6 @@ class TenantService:
     def __init__(
         self,
         repo: TenantRepository,
-        cipher: SecretCipher,
         users: UserRepository,
         secrets_for_tenant: Callable[[str], SecretRepository],
     ) -> None:
@@ -73,8 +73,6 @@ class TenantService:
 
         Args:
             repo: Repository providing Tenant persistence.
-            cipher: Cipher used to encrypt the Vault and OIDC credentials
-                before storage.
             users: Repository used to reset linked OIDC subjects when a
                 tenant's identity provider changes.
             secrets_for_tenant: Builds the secret repository of a tenant, used
@@ -82,11 +80,12 @@ class TenantService:
                 that tenant's secrets.
         """
         self._repo = repo
-        self._cipher = cipher
         self._users = users
         self._secrets_for_tenant = secrets_for_tenant
 
-    def _prepare_oidc(self, current: Tenant | None, payload: dict[str, Any]) -> None:
+    def _prepare_oidc(
+        self, current: Tenant | None, payload: dict[str, Any], cipher: SecretCipher
+    ) -> None:
         """Encrypt the OIDC client secret and validate the merged SSO settings.
 
         Mutates ``payload`` in place. A non-empty secret is replaced by its
@@ -99,6 +98,7 @@ class TenantService:
         Args:
             current: The stored tenant, or ``None`` on create.
             payload: The fields the caller set.
+            cipher: The tenant's data-key cipher.
 
         Raises:
             TenantValidationError: If a changed issuer is not an https URL on a
@@ -124,7 +124,7 @@ class TenantService:
             elif secret == "":
                 payload["oidc_client_secret"] = None
             else:
-                payload["oidc_client_secret"] = self._cipher.encrypt(secret)
+                payload["oidc_client_secret"] = cipher.encrypt(secret)
         issuer = payload.get("oidc_issuer")
         if issuer and issuer != getattr(current, "oidc_issuer", None):
             allowed = get_settings().oidc_allowed_private_hosts
@@ -198,7 +198,9 @@ class TenantService:
             if await self._secrets_for_tenant(tenant_id).get_by_name(name) is None:
                 raise ForeignKeyViolationError("Secret", name)
 
-    def _prepare(self, current: Tenant | None, payload: dict[str, Any]) -> None:
+    def _prepare(
+        self, current: Tenant | None, payload: dict[str, Any], cipher: SecretCipher
+    ) -> None:
         """Drop null sign-in limits and run the shared Vault and OIDC write rules.
 
         Mutates ``payload`` in place. An explicit ``None`` for a sign-in limit
@@ -210,6 +212,8 @@ class TenantService:
         Args:
             current: The stored tenant, or ``None`` on create.
             payload: The fields the caller set.
+            cipher: The tenant's data-key cipher, which encrypts every
+                credential in ``payload``.
 
         Raises:
             TenantValidationError: If the merged Vault connection would be
@@ -222,10 +226,10 @@ class TenantService:
                 payload.pop(field)
         for prefix in ("vault_", "global_vault_"):
             prepare_vault_fields(
-                current, payload, self._cipher, TenantValidationError, prefix=prefix
+                current, payload, cipher, TenantValidationError, prefix=prefix
             )
-        self._prepare_oidc(current, payload)
-        prepare_llm_fields(payload, self._cipher)
+        self._prepare_oidc(current, payload, cipher)
+        prepare_llm_fields(payload, cipher)
         self._prefer_one(payload)
 
     async def get(self, tenant_id: str) -> Tenant:
@@ -288,9 +292,12 @@ class TenantService:
         if await self._repo.at_capacity():
             raise TenantLimitReachedError()
         payload = data.model_dump()
-        self._prepare(None, payload)
+        # The row does not exist yet, so its data key is made here: the
+        # credentials in the payload are encrypted with it before the insert.
+        data_key = new_data_key()
+        self._prepare(None, payload, data_key_cipher(data_key))
         return await self._repo.create(
-            TenantCreate.model_construct(**payload), user_id=user_id
+            TenantCreate.model_construct(**payload), user_id=user_id, data_key=data_key
         )
 
     async def update(
@@ -352,7 +359,7 @@ class TenantService:
             if not payload.get("llm_api_key"):
                 payload["llm_api_key"] = None
             payload.setdefault("llm_api_key_ref", None)
-        self._prepare(current, payload)
+        self._prepare(current, payload, data_key_cipher(current.data_key))
         await self._check_refs(tenant_id, payload)
         if isinstance(data, AdminSettingsUpdate) and any(
             field.startswith("llm_") for field in payload

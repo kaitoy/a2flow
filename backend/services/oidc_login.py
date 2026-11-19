@@ -36,7 +36,7 @@ from infrastructure.oidc_client import (
     OidcProviderMetadata,
     make_pkce_pair,
 )
-from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_cipher import SecretCipher, data_key_cipher
 from infrastructure.secret_resolver import SecretResolver
 from models.tenant import Tenant, oidc_redirect_uri
 from models.user import User
@@ -193,7 +193,8 @@ class OidcLoginService:
             users: Finds, links and creates users.
             auth: Mints the session.
             oidc: Talks to the identity provider.
-            cipher: Encrypts the state cookie and decrypts client secrets.
+            cipher: The master cipher, which encrypts the state cookie. A
+                tenant's stored client secret is decrypted with its data key.
             groups_for_tenant: Builds an unrestricted user-group repository
                 scoped to the given tenant id.
             secrets_for_tenant: Builds the resolver of the given tenant's
@@ -446,7 +447,8 @@ class OidcLoginService:
             except SecretResolutionError as exc:
                 raise _refuse(SsoErrorCode.unavailable, tenant.id, str(exc)) from exc
         try:
-            return self._cipher.decrypt(tenant.oidc_client_secret or "")
+            cipher = data_key_cipher(tenant.data_key)
+            return cipher.decrypt(tenant.oidc_client_secret or "")
         except ValueError as exc:
             raise _refuse(
                 SsoErrorCode.unavailable, tenant.id, "undecryptable client secret"

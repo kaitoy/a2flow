@@ -24,7 +24,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import get_settings
 from infrastructure.mcp_ca import certificate_from_pem
 from infrastructure.mcp_certificate import extract_claims
-from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.workflow_task_tools import update_workflow_task
 from models.approval import Approval, ApprovalStatus
 from models.mcp_server import MCPServer, McpTransport
@@ -43,7 +42,7 @@ from models.workflow_task import (
 from repositories.mcp_tool_certificate import SqlMcpToolCertificateRepository
 from tests._engine import make_test_engine
 from tests._envelope import assert_ok
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users, tenant_cipher
 from tests.conftest import _install_auth_overrides
 
 
@@ -540,7 +539,7 @@ async def test_private_key_is_stored_only_as_ciphertext(
 
     certificate = (await _certificates(eng, approval_id))[0]
     assert "PRIVATE KEY" not in certificate.private_key_encrypted
-    plain = get_secret_cipher().decrypt(certificate.private_key_encrypted)
+    plain = (await tenant_cipher(eng)).decrypt(certificate.private_key_encrypted)
     assert "PRIVATE KEY" in plain
 
 
