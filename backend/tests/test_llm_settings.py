@@ -16,8 +16,9 @@ from infrastructure.llm_settings import (
 from infrastructure.secret_cipher import get_secret_cipher
 from models.system_settings import SYSTEM_SETTINGS_ID, SystemSettings
 from models.tenant import LlmMode, Tenant
+from repositories.exceptions import SecretResolutionError
 from tests._engine import make_test_engine
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_users
+from tests._seed import DEFAULT_TEST_TENANT_ID, seed_local_secret, seed_users
 
 
 @pytest_asyncio.fixture()
@@ -185,6 +186,36 @@ async def test_an_unknown_tenant_gets_the_platforms_llm(engine: AsyncEngine) -> 
     assert await _resolve(engine, "no-such-tenant") == ResolvedLlm(
         "gemini-3.8-flash", "sk-system"
     )
+
+
+async def _reference_key(engine: AsyncEngine, mode: LlmMode, ref: str) -> None:
+    """Point the default tenant's LLM key at ``ref``, under ``mode``."""
+    async with AsyncSession(engine) as session:
+        tenant = await session.get(Tenant, DEFAULT_TEST_TENANT_ID)
+        assert tenant is not None
+        tenant.llm_mode, tenant.llm_api_key_ref = mode, ref
+        session.add(tenant)
+        await session.commit()
+
+
+async def test_a_referenced_key_is_read_from_the_tenants_secret(
+    engine: AsyncEngine,
+) -> None:
+    await _configure(engine, system=("gemini-3.8-flash", "sk-system"))
+    await seed_local_secret(engine, "llm", {"key": "sk-from-secret"})
+    await _reference_key(engine, LlmMode.tenant_admin, "llm/key")
+
+    assert await _resolve(engine) == ResolvedLlm("gemini-3.8-flash", "sk-from-secret")
+
+
+async def test_an_unresolvable_referenced_key_is_an_error_not_a_fallback(
+    engine: AsyncEngine,
+) -> None:
+    await _configure(engine, system=("gemini-3.8-flash", "sk-system"))
+    await _reference_key(engine, LlmMode.tenant_admin, "gone/key")
+
+    with pytest.raises(SecretResolutionError):
+        await _resolve(engine)
 
 
 async def test_a_key_that_no_longer_decrypts_is_an_error_not_a_fallback(

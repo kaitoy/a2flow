@@ -11,11 +11,13 @@ Ouvrez **Secrets** dans la barre latérale d'administration pour les gérer. Cha
 
 ## Où un secret est utilisé {#where-a-secret-is-used}
 
-![Organigramme montrant l'entrée d'un secret référencée soit dans les en-têtes et variables d'environnement d'un serveur MCP, soit comme mot de passe d'authentification du dépôt d'une compétence d'agent.](./img/secrets-usage.svg#gh-light-mode-only)
-![Organigramme montrant l'entrée d'un secret référencée soit dans les en-têtes et variables d'environnement d'un serveur MCP, soit comme mot de passe d'authentification du dépôt d'une compétence d'agent.](./img/secrets-usage-dark.svg#gh-dark-mode-only)
+![Organigramme montrant l'entrée d'un secret référencée dans les en-têtes et variables d'environnement d'un serveur MCP, comme mot de passe d'authentification du dépôt d'une compétence d'agent, comme secret client de l'authentification unique d'un tenant ou comme clé d'API du LLM d'un tenant.](./img/secrets-usage.svg#gh-light-mode-only)
+![Organigramme montrant l'entrée d'un secret référencée dans les en-têtes et variables d'environnement d'un serveur MCP, comme mot de passe d'authentification du dépôt d'une compétence d'agent, comme secret client de l'authentification unique d'un tenant ou comme clé d'API du LLM d'un tenant.](./img/secrets-usage-dark.svg#gh-dark-mode-only)
 
 - **[Serveurs MCP](./mcp-servers.md)** — toute valeur d'en-tête ou de variable d'environnement peut intégrer `${secret:name/key}`, développé à la connexion.
 - **[Compétences d'agent](./agent-skills.md)** — le **Mot de passe d'authentification** d'une compétence est une référence à une entrée, choisie dans des listes déroulantes plutôt que saisie.
+- **[Authentification unique](./single-sign-on.md)** — dans **Paramètres administrateur**, le **Secret client** peut être lu dans une entrée : choisissez **Utiliser un secret**.
+- **[Le LLM du tenant](./users-and-groups.md#tenant-llm)** — la **Clé d'API** que l'administrateur d'un tenant configure dans **Paramètres administrateur** peut être lue dans une entrée de la même façon.
 
 Une entrée se désigne toujours par **`name/key`**. La clé est requise même lorsque le secret ne contient qu'une seule entrée — un nom seul désigne une table, pas une valeur : un `${secret:name}` sans clé échoue donc à la résolution au lieu d'être transmis comme chaîne littérale.
 
@@ -36,4 +38,4 @@ Un secret Vault est lu dans le Vault **de son propre tenant**, que l'administrat
 
 Les secrets sont référencés **par leur nom** et résolus à la demande. Renommer ou supprimer un secret encore référencé n'échoue pas au moment de la modification : c'est l'utilisation suivante qui échoue, en nommant le secret introuvable. Une [compétence d'agent](./agent-skills.md) dont la référence est devenue obsolète consigne le motif dans son propre enregistrement à sa prochaine récupération.
 
-Une référence est toutefois vérifiée lorsqu'elle est enregistrée. Lorsque vous enregistrez un serveur MCP dont les en-têtes ou l'environnement nomment un secret, que vous lancez une **Exécution de test** sur un script ou que vous enregistrez le **Mot de passe d'authentification** d'une compétence, le secret doit exister et vous devez pouvoir l'ouvrir. Un secret qu'une [étiquette de contrôle d'accès](./tags.md#access-control-tags) vous masque est rejeté exactement comme un secret manquant. Il en va de même lorsque vous modifiez un enregistrement qui référence déjà un tel secret, même si vous ne changez qu'un autre champ.
+Une référence est toutefois vérifiée lorsqu'elle est enregistrée. Lorsque vous enregistrez un serveur MCP dont les en-têtes ou l'environnement nomment un secret, que vous lancez une **Exécution de test** sur un script, que vous enregistrez le **Mot de passe d'authentification** d'une compétence ou que vous choisissez un secret pour le secret client ou la clé d'API du LLM dans **Paramètres administrateur**, le secret doit exister et vous devez pouvoir l'ouvrir. Un secret qu'une [étiquette de contrôle d'accès](./tags.md#access-control-tags) vous masque est rejeté exactement comme un secret manquant. Il en va de même lorsque vous modifiez un enregistrement qui référence déjà un tel secret, même si vous ne changez qu'un autre champ.

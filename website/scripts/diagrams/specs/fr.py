@@ -42,25 +42,21 @@ def _two(x: int, first: str, second: str, up: int = 9, gap: int = 17) -> str:
 # ---------------------------------------------------------------- guides/secrets-usage
 SPECS["guides/secrets-usage"] = head(
     "Where a secret entry is used", "Où une entrée de secret est utilisée",
-    "Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.",
-    "Organigramme montrant l'entrée d'un secret référencée soit dans les en-têtes et variables d'environnement d'un serveur MCP, soit comme mot de passe d'authentification du dépôt d'une compétence d'agent.",
+    "Flowchart showing a secret's entry referenced in an MCP server's headers and environment variables, as an Agent Skill repository's auth password, as a tenant's single sign-on client secret, or as the API key of a tenant's LLM.",
+    "Organigramme montrant l'entrée d'un secret référencée dans les en-têtes et variables d'environnement d'un serveur MCP, comme mot de passe d'authentification du dépôt d'une compétence d'agent, comme secret client de l'authentification unique d'un tenant ou comme clé d'API du LLM d'un tenant.",
 ) + [
-    ('viewBox="0 0 740 250"', 'viewBox="0 0 780 250"'),
-    ('<rect x="480" y="20" width="220"', '<rect x="480" y="20" width="260"'),
-    ('<rect x="480" y="160" width="220"', '<rect x="480" y="160" width="260"'),
-    ('<text x="590" y="50"', '<text x="610" y="50"'),
-    ('<text x="590" y="70"', '<text x="610" y="70"'),
-    ('<text x="590" y="190"', '<text x="610" y="190"'),
-    ('<text x="590" y="210"', '<text x="610" y="210"'),
-    label("HEADERS", "EN-TÊTES"),
-    ('<rect x="430" y="164" width="40"', '<rect x="368" y="164" width="108"'),
-    ('<text x="450" y="175"', '<text x="422" y="175"'),
-    label("AUTH", "AUTHENTIFICATION"),
+    ('viewBox="0 0 740 530"', 'viewBox="0 0 780 530"'),
+    ('width="220" height="72"', 'width="260" height="72"', 4),
+    ('<text x="590"', '<text x="610"', 8),
     label("Entry", "Entrée"),
     label("MCP server", "Serveur MCP"),
     label("headers + env vars", "en-têtes + variables d'environnement"),
     label("Agent Skill", "Compétence d'agent"),
     label("repo auth password", "mot de passe d'authentification du dépôt"),
+    label("Single sign-on", "Authentification unique"),
+    label("client secret", "secret client"),
+    label("Tenant LLM", "LLM du tenant"),
+    label("API key", "clé d'API"),
 ]
 
 # ---------------------------------------------------------------- guides/admin-ui-navigation
@@ -501,8 +497,8 @@ SPECS["architecture/overview-lifecycle"] = head(
 # ---------------------------------------------------------------- architecture/secrets-resolution
 SPECS["architecture/secrets-resolution"] = head(
     "How a secret reference resolves", "Comment une référence de secret est résolue",
-    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed an MCP server connection or a skill repository clone.",
-    "Organigramme montrant une référence de secret qui se divise selon le type : local déchiffre la valeur stockée, vault la lit en direct depuis Vault, et les deux alimentent une connexion à un serveur MCP ou le clonage d'un dépôt de compétence.",
+    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed whatever uses the reference: an MCP server connection, a skill repository clone, a single sign-on or a tenant's LLM.",
+    "Organigramme montrant une référence de secret qui se divise selon le type : local déchiffre la valeur stockée, vault la lit en direct depuis Vault, et les deux alimentent ce qui utilise la référence : une connexion à un serveur MCP, le clonage d'un dépôt de compétence, une authentification unique ou le LLM d'un tenant.",
     page_title="Secret reference resolution", svg_title="Secret reference resolution",
 ) + [
     label("A reference", "Une référence"),
@@ -511,8 +507,8 @@ SPECS["architecture/secrets-resolution"] = head(
     label("stored value", "valeur stockée"),
     label("Read it live", "La lire en direct"),
     label("from Vault", "depuis Vault"),
-    label("MCP server connection", "Connexion au serveur MCP"),
-    label("or a skill repository clone", "ou clonage d'un dépôt de compétence"),
+    label("Where it is used", "Où elle sert"),
+    label("MCP · skill repo · SSO · LLM key", "MCP · dépôt · SSO · clé LLM"),
 ]
 
 _POLICY_COMMON = [

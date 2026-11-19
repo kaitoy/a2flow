@@ -631,6 +631,13 @@ export const es = {
   "common.workflowExecutions": "Ejecuciones de flujos de trabajo",
   "common.workflows": "Flujos de trabajo",
   "common.yes": "Sí",
+  "credentialSource.choose": "Cómo se proporciona {field}",
+  "credentialSource.enterValue": "Introducir valor",
+  "credentialSource.secret": "Secreto",
+  "credentialSource.secretHint":
+    "Se lee del secreto cada vez que se usa, así que un valor rotado en el secreto (o en Vault) se aplica sin volver a guardar aquí.",
+  "credentialSource.secretRequired": "Seleccione un secreto y una entrada.",
+  "credentialSource.useSecret": "Usar un secreto",
   "dashboard.activeRuns": "Ejecuciones activas",
   "dashboard.approvalBacklog": "Aprobaciones acumuladas",
   "dashboard.approvalBacklogHint": "Aprobaciones pendientes, primero la espera más larga",

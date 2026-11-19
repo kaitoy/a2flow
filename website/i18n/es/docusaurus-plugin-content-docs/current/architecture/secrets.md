@@ -5,10 +5,10 @@ sidebar_position: 8
 
 # Almacenamiento de secretos
 
-Un [secreto](../guides/secrets.md) es un conjunto con nombre de entradas de clave/valor, y cada referencia apunta exactamente a una entrada: `${secret:name/key}` en los encabezados o el entorno de un servidor MCP, un nombre y una clave en una skill de agente. Las referencias se guardan por nombre y **se resuelven solo cuando se usan**, de modo que nada que necesite una credencial la almacena nunca.
+Un [secreto](../guides/secrets.md) es un conjunto con nombre de entradas de clave/valor, y cada referencia apunta exactamente a una entrada: `${secret:name/key}` en los encabezados o el entorno de un servidor MCP, un nombre y una clave en una skill de agente, en el secreto de cliente del inicio de sesión único de un tenant o en su clave de API del LLM. Las referencias se guardan por nombre y **se resuelven solo cuando se usan**, de modo que nada que necesite una credencial la almacena nunca.
 
-![Diagrama de flujo que muestra una referencia a un secreto que se bifurca según el tipo: local descifra el valor guardado, vault lo lee en vivo desde Vault, y ambos alimentan una conexión a un servidor MCP o la clonación de un repositorio de skill.](./img/secrets-resolution.svg#gh-light-mode-only)
-![Diagrama de flujo que muestra una referencia a un secreto que se bifurca según el tipo: local descifra el valor guardado, vault lo lee en vivo desde Vault, y ambos alimentan una conexión a un servidor MCP o la clonación de un repositorio de skill.](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
+![Diagrama de flujo que muestra una referencia a un secreto que se bifurca según el tipo: local descifra el valor guardado, vault lo lee en vivo desde Vault, y ambos alimentan lo que usa la referencia: una conexión a un servidor MCP, la clonación de un repositorio de skill, un inicio de sesión único o el LLM de un tenant.](./img/secrets-resolution.svg#gh-light-mode-only)
+![Diagrama de flujo que muestra una referencia a un secreto que se bifurca según el tipo: local descifra el valor guardado, vault lo lee en vivo desde Vault, y ambos alimentan lo que usa la referencia: una conexión a un servidor MCP, la clonación de un repositorio de skill, un inicio de sesión único o el LLM de un tenant.](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
 
 | | **Local** | **HashiCorp Vault** |
 |---|---|---|
@@ -37,5 +37,9 @@ Un secreto siempre se lee a través del Vault del tenant al que pertenece. Ese e
 |---|---|
 | Los valores de encabezados y de entorno de un servidor MCP | El [gateway](./mcp-gateway-and-proxy.md) los expande para la conexión que el proxy MCP abre con ese servidor |
 | La contraseña del repositorio de una skill de agente | El repositorio se clona o se actualiza |
+| El secreto de cliente del inicio de sesión único de un tenant | Alguien inicia sesión con el [inicio de sesión único](../guides/single-sign-on.md) |
+| La clave de API del LLM de un tenant, configurada por su administrador | Se ejecuta un agente del tenant |
 
-Como la resolución es diferida, cambiar el nombre de un secreto al que algo sigue haciendo referencia, o eliminarlo, no falla al editar. Lo que falla es el siguiente uso, que indica el secreto que no encontró; el motivo subyacente se queda en el registro del servidor y no se le entrega a quien llama.
+Como la resolución es diferida, cambiar el nombre de un secreto al que algo sigue haciendo referencia, o eliminarlo, no falla al editar. Lo que falla es el siguiente uso, que indica el secreto que no encontró; el motivo subyacente se queda en el registro del servidor y no se le entrega a quien llama. Un intento de inicio de sesión único termina entonces con «El inicio de sesión único no está disponible para este tenant.», y un agente se detiene con un error en lugar de usar la clave del sistema.
+
+Solo las credenciales propias del tenant admiten un secreto. Las de [Configuración del sistema](../guides/system-settings.md) no pertenecen a ningún tenant y por eso no pueden hacer referencia a sus secretos; la clave del LLM que un superadministrador configura para un tenant tampoco sale de uno, porque los servidores MCP de ese tenant podrían hacer referencia a ella.

@@ -25,19 +25,19 @@ SPECS: dict[str, list[tuple]] = {}
 # ---------------------------------------------------------------- guides/secrets-usage
 SPECS["guides/secrets-usage"] = head(
     "Where a secret entry is used", "密钥条目的使用位置",
-    "Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.",
-    "流程图：密钥的条目要么在 MCP 服务器的标头和环境变量中被引用，要么作为代理技能仓库的认证密码被引用。",
+    "Flowchart showing a secret's entry referenced in an MCP server's headers and environment variables, as an Agent Skill repository's auth password, as a tenant's single sign-on client secret, or as the API key of a tenant's LLM.",
+    "流程图：密钥的条目可以在 MCP 服务器的标头和环境变量中被引用，也可以作为代理技能仓库的认证密码、租户单点登录的客户端密钥或租户 LLM 的 API 密钥被引用。",
 ) + [
-    mask(423, 56, 54, 32),
-    label("HEADERS", "标头"),
     label("Secret", "密钥"),
     label("Entry", "条目"),
     label("MCP server", "MCP 服务器"),
     label("headers + env vars", "标头 + 环境变量"),
     label("Agent Skill", "代理技能"),
     label("repo auth password", "仓库认证密码"),
-    mask(430, 164, 40, 32),
-    label("AUTH", "认证"),
+    label("Single sign-on", "单点登录"),
+    label("client secret", "客户端密钥"),
+    label("Tenant LLM", "租户的 LLM"),
+    label("API key", "API 密钥"),
 ]
 
 # ---------------------------------------------------------------- guides/admin-ui-navigation
@@ -496,8 +496,8 @@ SPECS["architecture/overview-lifecycle"] = head(
 # ---------------------------------------------------------------- architecture/secrets-resolution
 SPECS["architecture/secrets-resolution"] = head(
     "How a secret reference resolves", "密钥引用如何解析",
-    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed an MCP server connection or a skill repository clone.",
-    "流程图，显示密钥引用按类型分支：本地类型解密已存储的值，Vault 类型从 Vault 实时读取，两者都用于 MCP 服务器连接或技能仓库克隆。",
+    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed whatever uses the reference: an MCP server connection, a skill repository clone, a single sign-on or a tenant's LLM.",
+    "流程图，显示密钥引用按类型分支：本地类型解密已存储的值，Vault 类型从 Vault 实时读取，两者都交给使用该引用的一方：MCP 服务器连接、技能仓库克隆、单点登录或租户的 LLM。",
     page_title="Secret reference resolution", svg_title="Secret reference resolution",
 ) + [
     mask(305, 160, 48, 32, h=12),
@@ -508,8 +508,8 @@ SPECS["architecture/secrets-resolution"] = head(
     label("stored value", "已存储的值"),
     label("Read it live", "从 Vault"),
     label("from Vault", "实时读取"),
-    label("MCP server connection", "MCP 服务器连接"),
-    label("or a skill repository clone", "或技能仓库克隆"),
+    label("Where it is used", "使用方"),
+    label("MCP · skill repo · SSO · LLM key", "MCP · 技能 · SSO · LLM 密钥"),
 ]
 
 _POLICY_MASKS = [

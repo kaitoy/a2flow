@@ -619,6 +619,13 @@ export const ja = {
   "common.workflowExecutions": "ワークフロー実行",
   "common.workflows": "ワークフロー",
   "common.yes": "はい",
+  "credentialSource.choose": "{field}の指定方法",
+  "credentialSource.enterValue": "値を入力",
+  "credentialSource.secret": "シークレット",
+  "credentialSource.secretHint":
+    "使うたびにシークレットから読み込みます。シークレット（または Vault）で値を更新すれば、ここで保存し直さなくても反映されます。",
+  "credentialSource.secretRequired": "シークレットとエントリを選択してください。",
+  "credentialSource.useSecret": "シークレットを参照",
   "dashboard.activeRuns": "稼働中の実行",
   "dashboard.approvalBacklog": "承認の滞留",
   "dashboard.approvalBacklogHint": "保留中の承認(待ち時間の長い順)",

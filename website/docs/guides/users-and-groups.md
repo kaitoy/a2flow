@@ -109,7 +109,9 @@ Both fields work as they do in [System Settings](./system-settings.md#llm), and 
 | **Set by a Super Admin** | Uses the system's value, so a tenant can change only the model and keep the system's key, or the reverse. |
 | **Set by the tenant's Admin** | A model needs the tenant's own API key: saving a model without one is rejected with an error. With no key the tenant runs on the system's LLM, model and key alike, so its usage is never billed to the system's key. A key alone runs the system's model on the tenant's key. |
 
-What was entered stays when you switch options, but it applies only while one of the last two is chosen. The exception is choosing **Set by the tenant's Admin**: it clears both the model and the API key, so the tenant's Admins start from empty fields rather than what a Super Admin entered.
+Under **Admin Settings**, the tenant's Admins choose how the **API key** is provided: **Enter value**, or **Use a secret** to pick one entry of the tenant's [secrets](./secrets.md), such as one kept in HashiCorp Vault. A secret is read each time an agent runs, so a key rotated there takes effect without saving again. If it cannot be read, the agent stops with an error rather than falling back to the system's key. A Super Admin always enters the key directly: a key the system pays for never goes into a tenant's secrets, which the tenant's own MCP servers could use.
+
+What was entered stays when you switch options, but it applies only while one of the last two is chosen. The exception is choosing **Set by the tenant's Admin**: it clears the model, the API key and a chosen secret, so the tenant's Admins start from empty fields rather than what a Super Admin entered.
 
 ## Your own account {#your-own-account}
 

@@ -11,11 +11,13 @@ Abre **Secretos** en la barra lateral de administración para gestionarlos. Cada
 
 ## Dónde se usa un secreto {#where-a-secret-is-used}
 
-![Diagrama de flujo que muestra cómo se hace referencia a una entrada de un secreto, ya sea en los encabezados y las variables de entorno de un servidor MCP, o como contraseña de autenticación del repositorio de una skill de agente.](./img/secrets-usage.svg#gh-light-mode-only)
-![Diagrama de flujo que muestra cómo se hace referencia a una entrada de un secreto, ya sea en los encabezados y las variables de entorno de un servidor MCP, o como contraseña de autenticación del repositorio de una skill de agente.](./img/secrets-usage-dark.svg#gh-dark-mode-only)
+![Diagrama de flujo que muestra cómo se hace referencia a una entrada de un secreto: en los encabezados y las variables de entorno de un servidor MCP, como contraseña de autenticación del repositorio de una skill de agente, como secreto de cliente del inicio de sesión único de un tenant o como clave de API del LLM de un tenant.](./img/secrets-usage.svg#gh-light-mode-only)
+![Diagrama de flujo que muestra cómo se hace referencia a una entrada de un secreto: en los encabezados y las variables de entorno de un servidor MCP, como contraseña de autenticación del repositorio de una skill de agente, como secreto de cliente del inicio de sesión único de un tenant o como clave de API del LLM de un tenant.](./img/secrets-usage-dark.svg#gh-dark-mode-only)
 
 - **[Servidores MCP](./mcp-servers.md)**: cualquier valor de encabezado o de variable de entorno puede incluir `${secret:name/key}`, que se expande al conectar.
 - **[Skills de agente](./agent-skills.md)**: la **Contraseña de autenticación** de una skill es una referencia a una entrada, que se elige en listas desplegables en lugar de escribirse.
+- **[Inicio de sesión único](./single-sign-on.md)**: en **Configuración de administrador**, el **Secreto de cliente** puede leerse de una entrada; elige **Usar un secreto**.
+- **[El LLM del tenant](./users-and-groups.md#tenant-llm)**: la **Clave de API** que el administrador de un tenant configura en **Configuración de administrador** puede leerse de una entrada de la misma forma.
 
 Una entrada concreta siempre se indica como **`name/key`**. La clave es obligatoria aunque el secreto contenga una sola entrada, porque un nombre solo identifica un mapa, no un valor; por eso, un `${secret:name}` sin clave no se resuelve, en lugar de pasarse como una cadena literal.
 
@@ -36,4 +38,4 @@ Un secreto de Vault se lee del Vault de **su propio tenant**, que el administrad
 
 Los secretos se referencian **por nombre** y se resuelven en el momento de usarlos. Cambiar el nombre de un secreto al que algo sigue haciendo referencia, o eliminarlo, no falla al editar: el que falla es el siguiente uso, que indica el nombre del secreto que no ha encontrado. Una [skill de agente](./agent-skills.md) cuya referencia ha quedado obsoleta anota el motivo en su propio registro la próxima vez que se actualiza desde el repositorio.
 
-Eso sí, al guardar una referencia se comprueba. Cuando guardas un servidor MCP cuyos encabezados o variables de entorno mencionan un secreto, usas **Ejecución de prueba** en un script o guardas la **Contraseña de autenticación** de una skill, el secreto debe existir y debes poder abrirlo. Un secreto que tienes oculto por una [etiqueta de control de acceso](./tags.md#access-control-tags) se rechaza exactamente igual que uno que no existe. Lo mismo ocurre cuando editas un registro que ya hace referencia a un secreto así, aunque solo cambies otro campo.
+Eso sí, al guardar una referencia se comprueba. Cuando guardas un servidor MCP cuyos encabezados o variables de entorno mencionan un secreto, usas **Ejecución de prueba** en un script, guardas la **Contraseña de autenticación** de una skill o eliges un secreto para el secreto de cliente o la clave de API del LLM en **Configuración de administrador**, el secreto debe existir y debes poder abrirlo. Un secreto que tienes oculto por una [etiqueta de control de acceso](./tags.md#access-control-tags) se rechaza exactamente igual que uno que no existe. Lo mismo ocurre cuando editas un registro que ya hace referencia a un secreto así, aunque solo cambies otro campo.

@@ -109,7 +109,9 @@ Los dos campos funcionan como en [Configuración del sistema](./system-settings.
 | **Lo configura un superadministrador** | Usa el valor del sistema, de modo que un tenant puede cambiar solo el modelo y conservar la clave del sistema, o al revés. |
 | **Lo configura el administrador del tenant** | Un modelo necesita una clave de API propia del tenant: guardar un modelo sin ella se rechaza con un error. Sin clave, el tenant usa el LLM del sistema, modelo y clave por igual, así que su uso nunca se factura a la clave del sistema. Una clave sola usa el modelo del sistema con la clave del tenant. |
 
-Lo introducido se conserva al cambiar de opción, pero solo se aplica mientras esté elegida una de las dos últimas. La excepción es elegir **Lo configura el administrador del tenant**: borra tanto el modelo como la clave de API, de modo que los administradores del tenant empiezan con los campos vacíos y no con lo que introdujo un superadministrador.
+En **Configuración de administrador**, los administradores del tenant eligen cómo se proporciona la **Clave de API**: **Introducir valor**, o **Usar un secreto** para elegir una entrada de los [secretos](./secrets.md) del tenant, por ejemplo una guardada en HashiCorp Vault. El secreto se lee cada vez que se ejecuta un agente, así que una clave rotada allí se aplica sin volver a guardar. Si no se puede leer, el agente se detiene con un error en lugar de pasar a la clave del sistema. Un superadministrador siempre introduce la clave directamente: una clave que paga el sistema nunca va a los secretos de un tenant, que los servidores MCP de ese tenant podrían usar.
+
+Lo introducido se conserva al cambiar de opción, pero solo se aplica mientras esté elegida una de las dos últimas. La excepción es elegir **Lo configura el administrador del tenant**: borra el modelo, la clave de API y el secreto elegido, de modo que los administradores del tenant empiezan con los campos vacíos y no con lo que introdujo un superadministrador.
 
 ## Tu propia cuenta {#your-own-account}
 

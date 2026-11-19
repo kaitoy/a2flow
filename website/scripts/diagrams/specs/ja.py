@@ -24,20 +24,19 @@ SPECS["guides/secrets-usage"] = [
     ("<h1>Where a secret entry is used</h1>", "<h1>シークレットのエントリが使われる場所</h1>"),
     ('<title id="secrets-usage-title">Where a secret entry is used</title>', '<title id="secrets-usage-title">シークレットのエントリが使われる場所</title>'),
     (
-        "Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.",
-        "シークレットのエントリが、MCP サーバーのヘッダーと環境変数から参照されるか、エージェントスキルのリポジトリの認証パスワードとして参照されるかを示すフローチャート。",
+        "Flowchart showing a secret's entry referenced in an MCP server's headers and environment variables, as an Agent Skill repository's auth password, as a tenant's single sign-on client secret, or as the API key of a tenant's LLM.",
+        "シークレットのエントリが、MCP サーバーのヘッダーと環境変数、エージェントスキルのリポジトリの認証パスワード、テナントのシングルサインオンのクライアントシークレット、テナントの LLM の API キーとして参照されることを示すフローチャート。",
     ),
-    # edge label HEADERS -> ヘッダー (12px needs a 56px mask)
-    ('<rect x="423" y="56" width="54" height="14" rx="2" fill="#f2f8fc"/>', '<rect x="422" y="56" width="56" height="16" rx="2" fill="#f2f8fc"/>'),
-    ('>HEADERS</text>', '>ヘッダー</text>'),
     (">Secret</text>", ">シークレット</text>"),
     (">Entry</text>", ">エントリ</text>"),
     (">MCP server</text>", ">MCP サーバー</text>"),
     (">headers + env vars</text>", ">ヘッダー + 環境変数</text>"),
     (">Agent Skill</text>", ">エージェントスキル</text>"),
     (">repo auth password</text>", ">リポジトリの認証パスワード</text>"),
-    mask(430, 164, 40, 32),
-    label("AUTH", "認証"),
+    label("Single sign-on", "シングルサインオン"),
+    label("client secret", "クライアントシークレット"),
+    label("Tenant LLM", "テナントの LLM"),
+    label("API key", "API キー"),
 ]
 
 # ---------------------------------------------------------------- guides/admin-ui-navigation
@@ -501,8 +500,8 @@ SPECS["architecture/overview-lifecycle"] = head(
 # ---------------------------------------------------------------- architecture/secrets-resolution
 SPECS["architecture/secrets-resolution"] = head(
     "How a secret reference resolves", "シークレット参照の解決",
-    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed an MCP server connection or a skill repository clone.",
-    "name/key のシークレット参照が保管の型で分岐することを示すフローチャート。ローカルのシークレットは保管された値を復号し、Vault のシークレットはその場で読み、どちらも MCP サーバーへの接続かスキルのリポジトリのクローンに使われる。",
+    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed whatever uses the reference: an MCP server connection, a skill repository clone, a single sign-on or a tenant's LLM.",
+    "name/key のシークレット参照が保管の型で分岐することを示すフローチャート。ローカルのシークレットは保管された値を復号し、Vault のシークレットはその場で読み、どちらも参照を使う側に渡る。使う側は MCP サーバーへの接続、スキルのリポジトリのクローン、シングルサインオン、テナントの LLM。",
     page_title="Secret reference resolution", svg_title="Secret reference resolution",
 ) + [
     mask(305, 160, 48, 56, h=12),
@@ -513,8 +512,8 @@ SPECS["architecture/secrets-resolution"] = head(
     label("stored value", "復号する"),
     label("Read it live", "Vault から"),
     label("from Vault", "その場で読む"),
-    label("MCP server connection", "MCP サーバーへの接続"),
-    label("or a skill repository clone", "またはスキルのリポジトリのクローン"),
+    label("Where it is used", "使う側"),
+    label("MCP · skill repo · SSO · LLM key", "MCP · スキル · SSO · LLM キー"),
 ]
 
 _POLICY_MASKS = [

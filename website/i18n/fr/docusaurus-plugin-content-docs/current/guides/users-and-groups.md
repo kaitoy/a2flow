@@ -109,7 +109,9 @@ Les deux champs fonctionnent comme dans [Paramètres système](./system-settings
 | **Configuré par un super administrateur** | Utilise la valeur du système ; un tenant peut donc ne changer que le modèle et garder la clé du système, ou l'inverse. |
 | **Configuré par l'administrateur du tenant** | Un modèle exige une clé d'API propre au tenant : enregistrer un modèle sans clé est refusé avec une erreur. Sans clé, le tenant utilise le LLM du système, modèle et clé compris, si bien que son usage n'est jamais facturé à la clé du système. Une clé seule fait tourner le modèle du système avec la clé du tenant. |
 
-Ce qui a été saisi est conservé quand vous changez d'option, mais ne s'applique que tant que l'une des deux dernières est choisie. Choisir **Configuré par l'administrateur du tenant** fait exception : le modèle et la clé d'API sont tous deux effacés, si bien que les administrateurs du tenant partent de champs vides plutôt que de ce qu'un super administrateur a saisi.
+Dans **Paramètres administrateur**, les administrateurs du tenant choisissent comment la **Clé d'API** est fournie : **Saisir la valeur**, ou **Utiliser un secret** pour choisir une entrée parmi les [secrets](./secrets.md) du tenant, par exemple une entrée conservée dans HashiCorp Vault. Le secret est lu à chaque exécution d'un agent : une clé changée là-bas s'applique sans réenregistrer. S'il est illisible, l'agent s'arrête sur une erreur au lieu de basculer sur la clé du système. Un super administrateur saisit toujours la clé directement : une clé payée par le système ne va jamais dans les secrets d'un tenant, que les serveurs MCP de ce tenant pourraient utiliser.
+
+Ce qui a été saisi est conservé quand vous changez d'option, mais ne s'applique que tant que l'une des deux dernières est choisie. Choisir **Configuré par l'administrateur du tenant** fait exception : le modèle, la clé d'API et le secret choisi sont effacés, si bien que les administrateurs du tenant partent de champs vides plutôt que de ce qu'un super administrateur a saisi.
 
 ## Votre propre compte {#your-own-account}
 

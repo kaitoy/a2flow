@@ -614,6 +614,13 @@ export const ko = {
   "common.workflowExecutions": "워크플로 실행",
   "common.workflows": "워크플로",
   "common.yes": "예",
+  "credentialSource.choose": "{field} 제공 방식",
+  "credentialSource.enterValue": "값 입력",
+  "credentialSource.secret": "시크릿",
+  "credentialSource.secretHint":
+    "사용할 때마다 시크릿에서 읽으므로, 시크릿(또는 Vault)에서 값을 교체하면 여기서 다시 저장하지 않아도 반영됩니다.",
+  "credentialSource.secretRequired": "시크릿과 항목을 선택하세요.",
+  "credentialSource.useSecret": "시크릿 사용",
   "dashboard.activeRuns": "진행 중인 실행",
   "dashboard.approvalBacklog": "승인 적체",
   "dashboard.approvalBacklogHint": "대기 중인 승인, 가장 오래 기다린 순",

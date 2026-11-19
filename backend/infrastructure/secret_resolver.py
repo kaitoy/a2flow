@@ -36,11 +36,13 @@ time.
 import re
 from typing import Protocol
 
-from infrastructure.secret_cipher import SecretCipher
-from infrastructure.vault_client import VaultClient, VaultError
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from infrastructure.secret_cipher import SecretCipher, get_secret_cipher
+from infrastructure.vault_client import TenantVaults, VaultClient, VaultError
 from models.secret import Secret, SecretType
 from repositories.exceptions import SecretResolutionError
-from repositories.secret import SecretRepository
+from repositories.secret import SecretRepository, SqlSecretRepository
 
 #: Matches ``${secret:NAME/KEY}`` where NAME uses the slug charset enforced by
 #: :data:`models.constraints.SecretName`. The key group is optional so that a
@@ -313,3 +315,23 @@ class SecretResolver:
             return await vault.read_kv2(secret.vault_mount, secret.vault_path)
         except VaultError as exc:
             raise SecretResolutionError(secret.name, exc.reason) from exc
+
+
+def tenant_secret_resolver(db: AsyncSession, tenant_id: str) -> SecretResolver:
+    """Build a resolver for one tenant's secrets, outside any request scope.
+
+    Unrestricted by access-control tags: callers resolve on behalf of a stored
+    record (an MCP connection, a skill clone, an SSO sign-in, an agent's LLM
+    key), not of a user browsing secrets.
+
+    Args:
+        db: The open database session to read secrets and Vault settings with.
+        tenant_id: Tenant the resolved secrets must belong to.
+
+    Returns:
+        A resolver reading that tenant's secrets through its Vault.
+    """
+    cipher = get_secret_cipher()
+    return SecretResolver(
+        SqlSecretRepository(db, tenant_id=tenant_id), cipher, TenantVaults(db, cipher)
+    )

@@ -14,18 +14,20 @@ import { z } from "zod";
 import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import type { CredentialSourceBinding } from "@/components/admin/credential-source-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import {
   LlmSettingsFields,
-  llmShape,
   refineTenantAdminLlm,
-  toLlmBody,
-  toLlmFormValues,
+  tenantAdminLlmShape,
+  toTenantAdminLlmBody,
+  toTenantAdminLlmFormValues,
 } from "@/components/admin/llm-settings-fields";
 import {
   OidcSettingsFields,
   oidcShape,
+  refineOidc,
   toOidcBody,
   toOidcFormValues,
 } from "@/components/admin/oidc-settings-fields";
@@ -68,9 +70,15 @@ function buildSchema(
   llm: { editable: boolean; keySaved: boolean }
 ) {
   return z
-    .object({ ...signInLockoutShape, ...vaultConnectionShape, ...oidcShape, ...llmShape })
+    .object({
+      ...signInLockoutShape,
+      ...vaultConnectionShape,
+      ...oidcShape,
+      ...tenantAdminLlmShape,
+    })
     .superRefine((values, ctx) => {
       refineVaultConnection(values, ctx, savedMethod);
+      refineOidc(values, ctx);
       if (llm.editable) refineTenantAdminLlm(values, ctx, llm.keySaved);
     });
 }
@@ -83,7 +91,7 @@ function toFormValues(settings: Partial<AdminSettings>): FormValues {
     ...toSignInLockoutFormValues(settings),
     ...toVaultConnectionFormValues(settings),
     ...toOidcFormValues(settings),
-    ...toLlmFormValues(settings),
+    ...toTenantAdminLlmFormValues(settings),
   };
 }
 
@@ -151,7 +159,7 @@ export default function AdminSettingsPage() {
           ...toSignInLockoutBody(values),
           ...toVaultConnectionBody(values),
           ...toOidcBody(values),
-          ...(llmMode === "tenant_admin" ? toLlmBody(values) : {}),
+          ...(llmMode === "tenant_admin" ? toTenantAdminLlmBody(values) : {}),
         });
         setSavedMethod(savedVaultMethod(saved));
         setSecretSaved(saved.oidcClientSecretSet ?? false);
@@ -166,6 +174,23 @@ export default function AdminSettingsPage() {
       // Failure toast is shown globally by api.ts; nothing else to do here.
     }
   }
+
+  // Each credential is entered or referenced from a secret; the choice and the
+  // reference live in the form, so a save sends whichever is selected.
+  const oidcSecretSource: CredentialSourceBinding = {
+    source: watch("oidcClientSecretSource"),
+    onSourceChange: (source) => setValue("oidcClientSecretSource", source),
+    secretRef: watch("oidcClientSecretRef"),
+    onSecretRefChange: (ref) => setValue("oidcClientSecretRef", ref),
+    secretRefError: errors.oidcClientSecretRef?.message,
+  };
+  const llmKeySource: CredentialSourceBinding = {
+    source: watch("llmApiKeySource"),
+    onSourceChange: (source) => setValue("llmApiKeySource", source),
+    secretRef: watch("llmApiKeyRef"),
+    onSecretRefChange: (ref) => setValue("llmApiKeyRef", ref),
+    secretRefError: errors.llmApiKeyRef?.message,
+  };
 
   const breadcrumbItems = [
     { label: t("common.home"), href: "/" },
@@ -243,6 +268,7 @@ export default function AdminSettingsPage() {
             groupsClaim={register("oidcGroupsClaim")}
             trustEmail={register("oidcTrustEmail")}
             secretSaved={secretSaved}
+            secretSource={oidcSecretSource}
             redirectUri={redirectUri}
             subdomainRedirectUri={subdomainRedirectUri}
           />
@@ -257,6 +283,7 @@ export default function AdminSettingsPage() {
                 apiKeySaved={llmKeySet}
                 inherits
                 keyRequired
+                apiKeySource={llmKeySource}
                 errors={{
                   llmModel: errors.llmModel?.message,
                   llmApiKey: errors.llmApiKey?.message,

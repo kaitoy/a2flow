@@ -11,11 +11,13 @@ Open **Secrets** in the admin sidebar to manage them. Each record has a **Name**
 
 ## Where a secret is used
 
-![Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.](./img/secrets-usage.svg#gh-light-mode-only)
-![Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.](./img/secrets-usage-dark.svg#gh-dark-mode-only)
+![Flowchart showing a secret's entry referenced in an MCP server's headers and environment variables, as an Agent Skill repository's auth password, as a tenant's single sign-on client secret, or as the API key of a tenant's LLM.](./img/secrets-usage.svg#gh-light-mode-only)
+![Flowchart showing a secret's entry referenced in an MCP server's headers and environment variables, as an Agent Skill repository's auth password, as a tenant's single sign-on client secret, or as the API key of a tenant's LLM.](./img/secrets-usage-dark.svg#gh-dark-mode-only)
 
 - **[MCP servers](./mcp-servers.md)** — any header value or environment variable value may embed `${secret:name/key}`, expanded when connecting.
 - **[Agent Skills](./agent-skills.md)** — a skill's **Auth Password** is a reference to one entry, chosen from dropdowns rather than typed.
+- **[Single sign-on](./single-sign-on.md)** — under **Admin Settings**, the **Client secret** can be read from one entry: choose **Use a secret**.
+- **[The tenant's LLM](./users-and-groups.md#tenant-llm)** — the **API key** a tenant's Admin sets under **Admin Settings** can be read from one entry the same way.
 
 A single entry is always addressed as **`name/key`**. The key is required even when the secret holds only one entry — a bare name identifies a map, not a value — so a key-less `${secret:name}` fails to resolve rather than being passed through as a literal string.
 
@@ -36,4 +38,4 @@ A Vault secret is read from **its own tenant's** Vault, which the tenant's admin
 
 Secrets are referenced **by name** and resolved lazily. Renaming or deleting one that something still references does not fail at edit time — the next use fails instead, naming the secret it could not find. An [agent skill](./agent-skills.md) whose reference has gone stale records the reason on its own record the next time it is pulled.
 
-Saving a reference is checked, though. When you save an MCP server whose headers or environment name a secret, run **Test Run** on a script, or save a skill's **Auth Password**, the secret must exist and must be one you can open. A secret hidden from you by an [access-control tag](./tags.md#access-control-tags) is rejected exactly like a missing one. The same applies when you edit a record that already references such a secret, even if you change only another field.
+Saving a reference is checked, though. When you save an MCP server whose headers or environment name a secret, run **Test Run** on a script, save a skill's **Auth Password**, or choose a secret for the client secret or LLM API key under **Admin Settings**, the secret must exist and must be one you can open. A secret hidden from you by an [access-control tag](./tags.md#access-control-tags) is rejected exactly like a missing one. The same applies when you edit a record that already references such a secret, even if you change only another field.

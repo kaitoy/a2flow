@@ -632,6 +632,13 @@ export const fr = {
   "common.workflowExecutions": "Exécutions de workflows",
   "common.workflows": "Workflows",
   "common.yes": "Oui",
+  "credentialSource.choose": "Mode de fourniture de {field}",
+  "credentialSource.enterValue": "Saisir la valeur",
+  "credentialSource.secret": "Secret",
+  "credentialSource.secretHint":
+    "Lu dans le secret à chaque utilisation : une valeur changée dans le secret (ou dans Vault) s'applique sans réenregistrer ici.",
+  "credentialSource.secretRequired": "Sélectionnez un secret et une entrée.",
+  "credentialSource.useSecret": "Utiliser un secret",
   "dashboard.activeRuns": "Exécutions actives",
   "dashboard.approvalBacklog": "Arriéré d'approbations",
   "dashboard.approvalBacklogHint":

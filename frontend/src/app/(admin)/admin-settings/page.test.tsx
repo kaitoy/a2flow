@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ADMIN } from "@/test/auth-state";
 import { envelope, envelopeErr } from "@/test/msw/envelope";
 import { server } from "@/test/msw/server";
-import { render, screen, waitFor } from "@/test/test-utils";
+import { render, screen, waitFor, within } from "@/test/test-utils";
 import AdminSettingsPage from "./page";
 
 const BASE = "http://localhost:8000";
@@ -205,6 +205,35 @@ describe("AdminSettingsPage", () => {
 
       await waitFor(() => expect(captured.body).toMatchObject({ oidcClientSecret: "s3cret" }));
     });
+
+    it("starts on a referenced client secret and saves the reference alone", async () => {
+      const captured = { body: null as Record<string, unknown> | null };
+      const settings = {
+        ...OIDC_SETTINGS,
+        oidcClientSecretSet: false,
+        oidcClientSecretRef: "idp/client-secret",
+      };
+      server.use(
+        http.get(`${BASE}/api/v1/admin-settings`, () => envelope(settings)),
+        http.patch(`${BASE}/api/v1/admin-settings`, async ({ request }) => {
+          captured.body = (await request.json()) as Record<string, unknown>;
+          return envelope(settings);
+        })
+      );
+      renderPage();
+
+      const source = await screen.findByRole("tablist", { name: "How Client secret is provided" });
+      expect(within(source).getByRole("tab", { name: "Use a secret" })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      );
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() =>
+        expect(captured.body).toMatchObject({ oidcClientSecretRef: "idp/client-secret" })
+      );
+      expect(captured.body).not.toHaveProperty("oidcClientSecret");
+    });
   });
 });
 
@@ -294,5 +323,37 @@ describe("AdminSettingsPage LLM", () => {
     await userEvent.type(screen.getByLabelText("API key"), "sk-tenant");
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
     await waitFor(() => expect(captured.body).toMatchObject({ llmApiKey: "sk-tenant" }));
+  });
+
+  it("refuses to save a key that should come from a secret until one is chosen", async () => {
+    const captured = capturePatch({ ...SETTINGS, llmMode: "tenant_admin" });
+    renderPage();
+    const source = await screen.findByRole("tablist", { name: "How API key is provided" });
+    await userEvent.click(within(source).getByRole("tab", { name: "Use a secret" }));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByText("Select a secret and an entry.")).toBeInTheDocument();
+    expect(captured.body).toBeNull();
+  });
+
+  it("saves a referenced key and clears it once a key is typed instead", async () => {
+    const captured = capturePatch({
+      ...SETTINGS,
+      llmMode: "tenant_admin",
+      llmApiKeyRef: "llm/key",
+    });
+    renderPage();
+    const source = await screen.findByRole("tablist", { name: "How API key is provided" });
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() => expect(captured.body).toMatchObject({ llmApiKeyRef: "llm/key" }));
+    expect(captured.body).not.toHaveProperty("llmApiKey");
+
+    captured.body = null;
+    await userEvent.click(within(source).getByRole("tab", { name: "Enter value" }));
+    await userEvent.type(screen.getByLabelText("API key"), "sk-tenant");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(captured.body).toMatchObject({ llmApiKey: "sk-tenant", llmApiKeyRef: null })
+    );
   });
 });

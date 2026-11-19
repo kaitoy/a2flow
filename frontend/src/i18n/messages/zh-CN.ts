@@ -590,6 +590,13 @@ export const zhCN = {
   "common.workflowExecutions": "工作流执行",
   "common.workflows": "工作流",
   "common.yes": "是",
+  "credentialSource.choose": "{field}的提供方式",
+  "credentialSource.enterValue": "输入值",
+  "credentialSource.secret": "密钥",
+  "credentialSource.secretHint":
+    "每次使用时都从密钥读取，因此在密钥（或 Vault）中轮换的值无需在此重新保存即可生效。",
+  "credentialSource.secretRequired": "请选择密钥和条目。",
+  "credentialSource.useSecret": "使用密钥",
   "dashboard.activeRuns": "进行中的运行",
   "dashboard.approvalBacklog": "审批积压",
   "dashboard.approvalBacklogHint": "待处理的审批，按等待时间从长到短",

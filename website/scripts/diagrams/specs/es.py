@@ -43,29 +43,22 @@ def _node(x: int, y: int, text: str, size: int = 14) -> str:
 # ---------------------------------------------------------------- guides/secrets-usage
 SPECS["guides/secrets-usage"] = head(
     "Where a secret entry is used", "Dónde se usa una entrada de un secreto",
-    "Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.",
-    "Diagrama de flujo que muestra cómo se hace referencia a una entrada de un secreto, ya sea en los encabezados y las variables de entorno de un servidor MCP, o como contraseña de autenticación del repositorio de una skill de agente.",
+    "Flowchart showing a secret's entry referenced in an MCP server's headers and environment variables, as an Agent Skill repository's auth password, as a tenant's single sign-on client secret, or as the API key of a tenant's LLM.",
+    "Diagrama de flujo que muestra cómo se hace referencia a una entrada de un secreto: en los encabezados y las variables de entorno de un servidor MCP, como contraseña de autenticación del repositorio de una skill de agente, como secreto de cliente del inicio de sesión único de un tenant o como clave de API del LLM de un tenant.",
 ) + [
-    # Both edge labels slide left of the elbow, so they clear the boxes they point at.
-    ('<rect x="423" y="56" width="54" height="14"', '<rect x="410" y="58" width="68" height="12"'),
-    ('<text x="450" y="67"', '<text x="444" y="67"'),
-    label("HEADERS", "ENCABEZADOS"),
-    ('<rect x="430" y="164" width="40" height="14"', '<rect x="397" y="164" width="84" height="14"'),
-    ('<text x="450" y="175"', '<text x="439" y="175"'),
-    ('letter-spacing="0.10em">AUTH</text>', 'letter-spacing="0.02em">AUTENTICACIÓN</text>'),
     label("Secret", "Secreto"),
     label("Entry", "Entrada"),
-    # The two right-hand boxes grow to the right; their arrows still meet the left edge.
-    ('<rect x="480" y="20" width="220"', '<rect x="480" y="20" width="236"'),
-    ('<text x="590" y="50"', '<text x="598" y="50"'),
-    ('<text x="590" y="70"', '<text x="598" y="70"'),
+    # The four right-hand boxes grow to the right; their arrows still meet the left edge.
+    ('width="220" height="72"', 'width="236" height="72"', 4),
+    ('<text x="590"', '<text x="598"', 8),
     label("MCP server", "Servidor MCP"),
     label("headers + env vars", "encabezados + variables de entorno"),
-    ('<rect x="480" y="160" width="220"', '<rect x="480" y="160" width="236"'),
-    ('<text x="590" y="190"', '<text x="598" y="190"'),
-    ('<text x="590" y="210"', '<text x="598" y="210"'),
     label("Agent Skill", "Skill de agente"),
     label("repo auth password", "contraseña de autenticación del repo"),
+    label("Single sign-on", "Inicio de sesión único"),
+    label("client secret", "secreto de cliente"),
+    label("Tenant LLM", "LLM del tenant"),
+    label("API key", "clave de API"),
 ]
 
 # ---------------------------------------------------------------- guides/admin-ui-navigation
@@ -509,8 +502,8 @@ SPECS["architecture/overview-lifecycle"] = head(
 # ---------------------------------------------------------------- architecture/secrets-resolution
 SPECS["architecture/secrets-resolution"] = head(
     "How a secret reference resolves", "Cómo se resuelve una referencia a un secreto",
-    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed an MCP server connection or a skill repository clone.",
-    "Diagrama de flujo que muestra una referencia a un secreto que se bifurca según el tipo: local descifra el valor guardado, vault lo lee en vivo desde Vault, y ambos alimentan una conexión a un servidor MCP o la clonación de un repositorio de skill.",
+    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed whatever uses the reference: an MCP server connection, a skill repository clone, a single sign-on or a tenant's LLM.",
+    "Diagrama de flujo que muestra una referencia a un secreto que se bifurca según el tipo: local descifra el valor guardado, vault lo lee en vivo desde Vault, y ambos alimentan lo que usa la referencia: una conexión a un servidor MCP, la clonación de un repositorio de skill, un inicio de sesión único o el LLM de un tenant.",
     page_title="Secret reference resolution", svg_title="Secret reference resolution",
 ) + [
     label("A reference", "Una referencia"),
@@ -519,8 +512,8 @@ SPECS["architecture/secrets-resolution"] = head(
     label("stored value", "valor guardado"),
     label("Read it live", "Leerlo en vivo"),
     label("from Vault", "desde Vault"),
-    label("MCP server connection", "Conexión a un servidor MCP"),
-    label("or a skill repository clone", "o clonación de un repositorio de skill"),
+    label("Where it is used", "Dónde se usa"),
+    label("MCP · skill repo · SSO · LLM key", "MCP · repo de skill · SSO · clave LLM"),
 ]
 
 _POLICY_MASKS = [

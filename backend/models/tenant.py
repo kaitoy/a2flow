@@ -36,6 +36,7 @@ from models.base import BaseEntity
 from models.constraints import (
     EntityName,
     HttpUrl,
+    SecretRef,
     ShortText,
     TenantSlug,
     VaultMount,
@@ -160,6 +161,29 @@ class TenantLlmFields(SQLModel):
     llm_api_key: str | None = Field(default=None, max_length=4096)
 
 
+class TenantSecretRefFields(SQLModel):
+    """References to the tenant's own secrets, in place of a stored credential.
+
+    Each names one entry of a :class:`models.secret.Secret` as ``NAME/KEY`` --
+    local or Vault-backed -- and is resolved each time it is used, so a value
+    rotated in Vault takes effect without touching A2Flow. A reference and the
+    stored credential it stands in for are exclusive: setting one clears the
+    other (:class:`services.tenant.TenantService`), and ``null`` clears the
+    reference.
+
+    Only the tenant's own ``admin`` sets these (:class:`AdminSettingsUpdate`),
+    never a ``super_admin`` for the tenant: a tenant's developers can send its
+    secrets to an MCP server of their choosing, so a key the platform pays for
+    must never live in one.
+    """
+
+    model_config = _alias_config
+    #: Stands in for :attr:`TenantOidcFields.oidc_client_secret`.
+    oidc_client_secret_ref: SecretRef | None = None
+    #: Stands in for :attr:`TenantLlmFields.llm_api_key`.
+    llm_api_key_ref: SecretRef | None = None
+
+
 class TenantUpdate(TenantGlobalVaultFields, TenantLlmFields):
     """Partial update payload for a Tenant — all fields are optional.
 
@@ -227,6 +251,12 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     #: Fernet ciphertext of the tenant's LLM API key, like
     #: :attr:`vault_credential`.
     llm_api_key: str | None = None
+    #: ``NAME/KEY`` of the secret entry holding the LLM API key, in place of
+    #: :attr:`llm_api_key` (see :class:`TenantSecretRefFields`).
+    llm_api_key_ref: str | None = None
+    #: ``NAME/KEY`` of the secret entry holding the OIDC client secret, in place
+    #: of :attr:`oidc_client_secret`.
+    oidc_client_secret_ref: str | None = None
     #: Whether members of this tenant may sign in through its OIDC provider.
     oidc_enabled: bool = False
     #: Issuer URL of the tenant's OIDC provider (the base of its discovery document).
@@ -242,13 +272,17 @@ class Tenant(TenantCreate, TenantVaultFields, BaseEntity, table=True):
     oidc_trust_email: bool = False
 
 
-class AdminSettingsUpdate(TenantVaultFields, TenantOidcFields, TenantLlmFields):
+class AdminSettingsUpdate(
+    TenantVaultFields, TenantOidcFields, TenantLlmFields, TenantSecretRefFields
+):
     """Partial update of the settings a tenant's own ``admin`` may change.
 
     Exposed on ``PATCH /admin-settings``, which acts on the caller's tenant
     rather than on a tenant id: sign-in throttling, the tenant's own Vault, its
     OIDC single sign-on and -- only while a ``super_admin`` has set the tenant's
-    :attr:`Tenant.llm_mode` to :attr:`LlmMode.tenant_admin` -- its LLM.
+    :attr:`Tenant.llm_mode` to :attr:`LlmMode.tenant_admin` -- its LLM. The
+    OIDC client secret and the LLM API key may each be entered or referenced
+    from one of the tenant's secrets (:class:`TenantSecretRefFields`).
     """
 
     login_max_failures: LoginMaxFailures | None = None
@@ -283,7 +317,9 @@ class AdminSettings(SQLModel):
     tenant's own subdomain of it, which the provider must also allow when the
     tenant uses that address.
     ``llm_mode`` tells the form whether to offer the LLM fields at all: only
-    :attr:`LlmMode.tenant_admin` lets this ``admin`` set them.
+    :attr:`LlmMode.tenant_admin` lets this ``admin`` set them. The
+    ``*_ref`` fields are returned as they are: a reference names a secret, it
+    holds no value.
     """
 
     model_config = _alias_config
@@ -293,6 +329,8 @@ class AdminSettings(SQLModel):
     llm_model: str | None = None
     #: Whether an LLM API key is stored. The key is never serialized.
     llm_api_key_set: bool = False
+    #: ``NAME/KEY`` of the secret entry the LLM API key is read from, if any.
+    llm_api_key_ref: str | None = None
     vault_addr: str | None = None
     vault_auth_method: VaultAuthMethod | None = None
     vault_role_id: str | None = None
@@ -304,6 +342,8 @@ class AdminSettings(SQLModel):
     oidc_client_id: str | None = None
     #: Whether an OIDC client secret is stored. The secret is never serialized.
     oidc_client_secret_set: bool = False
+    #: ``NAME/KEY`` of the secret entry the client secret is read from, if any.
+    oidc_client_secret_ref: str | None = None
     oidc_groups_claim: str = "groups"
     oidc_trust_email: bool = False
     oidc_redirect_uri: str | None = None
@@ -337,6 +377,7 @@ class AdminSettings(SQLModel):
             llm_mode=tenant.llm_mode,
             llm_model=tenant.llm_model,
             llm_api_key_set=bool(tenant.llm_api_key),
+            llm_api_key_ref=tenant.llm_api_key_ref,
             vault_addr=tenant.vault_addr,
             vault_auth_method=tenant.vault_auth_method,
             vault_role_id=tenant.vault_role_id,
@@ -346,6 +387,7 @@ class AdminSettings(SQLModel):
             oidc_issuer=tenant.oidc_issuer,
             oidc_client_id=tenant.oidc_client_id,
             oidc_client_secret_set=bool(tenant.oidc_client_secret),
+            oidc_client_secret_ref=tenant.oidc_client_secret_ref,
             oidc_groups_claim=tenant.oidc_groups_claim,
             oidc_trust_email=tenant.oidc_trust_email,
             oidc_redirect_uri=oidc_redirect_uri,
@@ -387,16 +429,19 @@ class TenantRead(BaseEntity):
 
         Returns:
             A read view carrying every field except the ``vault_*`` ones,
-            ``global_vault_credential`` and ``llm_api_key``, plus the
-            ``global_vault_credential_set`` and ``llm_api_key_set`` flags
-            derived from them.
+            ``global_vault_credential``, ``llm_api_key`` and
+            ``llm_api_key_ref``, plus the ``global_vault_credential_set`` and
+            ``llm_api_key_set`` flags derived from them (the latter set by a
+            stored key or a reference alike).
         """
         exclude = set(TenantVaultFields.model_fields) | {
             "global_vault_credential",
             "llm_api_key",
+            "llm_api_key_ref",
         }
         return cls(
             **tenant.model_dump(exclude=exclude),
             global_vault_credential_set=bool(tenant.global_vault_credential),
-            llm_api_key_set=bool(tenant.llm_api_key),
+            # A key the tenant's admin referenced from a secret is a key too.
+            llm_api_key_set=bool(tenant.llm_api_key or tenant.llm_api_key_ref),
         )

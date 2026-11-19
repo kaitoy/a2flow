@@ -18,12 +18,16 @@ from config import get_settings
 from infrastructure.oidc_client import OidcClient
 from infrastructure.password import hash_password
 from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_resolver import SecretResolver
+from infrastructure.vault_client import TenantVaults
+from models.secret import Secret, SecretType
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, User
 from models.user_group import UserGroup, UserGroupMember
 from repositories.auth_session import SqlAuthSessionRepository
 from repositories.exceptions import UnauthorizedError
 from repositories.login_failure import SqlLoginFailureRepository
+from repositories.secret import SqlSecretRepository
 from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from repositories.user_group import SqlUserGroupRepository
@@ -111,6 +115,9 @@ async def ctx(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Ctx, None]:
             cipher=cipher,
             groups_for_tenant=lambda t: SqlUserGroupRepository(
                 db, SqlUserRepository(db), tenant_id=t
+            ),
+            secrets_for_tenant=lambda t: SecretResolver(
+                SqlSecretRepository(db, tenant_id=t), cipher, TenantVaults(db, cipher)
             ),
         )
         try:
@@ -535,6 +542,42 @@ async def test_start_unavailable_is_uniform(
     tenant.oidc_issuer = "https://elsewhere.example.com"
     await save(tenant)
     assert await code_for("acme") == SsoErrorCode.unavailable
+
+
+async def reference_client_secret(c: Ctx, ref: str) -> None:
+    """Point ``acme``'s client secret at ``ref``, dropping the stored one."""
+    tenant = await c.db.get(Tenant, TENANT_ID)
+    assert tenant is not None
+    tenant.oidc_client_secret, tenant.oidc_client_secret_ref = None, ref
+    c.db.add(tenant)
+    await c.db.commit()
+
+
+@pytest.mark.asyncio
+async def test_a_referenced_client_secret_is_sent_to_the_idp(ctx: Ctx) -> None:
+    ctx.db.add(
+        Secret(
+            name="idp",
+            type=SecretType.local,
+            entries={"client-secret": SecretCipher(ctx.key).encrypt("from-secret")},
+            tenant_id=TENANT_ID,
+            created_by=SYSTEM_USER_ID,
+            updated_by=SYSTEM_USER_ID,
+        )
+    )
+    await reference_client_secret(ctx, "idp/client-secret")
+
+    await run_flow(ctx, sub="s1", email="a@x.com", groups=["eng"])
+
+    assert ctx.fake.token_forms[-1]["client_secret"] == "from-secret"
+
+
+@pytest.mark.asyncio
+async def test_an_unresolvable_client_secret_is_unavailable(ctx: Ctx) -> None:
+    await reference_client_secret(ctx, "gone/client-secret")
+
+    assert await refused(ctx, sub="s1", groups=["eng"]) == SsoErrorCode.unavailable
+    assert ctx.fake.count("/token") == 0
 
 
 @pytest.mark.asyncio

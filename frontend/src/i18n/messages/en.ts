@@ -620,6 +620,13 @@ export const en = {
   "common.workflowExecutions": "Workflow Executions",
   "common.workflows": "Workflows",
   "common.yes": "Yes",
+  "credentialSource.choose": "How {field} is provided",
+  "credentialSource.enterValue": "Enter value",
+  "credentialSource.secret": "Secret",
+  "credentialSource.secretHint":
+    "Read from the secret each time it is used, so a value rotated in the secret (or in Vault) takes effect without saving here again.",
+  "credentialSource.secretRequired": "Select a secret and an entry.",
+  "credentialSource.useSecret": "Use a secret",
   "dashboard.activeRuns": "Active runs",
   "dashboard.approvalBacklog": "Approval backlog",
   "dashboard.approvalBacklogHint": "Pending approvals, longest wait first",

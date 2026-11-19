@@ -12,8 +12,9 @@ from fastapi import Depends
 
 from config import get_settings
 from infrastructure.llm_settings import LlmSettingsResolver
-from infrastructure.secret_resolver import SecretResolver
+from infrastructure.secret_resolver import SecretResolver, tenant_secret_resolver
 from infrastructure.vault_client import TenantVaults
+from repositories.secret import SqlSecretRepository
 from repositories.session_file import SessionFileRepository
 from repositories.session_stream import SessionStreamRepository
 from repositories.user_group import SqlUserGroupRepository
@@ -331,10 +332,26 @@ OutboundEmailServiceDep = Annotated[
 
 
 def get_tenant_service(
-    repo: TenantRepositoryDep, cipher: SecretCipherDep, users: UserRepositoryDep
+    db: DBSessionDep,
+    repo: TenantRepositoryDep,
+    cipher: SecretCipherDep,
+    users: UserRepositoryDep,
 ) -> TenantService:
-    """Create a TenantService backed by the request's repositories and the cipher."""
-    return TenantService(repo, cipher, users)
+    """Create a TenantService backed by the request's repositories and the cipher.
+
+    The secret repository is built per tenant rather than injected: tenant
+    routes address a tenant by id, not by the caller's acting tenant, and only
+    an ``admin`` or ``super_admin`` reaches a write that names a secret, so no
+    access-tag restriction applies.
+    """
+    return TenantService(
+        repo,
+        cipher,
+        users,
+        secrets_for_tenant=lambda tenant_id: SqlSecretRepository(
+            db, tenant_id=tenant_id
+        ),
+    )
 
 
 TenantServiceDep = Annotated[TenantService, Depends(get_tenant_service)]
@@ -390,6 +407,7 @@ def get_oidc_login_service(
         groups_for_tenant=lambda tenant_id: SqlUserGroupRepository(
             db, users, tenant_id=tenant_id
         ),
+        secrets_for_tenant=lambda tenant_id: tenant_secret_resolver(db, tenant_id),
     )
 
 

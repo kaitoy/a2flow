@@ -48,7 +48,7 @@ To try single sign-on without an IdP of your own, start the Keycloak that comes 
 | **Enable single sign-on** | The switch. Turning it on requires the issuer URL, client ID and client secret. |
 | **Issuer URL** | The OpenID Connect issuer of your IdP, such as `https://idp.example.com`. |
 | **Client ID** | The application's client ID at your IdP. |
-| **Client secret** | Write-only: it is never shown back. Once saved, the field reads "Saved — leave empty to keep it". |
+| **Client secret** | Choose how it is provided. **Enter value**: write-only, never shown back; once saved, the field reads "Saved — leave empty to keep it". **Use a secret**: pick one entry of the tenant's [secrets](./secrets.md) — local or kept in HashiCorp Vault. It is read at every sign-in, so a secret rotated there takes effect without saving here again. |
 | **Groups claim** | The name of the ID token claim that lists a person's groups. `groups` unless your IdP uses another name. |
 | **Trust e-mail addresses from this IdP** | Off by default. Lets A2Flow link an existing account by e-mail address even when the IdP does not mark the address as verified. Microsoft Entra ID needs it. |
 | **Redirect URI** | Read-only. The address to register at your IdP; every tenant uses the same one. |
@@ -81,7 +81,7 @@ A failed attempt returns you to the sign-in screen with one of these messages.
 
 | Message | What it means and what to do |
 |---|---|
-| Single sign-on is not available for this tenant. | The tenant name is wrong, the tenant is disabled, or its single sign-on is not set up or not switched on. A2Flow deliberately does not say which, so the message cannot be used to find out which tenants exist. Check the name, then ask your tenant admin. |
+| Single sign-on is not available for this tenant. | The tenant name is wrong, the tenant is disabled, its single sign-on is not set up or not switched on, or its client secret comes from a secret that cannot be read — renamed, deleted, or in a Vault that cannot be reached. A2Flow deliberately does not say which, so the message cannot be used to find out which tenants exist. Check the name, then ask your tenant admin. |
 | Single sign-on failed. Please try again. | The exchange with the IdP did not complete, or the IdP sent no e-mail address or one that is not a usable address, or two accounts in the tenant share your e-mail address, or an account with your e-mail address is already linked to a different IdP identity, or the IdP's e-mail address is not trusted and an A2Flow account with that address already exists. In the last case ask your tenant admin to turn on **Trust e-mail addresses from this IdP**, or to change the e-mail address of one of the two accounts. Otherwise try again; if it keeps failing, ask your tenant admin to check the settings and the application registered at the IdP. |
 | Your account is disabled. | Your A2Flow account or your whole tenant is disabled, or the account was deleted. An admin can switch the account on again with **Enabled**. |
 | Your identity provider account is not allowed to sign in to A2Flow. | You have no A2Flow account yet and belong to no IdP group that a user group is mapped to — or the IdP left your group list out because you belong to very many groups. Ask the IdP's administrator to add you to a mapped group. |

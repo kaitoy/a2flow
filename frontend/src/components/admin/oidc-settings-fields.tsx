@@ -6,6 +6,13 @@
 
 import type { UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
+import {
+  type CredentialSourceBinding,
+  CredentialSourceField,
+  credentialSourceSchema,
+  initialCredentialSource,
+  refineCredentialSource,
+} from "@/components/admin/credential-source-field";
 import { FormField } from "@/components/admin/form-field";
 import { ReadOnlyField } from "@/components/admin/read-only-field";
 import { Button } from "@/components/ui/button";
@@ -27,6 +34,8 @@ export const oidcShape = {
   oidcIssuer: z.string(),
   oidcClientId: z.string(),
   oidcClientSecret: z.string(),
+  oidcClientSecretSource: credentialSourceSchema,
+  oidcClientSecretRef: z.string(),
   oidcGroupsClaim: z.string(),
   oidcTrustEmail: z.boolean(),
 };
@@ -36,7 +45,8 @@ export type OidcFormValues = z.infer<z.ZodObject<typeof oidcShape>>;
 
 /**
  * Convert stored settings into form values. The client secret field always
- * starts blank, since the secret is write-only.
+ * starts blank, since the secret is write-only; a referenced secret starts the
+ * form on "Use a secret".
  *
  * @param settings - The stored settings.
  * @returns The form values.
@@ -47,15 +57,34 @@ export function toOidcFormValues(settings: Partial<AdminSettings>): OidcFormValu
     oidcIssuer: settings.oidcIssuer ?? "",
     oidcClientId: settings.oidcClientId ?? "",
     oidcClientSecret: "",
+    oidcClientSecretSource: initialCredentialSource(settings.oidcClientSecretRef),
+    oidcClientSecretRef: settings.oidcClientSecretRef ?? "",
     oidcGroupsClaim: settings.oidcGroupsClaim ?? "groups",
     oidcTrustEmail: settings.oidcTrustEmail ?? false,
   };
 }
 
 /**
+ * Require a secret to be chosen once the client secret is to come from one.
+ *
+ * @param values - The SSO fields of the form.
+ * @param ctx - The refinement context to report issues on.
+ */
+export function refineOidc(values: OidcFormValues, ctx: z.RefinementCtx): void {
+  refineCredentialSource(
+    values.oidcClientSecretSource,
+    values.oidcClientSecretRef,
+    "oidcClientSecretRef",
+    ctx
+  );
+}
+
+/**
  * Convert form values into the request body fields. A blank client secret and
  * a blank groups claim are omitted so the backend keeps what it holds; a blank
- * issuer or client id clears the stored one.
+ * issuer or client id clears the stored one. With "Use a secret" only the
+ * reference is sent (the backend then drops the stored secret); with "Enter
+ * value" the reference is cleared.
  *
  * @param values - The form values.
  * @returns The SSO fields of the body.
@@ -67,7 +96,12 @@ export function toOidcBody(values: OidcFormValues): AdminSettingsUpdate {
     oidcClientId: values.oidcClientId.trim() || null,
     oidcTrustEmail: values.oidcTrustEmail,
   };
-  if (values.oidcClientSecret !== "") body.oidcClientSecret = values.oidcClientSecret;
+  if (values.oidcClientSecretSource === "secret") {
+    body.oidcClientSecretRef = values.oidcClientSecretRef;
+  } else {
+    body.oidcClientSecretRef = null;
+    if (values.oidcClientSecret !== "") body.oidcClientSecret = values.oidcClientSecret;
+  }
   if (values.oidcGroupsClaim.trim() !== "") body.oidcGroupsClaim = values.oidcGroupsClaim.trim();
   return body;
 }
@@ -88,6 +122,8 @@ export interface OidcSettingsFieldsProps {
   trustEmail: UseFormRegisterReturn;
   /** Whether a client secret is already stored. */
   secretSaved: boolean;
+  /** Whether the client secret is entered or read from a secret, and which. */
+  secretSource: CredentialSourceBinding;
   /** The callback URL to register at the IdP, or `null` while the deployment's base URL is unset. */
   redirectUri: string | null;
   /**
@@ -112,6 +148,7 @@ export function OidcSettingsFields({
   groupsClaim,
   trustEmail,
   secretSaved,
+  secretSource,
   redirectUri,
   subdomainRedirectUri = null,
 }: OidcSettingsFieldsProps) {
@@ -138,14 +175,18 @@ export function OidcSettingsFields({
         <Input id="oidcClientId" autoComplete="off" {...clientId} />
       </FormField>
 
-      <FormField htmlFor="oidcClientSecret" label={t("adminSettings.oidc.clientSecret")}>
+      <CredentialSourceField
+        htmlFor="oidcClientSecret"
+        label={t("adminSettings.oidc.clientSecret")}
+        binding={secretSource}
+      >
         <PasswordInput
           id="oidcClientSecret"
           autoComplete="new-password"
           placeholder={secretSaved ? t("common.savedLeaveEmptyToKeepIt") : ""}
           {...clientSecret}
         />
-      </FormField>
+      </CredentialSourceField>
 
       <FormField htmlFor="oidcGroupsClaim" label={t("adminSettings.oidc.groupsClaim")}>
         <Input id="oidcGroupsClaim" {...groupsClaim} />

@@ -9,6 +9,13 @@
 
 import type { UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
+import {
+  type CredentialSourceBinding,
+  CredentialSourceField,
+  credentialSourceSchema,
+  initialCredentialSource,
+  refineCredentialSource,
+} from "@/components/admin/credential-source-field";
 import { FormField } from "@/components/admin/form-field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -113,19 +120,72 @@ export function LlmModeField({ mode, onModeChange }: LlmModeFieldProps) {
 }
 
 /**
+ * Zod shape for the LLM a tenant's admin sets: {@link llmShape} plus whether
+ * the key is entered or read from one of the tenant's secrets. A super admin's
+ * key is always entered, so only Admin Settings uses this.
+ */
+export const tenantAdminLlmShape = {
+  ...llmShape,
+  llmApiKeySource: credentialSourceSchema,
+  llmApiKeyRef: z.string(),
+};
+
+/** Form values for {@link tenantAdminLlmShape}. */
+export type TenantAdminLlmFormValues = z.infer<z.ZodObject<typeof tenantAdminLlmShape>>;
+
+/**
+ * Convert a tenant admin's stored LLM into form values, starting on "Use a
+ * secret" when the key is referenced from one.
+ *
+ * @param stored - The stored model and key reference.
+ * @returns The form values.
+ */
+export function toTenantAdminLlmFormValues(
+  stored: StoredLlm & { llmApiKeyRef?: string | null }
+): TenantAdminLlmFormValues {
+  return {
+    ...toLlmFormValues(stored),
+    llmApiKeySource: initialCredentialSource(stored.llmApiKeyRef),
+    llmApiKeyRef: stored.llmApiKeyRef ?? "",
+  };
+}
+
+/**
+ * Convert a tenant admin's LLM into request body fields: the reference alone
+ * with "Use a secret" (the backend then drops a stored key), otherwise
+ * {@link toLlmBody} with the reference cleared.
+ *
+ * @param values - Validated form values.
+ * @returns The LLM fields of the body.
+ */
+export function toTenantAdminLlmBody(
+  values: TenantAdminLlmFormValues
+): LlmBody & { llmApiKeyRef: string | null } {
+  if (values.llmApiKeySource === "secret") {
+    return { llmModel: values.llmModel.trim() || null, llmApiKeyRef: values.llmApiKeyRef };
+  }
+  return { ...toLlmBody(values), llmApiKeyRef: null };
+}
+
+/**
  * Require an API key with a model, for the LLM a tenant's admin sets: the
  * platform's key never pays for a model the admin picked (the backend refuses
  * the save too). A key already stored counts, since it never reaches the form.
+ * With "Use a secret" a complete reference is required instead.
  *
  * @param values - The LLM fields of the form.
  * @param ctx - The refinement context to report issues on.
- * @param keySaved - Whether an API key is already stored.
+ * @param keySaved - Whether an API key (not a reference) is already stored.
  */
 export function refineTenantAdminLlm(
-  values: LlmFormValues,
+  values: TenantAdminLlmFormValues,
   ctx: z.RefinementCtx,
   keySaved: boolean
 ): void {
+  if (values.llmApiKeySource === "secret") {
+    refineCredentialSource("secret", values.llmApiKeyRef, "llmApiKeyRef", ctx);
+    return;
+  }
   if (values.llmModel.trim() !== "" && values.llmApiKey === "" && !keySaved) {
     ctx.addIssue({ code: "custom", path: ["llmApiKey"], message: "llm.apiKeyRequired" });
   }
@@ -153,6 +213,11 @@ export interface LlmSettingsFieldsProps {
   keyRequired?: boolean;
   /** Whether to print the "LLM" heading; off where {@link LlmModeField} already did. */
   withTitle?: boolean;
+  /**
+   * Lets the key be read from one of the tenant's secrets instead — only for
+   * the LLM a tenant's admin sets. Without it the key can only be entered.
+   */
+  apiKeySource?: CredentialSourceBinding;
 }
 
 /** The model name and the write-only API key. */
@@ -164,6 +229,7 @@ export function LlmSettingsFields({
   inherits = false,
   keyRequired = false,
   withTitle = true,
+  apiKeySource,
 }: LlmSettingsFieldsProps) {
   const t = useT();
   const keyHint = keyRequired
@@ -171,6 +237,14 @@ export function LlmSettingsFields({
     : inherits
       ? "llm.apiKeyHintTenant"
       : "llm.apiKeyHint";
+  const keyInput = (
+    <PasswordInput
+      id="llmApiKey"
+      autoComplete="new-password"
+      placeholder={apiKeySaved ? t("common.savedLeaveEmptyToKeepIt") : ""}
+      {...apiKey}
+    />
+  );
   return (
     <>
       {withTitle && (
@@ -191,15 +265,22 @@ export function LlmSettingsFields({
         </p>
       </FormField>
 
-      <FormField htmlFor="llmApiKey" label={t("llm.apiKey")} error={errors.llmApiKey}>
-        <PasswordInput
-          id="llmApiKey"
-          autoComplete="new-password"
-          placeholder={apiKeySaved ? t("common.savedLeaveEmptyToKeepIt") : ""}
-          {...apiKey}
-        />
-        <p className="text-xs text-on-surface-variant">{t(keyHint)}</p>
-      </FormField>
+      {apiKeySource ? (
+        <CredentialSourceField
+          htmlFor="llmApiKey"
+          label={t("llm.apiKey")}
+          binding={apiKeySource}
+          hint={t(keyHint)}
+          error={errors.llmApiKey}
+        >
+          {keyInput}
+        </CredentialSourceField>
+      ) : (
+        <FormField htmlFor="llmApiKey" label={t("llm.apiKey")} error={errors.llmApiKey}>
+          {keyInput}
+          <p className="text-xs text-on-surface-variant">{t(keyHint)}</p>
+        </FormField>
+      )}
     </>
   );
 }

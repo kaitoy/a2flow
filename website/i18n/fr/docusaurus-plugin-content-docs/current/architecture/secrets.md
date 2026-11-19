@@ -5,10 +5,10 @@ sidebar_position: 8
 
 # Stockage des secrets
 
-Un [secret](../guides/secrets.md) est un ensemble nommé d'entrées clé/valeur, et chaque référence désigne exactement une entrée : `${secret:name/key}` dans les en-têtes ou l'environnement d'un serveur MCP, un nom et une clé pour une compétence d'agent. Les références sont conservées par nom et **résolues uniquement au moment de leur utilisation** : rien de ce qui a besoin d'un identifiant n'en stocke jamais.
+Un [secret](../guides/secrets.md) est un ensemble nommé d'entrées clé/valeur, et chaque référence désigne exactement une entrée : `${secret:name/key}` dans les en-têtes ou l'environnement d'un serveur MCP, un nom et une clé pour une compétence d'agent, pour le secret client de l'authentification unique d'un tenant ou pour sa clé d'API du LLM. Les références sont conservées par nom et **résolues uniquement au moment de leur utilisation** : rien de ce qui a besoin d'un identifiant n'en stocke jamais.
 
-![Organigramme montrant une référence de secret qui se divise selon le type : local déchiffre la valeur stockée, vault la lit en direct depuis Vault, et les deux alimentent une connexion à un serveur MCP ou le clonage d'un dépôt de compétence.](./img/secrets-resolution.svg#gh-light-mode-only)
-![Organigramme montrant une référence de secret qui se divise selon le type : local déchiffre la valeur stockée, vault la lit en direct depuis Vault, et les deux alimentent une connexion à un serveur MCP ou le clonage d'un dépôt de compétence.](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
+![Organigramme montrant une référence de secret qui se divise selon le type : local déchiffre la valeur stockée, vault la lit en direct depuis Vault, et les deux alimentent ce qui utilise la référence : une connexion à un serveur MCP, le clonage d'un dépôt de compétence, une authentification unique ou le LLM d'un tenant.](./img/secrets-resolution.svg#gh-light-mode-only)
+![Organigramme montrant une référence de secret qui se divise selon le type : local déchiffre la valeur stockée, vault la lit en direct depuis Vault, et les deux alimentent ce qui utilise la référence : une connexion à un serveur MCP, le clonage d'un dépôt de compétence, une authentification unique ou le LLM d'un tenant.](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
 
 | | **Local** | **HashiCorp Vault** |
 |---|---|---|
@@ -37,5 +37,9 @@ Un secret est toujours lu par le Vault du tenant auquel il appartient. Il s'agit
 |---|---|
 | Les valeurs d'en-tête et d'environnement d'un serveur MCP | La [passerelle](./mcp-gateway-and-proxy.md) les développe pour la connexion que le proxy MCP ouvre vers ce serveur |
 | Le mot de passe du dépôt d'une compétence d'agent | Le dépôt est cloné ou récupéré |
+| Le secret client de l'authentification unique d'un tenant | Quelqu'un se connecte par [authentification unique](../guides/single-sign-on.md) |
+| La clé d'API du LLM d'un tenant, configurée par son administrateur | Un agent du tenant s'exécute |
 
-La résolution étant différée, renommer ou supprimer un secret encore référencé n'échoue pas au moment de la modification. C'est l'utilisation suivante qui échoue, en nommant le secret introuvable ; la raison sous-jacente reste dans le journal du serveur et n'est pas transmise à l'appelant.
+La résolution étant différée, renommer ou supprimer un secret encore référencé n'échoue pas au moment de la modification. C'est l'utilisation suivante qui échoue, en nommant le secret introuvable ; la raison sous-jacente reste dans le journal du serveur et n'est pas transmise à l'appelant. Une tentative d'authentification unique se termine alors par « L'authentification unique n'est pas disponible pour ce tenant. », et un agent s'arrête sur une erreur au lieu de s'exécuter avec la clé du système.
+
+Seuls les identifiants propres au tenant acceptent un secret. Ceux des [Paramètres système](../guides/system-settings.md) n'appartiennent à aucun tenant et ne peuvent donc pas référencer ses secrets ; la clé du LLM qu'un super administrateur configure pour un tenant n'en provient pas non plus, puisque les serveurs MCP de ce tenant pourraient la référencer.

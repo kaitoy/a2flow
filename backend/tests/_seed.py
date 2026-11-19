@@ -17,7 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.bootstrap import seed_system_settings, seed_system_user
+from infrastructure.secret_cipher import get_secret_cipher
 from models.execution_session import ExecutionSession, ExecutionSessionStatus
+from models.secret import SecretCreate, SecretType
 from models.tenant import Tenant
 from models.user import SYSTEM_USER_ID, Role, User
 from models.workflow_task import (
@@ -26,6 +28,7 @@ from models.workflow_task import (
     WorkflowTaskStatus,
     WorkflowTaskToolBinding,
 )
+from repositories.secret import SqlSecretRepository
 
 #: Named test actors seeded with ``id == username`` so ``X-User-Id: alice`` works.
 DEFAULT_TEST_USER_IDS: tuple[str, ...] = ("alice", "bob", "carol", "owner", "tester")
@@ -62,6 +65,32 @@ async def seed_tenant(
                 )
             )
             await session.commit()
+
+
+async def seed_local_secret(
+    engine: AsyncEngine,
+    name: str,
+    entries: dict[str, str],
+    tenant_id: str = DEFAULT_TEST_TENANT_ID,
+) -> None:
+    """Seed a ``local`` secret holding ``entries``, encrypted as the service would.
+
+    Args:
+        engine: The async engine bound to the test database.
+        name: The secret's name.
+        entries: Plaintext entry values by key.
+        tenant_id: Tenant the secret belongs to.
+    """
+    cipher = get_secret_cipher()
+    async with AsyncSession(engine) as session:
+        await SqlSecretRepository(session, tenant_id=tenant_id).create(
+            SecretCreate(
+                name=name,
+                type=SecretType.local,
+                entries={key: cipher.encrypt(value) for key, value in entries.items()},
+            ),
+            user_id=SYSTEM_USER_ID,
+        )
 
 
 async def seed_users(

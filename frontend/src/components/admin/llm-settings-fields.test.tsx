@@ -8,8 +8,11 @@ import {
   LlmSettingsFields,
   llmShape,
   refineTenantAdminLlm,
+  tenantAdminLlmShape,
   toLlmBody,
   toLlmFormValues,
+  toTenantAdminLlmBody,
+  toTenantAdminLlmFormValues,
 } from "./llm-settings-fields";
 
 function Harness({
@@ -114,22 +117,74 @@ describe("LlmSettingsFields", () => {
 
 describe("refineTenantAdminLlm", () => {
   const schema = (keySaved: boolean) =>
-    z.object(llmShape).superRefine((values, ctx) => refineTenantAdminLlm(values, ctx, keySaved));
+    z
+      .object(tenantAdminLlmShape)
+      .superRefine((values, ctx) => refineTenantAdminLlm(values, ctx, keySaved));
+  const entered = { llmApiKeySource: "value", llmApiKeyRef: "" } as const;
 
   it("requires a key with a model unless one is stored", () => {
-    const result = schema(false).safeParse({ llmModel: "m1", llmApiKey: "" });
+    const result = schema(false).safeParse({ llmModel: "m1", llmApiKey: "", ...entered });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]).toMatchObject({
       path: ["llmApiKey"],
       message: "llm.apiKeyRequired",
     });
-    expect(schema(true).safeParse({ llmModel: "m1", llmApiKey: "" }).success).toBe(true);
-    expect(schema(false).safeParse({ llmModel: "m1", llmApiKey: "sk" }).success).toBe(true);
+    expect(schema(true).safeParse({ llmModel: "m1", llmApiKey: "", ...entered }).success).toBe(
+      true
+    );
+    expect(schema(false).safeParse({ llmModel: "m1", llmApiKey: "sk", ...entered }).success).toBe(
+      true
+    );
   });
 
   it("accepts both fields left empty, or a key alone", () => {
-    expect(schema(false).safeParse({ llmModel: " ", llmApiKey: "" }).success).toBe(true);
-    expect(schema(false).safeParse({ llmModel: "", llmApiKey: "sk" }).success).toBe(true);
+    expect(schema(false).safeParse({ llmModel: " ", llmApiKey: "", ...entered }).success).toBe(
+      true
+    );
+    expect(schema(false).safeParse({ llmModel: "", llmApiKey: "sk", ...entered }).success).toBe(
+      true
+    );
+  });
+
+  it("requires a complete reference once the key comes from a secret", () => {
+    const fromSecret = { llmModel: "m1", llmApiKey: "", llmApiKeySource: "secret" } as const;
+    const result = schema(true).safeParse({ ...fromSecret, llmApiKeyRef: "" });
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ["llmApiKeyRef"],
+      message: "credentialSource.secretRequired",
+    });
+    expect(schema(false).safeParse({ ...fromSecret, llmApiKeyRef: "llm/key" }).success).toBe(true);
+  });
+});
+
+describe("toTenantAdminLlmBody", () => {
+  it("sends the reference and no key when the key comes from a secret", () => {
+    expect(
+      toTenantAdminLlmBody({
+        llmModel: " m1 ",
+        llmApiKey: "typed",
+        llmApiKeySource: "secret",
+        llmApiKeyRef: "llm/key",
+      })
+    ).toEqual({ llmModel: "m1", llmApiKeyRef: "llm/key" });
+  });
+
+  it("clears the reference when the key is entered", () => {
+    expect(
+      toTenantAdminLlmBody({
+        llmModel: "",
+        llmApiKey: "sk-1",
+        llmApiKeySource: "value",
+        llmApiKeyRef: "llm/key",
+      })
+    ).toEqual({ llmModel: null, llmApiKey: "sk-1", llmApiKeyRef: null });
+  });
+
+  it("starts on the secret when the stored key is referenced", () => {
+    expect(toTenantAdminLlmFormValues({ llmApiKeyRef: "llm/key" })).toMatchObject({
+      llmApiKeySource: "secret",
+      llmApiKeyRef: "llm/key",
+    });
   });
 });
 

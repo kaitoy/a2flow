@@ -23,19 +23,19 @@ SPECS: dict[str, list[tuple]] = {}
 # ---------------------------------------------------------------- guides/secrets-usage
 SPECS["guides/secrets-usage"] = head(
     "Where a secret entry is used", "시크릿 항목이 사용되는 곳",
-    "Flowchart showing a secret's entry referenced either in an MCP server's headers and environment variables, or as an Agent Skill repository's auth password.",
-    "시크릿 항목이 MCP 서버의 헤더와 환경 변수에서 참조되거나 에이전트 스킬 저장소의 인증 비밀번호로 참조되는 것을 보여 주는 순서도.",
+    "Flowchart showing a secret's entry referenced in an MCP server's headers and environment variables, as an Agent Skill repository's auth password, as a tenant's single sign-on client secret, or as the API key of a tenant's LLM.",
+    "시크릿 항목이 MCP 서버의 헤더와 환경 변수, 에이전트 스킬 저장소의 인증 비밀번호, 테넌트 싱글 사인온의 클라이언트 시크릿, 테넌트 LLM의 API 키로 참조되는 것을 보여 주는 순서도.",
 ) + [
-    mask(423, 56, 54, 32),
-    label("HEADERS", "헤더"),
     label("Secret", "시크릿"),
     label("Entry", "항목"),
     label("MCP server", "MCP 서버"),
     label("headers + env vars", "헤더 + 환경 변수"),
     label("Agent Skill", "에이전트 스킬"),
     label("repo auth password", "저장소 인증 비밀번호"),
-    mask(430, 164, 40, 32),
-    label("AUTH", "인증"),
+    label("Single sign-on", "싱글 사인온"),
+    label("client secret", "클라이언트 시크릿"),
+    label("Tenant LLM", "테넌트의 LLM"),
+    label("API key", "API 키"),
 ]
 
 # ---------------------------------------------------------------- guides/admin-ui-navigation
@@ -493,8 +493,8 @@ SPECS["architecture/overview-lifecycle"] = head(
 # ---------------------------------------------------------------- architecture/secrets-resolution
 SPECS["architecture/secrets-resolution"] = head(
     "How a secret reference resolves", "시크릿 참조의 해석",
-    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed an MCP server connection or a skill repository clone.",
-    "시크릿 참조가 유형에 따라 갈라지는 것을 보여 주는 순서도. 로컬 유형은 저장된 값을 복호화하고, Vault 유형은 Vault에서 값을 실시간으로 읽으며, 둘 다 MCP 서버 연결이나 스킬 저장소 복제에 사용됩니다.",
+    "Flowchart showing a name/key secret reference branching by storage type: local secrets are decrypted from the stored value, Vault secrets are read live, and both feed whatever uses the reference: an MCP server connection, a skill repository clone, a single sign-on or a tenant's LLM.",
+    "시크릿 참조가 유형에 따라 갈라지는 것을 보여 주는 순서도. 로컬 유형은 저장된 값을 복호화하고, Vault 유형은 Vault에서 값을 실시간으로 읽으며, 둘 다 참조를 사용하는 쪽에 전달됩니다. 사용하는 쪽은 MCP 서버 연결, 스킬 저장소 복제, 싱글 사인온, 테넌트의 LLM입니다.",
     page_title="Secret reference resolution", svg_title="Secret reference resolution",
 ) + [
     mask(305, 160, 48, 32, h=12),
@@ -505,8 +505,8 @@ SPECS["architecture/secrets-resolution"] = head(
     label("stored value", "복호화"),
     label("Read it live", "Vault에서"),
     label("from Vault", "실시간으로 읽기"),
-    label("MCP server connection", "MCP 서버 연결"),
-    label("or a skill repository clone", "또는 스킬 저장소 복제"),
+    label("Where it is used", "사용하는 쪽"),
+    label("MCP · skill repo · SSO · LLM key", "MCP · 스킬 · SSO · LLM 키"),
 ]
 
 _POLICY_MASKS = [

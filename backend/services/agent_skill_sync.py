@@ -18,16 +18,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from infrastructure.database import engine
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, skill_sync_key
-from infrastructure.secret_cipher import get_secret_cipher
-from infrastructure.secret_resolver import SecretResolver
+from infrastructure.secret_resolver import SecretResolver, tenant_secret_resolver
 from infrastructure.skill_manager import SkillManager, get_skill_manager
-from infrastructure.vault_client import TenantVaults
 from models.agent_skill import SkillSyncStatus
 from repositories.agent_skill import AgentSkillRepository, SqlAgentSkillRepository
 from repositories.exceptions import (
     NotFoundError,
 )
-from repositories.secret import SqlSecretRepository
 from repositories.tenant_bootstrap import resolve_agent_skill_tenant
 from repositories.workflow import SqlWorkflowRepository, WorkflowRepository
 from repositories.workflow_execution import (
@@ -165,7 +162,6 @@ async def sync_agent_skill(skill_id: str, *, user_id: str) -> None:
                     "Background sync of skill %s failed: skill not found.", skill_id
                 )
                 return
-            secrets = SqlSecretRepository(db, tenant_id=tenant_id)
             service = AgentSkillSyncService(
                 skills=SqlAgentSkillRepository(db, tenant_id=tenant_id),
                 sessions=SqlWorkflowExecutionRepository(db, tenant_id=tenant_id),
@@ -174,9 +170,7 @@ async def sync_agent_skill(skill_id: str, *, user_id: str) -> None:
                     SqlAgentSkillRepository(db, tenant_id=tenant_id),
                     tenant_id=tenant_id,
                 ),
-                resolver=SecretResolver(
-                    secrets, get_secret_cipher(), TenantVaults(db, get_secret_cipher())
-                ),
+                resolver=tenant_secret_resolver(db, tenant_id),
                 skill_manager=get_skill_manager(),
             )
             await service.sync(skill_id, user_id=user_id)

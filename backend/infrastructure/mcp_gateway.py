@@ -77,16 +77,13 @@ from infrastructure.mcp_certificate import (
 from infrastructure.mcp_client import ElicitHandler, McpConnection
 from infrastructure.mcp_connection import resolve_connection
 from infrastructure.mcp_executor import McpExecutor, get_mcp_executor
-from infrastructure.secret_cipher import get_secret_cipher
-from infrastructure.secret_resolver import SecretResolver
-from infrastructure.vault_client import TenantVaults
+from infrastructure.secret_resolver import SecretResolver, tenant_secret_resolver
 from models.mcp_server import MCPServer
 from models.mcp_tool_invocation import McpAuditDecision
 from repositories.effective_roles import SqlEffectiveRoleRepository
 from repositories.exceptions import McpConnectionError, SecretResolutionError
 from repositories.mcp_ca import SqlMcpCertificateAuthorityRepository
 from repositories.mcp_server import SqlMCPServerRepository
-from repositories.secret import SqlSecretRepository
 from repositories.tenant_bootstrap import (
     resolve_agent_run_tenant,
     resolve_workflow_execution_tenant,
@@ -989,11 +986,7 @@ class McpGateway:
         Returns:
             A resolver backed by the session's secret repository.
         """
-        return SecretResolver(
-            SqlSecretRepository(db, tenant_id=tenant_id),
-            get_secret_cipher(),
-            TenantVaults(db, get_secret_cipher()),
-        )
+        return tenant_secret_resolver(db, tenant_id)
 
     async def _resolve_connection(
         self,

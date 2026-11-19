@@ -37,9 +37,10 @@ from infrastructure.oidc_client import (
     make_pkce_pair,
 )
 from infrastructure.secret_cipher import SecretCipher
+from infrastructure.secret_resolver import SecretResolver
 from models.tenant import Tenant, oidc_redirect_uri
 from models.user import User
-from repositories.exceptions import UniqueViolationError
+from repositories.exceptions import SecretResolutionError, UniqueViolationError
 from repositories.tenant import TenantRepository
 from repositories.user import UserRepository
 from repositories.user_group import UserGroupRepository
@@ -183,6 +184,7 @@ class OidcLoginService:
         oidc: OidcClient,
         cipher: SecretCipher,
         groups_for_tenant: Callable[[str], UserGroupRepository],
+        secrets_for_tenant: Callable[[str], SecretResolver],
     ) -> None:
         """Initialize the service.
 
@@ -194,6 +196,8 @@ class OidcLoginService:
             cipher: Encrypts the state cookie and decrypts client secrets.
             groups_for_tenant: Builds an unrestricted user-group repository
                 scoped to the given tenant id.
+            secrets_for_tenant: Builds the resolver of the given tenant's
+                secrets, for a client secret the tenant references from one.
         """
         self._tenants = tenants
         self._users = users
@@ -201,6 +205,7 @@ class OidcLoginService:
         self._oidc = oidc
         self._cipher = cipher
         self._groups_for_tenant = groups_for_tenant
+        self._secrets_for_tenant = secrets_for_tenant
 
     async def sso_enabled(self, tenant_name: str) -> bool:
         """Return whether the tenant named ``tenant_name`` offers SSO sign-in.
@@ -384,12 +389,7 @@ class OidcLoginService:
         groups claim (with no overage marker); its ``sub`` must equal the ID
         token's, and the ID token's claims win.
         """
-        try:
-            secret = self._cipher.decrypt(tenant.oidc_client_secret or "")
-        except ValueError as exc:
-            raise _refuse(
-                SsoErrorCode.unavailable, tenant.id, "undecryptable client secret"
-            ) from exc
+        secret = await self._client_secret(tenant)
         client_id = tenant.oidc_client_id or ""
         try:
             tokens = await self._oidc.exchange_code(
@@ -427,6 +427,30 @@ class OidcLoginService:
                 raise _refuse(SsoErrorCode.failed, tenant.id, "userinfo sub mismatch")
             claims = {**info, **claims}
         return claims
+
+    async def _client_secret(self, tenant: Tenant) -> str:
+        """Return the tenant's client secret: referenced from a secret, or stored.
+
+        A referenced secret is read at every sign-in, so rotating it (in Vault,
+        say) takes effect without touching A2Flow.
+
+        Raises:
+            SsoLoginError: ``unavailable``, if the reference cannot be resolved
+                or the stored secret no longer decrypts.
+        """
+        if tenant.oidc_client_secret_ref:
+            try:
+                return await self._secrets_for_tenant(tenant.id).resolve_ref(
+                    tenant.oidc_client_secret_ref
+                )
+            except SecretResolutionError as exc:
+                raise _refuse(SsoErrorCode.unavailable, tenant.id, str(exc)) from exc
+        try:
+            return self._cipher.decrypt(tenant.oidc_client_secret or "")
+        except ValueError as exc:
+            raise _refuse(
+                SsoErrorCode.unavailable, tenant.id, "undecryptable client secret"
+            ) from exc
 
     async def _resolve(self, tenant: Tenant, claims: dict[str, Any]) -> LoginResult:
         """Resolve, link or create the user, sync groups and mint the session."""
@@ -538,7 +562,7 @@ def _sso_configured(tenant: Tenant) -> bool:
         tenant.oidc_enabled
         and tenant.oidc_issuer
         and tenant.oidc_client_id
-        and tenant.oidc_client_secret
+        and (tenant.oidc_client_secret or tenant.oidc_client_secret_ref)
     )
 
 

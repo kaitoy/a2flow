@@ -19,7 +19,12 @@ from repositories.tenant import SqlTenantRepository
 from repositories.user import SqlUserRepository
 from tests._engine import make_test_engine
 from tests._envelope import assert_err, assert_ok
-from tests._seed import DEFAULT_TEST_TENANT_ID, seed_tenant, seed_users
+from tests._seed import (
+    DEFAULT_TEST_TENANT_ID,
+    seed_local_secret,
+    seed_tenant,
+    seed_users,
+)
 from tests.conftest import _install_auth_overrides
 
 _PATH = "/api/v1/admin-settings"
@@ -78,6 +83,7 @@ _NO_OIDC = {
     "oidcIssuer": None,
     "oidcClientId": None,
     "oidcClientSecretSet": False,
+    "oidcClientSecretRef": None,
     "oidcGroupsClaim": "groups",
     "oidcTrustEmail": False,
     "oidcRedirectUri": None,
@@ -85,7 +91,12 @@ _NO_OIDC = {
 }
 
 #: The LLM fields of a tenant that runs on the platform's LLM.
-_NO_LLM = {"llmMode": "system_default", "llmModel": None, "llmApiKeySet": False}
+_NO_LLM = {
+    "llmMode": "system_default",
+    "llmModel": None,
+    "llmApiKeySet": False,
+    "llmApiKeyRef": None,
+}
 
 #: The Vault fields of an unconfigured tenant.
 _NO_VAULT = {
@@ -341,6 +352,77 @@ async def test_clearing_a_required_field_while_enabled_is_rejected(
             code="INVALID_TENANT",
             status=422,
         )
+
+
+async def test_oidc_secret_ref_replaces_the_stored_secret_and_back(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await seed_local_secret(settings_engine, "idp", {"client-secret": "s3cret"})
+    assert_ok(await settings_client.patch(_PATH, json={"oidcClientSecret": "s3cret"}))
+
+    body = assert_ok(
+        await settings_client.patch(
+            _PATH, json={"oidcClientSecretRef": "idp/client-secret"}
+        )
+    )
+    assert body["oidcClientSecretRef"] == "idp/client-secret"
+    assert body["oidcClientSecretSet"] is False
+    assert (await _tenant(settings_engine)).oidc_client_secret is None
+
+    body = assert_ok(
+        await settings_client.patch(_PATH, json={"oidcClientSecret": "other"})
+    )
+    assert body["oidcClientSecretRef"] is None
+    assert body["oidcClientSecretSet"] is True
+
+
+async def test_oidc_secret_ref_alone_lets_sso_be_enabled(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await seed_local_secret(settings_engine, "idp", {"client-secret": "s3cret"})
+    body = {
+        "oidcIssuer": _OIDC["oidcIssuer"],
+        "oidcClientId": "a2flow",
+        "oidcClientSecretRef": "idp/client-secret",
+        "oidcEnabled": True,
+    }
+
+    assert assert_ok(await settings_client.patch(_PATH, json=body))["oidcEnabled"]
+    # Dropping the reference with no secret entered leaves SSO without one.
+    assert_err(
+        await settings_client.patch(_PATH, json={"oidcClientSecretRef": None}),
+        code="INVALID_TENANT",
+        status=422,
+    )
+
+
+async def test_oidc_secret_ref_must_name_a_secret_of_the_tenant(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await seed_tenant(settings_engine, "tenant-other")
+    await seed_local_secret(
+        settings_engine, "theirs", {"k": "v"}, tenant_id="tenant-other"
+    )
+    for ref in ("missing/k", "theirs/k"):
+        assert_err(
+            await settings_client.patch(_PATH, json={"oidcClientSecretRef": ref}),
+            code="FOREIGN_KEY_VIOLATION",
+            status=422,
+        )
+
+
+async def test_oidc_secret_and_ref_together_are_rejected(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await seed_local_secret(settings_engine, "idp", {"client-secret": "s3cret"})
+    assert_err(
+        await settings_client.patch(
+            _PATH,
+            json={"oidcClientSecret": "x", "oidcClientSecretRef": "idp/client-secret"},
+        ),
+        code="INVALID_TENANT",
+        status=422,
+    )
 
 
 async def test_oidc_issuer_private_address_rejected(
@@ -661,3 +743,75 @@ async def test_admin_cannot_change_the_llm_mode(
         await settings_client.patch(_PATH, json={"llmMode": "tenant_admin"})
     )
     assert body["llmMode"] == "system_default"
+
+
+async def test_a_referenced_key_satisfies_a_model_and_replaces_the_stored_one(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await _set_llm_mode(settings_engine, LlmMode.tenant_admin)
+    await seed_local_secret(settings_engine, "llm", {"key": "sk-secret"})
+    assert_ok(await settings_client.patch(_PATH, json=_LLM_BODY))
+
+    body = assert_ok(
+        await settings_client.patch(
+            _PATH, json={"llmModel": "m1", "llmApiKeyRef": "llm/key"}
+        )
+    )
+
+    assert body["llmApiKeyRef"] == "llm/key"
+    assert body["llmApiKeySet"] is False
+    assert (await _tenant(settings_engine)).llm_api_key is None
+
+
+async def test_admin_cannot_reference_a_key_unless_the_llm_was_handed_to_them(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await seed_local_secret(settings_engine, "llm", {"key": "sk-secret"})
+    assert_err(
+        await settings_client.patch(_PATH, json={"llmApiKeyRef": "llm/key"}),
+        "FORBIDDEN",
+        403,
+    )
+
+
+async def test_handing_the_llm_over_again_clears_the_key_reference(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    """A super admin's later hand-over starts the admin from an empty LLM."""
+    await _set_llm_mode(settings_engine, LlmMode.tenant_admin)
+    await seed_local_secret(settings_engine, "llm", {"key": "sk-secret"})
+    assert_ok(await settings_client.patch(_PATH, json={"llmApiKeyRef": "llm/key"}))
+    await _set_llm_mode(settings_engine, LlmMode.super_admin)
+    super_admin = {"X-User-Roles": "super_admin"}
+
+    assert_ok(
+        await settings_client.patch(
+            f"/api/v1/tenants/{DEFAULT_TEST_TENANT_ID}",
+            json={"llmMode": "tenant_admin"},
+            headers=super_admin,
+        )
+    )
+
+    assert (await _tenant(settings_engine)).llm_api_key_ref is None
+
+
+async def test_a_super_admins_key_replaces_the_admins_reference(
+    settings_client: AsyncClient, settings_engine: AsyncEngine
+) -> None:
+    await _set_llm_mode(settings_engine, LlmMode.tenant_admin)
+    await seed_local_secret(settings_engine, "llm", {"key": "sk-secret"})
+    assert_ok(await settings_client.patch(_PATH, json={"llmApiKeyRef": "llm/key"}))
+    await _set_llm_mode(settings_engine, LlmMode.super_admin)
+
+    tenant = assert_ok(
+        await settings_client.patch(
+            f"/api/v1/tenants/{DEFAULT_TEST_TENANT_ID}",
+            json={"llmApiKey": "sk-platform"},
+            headers={"X-User-Roles": "super_admin"},
+        )
+    )
+
+    assert tenant["llmApiKeySet"] is True
+    stored = await _tenant(settings_engine)
+    assert stored.llm_api_key_ref is None
+    assert stored.llm_api_key is not None

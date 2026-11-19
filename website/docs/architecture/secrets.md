@@ -5,10 +5,10 @@ sidebar_position: 8
 
 # Secret storage
 
-A [secret](../guides/secrets.md) is a named bundle of key/value entries, and every reference names exactly one entry — `${secret:name/key}` in an MCP server's headers or environment, a name and a key on an agent skill. References are held by name and **resolved only when they are used**, so nothing that needs a credential ever stores one.
+A [secret](../guides/secrets.md) is a named bundle of key/value entries, and every reference names exactly one entry — `${secret:name/key}` in an MCP server's headers or environment, a name and a key on an agent skill, on a tenant's single sign-on client secret or on its LLM API key. References are held by name and **resolved only when they are used**, so nothing that needs a credential ever stores one.
 
-![Flowchart showing a secret reference branching by type: local decrypts the stored value, vault reads it live from Vault, and both feed an MCP server connection or a skill repository clone.](./img/secrets-resolution.svg#gh-light-mode-only)
-![Flowchart showing a secret reference branching by type: local decrypts the stored value, vault reads it live from Vault, and both feed an MCP server connection or a skill repository clone.](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
+![Flowchart showing a secret reference branching by type: local decrypts the stored value, vault reads it live from Vault, and both feed whatever uses it: an MCP server connection, a skill repository clone, a single sign-on or a tenant's LLM.](./img/secrets-resolution.svg#gh-light-mode-only)
+![Flowchart showing a secret reference branching by type: local decrypts the stored value, vault reads it live from Vault, and both feed whatever uses it: an MCP server connection, a skill repository clone, a single sign-on or a tenant's LLM.](./img/secrets-resolution-dark.svg#gh-dark-mode-only)
 
 | | **Local** | **HashiCorp Vault** |
 |---|---|---|
@@ -37,5 +37,9 @@ A secret is always read through the Vault of the tenant it belongs to. That is t
 |---|---|
 | An MCP server's header and environment values | The [gateway](./mcp-gateway-and-proxy.md) expands them for the connection the MCP proxy opens to that server |
 | An agent skill's repository password | The repository is cloned or pulled |
+| A tenant's single sign-on client secret | Someone signs in through [single sign-on](../guides/single-sign-on.md) |
+| A tenant's LLM API key, set by its Admin | An agent of the tenant runs |
 
-Because resolution is lazy, renaming or deleting a secret that something still references does not fail at edit time. The next use fails instead, naming the secret it could not find; the underlying reason stays in the server's log rather than being handed to the caller.
+Because resolution is lazy, renaming or deleting a secret that something still references does not fail at edit time. The next use fails instead, naming the secret it could not find; the underlying reason stays in the server's log rather than being handed to the caller. A single sign-on attempt then ends with "Single sign-on is not available for this tenant.", and an agent stops with an error rather than running on the system's key.
+
+The tenant's own credentials are the only settings that take a secret. The system-wide ones under [System Settings](../guides/system-settings.md) belong to no tenant and so cannot reference a tenant's secret; a Super Admin's LLM key for a tenant is not taken from one either, since that tenant's MCP servers could reference it.
