@@ -425,6 +425,12 @@ export default function UserDetailPage() {
                 placeholder={t("users.leaveBlankToKeepUnchanged")}
                 {...register("password")}
               />
+              {/* Resetting your own password does not make you change it again. */}
+              {viewer?.id !== userId && (
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {t("users.passwordResetSignsOut")}
+                </p>
+              )}
             </FormField>
           )}
 

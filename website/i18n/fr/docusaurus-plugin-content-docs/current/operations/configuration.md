@@ -55,7 +55,7 @@ L'**utilisateur système** caché est propriétaire des enregistrements d'amorç
 | `ROOT_PASSWORD` | générée | Mot de passe de l'utilisateur `root` initial |
 | `ADMIN_PASSWORD` | générée | Mot de passe de l'utilisateur `admin` initial du tenant Default |
 
-Si l'une de ces variables n'est pas définie (ou est vide), un mot de passe aléatoire est généré à la place et consigné **une seule fois**, au niveau `WARNING`, à la création de l'utilisateur. Il ne peut plus être récupéré une fois cette ligne de journal disparue. Au-delà d'un simple essai en local, définissez explicitement les deux avant le premier démarrage, ou relevez aussitôt les mots de passe générés dans les journaux de démarrage et modifiez-les ensuite. Les noms d'utilisateur sont fixés à `root` et `admin`.
+Si l'une de ces variables n'est pas définie (ou est vide), un mot de passe aléatoire est généré à la place et consigné **une seule fois**, au niveau `WARNING`, à la création de l'utilisateur. Il ne peut plus être récupéré une fois cette ligne de journal disparue. Au-delà d'un simple essai en local, définissez explicitement les deux avant le premier démarrage, ou relevez aussitôt les mots de passe générés dans les journaux de démarrage et modifiez-les ensuite depuis la carte **Mot de passe** de la page **Profil**. Contrairement à un mot de passe qu'un administrateur définit pour quelqu'un d'autre, ceux-ci ne doivent pas obligatoirement être changés à la première connexion. Les noms d'utilisateur sont fixés à `root` et `admin`.
 
 ## Inscription {#sign-up}
 

@@ -543,7 +543,9 @@ AUTH_PASSWORD = "login-password-123"
 
 
 @pytest_asyncio.fixture()
-async def auth_client() -> AsyncGenerator[AsyncClient, None]:
+async def auth_client(
+    auth_client_env: tuple[AsyncClient, AsyncEngine],
+) -> AsyncClient:
     """Yield a client exercising the real auth/CSRF flow (no dependency overrides).
 
     Backed by a throwaway database seeded with the system user and one enabled
@@ -551,6 +553,16 @@ async def auth_client() -> AsyncGenerator[AsyncClient, None]:
     so tests can drive ``/auth/login``, ``/auth/me``, and ``/auth/logout`` end
     to end. The ``httpx`` client keeps a cookie jar across requests, so cookies
     set at login are sent automatically on later calls.
+    """
+    return auth_client_env[0]
+
+
+@pytest_asyncio.fixture()
+async def auth_client_env() -> AsyncGenerator[tuple[AsyncClient, AsyncEngine], None]:
+    """Yield :func:`auth_client`'s client together with its database engine.
+
+    For tests that must change the seeded user's row directly, e.g. to set a
+    flag no API request can set.
     """
     from dependencies.auth import get_current_user, verify_csrf  # noqa: F401
     from infrastructure.database import get_session
@@ -586,7 +598,7 @@ async def auth_client() -> AsyncGenerator[AsyncClient, None]:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as ac:
-            yield ac
+            yield ac, mem_engine
     finally:
         app.dependency_overrides.clear()
         await mem_engine.dispose()

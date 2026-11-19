@@ -21,13 +21,13 @@ Abre **Usuarios** en la barra lateral de administración para gestionar las cuen
 | **Nombre de usuario** | Único dentro del tenant. No se puede editar después de crearlo. |
 | **Nombre** / **Apellidos** | Se muestran juntos como nombre visible en todos los lugares donde se nombra a un usuario. |
 | **Correo electrónico** | La dirección a la que se envía el correo de notificación. |
-| **Contraseña** | Nunca se vuelve a mostrar. Al editar, si la dejas en blanco se conserva la contraseña actual. Si estableces una nueva, se cierra la sesión del usuario en todos los lugares donde la tenga iniciada. |
+| **Contraseña** | Nunca se vuelve a mostrar. Al editar, si la dejas en blanco se conserva la contraseña actual. Si estableces una nueva, se cierra la sesión del usuario en todos los lugares donde la tenga iniciada. Una contraseña que estableces para otra persona, al crear o al editar, debe cambiarla ese usuario en su próximo inicio de sesión; consulta [Una contraseña establecida por un administrador](#password-set-by-an-admin). |
 | **Habilitado** | Desmárcalo para impedir el inicio de sesión sin eliminar la cuenta. En la lista, una cuenta deshabilitada aparece atenuada y lleva una pequeña insignia en el avatar, así que la propia columna **Habilitado** se puede ocultar desde el selector de columnas. |
 | **Correo verificado** | Las direcciones sin verificar quedan excluidas de la [entrega de correo](./notifications.md#email-delivery). |
 | **Roles** | Una casilla por rol; consulta más abajo. |
 | **Grupos** | Las pertenencias, editables desde cualquiera de los dos lados. |
 
-Una cuenta que ha iniciado sesión mediante [inicio de sesión único](./single-sign-on.md) lleva la insignia **SSO** en la lista y en su página de detalle. Las cuentas creadas así no tienen contraseña hasta que un administrador establece una.
+Una cuenta que ha iniciado sesión mediante [inicio de sesión único](./single-sign-on.md) lleva la insignia **SSO** en la lista y en su página de detalle. Las cuentas creadas así no tienen contraseña hasta que un administrador establece una, que el usuario debe cambiar en su próximo inicio de sesión.
 
 ### Roles {#roles}
 
@@ -113,15 +113,16 @@ Lo introducido se conserva al cambiar de opción, pero solo se aplica mientras e
 
 ## Tu propia cuenta {#your-own-account}
 
-Haz clic en el botón de perfil de la barra de la aplicación y elige **Perfil** para revisar tu propia cuenta. La página se abre con una tarjeta de identidad (un banner, tu avatar sobre su borde inferior, tu nombre visible como encabezado y, a su lado, tu `@username`, tus roles y tus píldoras de estado), seguida de dos tarjetas de solo lectura y una tarjeta **Preferencias**:
+Haz clic en el botón de perfil de la barra de la aplicación y elige **Perfil** para revisar tu propia cuenta. La página se abre con una tarjeta de identidad (un banner, tu avatar sobre su borde inferior, tu nombre visible como encabezado y, a su lado, tu `@username`, tus roles y tus píldoras de estado), seguida de dos tarjetas de solo lectura, una tarjeta **Preferencias** y una tarjeta **Contraseña**:
 
 | Tarjeta | Muestra |
 |---|---|
 | **Cuenta** | Nombre de usuario, correo electrónico, nombre y apellidos |
 | **Acceso** | Roles, Roles de los grupos y Grupos |
 | **Preferencias** | El [idioma](#language) en que se muestran las pantallas |
+| **Contraseña** | El formulario para [cambiar tu contraseña](#password) |
 
-**Cuenta** y **Acceso** son de solo lectura: para cambiar esos atributos se necesitan el rol Administrador y la página de detalle de usuario de administración. Lo único que puedes editar por tu cuenta son tu idioma y tu avatar, que se edita haciendo clic en él.
+**Cuenta** y **Acceso** son de solo lectura: para cambiar esos atributos se necesitan el rol Administrador y la página de detalle de usuario de administración. Lo que puedes editar por tu cuenta es tu idioma, tu contraseña y tu avatar, que se edita haciendo clic en él.
 
 ### Idioma {#language}
 
@@ -144,6 +145,36 @@ El idioma abarca lo que dice el propio A2Flow: el texto de las pantallas, los me
 - Todo lo que hayan escrito personas o agentes: nombres, descripciones, títulos de aprobaciones, respuestas del chat. El agente responde en el idioma de la conversación, no en el que se configura aquí.
 - El motivo técnico adjunto a algunos errores, que se muestra en inglés después del mensaje traducido.
 - Los [correos de notificación](./notifications.md#email-delivery), que están en inglés.
+
+### Contraseña {#password}
+
+1. Abre **Perfil** desde el botón de perfil de la barra de la aplicación.
+2. En la tarjeta **Contraseña**, escribe tu **Contraseña actual**, luego una **Nueva contraseña** de 12 a 72 caracteres y la misma otra vez en **Confirma la nueva contraseña**.
+3. Haz clic en **Cambiar contraseña**.
+
+El navegador desde el que la cambias mantiene la sesión iniciada; en todos los demás navegadores con tu sesión iniciada, esta se cierra. El cambio se rechaza con un error si la contraseña actual es incorrecta, lo que además cuenta como un [inicio de sesión fallido](#failed-sign-ins), o si la nueva es igual a la actual.
+
+La tarjeta no se muestra para una cuenta que solo inicia sesión mediante [inicio de sesión único](./single-sign-on.md), ya que no tiene contraseña. Se desactiva mientras actúas como otro usuario.
+
+#### Una contraseña establecida por un administrador {#password-set-by-an-admin}
+
+Cuando un administrador crea tu cuenta o te establece una contraseña nueva, debes sustituirla por una que solo tú conozcas antes de poder hacer cualquier otra cosa:
+
+```mermaid
+flowchart LR
+  A[Un administrador crea tu cuenta<br/>o establece una contraseña nueva] --> B[Inicias sesión]
+  B --> C[Pantalla Cambia tu contraseña]
+  C -- Cambiar contraseña --> D[La página a la que ibas]
+  C -- Cerrar sesión --> E[Sesión cerrada]
+```
+
+La pantalla **Cambia tu contraseña** tiene los mismos tres campos que la tarjeta **Contraseña**. No se abre ninguna otra pantalla hasta que cambies la contraseña.
+
+A estas cuentas nunca se les pide:
+
+- `root` y el `admin` inicial, creados cuando A2Flow arranca por primera vez; consulta [Usuarios iniciales](../operations/configuration.md#seeded-users)
+- Las cuentas creadas al [registrarse](../getting-started/sign-up.md)
+- Un administrador que establece su propia contraseña en la página de detalle de **Usuarios**
 
 ### Avatares {#avatars}
 

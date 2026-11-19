@@ -902,5 +902,9 @@ export const handlers = [
 
   http.post(`${BASE}/api/v1/auth/logout`, () => envelope(null)),
 
+  http.post(`${BASE}/api/v1/auth/password`, () =>
+    envelope({ ...USER_1, hasPassword: true, mustChangePassword: false })
+  ),
+
   http.get(`${BASE}/api/v1/auth/me`, () => envelope({ user: USER_1, impersonatedBy: null })),
 ];

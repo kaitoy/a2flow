@@ -1,4 +1,4 @@
-/** @module next-path — The page a sign-in returns to, carried as `/login?next=`. */
+/** @module next-path — The page a sign-in (or a forced password change) returns to, carried as `?next=`. */
 
 /**
  * Return `value` if it is a path on this site, else `/`. The value comes from
@@ -25,6 +25,19 @@ export function safeNextPath(value: string | null | undefined): string {
  * Plain `/login` when `next` is the welcome page or not a path on this site.
  */
 export function loginPath(next: string): string {
+  return withNext("/login", next);
+}
+
+/**
+ * Return the forced password-change page's path, asking it to return to `next`
+ * once the password is changed. Same rules as {@link loginPath}.
+ */
+export function changePasswordPath(next: string): string {
+  return withNext("/change-password", next);
+}
+
+/** `page`, carrying `next` as `?next=` unless it is the welcome page or off-site. */
+function withNext(page: string, next: string): string {
   const safe = safeNextPath(next);
-  return safe === "/" ? "/login" : `/login?next=${encodeURIComponent(safe)}`;
+  return safe === "/" ? page : `${page}?next=${encodeURIComponent(safe)}`;
 }

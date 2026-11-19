@@ -80,6 +80,36 @@ describe("LoginPage", () => {
     window.history.pushState({}, "", "/");
   });
 
+  it("sends a user with an admin-chosen password to change it first", async () => {
+    const user = userEvent.setup();
+    const replaceMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({
+      push: vi.fn(),
+      replace: replaceMock,
+      back: vi.fn(),
+      forward: vi.fn(),
+      bfcacheId: "",
+      prefetch: vi.fn(),
+      refresh: vi.fn(),
+    });
+    server.use(
+      http.post("http://localhost:8000/api/v1/auth/login", () =>
+        envelope({ ...USER, mustChangePassword: true })
+      )
+    );
+    window.history.pushState({}, "", "/login?next=%2Fworkflows");
+
+    render(<LoginPage />);
+    await user.type(await screen.findByRole("textbox", { name: /username/i }), "alice");
+    await user.type(screen.getByLabelText(/password/i), "secret123abc");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() =>
+      expect(replaceMock).toHaveBeenCalledWith("/change-password?next=%2Fworkflows")
+    );
+    window.history.pushState({}, "", "/");
+  });
+
   it("submits the typed tenant name in the request body", async () => {
     const user = userEvent.setup();
     vi.mocked(useRouter).mockReturnValue({

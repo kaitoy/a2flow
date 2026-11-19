@@ -17,7 +17,8 @@ Failed logins are throttled per submitted account -- by the limit and lockout
 time its tenant sets (``Tenant.login_max_failures`` /
 ``Tenant.login_lockout_minutes``, the ``models.tenant`` defaults for a
 platform-scoped account or an unknown tenant). The counts live in the
-``login_failures`` table, so every replica enforces the same limit.
+``login_failures`` table, so every replica enforces the same limit. A wrong
+current password in :meth:`AuthService.change_password` counts the same way.
 
 Every bcrypt call runs in a worker thread: one costs hundreds of milliseconds
 of CPU, and on the event loop it would stall every other request and stream
@@ -30,16 +31,26 @@ from datetime import UTC, datetime, timedelta
 
 from config import get_settings
 from infrastructure.auth_tokens import generate_token, hash_token
-from infrastructure.password import burn_password_check, verify_password
+from infrastructure.password import (
+    burn_password_check,
+    hash_password,
+    verify_password,
+)
 from models.tenant import (
     DEFAULT_LOGIN_LOCKOUT_MINUTES,
     DEFAULT_LOGIN_MAX_FAILURES,
     MAX_LOGIN_LOCKOUT_MINUTES,
     Tenant,
 )
-from models.user import User
+from models.user import User, UserUpdate
 from repositories.auth_session import AuthSessionRepository
-from repositories.exceptions import TooManyLoginAttemptsError, UnauthorizedError
+from repositories.exceptions import (
+    ForbiddenError,
+    InvalidCurrentPasswordError,
+    PasswordUnchangedError,
+    TooManyLoginAttemptsError,
+    UnauthorizedError,
+)
 from repositories.login_failure import LoginFailureRepository
 from repositories.tenant import TenantRepository
 from repositories.user import UserRepository
@@ -130,6 +141,89 @@ class AuthService:
         """
         tenant = await self._tenants.get_by_name(tenant_name) if tenant_name else None
         account_key = f"{tenant_name or ''}/{username}"
+        now = datetime.now(UTC)
+        await self._check_lockout(account_key, tenant, now)
+        try:
+            user = await self._verify_credentials(
+                username, password, tenant_name, tenant
+            )
+        except UnauthorizedError:
+            await self._record_failure(account_key, now)
+            raise
+        await self._login_failures.clear(account_key)
+        return await self.start_session(user)
+
+    async def change_password(
+        self,
+        user: User,
+        session_token: str,
+        current_password: str,
+        new_password: str,
+    ) -> User:
+        """Replace a user's own password, keeping only the calling session.
+
+        The current password is checked against the same failure count as
+        sign-in, so a hijacked session cannot be used to guess it any faster
+        than the sign-in form could. On success the must-change-password flag
+        is cleared and every other session of the user is revoked.
+
+        Args:
+            user: The signed-in user changing their password.
+            session_token: The raw token of the calling session, the one
+                session left signed in.
+            current_password: The submitted current password.
+            new_password: The new plaintext password, already length-checked.
+
+        Returns:
+            The updated user.
+
+        Raises:
+            ForbiddenError: If the user has no password (an SSO-only account).
+            TooManyLoginAttemptsError: If the account is at its failure limit.
+            InvalidCurrentPasswordError: If ``current_password`` is wrong.
+            PasswordUnchangedError: If ``new_password`` equals the current one.
+        """
+        if user.password is None:
+            raise ForbiddenError("This account signs in through SSO only")
+        tenant = await self._tenants.get(user.tenant_id) if user.tenant_id else None
+        # The key sign-in uses for this account, so both count the same failures.
+        account_key = f"{tenant.name if tenant else ''}/{user.username}"
+        now = datetime.now(UTC)
+        await self._check_lockout(account_key, tenant, now)
+        if not await asyncio.to_thread(
+            verify_password, current_password, user.password
+        ):
+            await self._record_failure(account_key, now)
+            raise InvalidCurrentPasswordError()
+        await self._login_failures.clear(account_key)
+        if new_password == current_password:
+            raise PasswordUnchangedError()
+        hashed = await asyncio.to_thread(hash_password, new_password)
+        await self._sessions.delete_for_user(
+            user.id, keep_token_hash=hash_token(session_token)
+        )
+        return await self._users.update(
+            user.id,
+            UserUpdate(password=hashed),
+            user_id=user.id,
+            must_change_password=False,
+        )
+
+    async def _check_lockout(
+        self, account_key: str, tenant: Tenant | None, now: datetime
+    ) -> None:
+        """Refuse the attempt if the account is at its tenant's failure limit.
+
+        Args:
+            account_key: ``"<tenant name>/<username>"``, the throttled account.
+            tenant: The account's tenant, or ``None`` for a platform-scoped
+                account or an unknown tenant.
+            now: The current time.
+
+        Raises:
+            TooManyLoginAttemptsError: If the account has reached the limit
+                within the lockout window.
+        """
         # An unknown tenant gets the defaults, exactly like a known one that
         # never changed them, so the limit reveals nothing about existence.
         window = timedelta(
@@ -142,24 +236,23 @@ class AuthService:
             if tenant is not None
             else DEFAULT_LOGIN_MAX_FAILURES
         )
-        now = datetime.now(UTC)
         count, oldest = await self._login_failures.recent(account_key, now - window)
         if count >= limit and oldest is not None:
             if oldest.tzinfo is None:
                 oldest = oldest.replace(tzinfo=UTC)
             retry_after = (oldest + window - now).total_seconds()
             raise TooManyLoginAttemptsError(int(retry_after) + 1)
-        try:
-            user = await self._verify_credentials(
-                username, password, tenant_name, tenant
-            )
-        except UnauthorizedError:
-            await self._login_failures.record(
-                account_key, now, now - timedelta(minutes=MAX_LOGIN_LOCKOUT_MINUTES)
-            )
-            raise
-        await self._login_failures.clear(account_key)
-        return await self.start_session(user)
+
+    async def _record_failure(self, account_key: str, now: datetime) -> None:
+        """Count one failed password check against an account.
+
+        Args:
+            account_key: ``"<tenant name>/<username>"``, the throttled account.
+            now: The time of the failure.
+        """
+        await self._login_failures.record(
+            account_key, now, now - timedelta(minutes=MAX_LOGIN_LOCKOUT_MINUTES)
+        )
 
     async def start_session(self, user: User) -> LoginResult:
         """Mint a login session for a user who has already been authenticated.

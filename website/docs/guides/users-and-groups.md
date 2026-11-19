@@ -21,13 +21,13 @@ Open **Users** in the admin sidebar to manage accounts. The list shows one row p
 | **Username** | Unique within the tenant. Not editable after creation. |
 | **First Name** / **Last Name** | Shown together as the display name everywhere a user is named. |
 | **Email** | Where notification email is sent. |
-| **Password** | Never shown back. On edit, leaving it blank keeps the current password. Setting a new one signs the user out everywhere they are signed in. |
+| **Password** | Never shown back. On edit, leaving it blank keeps the current password. Setting a new one signs the user out everywhere they are signed in. A password you set for someone else, on create or on edit, must be changed by that user at their next sign-in — see [A password set by an admin](#password-set-by-an-admin). |
 | **Enabled** | Clear it to block sign-in without deleting the account. In the list, a disabled account is shown muted and carries a small badge on its avatar, so the **Enabled** column itself can be hidden from the column picker. |
 | **Email verified** | Unverified addresses are skipped by [email delivery](./notifications.md#email-delivery). |
 | **Roles** | Checkbox per role — see below. |
 | **Groups** | Memberships, editable from either side. |
 
-An account that has signed in through [single sign-on](./single-sign-on.md) carries an **SSO** badge in the list and on its detail page. Accounts created that way have no password until an admin sets one.
+An account that has signed in through [single sign-on](./single-sign-on.md) carries an **SSO** badge in the list and on its detail page. Accounts created that way have no password until an admin sets one, which the user must then change at their next sign-in.
 
 ### Roles
 
@@ -113,15 +113,16 @@ What was entered stays when you switch options, but it applies only while one of
 
 ## Your own account {#your-own-account}
 
-Click the profile button in the app bar and choose **Profile** to review your own account. The page opens with an identity card — a banner, your avatar across its lower edge, your display name as the heading, and your `@username`, roles and status pills beside it — followed by two read-only cards and a **Preferences** card:
+Click the profile button in the app bar and choose **Profile** to review your own account. The page opens with an identity card — a banner, your avatar across its lower edge, your display name as the heading, and your `@username`, roles and status pills beside it — followed by two read-only cards, a **Preferences** card and a **Password** card:
 
 | Card | Shows |
 |---|---|
 | **Account** | Username, email, first and last name |
 | **Access** | Roles, Roles from Groups, and Groups |
 | **Preferences** | The [language](#language) the screens are shown in |
+| **Password** | The form for [changing your password](#password) |
 
-**Account** and **Access** are read-only: changing those attributes requires the `admin` role and the admin user detail page. The two things you can edit yourself are your language and your avatar, which you edit by clicking it.
+**Account** and **Access** are read-only: changing those attributes requires the `admin` role and the admin user detail page. The things you can edit yourself are your language, your password, and your avatar, which you edit by clicking it.
 
 ### Language {#language}
 
@@ -144,6 +145,36 @@ The language covers what A2Flow itself says: screen text, messages and validatio
 - Anything people or agents wrote: names, descriptions, approval titles, chat replies. The agent answers in the language of the conversation, not the language set here.
 - The technical reason attached to some errors, shown in English after the translated message.
 - [Notification emails](./notifications.md#email-delivery), which are in English.
+
+### Password {#password}
+
+1. Open **Profile** from the profile button in the app bar.
+2. In the **Password** card, enter your **Current password**, then a **New password** of 12 to 72 characters, and the same again in **Confirm new password**.
+3. Click **Change password**.
+
+The browser you changed it in stays signed in; every other browser signed in as you is signed out. The change is rejected with an error when the current password is wrong, which also counts as a [failed sign-in](#failed-sign-ins), or when the new password is the same as the current one.
+
+The card is not shown for an account that signs in only through [single sign-on](./single-sign-on.md), which has no password. It is disabled while acting as another user.
+
+#### A password set by an admin {#password-set-by-an-admin}
+
+When an admin creates your account or sets a new password for you, you must replace it with one only you know before you can do anything else:
+
+```mermaid
+flowchart LR
+  A[An admin creates your account<br/>or sets a new password] --> B[You sign in]
+  B --> C[Change your password screen]
+  C -- Change password --> D[The page you were heading for]
+  C -- Log out --> E[Signed out]
+```
+
+The **Change your password** screen has the same three fields as the **Password** card. No other screen opens until the password is changed.
+
+These accounts are never asked:
+
+- `root` and the seeded `admin`, set up when A2Flow first starts — see [Seeded users](../operations/configuration.md#seeded-users)
+- Accounts created by [signing up](../getting-started/sign-up.md)
+- An admin who sets their own password on the **Users** detail page
 
 ### Avatars
 

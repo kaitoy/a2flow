@@ -506,6 +506,15 @@ export const en = {
   "chat.startANewChat": "Start a new chat",
   "chat.theFilesCouldNotBeAttachedNothing": "The files could not be attached. Nothing was sent.",
   "chat.unknownSender": "Unknown sender",
+  "changePassword.title": "Change your password",
+  "changePassword.required":
+    "An administrator set your password. To continue, choose a new one that only you know.",
+  "changePassword.current": "Current password",
+  "changePassword.new": "New password",
+  "changePassword.confirm": "Confirm new password",
+  "changePassword.mismatch": "The passwords do not match.",
+  "changePassword.submit": "Change password",
+  "changePassword.changing": "Changing…",
   "common.a2flowLogo": "A2Flow logo",
   "common.accessControl": "Access control",
   "common.actions": "Actions",
@@ -719,6 +728,9 @@ export const en = {
     "A confirmation email was just sent to this address. Wait a minute and try again.",
   "errors.TENANT_LIMIT_REACHED": "The maximum number of tenants has been reached.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS": "Too many failed sign-in attempts. Wait a while and try again.",
+  "errors.INVALID_CURRENT_PASSWORD": "The current password is incorrect.",
+  "errors.PASSWORD_CHANGE_REQUIRED": "You must change your password before continuing.",
+  "errors.PASSWORD_UNCHANGED": "The new password must differ from the current one.",
   "errors.UNAUTHENTICATED": "Invalid username or password.",
   "errors.VALIDATION_ERROR": "The request is not valid. Check what you entered.",
   "errors.WORKFLOW_NOT_DEACTIVATABLE":
@@ -860,6 +872,8 @@ export const en = {
   "profile.language.label": "Language",
   "profile.palette": "Palette",
   "profile.paletteColorValue": "Palette color {value}",
+  "profile.password.changed": "Your password was changed. Other browsers were signed out.",
+  "profile.password.impersonating": "The password cannot be changed while acting as another user.",
   "profile.preferences": "Preferences",
   "profile.rolesFromGroups": "Roles from Groups",
   "profile.uploadAnImageOrTuneTheColors":
@@ -1092,6 +1106,9 @@ export const en = {
   "users.names.system": "System User",
   "users.newUser": "New User",
   "users.noUsersRegisteredYet": "No users registered yet.",
+  "users.passwordChangedAtFirstSignIn": "The user is asked to change it at their first sign-in.",
+  "users.passwordResetSignsOut":
+    "Setting a new one signs the user out and asks them to change it at their next sign-in.",
   "users.passwordMustBe1272Characters": "Password must be 12–72 characters",
   "users.selectATenantInTheHeaderBefore":
     "Select a tenant in the header before creating this user.",

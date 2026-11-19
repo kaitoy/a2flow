@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loginPath, safeNextPath } from "./next-path";
+import { changePasswordPath, loginPath, safeNextPath } from "./next-path";
 
 describe("safeNextPath", () => {
   it.each([
@@ -26,5 +26,12 @@ describe("loginPath", () => {
   it("is plain /login for the welcome page or an unsafe value", () => {
     expect(loginPath("/")).toBe("/login");
     expect(loginPath("//evil.example")).toBe("/login");
+  });
+});
+
+describe("changePasswordPath", () => {
+  it("carries the page to return to, like loginPath", () => {
+    expect(changePasswordPath("/workflows")).toBe("/change-password?next=%2Fworkflows");
+    expect(changePasswordPath("/")).toBe("/change-password");
   });
 });

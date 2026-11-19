@@ -402,7 +402,8 @@ class UserService:
     async def create(self, data: UserCreate, *, acting_user: User) -> User:
         """Create a new User, hashing the supplied password before persistence.
 
-        The route itself is gated behind the ``admin`` role; this method adds
+        The new user must change that admin-chosen password at their first
+        sign-in (``must_change_password``). The route itself is gated behind the ``admin`` role; this method adds
         the escalation guard: only a super admin may create a user that holds
         the ``super_admin`` role.
 
@@ -444,7 +445,11 @@ class UserService:
         hashed = data.model_copy(
             update={"password": await asyncio.to_thread(hash_password, data.password)}
         )
-        return await self._repo.create(hashed, user_id=acting_user.id)
+        # The admin chose this password, so the user must replace it with one
+        # only they know before using anything else.
+        return await self._repo.create(
+            hashed, user_id=acting_user.id, must_change_password=True
+        )
 
     async def update(
         self,
@@ -468,7 +473,9 @@ class UserService:
 
         A blank or omitted password leaves the stored password unchanged; a
         non-empty password is hashed before persistence, and every login
-        session the target holds is revoked.
+        session the target holds is revoked. When the target is someone other
+        than the acting user, the target must also change that password at
+        their next sign-in (``must_change_password``).
 
         Args:
             target_id: Identifier of the user to update.
@@ -530,6 +537,7 @@ class UserService:
                 "Only admins can update other users or non-self-service fields"
             )
         password = update.get("password")
+        must_change_password: bool | None = None
         if password:
             update["password"] = await asyncio.to_thread(hash_password, password)
             # A reset is the usual answer to a stolen login, so it must also
@@ -537,10 +545,17 @@ class UserService:
             # before the update so the user it returns is not expired by this
             # commit; if the update then fails, the target just signs in again.
             await self._sessions.delete_for_user(target_id)
+            # Someone else's password chosen by an admin must be replaced by
+            # its owner; an admin resetting their own already knows it.
+            if target_id != acting_user.id:
+                must_change_password = True
         else:
             update.pop("password", None)
         return await self._repo.update(
-            target_id, UserUpdate(**update), user_id=acting_user.id
+            target_id,
+            UserUpdate(**update),
+            user_id=acting_user.id,
+            must_change_password=must_change_password,
         )
 
     async def delete(self, user_id: str, *, acting_user: User) -> None:

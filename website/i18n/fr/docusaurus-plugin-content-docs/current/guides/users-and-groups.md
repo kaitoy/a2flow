@@ -21,13 +21,13 @@ Ouvrez **Utilisateurs** dans la barre latérale d'administration pour gérer les
 | **Nom d'utilisateur** | Unique au sein du tenant. Non modifiable après la création. |
 | **Prénom** / **Nom** | Affichés ensemble comme nom d'affichage partout où un utilisateur est nommé. |
 | **E-mail** | Adresse à laquelle sont envoyés les e-mails de notification. |
-| **Mot de passe** | Jamais réaffiché. En modification, le laisser vide conserve le mot de passe actuel. En définir un nouveau déconnecte l'utilisateur partout où il est connecté. |
+| **Mot de passe** | Jamais réaffiché. En modification, le laisser vide conserve le mot de passe actuel. En définir un nouveau déconnecte l'utilisateur partout où il est connecté. Un mot de passe que vous définissez pour quelqu'un d'autre, à la création ou en modification, doit être changé par cet utilisateur à sa prochaine connexion — voir [Un mot de passe défini par un administrateur](#password-set-by-an-admin). |
 | **Activé** | Décochez-le pour bloquer la connexion sans supprimer le compte. Dans la liste, un compte désactivé apparaît estompé et porte un petit badge sur son avatar : la colonne **Activé** elle-même peut donc être masquée depuis le sélecteur de colonnes. |
 | **E-mail vérifié** | Les adresses non vérifiées sont ignorées par l'[envoi des e-mails](./notifications.md#email-delivery). |
 | **Rôles** | Une case à cocher par rôle : voir ci-dessous. |
 | **Groupes** | Appartenances aux groupes, modifiables depuis l'un ou l'autre côté. |
 
-Un compte qui s'est connecté par [authentification unique](./single-sign-on.md) porte le badge **SSO** dans la liste et sur sa page de détail. Les comptes créés ainsi n'ont pas de mot de passe tant qu'un administrateur n'en définit pas un.
+Un compte qui s'est connecté par [authentification unique](./single-sign-on.md) porte le badge **SSO** dans la liste et sur sa page de détail. Les comptes créés ainsi n'ont pas de mot de passe tant qu'un administrateur n'en définit pas un, que l'utilisateur doit alors changer à sa prochaine connexion.
 
 ### Rôles {#roles}
 
@@ -113,15 +113,16 @@ Ce qui a été saisi est conservé quand vous changez d'option, mais ne s'appliq
 
 ## Votre propre compte {#your-own-account}
 
-Cliquez sur le bouton de profil dans la barre d'application et choisissez **Profil** pour consulter votre compte. La page s'ouvre sur une carte d'identité : une bannière, votre avatar à cheval sur son bord inférieur, votre nom d'affichage en titre et, à côté, votre `@username`, vos rôles et des pastilles d'état. Viennent ensuite deux cartes en lecture seule et une carte **Préférences** :
+Cliquez sur le bouton de profil dans la barre d'application et choisissez **Profil** pour consulter votre compte. La page s'ouvre sur une carte d'identité : une bannière, votre avatar à cheval sur son bord inférieur, votre nom d'affichage en titre et, à côté, votre `@username`, vos rôles et des pastilles d'état. Viennent ensuite deux cartes en lecture seule, une carte **Préférences** et une carte **Mot de passe** :
 
 | Carte | Contenu |
 |---|---|
 | **Compte** | Nom d'utilisateur, e-mail, prénom et nom |
 | **Accès** | Rôles, Rôles issus des groupes et Groupes |
 | **Préférences** | La [langue](#language) d'affichage des écrans |
+| **Mot de passe** | Le formulaire pour [changer votre mot de passe](#password) |
 
-**Compte** et **Accès** sont en lecture seule : modifier ces attributs requiert le rôle Administrateur et la page de détail de l'utilisateur côté administration. Vous pouvez vous-même modifier deux choses : votre langue et votre avatar, sur lequel il suffit de cliquer.
+**Compte** et **Accès** sont en lecture seule : modifier ces attributs requiert le rôle Administrateur et la page de détail de l'utilisateur côté administration. Vous pouvez vous-même modifier votre langue, votre mot de passe et votre avatar, sur lequel il suffit de cliquer.
 
 ### Langue {#language}
 
@@ -144,6 +145,36 @@ La langue couvre ce qu'A2Flow dit lui-même : le texte des écrans, les message
 - Tout ce que des personnes ou des agents ont écrit : noms, descriptions, titres d'approbation, réponses de discussion. L'agent répond dans la langue de la conversation, et non dans celle définie ici.
 - La raison technique jointe à certaines erreurs, affichée en anglais après le message traduit.
 - Les [e-mails de notification](./notifications.md#email-delivery), qui sont en anglais.
+
+### Mot de passe {#password}
+
+1. Ouvrez **Profil** depuis le bouton de profil de la barre d'application.
+2. Dans la carte **Mot de passe**, saisissez votre **Mot de passe actuel**, puis un **Nouveau mot de passe** de 12 à 72 caractères, et le même à nouveau dans **Confirmez le nouveau mot de passe**.
+3. Cliquez sur **Changer le mot de passe**.
+
+Le navigateur depuis lequel vous l'avez changé reste connecté ; tous les autres navigateurs connectés à votre compte sont déconnectés. Le changement est refusé avec une erreur si le mot de passe actuel est incorrect, ce qui compte aussi comme une [connexion échouée](#failed-sign-ins), ou si le nouveau est identique à l'actuel.
+
+La carte n'est pas affichée pour un compte qui se connecte uniquement par [authentification unique](./single-sign-on.md), car il n'a pas de mot de passe. Elle est désactivée lorsque vous agissez en tant qu'un autre utilisateur.
+
+#### Un mot de passe défini par un administrateur {#password-set-by-an-admin}
+
+Lorsqu'un administrateur crée votre compte ou vous définit un nouveau mot de passe, vous devez le remplacer par un mot de passe connu de vous seul avant de pouvoir faire quoi que ce soit d'autre :
+
+```mermaid
+flowchart LR
+  A[Un administrateur crée votre compte<br/>ou définit un nouveau mot de passe] --> B[Vous vous connectez]
+  B --> C[Écran Changez votre mot de passe]
+  C -- Changer le mot de passe --> D[La page où vous alliez]
+  C -- Se déconnecter --> E[Déconnecté]
+```
+
+L'écran **Changez votre mot de passe** comporte les trois mêmes champs que la carte **Mot de passe**. Aucun autre écran ne s'ouvre tant que le mot de passe n'est pas changé.
+
+Ces comptes ne sont jamais concernés :
+
+- `root` et l'`admin` initial, créés au premier démarrage d'A2Flow — voir [Utilisateurs initiaux](../operations/configuration.md#seeded-users)
+- Les comptes créés par [inscription](../getting-started/sign-up.md)
+- Un administrateur qui définit son propre mot de passe sur la page de détail **Utilisateurs**
 
 ### Avatars {#avatars}
 

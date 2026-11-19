@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends
 
-from dependencies.auth import get_current_user, verify_csrf
+from dependencies.auth import (
+    get_current_user,
+    require_password_changed,
+    verify_csrf,
+)
 from routers import (
     admin_settings,
     agent,
@@ -35,9 +39,15 @@ api_router = APIRouter(prefix="/api/v1")
 
 #: Dependencies applied to every protected resource router: a valid session is
 #: required (``get_current_user``) and state-changing requests must pass CSRF
-#: validation (``verify_csrf``). The auth and health routers are intentionally
-#: left unguarded so login and liveness probes work without a session.
-_protected = [Depends(get_current_user), Depends(verify_csrf)]
+#: validation (``verify_csrf``), and a user made to change an admin-chosen
+#: password is refused until they do (``require_password_changed``). The auth
+#: and health routers are intentionally left unguarded so login and liveness
+#: probes work without a session, and so the password can still be changed.
+_protected = [
+    Depends(get_current_user),
+    Depends(verify_csrf),
+    Depends(require_password_changed),
+]
 
 # Public routers (no auth/CSRF guard).
 api_router.include_router(auth.router)

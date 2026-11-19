@@ -33,7 +33,9 @@ class AuthSessionRepository(Protocol):
 
     async def delete_by_token_hash(self, token_hash: str) -> None: ...
 
-    async def delete_for_user(self, user_id: str) -> None: ...
+    async def delete_for_user(
+        self, user_id: str, *, keep_token_hash: str | None = None
+    ) -> None: ...
 
 
 class SqlAuthSessionRepository:
@@ -146,13 +148,19 @@ class SqlAuthSessionRepository:
             await self._db.delete(session)
             await self._db.commit()
 
-    async def delete_for_user(self, user_id: str) -> None:
+    async def delete_for_user(
+        self, user_id: str, *, keep_token_hash: str | None = None
+    ) -> None:
         """Delete every login session belonging to a user.
 
         Args:
             user_id: The user whose sessions to revoke.
+            keep_token_hash: Hash of one session to spare -- the caller's own,
+                when a user changes their password and should stay signed in
+                on the browser that did it.
         """
-        await self._db.exec(
-            delete(AuthSession).where(col(AuthSession.user_id) == user_id)
-        )
+        stmt = delete(AuthSession).where(col(AuthSession.user_id) == user_id)
+        if keep_token_hash is not None:
+            stmt = stmt.where(col(AuthSession.token_hash) != keep_token_hash)
+        await self._db.exec(stmt)
         await self._db.commit()

@@ -505,6 +505,15 @@ export const ja = {
   "chat.theFilesCouldNotBeAttachedNothing":
     "ファイルを添付できませんでした。何も送信されていません。",
   "chat.unknownSender": "不明な送信者",
+  "changePassword.title": "パスワードの変更",
+  "changePassword.required":
+    "現在のパスワードは管理者が設定したものです。続けるには、自分だけが知る新しいパスワードを設定してください。",
+  "changePassword.current": "現在のパスワード",
+  "changePassword.new": "新しいパスワード",
+  "changePassword.confirm": "新しいパスワード（確認）",
+  "changePassword.mismatch": "パスワードが一致しません。",
+  "changePassword.submit": "パスワードを変更",
+  "changePassword.changing": "変更中…",
   "common.a2flowLogo": "A2Flow ロゴ",
   "common.accessControl": "アクセス制御",
   "common.actions": "操作",
@@ -720,6 +729,9 @@ export const ja = {
   "errors.TENANT_LIMIT_REACHED": "テナント数が上限に達しています。",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "ログインの失敗が多すぎます。しばらく待ってから、もう一度お試しください。",
+  "errors.INVALID_CURRENT_PASSWORD": "現在のパスワードが正しくありません。",
+  "errors.PASSWORD_CHANGE_REQUIRED": "続けるにはパスワードを変更してください。",
+  "errors.PASSWORD_UNCHANGED": "新しいパスワードは現在のものと異なるものにしてください。",
   "errors.UNAUTHENTICATED": "ユーザー名またはパスワードが正しくありません。",
   "errors.VALIDATION_ERROR": "リクエストが正しくありません。入力内容を確認してください。",
   "errors.WORKFLOW_NOT_DEACTIVATABLE": "ワークフローが公開されていないため、無効化できません。",
@@ -862,6 +874,9 @@ export const ja = {
   "profile.language.label": "言語",
   "profile.palette": "パレット",
   "profile.paletteColorValue": "パレットの色 {value}",
+  "profile.password.changed": "パスワードを変更しました。他のブラウザーはログアウトされました。",
+  "profile.password.impersonating":
+    "別のユーザーとして操作している間はパスワードを変更できません。",
   "profile.preferences": "設定",
   "profile.rolesFromGroups": "グループから付与されたロール",
   "profile.uploadAnImageOrTuneTheColors":
@@ -1093,6 +1108,10 @@ export const ja = {
   "users.names.system": "システムユーザー",
   "users.newUser": "新しいユーザー",
   "users.noUsersRegisteredYet": "ユーザーはまだ登録されていません。",
+  "users.passwordChangedAtFirstSignIn":
+    "ユーザーは初回ログイン時にこのパスワードの変更を求められます。",
+  "users.passwordResetSignsOut":
+    "新しいパスワードを設定するとユーザーはログアウトされ、次回ログイン時に変更を求められます。",
   "users.passwordMustBe1272Characters": "パスワードは 12〜72 文字にしてください",
   "users.selectATenantInTheHeaderBefore":
     "このユーザーを作成する前に、ヘッダーでテナントを選択してください。",

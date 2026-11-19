@@ -51,7 +51,11 @@ from infrastructure.database import get_session
 from models.user import Role, User, has_any_role
 from repositories.auth_session import SqlAuthSessionRepository
 from repositories.effective_roles import SqlEffectiveRoleRepository
-from repositories.exceptions import CsrfError, ForbiddenError
+from repositories.exceptions import (
+    CsrfError,
+    ForbiddenError,
+    PasswordChangeRequiredError,
+)
 from repositories.impersonation_event import SqlImpersonationEventRepository
 from repositories.login_failure import SqlLoginFailureRepository
 from repositories.tenant import SqlTenantRepository
@@ -141,6 +145,24 @@ async def get_session_user(request: Request, auth_service: AuthServiceDep) -> Us
 
 
 RealUserDep = Annotated[User, Depends(get_session_user)]
+
+
+def require_password_changed(user: RealUserDep) -> None:
+    """Refuse the request while the real user must change an admin-chosen password.
+
+    Attached to every resource router (:mod:`routers`), so the ``/auth``
+    routes -- ``/me``, ``/logout``, and ``/password`` itself -- stay open. It
+    checks the real user, not the effective one, so an admin impersonating a
+    user who has yet to change their password is not locked out.
+
+    Args:
+        user: The real, session-authenticated user.
+
+    Raises:
+        PasswordChangeRequiredError: If ``user.must_change_password`` is set.
+    """
+    if user.must_change_password:
+        raise PasswordChangeRequiredError()
 
 
 async def get_current_user(

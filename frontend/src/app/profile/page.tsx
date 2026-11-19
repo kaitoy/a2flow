@@ -1,9 +1,10 @@
-/** @module ProfilePage — The signed-in user's own profile: identity hero, read-only attributes, language, and the avatar editor. */
+/** @module ProfilePage — The signed-in user's own profile: identity hero, read-only attributes, language, password, and the avatar editor. */
 "use client";
 
 import { useEffect, useState } from "react";
 import { AvatarDialog } from "@/components/profile/AvatarDialog";
 import { LanguagePreference } from "@/components/profile/LanguagePreference";
+import { PasswordCard } from "@/components/profile/PasswordCard";
 import { ProfileDetails } from "@/components/profile/ProfileDetails";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { Spinner } from "@/components/ui/spinner";
@@ -14,9 +15,9 @@ import { useAppSelector } from "@/store/hooks";
  * Profile page for the signed-in user: an identity hero naming them, their
  * account and access attributes as two read-only cards, and their preferences.
  *
- * The backend only accepts self-service updates to `avatarConfig` and `language`,
- * so those are the two editable things: the language in {@link LanguagePreference},
- * and the avatar by clicking the hero's avatar, which opens {@link AvatarDialog}.
+ * Three things are editable: the language in {@link LanguagePreference}, the
+ * password in {@link PasswordCard}, and the avatar by clicking the hero's
+ * avatar, which opens {@link AvatarDialog}.
  *
  * The surrounding `ProfileLayout` gates rendering on authentication, so the
  * user is normally present; a spinner covers the brief window before the auth
@@ -51,6 +52,7 @@ export default function ProfilePage() {
       <ProfileHero user={user} onEditAvatar={() => setAvatarOpen(true)} />
       <ProfileDetails user={user} groups={groups} />
       <LanguagePreference user={user} />
+      <PasswordCard user={user} />
       <AvatarDialog open={avatarOpen} onClose={() => setAvatarOpen(false)} user={user} />
     </div>
   );

@@ -35,6 +35,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy import false as sa_false
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -329,6 +330,14 @@ class User(UserCreate, BaseEntity, table=True):
     oidc_subject: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
+    #: Set when an admin chose the password (on create, or on resetting someone
+    #: else's) and cleared once the user changes it themselves. While it is set
+    #: every resource API refuses the user (see
+    #: :func:`dependencies.auth.require_password_changed`). Table-only, like
+    #: ``oidc_subject``, so no client can clear it through ``PATCH /users``.
+    must_change_password: bool = Field(
+        default=False, sa_column_kwargs={"server_default": sa_false()}
+    )
     deleted_at: datetime | None = Field(default=None, sa_type=TZDateTime)
     #: Set when the user has a custom uploaded avatar (see :class:`~models.user_avatar.UserAvatar`)
     #: and cleared when it is removed. Acts as a presence marker plus cache-busting
@@ -432,6 +441,13 @@ class UserRead(BaseEntity):
     #: Whether the user has signed in through SSO and so is linked to an OIDC
     #: subject. The subject itself is never serialized.
     sso_linked: bool = False
+    #: Whether the user has a password at all; ``False`` for an SSO-only
+    #: account, which therefore has nothing to change. The hash itself is
+    #: never serialized.
+    has_password: bool = False
+    #: Whether an admin chose the user's current password, so they must change
+    #: it before using anything else (see :attr:`User.must_change_password`).
+    must_change_password: bool = False
 
     @classmethod
     def from_user(
@@ -470,6 +486,7 @@ class UserRead(BaseEntity):
         return cls(
             **user.model_dump(exclude={"password", "oidc_subject"}),
             sso_linked=user.oidc_subject is not None,
+            has_password=user.password is not None,
             group_roles=sorted(Role(role) for role in group_roles),
             group_ids=sorted(group_ids),
             group_tag_ids=sorted(group_tag_ids),

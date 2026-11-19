@@ -517,6 +517,15 @@ export const es = {
   "chat.theFilesCouldNotBeAttachedNothing":
     "No se pudieron adjuntar los archivos. No se envió nada.",
   "chat.unknownSender": "Remitente desconocido",
+  "changePassword.title": "Cambia tu contraseña",
+  "changePassword.required":
+    "Un administrador estableció tu contraseña. Para continuar, elige una nueva que solo tú conozcas.",
+  "changePassword.current": "Contraseña actual",
+  "changePassword.new": "Nueva contraseña",
+  "changePassword.confirm": "Confirma la nueva contraseña",
+  "changePassword.mismatch": "Las contraseñas no coinciden.",
+  "changePassword.submit": "Cambiar contraseña",
+  "changePassword.changing": "Cambiando…",
   "common.a2flowLogo": "Logotipo de A2Flow",
   "common.accessControl": "Control de acceso",
   "common.actions": "Acciones",
@@ -741,6 +750,9 @@ export const es = {
   "errors.TENANT_LIMIT_REACHED": "Se ha alcanzado el número máximo de Tenants.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "Demasiados intentos de inicio de sesión fallidos. Espera un momento e inténtalo de nuevo.",
+  "errors.INVALID_CURRENT_PASSWORD": "La contraseña actual no es correcta.",
+  "errors.PASSWORD_CHANGE_REQUIRED": "Debes cambiar tu contraseña antes de continuar.",
+  "errors.PASSWORD_UNCHANGED": "La nueva contraseña debe ser distinta de la actual.",
   "errors.UNAUTHENTICATED": "El nombre de usuario o la contraseña no son válidos.",
   "errors.VALIDATION_ERROR": "La solicitud no es válida. Comprueba lo que has introducido.",
   "errors.WORKFLOW_NOT_DEACTIVATABLE":
@@ -891,6 +903,10 @@ export const es = {
   "profile.language.label": "Idioma",
   "profile.palette": "Paleta",
   "profile.paletteColorValue": "Color de paleta {value}",
+  "profile.password.changed":
+    "Se cambió tu contraseña. Se cerró la sesión en los demás navegadores.",
+  "profile.password.impersonating":
+    "No se puede cambiar la contraseña mientras actúas como otro usuario.",
   "profile.preferences": "Preferencias",
   "profile.rolesFromGroups": "Roles de los grupos",
   "profile.uploadAnImageOrTuneTheColors":
@@ -1129,6 +1145,10 @@ export const es = {
   "users.names.system": "Usuario del sistema",
   "users.newUser": "Nuevo usuario",
   "users.noUsersRegisteredYet": "Aún no hay usuarios registrados.",
+  "users.passwordChangedAtFirstSignIn":
+    "Se pedirá al usuario que la cambie en su primer inicio de sesión.",
+  "users.passwordResetSignsOut":
+    "Si estableces una nueva, se cerrará la sesión del usuario y se le pedirá que la cambie en su próximo inicio de sesión.",
   "users.passwordMustBe1272Characters": "La contraseña debe tener entre 12 y 72 caracteres",
   "users.selectATenantInTheHeaderBefore":
     "Selecciona un tenant en el encabezado antes de crear este usuario.",

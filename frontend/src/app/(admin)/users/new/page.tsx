@@ -193,6 +193,9 @@ export default function NewUserPage() {
               placeholder={t("users.atLeast12Characters")}
               {...register("password")}
             />
+            <p className="mt-1 text-xs text-on-surface-variant">
+              {t("users.passwordChangedAtFirstSignIn")}
+            </p>
           </FormField>
 
           <RolesField value={roles} onChange={setRoles} />

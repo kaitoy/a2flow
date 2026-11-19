@@ -55,7 +55,7 @@ The hidden **system user** owns the bootstrap records (it cannot log in and is e
 | `ROOT_PASSWORD` | generated | Password for the seeded `root` user |
 | `ADMIN_PASSWORD` | generated | Password for the seeded `admin` user in the Default tenant |
 
-If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them afterwards. The usernames are fixed to `root` and `admin`.
+If either is unset (or empty), a random password is generated instead and logged **once**, at `WARNING` level, when that user is created — it cannot be recovered once the log line has scrolled past. Set both explicitly before the first run for anything beyond local experimentation, or capture the generated passwords from the startup logs immediately and change them afterwards from the **Password** card on the **Profile** page. Unlike a password an admin sets for someone, these are not forced to change at the first sign-in. The usernames are fixed to `root` and `admin`.
 
 ## Sign-up {#sign-up}
 

@@ -54,10 +54,17 @@ class UserRepository(Protocol):
         group_ids: Sequence[str] = (),
     ) -> list[User]: ...
 
-    async def create(self, data: UserCreate, *, user_id: str) -> User: ...
+    async def create(
+        self, data: UserCreate, *, user_id: str, must_change_password: bool = False
+    ) -> User: ...
 
     async def update(
-        self, target_id: str, data: UserUpdate, *, user_id: str
+        self,
+        target_id: str,
+        data: UserUpdate,
+        *,
+        user_id: str,
+        must_change_password: bool | None = None,
     ) -> User: ...
 
     async def delete(self, user_id: str) -> None: ...
@@ -222,9 +229,31 @@ class SqlUserRepository:
         result = await self._db.exec(stmt.limit(limit).offset(offset))
         return list(result.all())
 
-    async def create(self, data: UserCreate, *, user_id: str) -> User:
+    async def create(
+        self, data: UserCreate, *, user_id: str, must_change_password: bool = False
+    ) -> User:
+        """Insert a user built from ``data``.
+
+        Args:
+            data: Fields for the new user, password already hashed.
+            user_id: The acting user, recorded as creator and last updater.
+            must_change_password: Whether the user must change the password
+                before using the app (set when an admin chose it).
+
+        Returns:
+            The persisted user.
+
+        Raises:
+            ForeignKeyViolationError: If ``user_id`` names no user.
+            UniqueViolationError: If the username is already taken.
+        """
         user = User.model_validate(
-            {**data.model_dump(), "created_by": user_id, "updated_by": user_id}
+            {
+                **data.model_dump(),
+                "created_by": user_id,
+                "updated_by": user_id,
+                "must_change_password": must_change_password,
+            }
         )
         self._db.add(user)
         try:
@@ -237,12 +266,39 @@ class SqlUserRepository:
         await self._db.refresh(user)
         return user
 
-    async def update(self, target_id: str, data: UserUpdate, *, user_id: str) -> User:
+    async def update(
+        self,
+        target_id: str,
+        data: UserUpdate,
+        *,
+        user_id: str,
+        must_change_password: bool | None = None,
+    ) -> User:
+        """Apply the fields set on ``data`` to a user.
+
+        Args:
+            target_id: The user to update.
+            data: Fields to change; only those explicitly set are applied.
+            user_id: The acting user, recorded as last updater.
+            must_change_password: New value of the must-change-password flag,
+                or ``None`` to leave it alone. Not a field of ``data`` so no
+                client request can set it.
+
+        Returns:
+            The updated user.
+
+        Raises:
+            NotFoundError: If no user has ``target_id``.
+            ForeignKeyViolationError: If ``user_id`` names no user.
+            UniqueViolationError: If the new username is already taken.
+        """
         user = await self._db.get(User, target_id)
         if user is None:
             raise NotFoundError("User", target_id)
         update = data.model_dump(exclude_unset=True)
         user.sqlmodel_update(update)
+        if must_change_password is not None:
+            user.must_change_password = must_change_password
         user.updated_by = user_id
         self._db.add(user)
         try:

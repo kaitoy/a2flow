@@ -55,7 +55,7 @@ El **usuario del sistema** oculto es el propietario de los registros de arranque
 | `ROOT_PASSWORD` | generada | Contraseña del usuario inicial `root` |
 | `ADMIN_PASSWORD` | generada | Contraseña del usuario inicial `admin` del tenant Default |
 
-Si alguna no está definida (o está vacía), se genera una contraseña aleatoria y se registra **una sola vez**, con nivel `WARNING`, al crear ese usuario; no se puede recuperar una vez que esa línea del registro haya pasado. Para cualquier uso que vaya más allá de las pruebas locales, define ambas explícitamente antes del primer arranque, o copia las contraseñas generadas de los registros de arranque de inmediato y cámbialas después. Los nombres de usuario son fijos: `root` y `admin`.
+Si alguna no está definida (o está vacía), se genera una contraseña aleatoria y se registra **una sola vez**, con nivel `WARNING`, al crear ese usuario; no se puede recuperar una vez que esa línea del registro haya pasado. Para cualquier uso que vaya más allá de las pruebas locales, define ambas explícitamente antes del primer arranque, o copia las contraseñas generadas de los registros de arranque de inmediato y cámbialas después desde la tarjeta **Contraseña** de la página **Perfil**. A diferencia de una contraseña que un administrador establece para otra persona, no es obligatorio cambiarlas en el primer inicio de sesión. Los nombres de usuario son fijos: `root` y `admin`.
 
 ## Registro {#sign-up}
 

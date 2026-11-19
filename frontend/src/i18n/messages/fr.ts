@@ -518,6 +518,15 @@ export const fr = {
   "chat.theFilesCouldNotBeAttachedNothing":
     "Impossible de joindre les fichiers. Rien n'a été envoyé.",
   "chat.unknownSender": "Expéditeur inconnu",
+  "changePassword.title": "Changez votre mot de passe",
+  "changePassword.required":
+    "Votre mot de passe a été défini par un administrateur. Pour continuer, choisissez-en un nouveau que vous seul connaissez.",
+  "changePassword.current": "Mot de passe actuel",
+  "changePassword.new": "Nouveau mot de passe",
+  "changePassword.confirm": "Confirmez le nouveau mot de passe",
+  "changePassword.mismatch": "Les mots de passe ne correspondent pas.",
+  "changePassword.submit": "Changer le mot de passe",
+  "changePassword.changing": "Modification…",
   "common.a2flowLogo": "Logo A2Flow",
   "common.accessControl": "Contrôle d'accès",
   "common.actions": "Actions",
@@ -742,6 +751,9 @@ export const fr = {
   "errors.TENANT_LIMIT_REACHED": "Le nombre maximal de Tenants est atteint.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS":
     "Trop de tentatives de connexion échouées. Patientez un moment, puis réessayez.",
+  "errors.INVALID_CURRENT_PASSWORD": "Le mot de passe actuel est incorrect.",
+  "errors.PASSWORD_CHANGE_REQUIRED": "Vous devez changer votre mot de passe avant de continuer.",
+  "errors.PASSWORD_UNCHANGED": "Le nouveau mot de passe doit être différent de l'actuel.",
   "errors.UNAUTHENTICATED": "Nom d'utilisateur ou mot de passe incorrect.",
   "errors.VALIDATION_ERROR": "La requête n'est pas valide. Vérifiez votre saisie.",
   "errors.WORKFLOW_NOT_DEACTIVATABLE": "Le workflow n'est pas publié : il n'y a rien à désactiver.",
@@ -891,6 +903,10 @@ export const fr = {
   "profile.language.label": "Langue",
   "profile.palette": "Palette",
   "profile.paletteColorValue": "Couleur de palette {value}",
+  "profile.password.changed":
+    "Votre mot de passe a été changé. Les autres navigateurs ont été déconnectés.",
+  "profile.password.impersonating":
+    "Le mot de passe ne peut pas être changé lorsque vous agissez en tant qu'un autre utilisateur.",
   "profile.preferences": "Préférences",
   "profile.rolesFromGroups": "Rôles issus des groupes",
   "profile.uploadAnImageOrTuneTheColors":
@@ -1128,6 +1144,9 @@ export const fr = {
   "users.names.system": "Utilisateur système",
   "users.newUser": "Nouvel utilisateur",
   "users.noUsersRegisteredYet": "Aucun utilisateur n'est encore enregistré.",
+  "users.passwordChangedAtFirstSignIn": "L'utilisateur devra le changer à sa première connexion.",
+  "users.passwordResetSignsOut":
+    "En définir un nouveau déconnecte l'utilisateur, qui devra le changer à sa prochaine connexion.",
   "users.passwordMustBe1272Characters": "Le mot de passe doit comporter de 12 à 72 caractères",
   "users.selectATenantInTheHeaderBefore":
     "Sélectionnez un tenant dans l'en-tête avant de créer cet utilisateur.",

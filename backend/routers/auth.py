@@ -1,4 +1,4 @@
-"""Authentication endpoints: login, sign-up, logout, current-user lookup, and OIDC sign-in.
+"""Authentication endpoints: login, sign-up, logout, password change, current-user lookup, and OIDC sign-in.
 
 Login establishes a server-side session and sets two cookies: an HttpOnly
 ``a2flow_session`` cookie carrying the opaque session token, and a readable
@@ -34,10 +34,11 @@ from dependencies.authz import require_actor_roles
 from dependencies.context import ApiMetaDep
 from dependencies.repository import EffectiveRoleRepositoryDep
 from dependencies.service import OidcLoginServiceDep, SignupServiceDep
-from models.constraints import TenantSlug
+from models.constraints import Password, TenantSlug
 from models.response import ApiResponse
 from models.user import Role, User, UserRead
 from repositories.effective_roles import EffectiveRoleRepository
+from repositories.exceptions import ForbiddenError
 from services.oidc_login import (
     STATE_COOKIE_NAME,
     STATE_TTL_SECONDS,
@@ -130,6 +131,14 @@ class MeResponse(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     user: UserRead
     impersonated_by: UserRead | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    """Body submitted to change the signed-in user's own password."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    current_password: str
+    new_password: Password
 
 
 class ImpersonateRequest(BaseModel):
@@ -274,6 +283,37 @@ async def logout(
     _clear_auth_cookies(response)
     response.headers["Clear-Site-Data"] = '"cache"'
     return ApiResponse(meta=meta, data=None)
+
+
+@router.post("/password", response_model=ApiResponse[UserRead])
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    service: AuthServiceDep,
+    user: CurrentUserDep,
+    real_user: RealUserDep,
+    _csrf: Annotated[None, Depends(verify_csrf)],
+    effective_roles: EffectiveRoleRepositoryDep,
+    meta: ApiMetaDep,
+) -> ApiResponse[UserRead]:
+    """Change the signed-in user's own password.
+
+    Open while ``mustChangePassword`` is set -- this is how the user clears
+    it. The calling session stays signed in; every other session of the user
+    is revoked. Raises ``ForbiddenError`` (HTTP 403) while impersonating or
+    for an SSO-only account, ``InvalidCurrentPasswordError`` /
+    ``PasswordUnchangedError`` (HTTP 422), and ``TooManyLoginAttemptsError``
+    (HTTP 429) once the account has too many recent failures.
+    """
+    if user.id != real_user.id:
+        raise ForbiddenError("Cannot change a password while impersonating")
+    updated = await service.change_password(
+        real_user,
+        request.cookies.get(SESSION_COOKIE_NAME, ""),
+        body.current_password,
+        body.new_password,
+    )
+    return ApiResponse(meta=meta, data=await _to_read(effective_roles, updated))
 
 
 @router.get("/me", response_model=ApiResponse[MeResponse])

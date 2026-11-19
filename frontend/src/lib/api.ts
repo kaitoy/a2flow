@@ -624,6 +624,17 @@ export async function completeSignup(token: string): Promise<SignupResult> {
   ) as Promise<SignupResult>;
 }
 
+/**
+ * Change the signed-in user's own password and return the updated user, whose
+ * `mustChangePassword` is now false. The browser stays signed in; the backend
+ * signs the user out everywhere else.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<User> {
+  return unwrap(
+    sdk.changePasswordApiV1AuthPasswordPost({ body: { currentPassword, newPassword } })
+  ) as Promise<User>;
+}
+
 /** Revoke the current session and clear the auth cookies. */
 export async function logout(): Promise<void> {
   await unwrap(sdk.logoutApiV1AuthLogoutPost());

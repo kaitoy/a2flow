@@ -500,6 +500,15 @@ export const ko = {
   "chat.theFilesCouldNotBeAttachedNothing":
     "파일을 첨부할 수 없습니다. 아무것도 보내지 않았습니다.",
   "chat.unknownSender": "알 수 없는 발신자",
+  "changePassword.title": "비밀번호 변경",
+  "changePassword.required":
+    "현재 비밀번호는 관리자가 설정한 것입니다. 계속하려면 본인만 아는 새 비밀번호를 설정해 주세요.",
+  "changePassword.current": "현재 비밀번호",
+  "changePassword.new": "새 비밀번호",
+  "changePassword.confirm": "새 비밀번호 확인",
+  "changePassword.mismatch": "비밀번호가 일치하지 않습니다.",
+  "changePassword.submit": "비밀번호 변경",
+  "changePassword.changing": "변경 중…",
   "common.a2flowLogo": "A2Flow 로고",
   "common.accessControl": "액세스 제어",
   "common.actions": "작업",
@@ -712,6 +721,9 @@ export const ko = {
     "이 주소로 방금 확인 이메일을 보냈습니다. 1분 정도 기다린 후 다시 시도하세요.",
   "errors.TENANT_LIMIT_REACHED": "테넌트 수가 최대치에 도달했습니다.",
   "errors.TOO_MANY_LOGIN_ATTEMPTS": "로그인 실패 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+  "errors.INVALID_CURRENT_PASSWORD": "현재 비밀번호가 올바르지 않습니다.",
+  "errors.PASSWORD_CHANGE_REQUIRED": "계속하려면 비밀번호를 변경해야 합니다.",
+  "errors.PASSWORD_UNCHANGED": "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
   "errors.UNAUTHENTICATED": "사용자 이름 또는 비밀번호가 올바르지 않습니다.",
   "errors.VALIDATION_ERROR": "요청이 올바르지 않습니다. 입력한 내용을 확인해 주세요.",
   "errors.WORKFLOW_NOT_DEACTIVATABLE": "워크플로가 게시되지 않았으므로 비활성화할 수 없습니다.",
@@ -850,6 +862,9 @@ export const ko = {
   "profile.language.label": "언어",
   "profile.palette": "팔레트",
   "profile.paletteColorValue": "팔레트 색상 {value}",
+  "profile.password.changed": "비밀번호를 변경했습니다. 다른 브라우저는 로그아웃되었습니다.",
+  "profile.password.impersonating":
+    "다른 사용자로 작업하는 동안에는 비밀번호를 변경할 수 없습니다.",
   "profile.preferences": "환경설정",
   "profile.rolesFromGroups": "그룹에서 받은 역할",
   "profile.uploadAnImageOrTuneTheColors":
@@ -1079,6 +1094,10 @@ export const ko = {
   "users.names.system": "시스템 사용자",
   "users.newUser": "새 사용자",
   "users.noUsersRegisteredYet": "아직 등록된 사용자가 없습니다.",
+  "users.passwordChangedAtFirstSignIn":
+    "사용자는 처음 로그인할 때 이 비밀번호를 변경하도록 요청받습니다.",
+  "users.passwordResetSignsOut":
+    "새 비밀번호를 설정하면 사용자는 로그아웃되고 다음 로그인 시 변경하도록 요청받습니다.",
   "users.passwordMustBe1272Characters": "비밀번호는 12~72자여야 합니다",
   "users.selectATenantInTheHeaderBefore": "이 사용자를 만들기 전에 헤더에서 테넌트를 선택하세요.",
   "users.selectATenantInTheHeaderBefore2":

@@ -148,6 +148,56 @@ class InvalidSignupLinkError(HttpMappedError):
         )
 
 
+class InvalidCurrentPasswordError(HttpMappedError):
+    """Raised when a password change is refused because the current password is wrong.
+
+    Mapped to HTTP 422 with the ``INVALID_CURRENT_PASSWORD`` error code -- not
+    401, since the session itself is fine and the client treats a 401 as a
+    signed-out session. Raised by ``AuthService.change_password``; the failure
+    also counts towards the account's sign-in lockout.
+    """
+
+    code = "INVALID_CURRENT_PASSWORD"
+    http_status = 422
+
+    def __init__(self) -> None:
+        """Initialize the error with its fixed message."""
+        super().__init__("The current password is incorrect.")
+
+
+class PasswordUnchangedError(HttpMappedError):
+    """Raised when a password change would keep the same password.
+
+    Mapped to HTTP 422 with the ``PASSWORD_UNCHANGED`` error code. Raised by
+    ``AuthService.change_password``, so a user made to replace an
+    admin-chosen password cannot just submit it again.
+    """
+
+    code = "PASSWORD_UNCHANGED"
+    http_status = 422
+
+    def __init__(self) -> None:
+        """Initialize the error with its fixed message."""
+        super().__init__("The new password must differ from the current one.")
+
+
+class PasswordChangeRequiredError(HttpMappedError):
+    """Raised when a user must change an admin-chosen password before anything else.
+
+    Mapped to HTTP 403 with the ``PASSWORD_CHANGE_REQUIRED`` error code. Raised
+    by ``dependencies.auth.require_password_changed`` for every resource API
+    while ``User.must_change_password`` is set; the ``/auth`` routes stay open
+    so the user can still change the password or sign out.
+    """
+
+    code = "PASSWORD_CHANGE_REQUIRED"
+    http_status = 403
+
+    def __init__(self) -> None:
+        """Initialize the error with its fixed message."""
+        super().__init__("You must change your password before continuing.")
+
+
 class ForbiddenError(HttpMappedError):
     """Raised when an authenticated user is not allowed to perform an action.
 

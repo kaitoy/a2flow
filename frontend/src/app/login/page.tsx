@@ -12,7 +12,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useT } from "@/i18n/provider";
 import { API_BASE, getLoginOptions, login } from "@/lib/api";
 import { persistImpersonatedUserId } from "@/lib/impersonation";
-import { loginPath, safeNextPath } from "@/lib/next-path";
+import { changePasswordPath, loginPath, safeNextPath } from "@/lib/next-path";
 import { clearImpersonation, setUser } from "@/store/authSlice";
 import { useAppDispatch } from "@/store/hooks";
 import { showToast } from "@/store/toastSlice";
@@ -124,7 +124,8 @@ export default function LoginPage() {
           // selection lingering in localStorage.
           dispatch(clearImpersonation());
           persistImpersonatedUserId(null);
-          router.replace(nextPath);
+          // An admin-chosen password is replaced before going anywhere else.
+          router.replace(user.mustChangePassword ? changePasswordPath(nextPath) : nextPath);
         });
       } catch {
         // Failure toast is shown globally by api.ts; nothing else to do here.
