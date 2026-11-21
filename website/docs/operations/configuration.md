@@ -67,6 +67,21 @@ Sign-up mails each visitor a confirmation link, so it also needs `APP_BASE_URL` 
 
 Anyone who can reach the deployment and receive mail can then create tenants. One address gets at most one confirmation email a minute, which keeps the form from being used to flood someone's inbox, but the only other limit is the **Maximum Number of Tenants** in [System Settings](../guides/system-settings.md#tenant-limit). It is empty by default, meaning no limit, so set one before turning sign-up on anywhere an unbounded number of tenants would be a problem.
 
+## Demo data {#demo-data}
+
+An admin loads the [demo data](../getting-started/demo-data.md) into their tenant from **Admin Settings**. These variables fill in its secrets when it is loaded into the **Default** tenant; every other tenant gets a `REPLACE_ME` placeholder in each, so the deployment's own credentials never reach another tenant. All are optional: an unset one is a placeholder too, which the tenant's admin replaces on the **Secrets** page.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `DEMO_AWS_ACCESS_KEY_ID` | — | AWS access key id stored in the `demo-aws-credentials` secret |
+| `DEMO_AWS_SECRET_ACCESS_KEY` | — | The matching secret access key |
+| `DEMO_GCP_CREDENTIALS_JSON` | — | Google Cloud credential JSON, on one line, stored in the `demo-gcp-credentials` secret |
+| `DEMO_AZURE_TENANT_ID` | — | Microsoft Entra tenant id of the service principal stored in the `demo-azure-credentials` secret |
+| `DEMO_AZURE_CLIENT_ID` | — | Client id of that service principal |
+| `DEMO_AZURE_CLIENT_SECRET` | — | Client secret of that service principal |
+
+A value set after the demo data was loaded does not change the stored secret; edit it on the **Secrets** page, or clear the demo data and load it again. What each credential needs is on the [Demo data](../getting-started/demo-data.md#loading-it) page.
+
 ## Session lifetime
 
 | Variable | Default | What it does |

@@ -67,6 +67,21 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 
 开启后，任何能访问该部署并能收到邮件的人都可以创建租户。同一地址每分钟最多收到一封确认邮件，因此无法利用该表单轰炸他人的邮箱，但除此之外的唯一限制是[系统设置](../guides/system-settings.md#tenant-limit)中的**租户数量上限**。它默认留空，表示不限制，因此在租户数量不受限会带来问题的环境中，请先设置上限再开启注册。
 
+## 演示数据 {#demo-data}
+
+管理员在**管理员设置**中把[演示数据](../getting-started/demo-data.md)加载到自己的租户。这些变量仅在加载到 **Default** 租户时填入演示密钥；其他租户的每个密钥中都是 `REPLACE_ME` 占位符，因此部署自己的凭据绝不会流向其他租户。所有变量都是可选的：未设置的变量同样会成为占位符，由租户管理员在**密钥**页面替换。
+
+| 变量 | 默认值 | 作用 |
+|---|---|---|
+| `DEMO_AWS_ACCESS_KEY_ID` | — | 保存在 `demo-aws-credentials` 密钥中的 AWS 访问密钥 ID |
+| `DEMO_AWS_SECRET_ACCESS_KEY` | — | 对应的秘密访问密钥 |
+| `DEMO_GCP_CREDENTIALS_JSON` | — | 写成一行的 Google Cloud 凭据 JSON，保存在 `demo-gcp-credentials` 密钥中 |
+| `DEMO_AZURE_TENANT_ID` | — | 保存在 `demo-azure-credentials` 密钥中的服务主体的 Microsoft Entra 租户 ID |
+| `DEMO_AZURE_CLIENT_ID` | — | 该服务主体的客户端 ID |
+| `DEMO_AZURE_CLIENT_SECRET` | — | 该服务主体的客户端密钥 |
+
+在加载演示数据之后设置的值不会改变已保存的密钥；请在**密钥**页面编辑，或者清除演示数据后重新加载。每种凭据需要什么，见[演示数据](../getting-started/demo-data.md#loading-it)页面。
+
 ## 会话有效期 {#session-lifetime}
 
 | 变量 | 默认值 | 作用 |

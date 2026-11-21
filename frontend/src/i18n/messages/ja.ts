@@ -288,6 +288,26 @@ export const ja = {
   "admin.workflowGenerationStarted": "ワークフローの生成を開始しました",
   "admin.workflowName": "ワークフロー名",
   "adminSettings.adminSettingsUpdated": "管理者設定を更新しました",
+  "adminSettings.demoData.title": "デモデータ",
+  "adminSettings.demoData.description":
+    "このテナントで A2Flow を試すためのサンプルのユーザー、ユーザーグループ、シークレット、MCP サーバー、エージェントスキル、ツールモック、実行履歴です。",
+  "adminSettings.demoData.loaded": "このテナントにロード済みです。",
+  "adminSettings.demoData.notLoaded": "このテナントにはロードされていません。",
+  "adminSettings.demoData.load": "デモデータをロード",
+  "adminSettings.demoData.loading": "ロード中…",
+  "adminSettings.demoData.clear": "デモデータをクリア",
+  "adminSettings.demoData.clearing": "クリア中…",
+  "adminSettings.demoData.loadConfirmTitle": "デモデータをロードしますか?",
+  "adminSettings.demoData.loadConfirmDescription":
+    "11 人のデモユーザーとそのユーザーグループ、サンプルのシークレット、MCP サーバー、エージェントスキル、ツールモック、タグ、ワークフローをこのテナントに追加します。デモユーザーのパスワードは誰にもわからないので、ユーザー画面から代理ログインして使ってください。ロード済みのものはそのまま残ります。",
+  "adminSettings.demoData.clearConfirmTitle": "デモデータをクリアしますか?",
+  "adminSettings.demoData.clearConfirmDescription":
+    "このテナントからデモのレコードを削除します。デモスキルから作ったワークフローなど、他のレコードが使っているものは残ります。",
+  "adminSettings.demoData.loadedToast": "デモデータをロードしました",
+  "adminSettings.demoData.clearedToast": "デモデータをクリアしました",
+  "adminSettings.demoData.keptToast": {
+    other: "デモデータをクリアしました。{count} 件は他のレコードが使っているため残しました。",
+  },
   "adminSettings.oidc.title": "シングルサインオン",
   "adminSettings.oidc.enable": "シングルサインオンを有効にする",
   "adminSettings.oidc.issuerUrl": "発行者 URL",

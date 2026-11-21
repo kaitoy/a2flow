@@ -32,14 +32,14 @@ import TabItem from '@theme/TabItem';
 
 ## 开始之前 \{#before-you-start\}
 
-- 后端正在运行，并且已启用[演示数据](./demo-data.md)。
+- [演示数据](./demo-data.md#loading-it)已加载到 **Default** 租户。
 - 您知道 `root` 的密码：`ROOT_PASSWORD` 的值，如果未设置，则是后端启动时在日志中输出过一次的那一行（[预置用户](../operations/configuration.md#seeded-users)）。
 - 确实能够访问提供商：
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  `demo-aws-credentials` [密钥](../guides/secrets.md)中保存着真实的访问密钥：要么在首次启动前设置了 `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY`，要么在**密钥**中编辑该密钥。这次运行会**真实启动一个 EC2 实例**，在您终止它之前会持续产生费用。
+  `demo-aws-credentials` [密钥](../guides/secrets.md)中保存着真实的访问密钥：要么部署的运维人员在加载演示数据之前提供了它（[配置](../operations/configuration.md#demo-data)），要么在**密钥**中编辑该密钥。这次运行会**真实启动一个 EC2 实例**，在您终止它之前会持续产生费用。
 
   该访问密钥的 IAM 用户需要一个策略，允许其解析 AMI、查询网络和密钥对，并启动实例。下面的策略已经足够：
 
@@ -77,12 +77,12 @@ import TabItem from '@theme/TabItem';
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 
-  `demo-gcp-credentials` [密钥](../guides/secrets.md)中保存着 Google Cloud 凭据，其身份可以访问 GKE 集群：要么在首次启动前设置了 `DEMO_GCP_CREDENTIALS_JSON`，要么在**密钥**中编辑该密钥。请准备好项目、集群、集群所在区域，以及一个可以重启的工作负载，这次运行会**真实地滚动重启它**。
+  `demo-gcp-credentials` [密钥](../guides/secrets.md)中保存着 Google Cloud 凭据，其身份可以访问 GKE 集群：要么部署的运维人员在加载演示数据之前提供了它（[配置](../operations/configuration.md#demo-data)），要么在**密钥**中编辑该密钥。请准备好项目、集群、集群所在区域，以及一个可以重启的工作负载，这次运行会**真实地滚动重启它**。
 
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  `demo-azure-credentials` [密钥](../guides/secrets.md)中保存着真实的服务主体：要么在首次启动前设置了 `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET`，要么在**密钥**中编辑该密钥。该主体需要在某个 Key Vault 上拥有可以列出和写入密钥的角色。内置的 **Key Vault Secrets Officer** 角色还能读取所有密钥的值，因此建议改用只包含 `Microsoft.KeyVault/vaults/secrets/readMetadata/action` 和 `Microsoft.KeyVault/vaults/secrets/setSecret/action` 这两个数据操作的自定义角色：这样即使代理被人诱导，也无法读取值。如果 Key Vault 使用访问策略，则只授予 **List** 和 **Set** 这两项密钥权限。请准备好该 Key Vault 以及其中一个可以轮换的密钥，这次运行会**真实写入该密钥的新版本**，读取其当前版本的所有内容都会改用新值。
+  `demo-azure-credentials` [密钥](../guides/secrets.md)中保存着真实的服务主体：要么部署的运维人员在加载演示数据之前提供了它（[配置](../operations/configuration.md#demo-data)），要么在**密钥**中编辑该密钥。该主体需要在某个 Key Vault 上拥有可以列出和写入密钥的角色。内置的 **Key Vault Secrets Officer** 角色还能读取所有密钥的值，因此建议改用只包含 `Microsoft.KeyVault/vaults/secrets/readMetadata/action` 和 `Microsoft.KeyVault/vaults/secrets/setSecret/action` 这两个数据操作的自定义角色：这样即使代理被人诱导，也无法读取值。如果 Key Vault 使用访问策略，则只授予 **List** 和 **Set** 这两项密钥权限。请准备好该 Key Vault 以及其中一个可以轮换的密钥，这次运行会**真实写入该密钥的新版本**，读取其当前版本的所有内容都会改用新值。
 
   </TabItem>
 </Tabs>

@@ -5,35 +5,28 @@ sidebar_position: 4
 
 # Demo data
 
-Setting `DEMO_DATA=true` on the backend registers everything three approval-gated, mutating examples need — "launch an EC2 instance", "restart a GKE pod", and "rotate an Azure Key Vault secret" — in the seeded **Default** tenant, so there is something to run without registering every piece by hand. The [workflow](../guides/workflows.md) you run is deliberately not seeded — these records are the ingredients you generate one from, and the [Walkthrough](./walkthrough.mdx) is the tour that does it. Alongside them comes a made-up run history, so the [Dashboard](../guides/dashboard.md) has figures to show from the start.
+An admin can load a ready-made dataset into their tenant, with everything three approval-gated, mutating examples need — "launch an EC2 instance", "restart a GKE pod", and "rotate an Azure Key Vault secret" — so there is something to run without registering every piece by hand. Any tenant can load it, the **Default** tenant included, and each tenant gets its own copy. The [workflow](../guides/workflows.md) you run is deliberately not loaded — these records are the ingredients you generate one from, and the [Walkthrough](./walkthrough.mdx) is the tour that does it. Alongside them comes a made-up run history, so the [Dashboard](../guides/dashboard.md) has figures to show from the start.
 
-## Enabling it
+## Loading it {#loading-it}
 
-Add the flag to `backend/.env` and restart the backend. With [Docker Compose](./docker-compose.md) it is already on: `compose.yml` sets `DEMO_DATA: ${DEMO_DATA:-true}`.
+1. Sign in as an `admin` of the tenant. A super admin picks the tenant in the tenant selector in the app bar first.
+2. Open **Admin Settings** in the admin sidebar.
+3. Under **Demo data**, press **Load demo data**, and confirm with **Load demo data** in the dialog.
 
-```env
-DEMO_DATA=true
-DEMO_PASSWORD=change-me-now-123
-DEMO_AWS_ACCESS_KEY_ID=AKIA...
-DEMO_AWS_SECRET_ACCESS_KEY=...
-DEMO_AWS_REGION=us-east-1
-DEMO_GCP_CREDENTIALS_JSON='{"type":"service_account",...}'
-DEMO_AZURE_TENANT_ID=...
-DEMO_AZURE_CLIENT_ID=...
-DEMO_AZURE_CLIENT_SECRET=...
-```
+The section then reads "Loaded in this tenant." Pressing **Load demo data** again later is harmless: it restores whatever demo record has been deleted since and leaves the rest as it is.
 
-- `DEMO_PASSWORD` is shared by all eleven demo users and has the same generate-and-log-once fallback as `ROOT_PASSWORD` / `ADMIN_PASSWORD`. It is only consulted while one of the accounts is missing.
-- The AWS credentials, the Google Cloud credential, and the Azure credentials are optional. Left unset, a `REPLACE_ME` placeholder is stored instead, so the demo is complete in shape and you fill the real values in from the [Secrets](../guides/secrets.md) page.
-- `DEMO_AWS_REGION` is the region the demo AWS MCP server's tools act on. It defaults to `us-east-1`.
-- `DEMO_GCP_CREDENTIALS_JSON` is a Google Cloud credential JSON on a single line — a service account key, or the authorized-user JSON `gcloud` writes after a one-time sign-in with an OAuth client ID and secret. The GKE MCP server mints its access token from it; Google's MCP servers do not accept API keys. See [Google Cloud MCP servers](../guides/mcp-servers.md#google-cloud-mcp-servers) for how to obtain either.
-- `DEMO_AZURE_TENANT_ID`, `DEMO_AZURE_CLIENT_ID`, and `DEMO_AZURE_CLIENT_SECRET` are an Azure service principal — the tenant, the app's client id, and one of its client secrets, as `az ad sp create-for-rbac` prints them. On the vault the demo should rotate secrets in, grant it a custom role with only the `Microsoft.KeyVault/vaults/secrets/readMetadata/action` and `Microsoft.KeyVault/vaults/secrets/setSecret/action` data actions — or, on a vault that uses access policies, only the **List** and **Set** secret permissions. The built-in **Key Vault Secrets Officer** role also works, but it can read every secret's value as well.
+- **Demo users have no password anyone knows.** Use them through [impersonation](../concepts/impersonation.md): open **Users**, press **Impersonate** on the account's row, and confirm. To sign in as one instead, set its password on its user page first.
+- **The credentials start as placeholders.** Each demo secret holds `REPLACE_ME` until you put real values in from the [Secrets](../guides/secrets.md) page. For the **Default** tenant only, the deployment's operator can supply them up front instead — see [Configuration](../operations/configuration.md#demo-data). Those values are never copied into any other tenant.
+- **The AWS tools act on `us-east-1`.** To use another region, change the `AWS_REGION` entry of the `AWS MCP Server`'s environment on its [MCP server](../guides/mcp-servers.md) page.
+- In the AWS secret, fill in an AWS access key id and secret access key. They need permission to call the managed AWS MCP endpoint on top of whatever the tools go on to do.
+- In the Google Cloud secret, put a Google Cloud credential JSON on a single line — a service account key, or the authorized-user JSON `gcloud` writes after a one-time sign-in with an OAuth client ID and secret. The GKE MCP server mints its access token from it; Google's MCP servers do not accept API keys. See [Google Cloud MCP servers](../guides/mcp-servers.md#google-cloud-mcp-servers) for how to obtain either.
+- In the Azure secret, put an Azure service principal — the tenant, the app's client id, and one of its client secrets, as `az ad sp create-for-rbac` prints them. On the vault the demo should rotate secrets in, grant it a custom role with only the `Microsoft.KeyVault/vaults/secrets/readMetadata/action` and `Microsoft.KeyVault/vaults/secrets/setSecret/action` data actions — or, on a vault that uses access policies, only the **List** and **Set** secret permissions. The built-in **Key Vault Secrets Officer** role also works, but it can read every secret's value as well.
 
 ⚠️ The AWS, GKE, and Azure MCP servers can run **mutating** operations, not just reads. The AWS MCP server's credentials can create and delete real AWS resources, the GKE MCP server's identity can roll out a restart of a workload, or delete a pod, on a real cluster, and the Azure MCP server's service principal can write Key Vault secrets — use throwaway accounts or tightly scoped credentials for all three. To try any of them without touching a real provider at all, see [Trying it out](#trying-it-out) below.
 
 ## What gets registered
 
-- **[Agent skill](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — gathers the instance configuration, gets a manager's explicit approval of it, then launches the instance through an MCP tool. Its repository is cloned in the background after startup, so the skill shows as `pending` for a moment before it can be used.
+- **[Agent skill](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — gathers the instance configuration, gets a manager's explicit approval of it, then launches the instance through an MCP tool. Its repository is cloned in the background after loading, so the skill shows as `pending` for a moment before it can be used.
 - **[Agent skill](../guides/agent-skills.md) `Demo GKE Pod Restart`** — agrees the exact target (project, cluster, namespace, and either a Deployment/StatefulSet name or a single pod name) with the user, gets a manager's explicit approval of that exact target, then, by default, rolling-restarts the workload through the GKE MCP Server — or, when the user wants just one pod gone, deletes that pod so its owning controller recreates it — and reports the outcome. Its repository is cloned the same way, so it also shows as `pending` at first.
 - **[Agent skill](../guides/agent-skills.md) `Demo Azure Key Vault Secret Rotation`** — agrees the Key Vault and an existing secret in it with the user, gets a manager's explicit approval of that exact secret, then writes a freshly generated random value as the secret's new version through the Azure MCP Server and reports when the new version was created. It never shows the value in the chat. Its repository is cloned the same way, so it also shows as `pending` at first.
 - **[MCP server](../guides/mcp-servers.md) `AWS MCP Server`** — a `stdio` server reaching AWS's managed AWS MCP Server, which is where the EC2 tools come from.
@@ -48,7 +41,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 - **[Secret](../guides/secrets.md) `demo-azure-credentials`** — the Azure service principal's tenant id, client id, and client secret the Azure MCP Server signs in with.
 - **[Tool mocks](../guides/tool-mocks.md)** — stubs for the demo run's side-effecting tools: `aws___call_aws` and `aws___run_script` on the AWS MCP Server, each returning a successful launch, `patch_k8s_resource` and `delete_k8s_resource` on the GKE MCP Server, returning a successful rolling restart and a successful pod deletion respectively, `keyvault_secret_get` and `keyvault_secret_create` on the Azure MCP Server, returning a list of the vault's secrets and a new secret version respectively, and the built-in `request_approval`, returning approved. Selecting them in a draft run's **Run** dialog lets any of the three workflows finish without touching AWS, a real GKE cluster, a real Key Vault, or waiting on a manager.
 - **[Tags](../guides/tags.md)** `AWS`, `GCP`, and `Azure` — each an [access-control tag](../guides/tags.md#access-control-tags), so only `Demo AWS Group` / `Demo GCP Group` / `Demo Azure Group` members (and `admin`, or a super admin) can see that provider's tagged records above. `EC2 Cost Estimator` and the `AWS EC2 Pricing` knowledge base carry `AWS`, `Kubernetes Manifest Toolkit` carries `GCP`, and `Secret Value Generator` carries `Azure`, alongside the provider records they help with. `Approval Required` is a plain tag on all three agent skills and restricts nothing.
-- **[Workflows](../guides/workflows.md) with a run history** — four published workflows, `Provision Dev EC2 Instance`, `Launch GPU Training Instance`, `Restart Crashlooping GKE Pod`, and `Rotate Database Password`, with about ninety days of past runs, their tasks, and their approvals, so the [Dashboard](../guides/dashboard.md) has something to show. They are for display only: they have no task templates, so running one does nothing useful, and the chat of any of their runs is empty. A few of the runs are always in progress and waiting on a demo approver, so those approvers find requests under **Approvals** too. The history is rebuilt at every startup and ends at the present, so the dashboard always looks current; a run you start yourself on one of these workflows is kept.
+- **[Workflows](../guides/workflows.md) with a run history** — four published workflows, `Provision Dev EC2 Instance`, `Launch GPU Training Instance`, `Restart Crashlooping GKE Pod`, and `Rotate Database Password`, with about ninety days of past runs, their tasks, and their approvals, so the [Dashboard](../guides/dashboard.md) has something to show. They are for display only: they have no task templates, so running one does nothing useful, and the chat of any of their runs is empty. A few of the runs are always in progress and waiting on a demo approver, so those approvers find requests under **Approvals** too. The history ends at the moment you loaded the demo data, so as the days pass its most recent days empty out on the dashboard; to bring it up to date, [clear](#clearing-it) the demo data and load it again. Loading again without clearing leaves the history as it is, and a run you start yourself on one of these workflows is kept either way.
 - **Demo users and groups:**
 
 | User | Role | Access-control group | What they do |
@@ -68,14 +61,14 @@ None of them holds its role directly: each inherits it from a [user group](../gu
 
 ## Trying it out
 
-The [Walkthrough](./walkthrough.mdx) plays any of the examples through end to end — generate, publish, run, approve, confirm — from a single `root` sign-in, [impersonating](../concepts/impersonation.md) each demo account in turn. Signing in as each account with `DEMO_PASSWORD` works just as well; the table above says who does what.
+The [Walkthrough](./walkthrough.mdx) plays any of the examples through end to end — generate, publish, run, approve, confirm — from a single admin sign-in, [impersonating](../concepts/impersonation.md) each demo account in turn; the table above says who does what.
 
-`Demo AWS Group`, `Demo GCP Group`, and `Demo Azure Group` each see only their own provider's records, so `demo-aws-developer` cannot open `Demo GKE Pod Restart`, and `demo-gcp-developer` cannot open `Demo Azure Key Vault Secret Rotation`. Either approver account works for every example, since `Demo Approvers` carries all three access-control tags directly. A real GKE run needs `DEMO_GCP_CREDENTIALS_JSON` set to a credential whose identity may reach a real GKE cluster, and a real rotation needs the `DEMO_AZURE_*` service principal to hold write access to secrets in a real vault.
+`Demo AWS Group`, `Demo GCP Group`, and `Demo Azure Group` each see only their own provider's records, so `demo-aws-developer` cannot open `Demo GKE Pod Restart`, and `demo-gcp-developer` cannot open `Demo Azure Key Vault Secret Rotation`. Either approver account works for every example, since `Demo Approvers` carries all three access-control tags directly. A real GKE run needs the `demo-gcp-credentials` secret to hold a credential whose identity may reach a real GKE cluster, and a real rotation needs the service principal in `demo-azure-credentials` to hold write access to secrets in a real vault.
 
 **No AWS account, GKE cluster, or Key Vault?** Do not publish: run the workflow while it is still `draft` — as a `developer`, the provider's developer account (`demo-aws-developer`, `demo-gcp-developer`, or `demo-azure-developer`) may do that, and only a draft run's dialog offers the tenant's [tool mocks](../guides/tool-mocks.md). Under **Mock tools**, check the seeded stubs it lists (`aws___call_aws` or `aws___run_script` for the launch, `patch_k8s_resource` or `delete_k8s_resource` for the pod restart, `keyvault_secret_get` and `keyvault_secret_create` for the rotation, and `request_approval`); the whole workflow then plays through without reaching a real provider or waiting on a human. With the rotation's mocks checked, the vault's secret list is made up too: pick `db-password` from it.
 
-## Removing it
+## Clearing it {#clearing-it}
 
-Setting `DEMO_DATA=false` (or removing the line) **removes those records again** on the next startup — the flag is declarative in both directions.
+Under **Demo data** in **Admin Settings**, press **Clear demo data** and confirm with **Clear demo data** in the dialog. The demo records are deleted from your tenant only; another tenant's copy is untouched.
 
-Two things survive by design: a demo record something else has come to depend on — a workflow built on the demo skill, for instance — is kept and logged rather than deleted, and a demo user who has created records is soft-deleted so their name still resolves on those records.
+Two things survive by design: a demo record something else has come to depend on — a workflow built on the demo skill, for instance — is kept, and the message after clearing says how many were; and a demo user who has created records is removed from the user list but still named on those records. Delete what depends on a kept record, then clear again to remove it.

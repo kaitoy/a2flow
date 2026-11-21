@@ -67,6 +67,21 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 
 켜면 배포에 접근하고 이메일을 받을 수 있는 누구나 테넌트를 만들 수 있습니다. 한 주소로 보내는 확인 이메일은 1분에 1통까지라서 양식으로 다른 사람의 메일함을 넘치게 할 수는 없지만, 그 밖의 제한은 [시스템 설정](../guides/system-settings.md#tenant-limit)의 **최대 테넌트 수**뿐입니다. 기본값은 비어 있으며 제한이 없다는 뜻이므로, 테넌트가 무제한으로 늘어나면 곤란한 환경에서는 가입을 켜기 전에 한도를 설정하세요.
 
+## 데모 데이터 {#demo-data}
+
+관리자는 **관리자 설정**에서 자신의 테넌트에 [데모 데이터](../getting-started/demo-data.md)를 로드합니다. 이 변수들의 값은 **Default** 테넌트에 로드할 때만 데모 시크릿에 들어갑니다. 다른 테넌트에서는 모든 시크릿에 `REPLACE_ME` 자리표시자가 들어가므로, 배포 자체의 자격 증명이 다른 테넌트로 넘어가지 않습니다. 모두 선택 사항이며, 설정하지 않은 값도 자리표시자가 되어 테넌트 관리자가 **시크릿** 페이지에서 바꿉니다.
+
+| 변수 | 기본값 | 역할 |
+|---|---|---|
+| `DEMO_AWS_ACCESS_KEY_ID` | — | `demo-aws-credentials` 시크릿에 저장되는 AWS 액세스 키 ID |
+| `DEMO_AWS_SECRET_ACCESS_KEY` | — | 그에 대응하는 시크릿 액세스 키 |
+| `DEMO_GCP_CREDENTIALS_JSON` | — | `demo-gcp-credentials` 시크릿에 저장되는, 한 줄로 작성한 Google Cloud 자격 증명 JSON |
+| `DEMO_AZURE_TENANT_ID` | — | `demo-azure-credentials` 시크릿에 저장되는 서비스 주체의 Microsoft Entra 테넌트 ID |
+| `DEMO_AZURE_CLIENT_ID` | — | 그 서비스 주체의 클라이언트 ID |
+| `DEMO_AZURE_CLIENT_SECRET` | — | 그 서비스 주체의 클라이언트 시크릿 |
+
+데모 데이터를 로드한 뒤에 값을 설정해도 저장된 시크릿은 바뀌지 않습니다. **시크릿** 페이지에서 편집하거나, 데모 데이터를 지운 뒤 다시 로드하세요. 각 자격 증명에 필요한 것은 [데모 데이터](../getting-started/demo-data.md#loading-it) 페이지에 있습니다.
+
 ## 세션 수명 {#session-lifetime}
 
 | 변수 | 기본값 | 설명 |

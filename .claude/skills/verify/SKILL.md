@@ -52,12 +52,13 @@ a deep root pushes that past Windows' 260-char `MAX_PATH`; dulwich then fails
 with `WinError 3` mid-clone.
 
 The scratchpad path is itself deep, so `"$sp\st\sk"` above only survives a
-shallow clone target like `octocat/Hello-World`. Adding `$env:DEMO_DATA = "true"`
+shallow clone target like `octocat/Hello-World`. Loading the demo data
+(`POST /api/v1/demo-data` as `admin`, or **Load demo data** on Admin Settings)
 clones **this** repository, whose own paths run to
 `frontend/src/app/(admin)/workflows/[workflowId]/task-templates/[templateId]/page.test.tsx`,
 and that overflows — the clone dies with `FileNotFoundError` (not `WinError 3`)
 and the demo skill lands in `syncStatus: failed`. Everything else in the demo
-dataset still seeds, so ignore it unless you need the skill.
+dataset still loads, so ignore it unless you need the skill.
 
 Since any agent-running verification needs a repo with a `SKILL.md` (see
 "Picking the skill repository" below), and the one to hand is this repository,
@@ -188,8 +189,8 @@ run itself the moment it is created -- no page has to be open -- so watch
 Opening the page right after executing shows the kickoff turn arrive live over
 `.../sessions/{sid}/stream`; opening it later shows it from the history.
 `admin` holds no `approver` role, so a run that asks for approval needs a user
-or group that does before the approval path can be driven. With `DEMO_DATA=true`
-the demo tool mocks stub the side-effecting calls, so the run plays through
+or group that does before the approval path can be driven. With the demo data
+loaded, the demo tool mocks stub the side-effecting calls, so the run plays through
 without reaching AWS.
 
 ### Driving the design chat

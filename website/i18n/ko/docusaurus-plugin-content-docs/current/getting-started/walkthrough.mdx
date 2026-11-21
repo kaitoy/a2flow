@@ -32,14 +32,14 @@ import TabItem from '@theme/TabItem';
 
 ## 시작하기 전에 \{#before-you-start\}
 
-- [데모 데이터](./demo-data.md)를 활성화한 상태로 백엔드가 실행 중이어야 합니다.
+- [데모 데이터](./demo-data.md#loading-it)가 **Default** 테넌트에 로드되어 있어야 합니다.
 - `root` 비밀번호를 알고 있어야 합니다. `ROOT_PASSWORD`이거나, 설정하지 않았다면 시작할 때 백엔드가 로그에 한 번 출력한 줄입니다([초기 사용자](../operations/configuration.md#seeded-users)).
 - 제공자에 실제로 접근할 수 있어야 합니다.
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  `demo-aws-credentials` [시크릿](../guides/secrets.md)에 실제 액세스 키가 들어 있어야 합니다. 최초 시작 전에 `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY`를 설정했거나, **시크릿**에서 해당 시크릿을 편집하면 됩니다. 실행하면 **실제 EC2 인스턴스가 시작되며**, 종료할 때까지 비용이 발생합니다.
+  `demo-aws-credentials` [시크릿](../guides/secrets.md)에 실제 액세스 키가 들어 있어야 합니다. 데모 데이터를 로드하기 전에 배포 운영자가 값을 제공했거나([구성](../operations/configuration.md#demo-data)), **시크릿**에서 해당 시크릿을 편집하면 됩니다. 실행하면 **실제 EC2 인스턴스가 시작되며**, 종료할 때까지 비용이 발생합니다.
 
   이 키의 IAM 사용자에게는 AMI를 확인하고, 네트워크와 키 페어를 조회하고, 인스턴스를 시작할 수 있는 정책이 필요합니다. 다음 정책이면 충분합니다.
 
@@ -77,12 +77,12 @@ import TabItem from '@theme/TabItem';
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 
-  `demo-gcp-credentials` [시크릿](../guides/secrets.md)에 GKE 클러스터에 접근할 수 있는 ID의 Google Cloud 자격 증명이 들어 있어야 합니다. 최초 시작 전에 `DEMO_GCP_CREDENTIALS_JSON`을 설정했거나, **시크릿**에서 해당 시크릿을 편집하면 됩니다. 프로젝트, 클러스터, 클러스터의 리전, 재시작해도 되는 워크로드를 준비해 두세요. 실행하면 **실제로 롤링 재시작이 이루어집니다**.
+  `demo-gcp-credentials` [시크릿](../guides/secrets.md)에 GKE 클러스터에 접근할 수 있는 ID의 Google Cloud 자격 증명이 들어 있어야 합니다. 데모 데이터를 로드하기 전에 배포 운영자가 값을 제공했거나([구성](../operations/configuration.md#demo-data)), **시크릿**에서 해당 시크릿을 편집하면 됩니다. 프로젝트, 클러스터, 클러스터의 리전, 재시작해도 되는 워크로드를 준비해 두세요. 실행하면 **실제로 롤링 재시작이 이루어집니다**.
 
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  `demo-azure-credentials` [시크릿](../guides/secrets.md)에 실제 서비스 주체가 들어 있어야 합니다. 최초 시작 전에 `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET`을 설정했거나, **시크릿**에서 해당 시크릿을 편집하면 됩니다. 서비스 주체에는 볼트의 시크릿을 나열하고 쓸 수 있는 역할이 필요합니다. 기본 제공 **Key Vault Secrets Officer** 역할은 모든 시크릿의 값까지 읽을 수 있으므로, 이보다는 `Microsoft.KeyVault/vaults/secrets/readMetadata/action` 및 `Microsoft.KeyVault/vaults/secrets/setSecret/action` 데이터 작업만 있는 사용자 지정 역할을 권장합니다. 그러면 에이전트가 설득당해 시도하더라도 값을 읽을 수 없습니다. 액세스 정책을 사용하는 볼트라면 시크릿 권한 중 **List**와 **Set**만 부여하세요. 해당 볼트와 그 안의 교체해도 되는 시크릿을 준비해 두세요. 실행하면 **실제로 시크릿의 새 버전이 쓰이며**, 현재 버전을 읽는 모든 곳이 새 값을 사용하게 됩니다.
+  `demo-azure-credentials` [시크릿](../guides/secrets.md)에 실제 서비스 주체가 들어 있어야 합니다. 데모 데이터를 로드하기 전에 배포 운영자가 값을 제공했거나([구성](../operations/configuration.md#demo-data)), **시크릿**에서 해당 시크릿을 편집하면 됩니다. 서비스 주체에는 볼트의 시크릿을 나열하고 쓸 수 있는 역할이 필요합니다. 기본 제공 **Key Vault Secrets Officer** 역할은 모든 시크릿의 값까지 읽을 수 있으므로, 이보다는 `Microsoft.KeyVault/vaults/secrets/readMetadata/action` 및 `Microsoft.KeyVault/vaults/secrets/setSecret/action` 데이터 작업만 있는 사용자 지정 역할을 권장합니다. 그러면 에이전트가 설득당해 시도하더라도 값을 읽을 수 없습니다. 액세스 정책을 사용하는 볼트라면 시크릿 권한 중 **List**와 **Set**만 부여하세요. 해당 볼트와 그 안의 교체해도 되는 시크릿을 준비해 두세요. 실행하면 **실제로 시크릿의 새 버전이 쓰이며**, 현재 버전을 읽는 모든 곳이 새 값을 사용하게 됩니다.
 
   </TabItem>
 </Tabs>

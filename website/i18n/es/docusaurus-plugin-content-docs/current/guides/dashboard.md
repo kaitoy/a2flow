@@ -11,7 +11,7 @@ Está pensado para dejarlo abierto: todas las cifras se vuelven a leer cada 15 s
 
 Dos tipos de ejecución quedan fuera de todas las cifras: las ejecuciones de prueba iniciadas desde un flujo de trabajo que sigue siendo un borrador y las ejecuciones que una [etiqueta de control de acceso](./tags.md#access-control-tags) te oculta.
 
-Para ver el panel con datos antes de que tu tenant haya ejecutado nada, activa los [datos de demostración](../getting-started/demo-data.md): incluyen unos noventa días de ejecuciones inventadas.
+Para ver el panel con datos antes de que tu tenant haya ejecutado nada, carga los [datos de demostración](../getting-started/demo-data.md): incluyen unos noventa días de ejecuciones inventadas.
 
 ## La barra de herramientas {#the-toolbar}
 

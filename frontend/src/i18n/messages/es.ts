@@ -290,6 +290,28 @@ export const es = {
   "admin.workflowGenerationStarted": "Se inició la generación del flujo de trabajo",
   "admin.workflowName": "Nombre del flujo de trabajo",
   "adminSettings.adminSettingsUpdated": "Configuración de administrador actualizada",
+  "adminSettings.demoData.title": "Datos de demostración",
+  "adminSettings.demoData.description":
+    "Usuarios, grupos de usuarios, secretos, servidores MCP, skills de agente, simulaciones de herramientas y un historial de ejecuciones de ejemplo para probar A2Flow en este tenant.",
+  "adminSettings.demoData.loaded": "Cargados en este tenant.",
+  "adminSettings.demoData.notLoaded": "No cargados en este tenant.",
+  "adminSettings.demoData.load": "Cargar datos de demostración",
+  "adminSettings.demoData.loading": "Cargando…",
+  "adminSettings.demoData.clear": "Borrar datos de demostración",
+  "adminSettings.demoData.clearing": "Borrando…",
+  "adminSettings.demoData.loadConfirmTitle": "¿Cargar los datos de demostración?",
+  "adminSettings.demoData.loadConfirmDescription":
+    "Añade once usuarios de demostración, sus grupos de usuarios y secretos, servidores MCP, skills de agente, simulaciones de herramientas, etiquetas y flujos de trabajo de ejemplo a este tenant. Nadie conoce la contraseña de los usuarios de demostración: suplántelos desde Usuarios. Lo que ya esté cargado se queda como está.",
+  "adminSettings.demoData.clearConfirmTitle": "¿Borrar los datos de demostración?",
+  "adminSettings.demoData.clearConfirmDescription":
+    "Elimina los registros de demostración de este tenant. Se conservan los que ahora usa otro registro, como un flujo de trabajo creado a partir de una skill de demostración.",
+  "adminSettings.demoData.loadedToast": "Datos de demostración cargados",
+  "adminSettings.demoData.clearedToast": "Datos de demostración borrados",
+  "adminSettings.demoData.keptToast": {
+    one: "Datos de demostración borrados. Se conservó {count} registro porque otros registros lo usan.",
+    other:
+      "Datos de demostración borrados. Se conservaron {count} registros porque otros registros los usan.",
+  },
   "adminSettings.oidc.title": "Inicio de sesión único",
   "adminSettings.oidc.enable": "Habilitar el inicio de sesión único",
   "adminSettings.oidc.issuerUrl": "URL del emisor",

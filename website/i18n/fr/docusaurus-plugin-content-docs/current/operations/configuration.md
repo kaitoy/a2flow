@@ -67,6 +67,21 @@ L'inscription envoie à chaque visiteur un lien de confirmation : il faut donc a
 
 Toute personne qui atteint le déploiement et reçoit des e-mails peut alors créer des tenants. Une adresse reçoit au plus un e-mail de confirmation par minute, ce qui empêche d'utiliser le formulaire pour inonder la boîte de quelqu'un d'autre, mais la seule autre limite est le **Nombre maximal de Tenants** des [paramètres système](../guides/system-settings.md#tenant-limit). Il est vide par défaut, ce qui signifie aucune limite : fixez-en un avant d'activer l'inscription là où un nombre illimité de tenants poserait problème.
 
+## Données de démonstration {#demo-data}
+
+Un administrateur charge les [données de démonstration](../getting-started/demo-data.md) dans son tenant depuis **Paramètres administrateur**. Ces variables remplissent leurs secrets lorsqu'elles sont chargées dans le tenant **Default** ; tout autre tenant reçoit une valeur de remplacement `REPLACE_ME` dans chacun, si bien que les identifiants propres au déploiement n'atteignent jamais un autre tenant. Toutes sont facultatives : une variable non définie donne aussi une valeur de remplacement, que l'administrateur du tenant remplace sur la page **Secrets**.
+
+| Variable | Valeur par défaut | Rôle |
+|---|---|---|
+| `DEMO_AWS_ACCESS_KEY_ID` | — | ID de clé d'accès AWS stocké dans le secret `demo-aws-credentials` |
+| `DEMO_AWS_SECRET_ACCESS_KEY` | — | La clé d'accès secrète correspondante |
+| `DEMO_GCP_CREDENTIALS_JSON` | — | Identifiant Google Cloud au format JSON, sur une seule ligne, stocké dans le secret `demo-gcp-credentials` |
+| `DEMO_AZURE_TENANT_ID` | — | ID de tenant Microsoft Entra du principal de service stocké dans le secret `demo-azure-credentials` |
+| `DEMO_AZURE_CLIENT_ID` | — | ID client de ce principal de service |
+| `DEMO_AZURE_CLIENT_SECRET` | — | Secret client de ce principal de service |
+
+Une valeur définie après le chargement des données de démonstration ne modifie pas le secret enregistré ; modifiez-le sur la page **Secrets**, ou effacez les données de démonstration puis chargez-les de nouveau. Ce dont chaque identifiant a besoin figure sur la page [Données de démonstration](../getting-started/demo-data.md#loading-it).
+
 ## Durée de vie des sessions {#session-lifetime}
 
 | Variable | Valeur par défaut | Rôle |

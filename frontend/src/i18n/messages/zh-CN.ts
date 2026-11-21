@@ -267,6 +267,26 @@ export const zhCN = {
   "admin.workflowGenerationStarted": "已开始生成工作流",
   "admin.workflowName": "工作流名称",
   "adminSettings.adminSettingsUpdated": "已更新管理员设置",
+  "adminSettings.demoData.title": "演示数据",
+  "adminSettings.demoData.description":
+    "用于在此租户中试用 A2Flow 的示例用户、用户组、密钥、MCP 服务器、代理技能、工具模拟和运行历史。",
+  "adminSettings.demoData.loaded": "已加载到此租户。",
+  "adminSettings.demoData.notLoaded": "尚未加载到此租户。",
+  "adminSettings.demoData.load": "加载演示数据",
+  "adminSettings.demoData.loading": "正在加载…",
+  "adminSettings.demoData.clear": "清除演示数据",
+  "adminSettings.demoData.clearing": "正在清除…",
+  "adminSettings.demoData.loadConfirmTitle": "加载演示数据？",
+  "adminSettings.demoData.loadConfirmDescription":
+    "向此租户添加 11 个演示用户及其用户组，以及示例密钥、MCP 服务器、代理技能、工具模拟、标签和工作流。演示用户的密码无人知晓：请在“用户”页面代理登录使用。已加载的内容保持不变。",
+  "adminSettings.demoData.clearConfirmTitle": "清除演示数据？",
+  "adminSettings.demoData.clearConfirmDescription":
+    "从此租户删除演示记录。其他记录正在使用的记录（例如基于演示技能构建的工作流）会保留。",
+  "adminSettings.demoData.loadedToast": "已加载演示数据",
+  "adminSettings.demoData.clearedToast": "已清除演示数据",
+  "adminSettings.demoData.keptToast": {
+    other: "已清除演示数据。有 {count} 条记录因被其他记录使用而保留。",
+  },
   "adminSettings.oidc.title": "单点登录",
   "adminSettings.oidc.enable": "启用单点登录",
   "adminSettings.oidc.issuerUrl": "颁发者 URL",

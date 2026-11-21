@@ -71,15 +71,15 @@ schema is created. When it settles, open **<http://localhost:3000>**.
 
 Sign in as the seeded `admin` user. Its password comes from `ADMIN_PASSWORD` in `.env`;
 leave that unset and one is generated and printed to `docker compose logs backend` on
-first start — as are the `root` and demo-account passwords.
+first start — as is the `root` password.
 
-Demo data is on by default under Compose, so there is something to run straight away:
-the [Walkthrough](https://kaitoy.github.io/a2flow/docs/getting-started/walkthrough) plays
+For something to run straight away, open **Admin Settings** and press **Load demo data**:
+the [Walkthrough](https://kaitoy.github.io/a2flow/docs/getting-started/walkthrough) then plays
 an approval-gated "launch an EC2 instance" (or "restart a GKE workload") workflow from
-generation to approval, signing in once as `root` and impersonating a developer, a
-reviewer, a requester, and an approver in turn.
+generation to approval, signing in once and impersonating a developer, a reviewer, a
+requester, and an approver in turn. Any tenant's admin can load (and clear) its own copy.
 [Demo data](https://kaitoy.github.io/a2flow/docs/getting-started/demo-data) lists what is
-seeded, and how to play it through with tool mocks, without an AWS account.
+loaded, and how to play it through with tool mocks, without an AWS account.
 
 To use a model other than Google Gemini, see
 [LLM configuration](https://kaitoy.github.io/a2flow/docs/getting-started/llm-configuration).

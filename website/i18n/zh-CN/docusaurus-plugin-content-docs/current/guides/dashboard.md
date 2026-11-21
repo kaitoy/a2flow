@@ -11,7 +11,7 @@ sidebar_position: 16
 
 有两类运行不计入任何数字：从仍是草稿的工作流启动的测试运行，以及被[访问控制标签](./tags.md#access-control-tags)对你隐藏的运行。
 
-如果想在租户还没有任何运行时就看到填满数据的仪表盘，请启用[演示数据](../getting-started/demo-data.md)：它附带约 90 天的虚构运行。
+如果想在租户还没有任何运行时就看到填满数据的仪表盘，请加载[演示数据](../getting-started/demo-data.md)：它附带约 90 天的虚构运行。
 
 ## 工具栏 {#the-toolbar}
 

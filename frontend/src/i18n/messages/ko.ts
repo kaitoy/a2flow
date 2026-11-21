@@ -285,6 +285,26 @@ export const ko = {
   "admin.workflowGenerationStarted": "워크플로 생성을 시작했습니다",
   "admin.workflowName": "워크플로 이름",
   "adminSettings.adminSettingsUpdated": "관리자 설정을 업데이트했습니다",
+  "adminSettings.demoData.title": "데모 데이터",
+  "adminSettings.demoData.description":
+    "이 테넌트에서 A2Flow를 체험해 볼 수 있는 샘플 사용자, 사용자 그룹, 시크릿, MCP 서버, 에이전트 스킬, 도구 모의, 실행 기록입니다.",
+  "adminSettings.demoData.loaded": "이 테넌트에 로드되어 있습니다.",
+  "adminSettings.demoData.notLoaded": "이 테넌트에 로드되어 있지 않습니다.",
+  "adminSettings.demoData.load": "데모 데이터 로드",
+  "adminSettings.demoData.loading": "로드 중…",
+  "adminSettings.demoData.clear": "데모 데이터 지우기",
+  "adminSettings.demoData.clearing": "지우는 중…",
+  "adminSettings.demoData.loadConfirmTitle": "데모 데이터를 로드할까요?",
+  "adminSettings.demoData.loadConfirmDescription":
+    "데모 사용자 11명과 그 사용자 그룹, 샘플 시크릿, MCP 서버, 에이전트 스킬, 도구 모의, 태그, 워크플로를 이 테넌트에 추가합니다. 데모 사용자의 비밀번호는 아무도 모르므로 사용자 화면에서 대리 로그인하여 사용하세요. 이미 로드된 것은 그대로 둡니다.",
+  "adminSettings.demoData.clearConfirmTitle": "데모 데이터를 지울까요?",
+  "adminSettings.demoData.clearConfirmDescription":
+    "이 테넌트에서 데모 레코드를 삭제합니다. 데모 스킬로 만든 워크플로처럼 다른 레코드가 사용 중인 것은 남겨 둡니다.",
+  "adminSettings.demoData.loadedToast": "데모 데이터를 로드했습니다",
+  "adminSettings.demoData.clearedToast": "데모 데이터를 지웠습니다",
+  "adminSettings.demoData.keptToast": {
+    other: "데모 데이터를 지웠습니다. 다른 레코드가 사용 중이어서 {count}개는 남겨 두었습니다.",
+  },
   "adminSettings.oidc.title": "싱글 사인온",
   "adminSettings.oidc.enable": "싱글 사인온 사용",
   "adminSettings.oidc.issuerUrl": "발급자 URL",

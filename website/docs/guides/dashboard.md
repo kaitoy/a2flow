@@ -11,7 +11,7 @@ It is built to be left open: every figure re-reads itself every 15 seconds. It c
 
 Two kinds of run are left out of every figure: test runs started from a workflow that is still a draft, and runs that an [access-control tag](./tags.md#access-control-tags) hides from you.
 
-To see the dashboard filled in before your tenant has run anything, turn on the [demo data](../getting-started/demo-data.md): it comes with about ninety days of made-up runs.
+To see the dashboard filled in before your tenant has run anything, load the [demo data](../getting-started/demo-data.md): it comes with about ninety days of made-up runs.
 
 ## The toolbar {#the-toolbar}
 

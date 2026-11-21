@@ -1,10 +1,10 @@
-"""Startup registration and removal of the optional demo dataset.
+"""Loading and clearing the optional demo dataset, one tenant at a time.
 
-Gated by ``Settings.demo_data`` (the ``DEMO_DATA`` environment variable),
-this module keeps a small, self-contained example of everything three
-approval-gated, mutating workflows need -- "launch an EC2 instance",
-"restart a GKE pod", and "rotate an Azure Key Vault secret" -- all inside the
-seeded ``Default`` tenant (see :mod:`infrastructure.bootstrap`):
+A tenant's ``admin`` loads the dataset into their tenant, or clears it out
+again, from the Admin Settings page (``routers/demo_data.py``). It is a
+small, self-contained example of everything three approval-gated, mutating
+workflows need -- "launch an EC2 instance", "restart a GKE pod", and "rotate
+an Azure Key Vault secret" -- all inside the one tenant it is loaded into:
 
 * three Secrets -- one holding the AWS access key id and secret access key as
   two entries, one holding a Google Cloud credential JSON (a service
@@ -95,42 +95,54 @@ a set of four **display-only** workflows (``Provision Dev EC2 Instance``,
 ``Rotate Database Password``): published, but with no task templates or design
 conversation, they exist so that ninety days of generated run history -- runs,
 their tasks, and their approvals -- gives the operations dashboard something to
-show. That history is regenerated on every startup, laid out backwards from
-the present, because the dashboard reads it through windows anchored on now.
-No tag is attached to any workflow; an operator is free to attach one.
+show. That history is generated once, when the dataset is loaded, laid out
+backwards from that moment; the dashboard reads it through windows anchored on
+now, so it drifts out of them as days pass, and clearing the dataset and
+loading it again is how an admin brings it back up to date. No tag is
+attached to any workflow; an operator is free to attach one.
 
-The flag is declarative in both directions: ``DEMO_DATA=true`` guarantees the
-records exist, and leaving it unset (the default) guarantees they do not, so
-turning the option off and restarting removes whatever a previous run
-registered. Every record is identified by a fixed id constant rather than by
-name, which makes both directions exact and idempotent no matter how the rows
-were renamed in the admin UI in between -- and it cuts the other way too for
-the handful of fields this module itself declares: an existing row (a demo
-user seeded under an older username, a tag seeded before it became
-access-control) is brought back in line with the current declaration on the
-next startup, the same way a demo account's direct roles are stripped back
-to none on every restart.
+Every record is identified by a fixed id rather than by name, which makes
+loading and clearing exact and idempotent no matter how the rows were renamed
+in the admin UI in between -- loading again restores whatever is missing, and
+it cuts the other way too for the handful of fields this module itself
+declares: an existing row (a demo user seeded under an older username, a tag
+seeded before it became access-control) is brought back in line with the
+current declaration, the same way a demo account's direct roles are stripped
+back to none. The ids are fixed *per tenant* (:class:`_DemoTenant`): the
+``Default`` tenant keeps the ``DEMO_*_ID`` constants below, which it was
+seeded under before the dataset became per-tenant, and every other tenant
+derives its own from them.
+
+The demo accounts get a random password nobody knows: an ``admin`` reaches
+them by impersonation, or sets a password from the Users page. The
+``DEMO_AWS_*`` / ``DEMO_GCP_*`` / ``DEMO_AZURE_*`` credentials are stored
+only when the dataset is loaded into the ``Default`` tenant -- they belong to
+whoever runs the deployment, and any tenant, a self-signed-up one included,
+may load the dataset. Everywhere else the secrets hold a placeholder.
 
 Rows are built as table models directly, not through the ``...Create``
 validation models the API uses. That is deliberate: ``AgentSkillCreate``'s
 ``repo_url`` runs an SSRF check that resolves the host over DNS, which would
-make application startup depend on working name resolution.
+make loading the dataset depend on working name resolution.
 """
 
 import itertools
 import logging
 import random
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypeVar
+from uuid import UUID, uuid5
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
-from infrastructure.bootstrap import DEFAULT_TENANT_NAME, resolve_seed_password
+from infrastructure.bootstrap import DEFAULT_TENANT_NAME
+from infrastructure.locks import advisory_lock, demo_data_key
 from infrastructure.password import hash_password
 from infrastructure.tenant_cipher import TenantCiphers
 from models.agent_skill import AgentSkill
@@ -268,7 +280,7 @@ DEMO_SECRET_GENERATOR_MCP_SERVER_ID = "58e0b2fa-4b1e-4594-8710-18a0bd477dfc"
 
 #: The ids earlier versions of this module seeded the demo MCP servers under,
 #: in the order of the constants above. A row still under one of them is
-#: removed on the next startup (:func:`_retire_old_demo_mcp_servers`) so the
+#: removed on the next load (:func:`_retire_old_demo_mcp_servers`) so the
 #: server is registered again under its new id.
 _RETIRED_DEMO_MCP_SERVER_IDS = tuple(
     f"00000000-0000-0000-0000-00000000d20{n}" for n in range(1, 7)
@@ -336,6 +348,47 @@ DEMO_GKE_WORKFLOW_ID = "00000000-0000-0000-0000-00000000d803"
 
 #: Fixed identifier of the display-only ``Rotate Database Password`` workflow.
 DEMO_ROTATION_WORKFLOW_ID = "00000000-0000-0000-0000-00000000d804"
+
+#: Namespace the per-tenant demo ids are derived in (see :class:`_DemoTenant`).
+#: Never change it: a tenant's existing demo rows would no longer be found.
+_DEMO_ID_NAMESPACE = UUID("6b1f2a4e-3c7d-4e9a-9f0b-5d8c2e1a7b34")
+
+
+@dataclass(frozen=True)
+class _DemoTenant:
+    """The tenant a load or clear acts on, and how its demo rows are identified.
+
+    The ``DEMO_*_ID`` constants are *base* ids. The ``Default`` tenant uses
+    them as they are -- it was seeded under them before the dataset became
+    per-tenant, so its existing rows stay findable, and the scripts and tests
+    importing a constant keep pointing at a real row. Every other tenant
+    derives its own id from each base id with ``uuid5``, which keeps them
+    stable from one load to the next and random-looking (see the note above
+    the demo MCP server ids).
+
+    Attributes:
+        id: Id of the tenant.
+        legacy_ids: Whether this is the ``Default`` tenant, which uses the
+            base ids unchanged and is the only one given the ``DEMO_*``
+            credentials from the environment.
+    """
+
+    id: str
+    legacy_ids: bool
+
+    def row_id(self, base_id: str) -> str:
+        """Return this tenant's id for the demo row whose base id is ``base_id``.
+
+        Args:
+            base_id: One of the ``DEMO_*_ID`` constants.
+
+        Returns:
+            The row's primary key in this tenant.
+        """
+        if self.legacy_ids:
+            return base_id
+        return str(uuid5(_DEMO_ID_NAMESPACE, f"{self.id}/{base_id}"))
+
 
 #: Name of the demo knowledge base as shown in the admin UI.
 DEMO_PRICING_KB_NAME = "AWS EC2 Pricing"
@@ -464,11 +517,16 @@ _DEMO_MCP_PROXY_PACKAGE = "mcp-proxy-for-aws@1.6.4"
 _DEMO_MCP_ENDPOINT = "https://aws-mcp.us-east-1.api.aws/mcp"
 
 #: Region :data:`_DEMO_MCP_ENDPOINT` lives in, and therefore the region the
-#: proxy must sign for. Deliberately independent of ``DEMO_AWS_REGION``, which
-#: selects the region the *tools* operate on: the proxy does not derive the
-#: signing region from the endpoint URL, it falls back to ``AWS_REGION``, so
-#: leaving it implicit would break signing as soon as the two differ.
+#: proxy must sign for. Deliberately independent of :data:`_DEMO_AWS_REGION`,
+#: which selects the region the *tools* operate on: the proxy does not derive
+#: the signing region from the endpoint URL, it falls back to ``AWS_REGION``,
+#: so leaving it implicit would break signing as soon as the two differ.
 _DEMO_MCP_ENDPOINT_REGION = "us-east-1"
+
+#: Region the demo AWS MCP server's tools act on, and the EC2 Cost
+#: Estimator's default region. A tenant wanting another one edits the
+#: ``AWS_REGION`` entry of the server's environment.
+_DEMO_AWS_REGION = "us-east-1"
 
 #: Google-managed GKE (Google Kubernetes Engine) remote MCP endpoint the demo
 #: ``streamable_http`` server connects to -- the full endpoint, not the
@@ -509,7 +567,7 @@ _DEMO_AZURE_MCP_ARGS = (
 
 #: The flag earlier versions of this module launched the demo Azure MCP server
 #: with, from before A2Flow could answer the server's consent questions. Taken
-#: back out of an existing row on the next startup.
+#: back out of an existing row on the next load.
 _RETIRED_AZURE_MCP_FLAG = "--dangerously-disable-elicitation"
 
 #: Azure SDK credential the demo Azure MCP server is told to use. Pinning it to
@@ -825,7 +883,7 @@ class _DemoUserSpec:
 
     Attributes:
         id: Fixed primary key, so the user can be found again for removal.
-        username: Login name, unique within the ``Default`` tenant.
+        username: Login name, unique within the tenant.
         first_name: Given name shown in the UI.
         last_name: Family name shown in the UI.
     """
@@ -1240,7 +1298,7 @@ class _DemoToolMockSpec:
     response: dict[str, Any]
 
 
-#: The demo tool mocks, all in the seeded ``Default`` tenant. The first two stub
+#: The demo tool mocks, all in the tenant the dataset is loaded into. The first two stub
 #: tools of the demo AWS MCP server (see :func:`_seed_demo_mcp_server`); the
 #: third and fourth stub the demo GKE MCP server's tools (see
 #: :func:`_seed_demo_gke_mcp_server`) -- rolling-restarting a Deployment/
@@ -1311,90 +1369,67 @@ _DEMO_TOOL_MOCKS = (
 )
 
 
-async def sync_demo_data(session: AsyncSession) -> list[str]:
-    """Register or remove the demo dataset according to ``DEMO_DATA``.
+async def load_demo_data(session: AsyncSession, tenant_id: str) -> list[str]:
+    """Create every missing demo record in one tenant.
 
-    Must run **after** :func:`infrastructure.bootstrap.seed_root_user` and
-    :func:`infrastructure.bootstrap.seed_default_tenant_and_admin_user`: the
-    demo accounts are real (non-system) users, so seeding them first would
-    make ``seed_root_user``'s "any real user exists" skip check wrongly fire,
-    and the ``Default`` tenant these records hang off has to exist already.
+    Loading again is harmless: whatever already exists is left alone (bar the
+    few fields this module reconciles) and whatever is missing is created. The
+    run history counts as one record here: it is generated only when the
+    tenant has none, so loading again does not move it; clear and load to
+    regenerate it ending now. Serialized per tenant, so two admins pressing
+    **Load** together cannot write the history twice.
 
     Args:
-        session: Database session used to read, insert, and delete records.
+        session: Database session used to read and insert records.
+        tenant_id: Id of the tenant to load the dataset into.
 
     Returns:
         The ids of the demo AgentSkills this call freshly registered, whose
         repositories have not been cloned yet and whose sync the caller should
-        schedule. Empty when every demo skill already existed, none could be
-        registered, or the demo data was removed instead.
+        schedule. Empty when every demo skill already existed or none could be
+        registered.
     """
-    if get_settings().demo_data:
-        return await _seed_demo_data(session)
-    await _remove_demo_data(session)
-    return []
-
-
-async def _seed_demo_data(session: AsyncSession) -> list[str]:
-    """Create every missing demo record in the seeded ``Default`` tenant.
-
-    Args:
-        session: Database session used to read and insert records.
-
-    Returns:
-        The ids of the demo AgentSkills this call created, in seeding order.
-    """
-    tenant_id = await _default_tenant_id(session)
-    if tenant_id is None:
-        logger.warning(
-            "DEMO_DATA is enabled but the seeded '%s' tenant does not exist; "
-            "skipping demo data.",
-            DEFAULT_TENANT_NAME,
-        )
-        return []
-    await _retire_old_demo_mcp_servers(session)
-    await _seed_demo_users(session, tenant_id)
-    await _seed_demo_groups(session, tenant_id)
-    await _seed_demo_secrets(session, tenant_id)
-    await _seed_demo_mcp_server(session, tenant_id)
-    await _seed_demo_gke_mcp_server(session, tenant_id)
-    await _seed_demo_cost_estimator_mcp_server(session, tenant_id)
-    await _seed_demo_k8s_toolkit_mcp_server(session, tenant_id)
-    await _seed_demo_azure_mcp_server(session, tenant_id)
-    await _seed_demo_secret_generator_mcp_server(session, tenant_id)
-    await _seed_demo_tool_mocks(session, tenant_id)
-    await _seed_demo_knowledge_base(session, tenant_id)
-    new_skill_ids = [
-        skill_id
-        for skill_id in (
-            await _seed_demo_agent_skill(session, tenant_id),
-            await _seed_demo_gke_agent_skill(session, tenant_id),
-            await _seed_demo_azure_agent_skill(session, tenant_id),
-        )
-        if skill_id is not None
-    ]
-    await _seed_demo_tags(session, tenant_id)
-    await _seed_demo_workflows(session, tenant_id)
-    await _seed_demo_run_history(session, tenant_id)
+    t = await _demo_tenant(session, tenant_id)
+    async with advisory_lock(demo_data_key(tenant_id), wait_seconds=60):
+        if t.legacy_ids:
+            await _retire_old_demo_mcp_servers(session, t)
+        await _seed_demo_users(session, t)
+        await _seed_demo_groups(session, t)
+        await _seed_demo_secrets(session, t)
+        await _seed_demo_mcp_server(session, t)
+        await _seed_demo_gke_mcp_server(session, t)
+        await _seed_demo_cost_estimator_mcp_server(session, t)
+        await _seed_demo_k8s_toolkit_mcp_server(session, t)
+        await _seed_demo_azure_mcp_server(session, t)
+        await _seed_demo_secret_generator_mcp_server(session, t)
+        await _seed_demo_tool_mocks(session, t)
+        await _seed_demo_knowledge_base(session, t)
+        new_skill_ids = [
+            skill_id
+            for skill_id in (
+                await _seed_demo_agent_skill(session, t),
+                await _seed_demo_gke_agent_skill(session, t),
+                await _seed_demo_azure_agent_skill(session, t),
+            )
+            if skill_id is not None
+        ]
+        await _seed_demo_tags(session, t)
+        await _seed_demo_workflows(session, t)
+        await _seed_demo_run_history(session, t)
     return new_skill_ids
 
 
-async def _remove_demo_data(session: AsyncSession) -> None:
-    """Delete every demo record that is still present.
+async def clear_demo_data(session: AsyncSession, tenant_id: str) -> int:
+    """Delete every demo record still present in one tenant.
 
     Deletion follows the direction of the foreign keys — the generated run
-    history and the display-only workflows, then tool mocks, then agent
-    skills, then MCP servers, then secrets, then the knowledge base (its source
-    and any workflow links cascade with it), then tags, then user groups, then
-    users — so a record is never orphaned by the removal of something it points
-    at. The tool mocks go first because two of them (``call_aws`` and
-    ``run_script``) reference the AWS MCP server with ``ondelete="RESTRICT"``,
-    which would otherwise block its removal. A record that other data has come
-    to depend on (a Workflow built on a demo skill, a task tool binding on
-    one of the demo MCP servers) cannot be deleted; that is logged and skipped
-    rather than allowed to fail startup. The same holds for the
-    ``keyvault_secret_get`` and ``keyvault_secret_create`` mocks and the
-    Azure MCP server.
+    history first, then :data:`_REMOVAL_ORDER` (display-only workflows, tool
+    mocks, agent skills, MCP servers, secrets, the knowledge base with its
+    source and workflow links, tags, user groups), then users — so a record is
+    never orphaned by the removal of something it points at. A record that
+    other data has come to depend on (a Workflow built on a demo skill, a task
+    tool binding on one of the demo MCP servers) cannot be deleted; it is kept
+    and counted rather than failing the whole clear.
 
     Deleting a tag has no such protection — the join tables cascade rather
     than restrict, by design (see the module docstring of ``models.tag``) —
@@ -1404,144 +1439,100 @@ async def _remove_demo_data(session: AsyncSession) -> None:
     Groups go before their members: the membership rows cascade away with the
     group, so the users are then free of them and the roles they granted are
     gone from the accounts' effective roles immediately. Nothing has to be
-    recomputed, since inherited roles are never stored on the user.
+    recomputed, since inherited roles are never stored on the user. A demo
+    user who has created records is soft-deleted rather than removed, so
+    their name still resolves on those records; that does not count as kept.
 
     Args:
         session: Database session used to read and delete records.
+        tenant_id: Id of the tenant to clear the dataset from.
+
+    Returns:
+        How many demo records were kept because other records reference them.
     """
-    # The generated runs and the demo workflows go first: a run restricts the
-    # deletion of its initiator, and a workflow that of its agent skill.
-    await _delete_demo_run_history(session)
-    for workflow_spec in _DEMO_WORKFLOWS:
-        await _delete_demo_row(
-            session,
-            Workflow,
-            workflow_spec.id,
-            label=f"workflow {workflow_spec.name!r}",
-        )
-    for mock_spec in _DEMO_TOOL_MOCKS:
-        await _delete_demo_row(
-            session, MCPToolMock, mock_spec.id, label=f"tool mock {mock_spec.name!r}"
-        )
-    await _retire_old_demo_mcp_servers(session)
-    await _delete_demo_row(
-        session, AgentSkill, DEMO_AGENT_SKILL_ID, label="EC2-launch agent skill"
-    )
-    await _delete_demo_row(
-        session,
-        AgentSkill,
-        DEMO_GKE_SKILL_ID,
-        label="GKE pod-restart agent skill",
-    )
-    await _delete_demo_row(
-        session,
-        AgentSkill,
-        DEMO_AZURE_SKILL_ID,
-        label="Azure secret-rotation agent skill",
-    )
-    await _delete_demo_row(
-        session, MCPServer, DEMO_MCP_SERVER_ID, label="AWS MCP server"
-    )
-    await _delete_demo_row(
-        session, MCPServer, DEMO_GKE_MCP_SERVER_ID, label="GKE MCP server"
-    )
-    await _delete_demo_row(
-        session,
-        MCPServer,
-        DEMO_COST_ESTIMATOR_MCP_SERVER_ID,
-        label="EC2 Cost Estimator MCP server",
-    )
-    await _delete_demo_row(
-        session,
-        MCPServer,
-        DEMO_K8S_TOOLKIT_MCP_SERVER_ID,
-        label="Kubernetes Manifest Toolkit MCP server",
-    )
-    await _delete_demo_row(
-        session, MCPServer, DEMO_AZURE_MCP_SERVER_ID, label="Azure MCP server"
-    )
-    await _delete_demo_row(
-        session,
-        MCPServer,
-        DEMO_SECRET_GENERATOR_MCP_SERVER_ID,
-        label="Secret Value Generator MCP server",
-    )
-    await _delete_demo_row(
-        session, Secret, DEMO_AWS_SECRET_ID, label="AWS credentials secret"
-    )
-    await _delete_demo_row(
-        session, Secret, DEMO_GCP_SECRET_ID, label="Google Cloud API key secret"
-    )
-    await _delete_demo_row(
-        session, Secret, DEMO_AZURE_SECRET_ID, label="Azure credentials secret"
-    )
-    await _delete_demo_row(
-        session,
-        KnowledgeBase,
-        DEMO_PRICING_KB_ID,
-        label=f"knowledge base '{DEMO_PRICING_KB_NAME}'",
-    )
-    await _delete_demo_row(
-        session, Tag, DEMO_AWS_TAG_ID, label=f"tag '{DEMO_AWS_TAG_NAME}'"
-    )
-    await _delete_demo_row(
-        session, Tag, DEMO_GCP_TAG_ID, label=f"tag '{DEMO_GCP_TAG_NAME}'"
-    )
-    await _delete_demo_row(
-        session, Tag, DEMO_AZURE_TAG_ID, label=f"tag '{DEMO_AZURE_TAG_NAME}'"
-    )
-    await _delete_demo_row(
-        session, Tag, DEMO_APPROVAL_TAG_ID, label=f"tag '{DEMO_APPROVAL_TAG_NAME}'"
-    )
-    for group_spec in _DEMO_GROUPS:
-        await _delete_demo_row(
-            session, UserGroup, group_spec.id, label=f"user group {group_spec.name!r}"
-        )
-    for spec in _DEMO_USERS:
-        await _delete_demo_user(session, spec.id)
+    t = await _demo_tenant(session, tenant_id)
+    kept = 0
+    async with advisory_lock(demo_data_key(tenant_id), wait_seconds=60):
+        # The generated runs go first: a run restricts the deletion of its
+        # initiator, and of the workflow it ran.
+        await _delete_demo_run_history(session, t)
+        if t.legacy_ids:
+            await _retire_old_demo_mcp_servers(session, t)
+        for model, base_id, label in _REMOVAL_ORDER:
+            kept += await _delete_demo_row(session, t, model, base_id, label=label)
+        for spec in _DEMO_USERS:
+            await _delete_demo_user(session, t.row_id(spec.id))
+    return kept
 
 
-async def _retire_old_demo_mcp_servers(session: AsyncSession) -> None:
+async def has_demo_data(session: AsyncSession, tenant_id: str) -> bool:
+    """Report whether any demo record is present in one tenant.
+
+    Users are not looked at: a demo user left soft-deleted by a clear is
+    still a row, but no longer part of the dataset.
+
+    Args:
+        session: Database session used to read the records.
+        tenant_id: Id of the tenant to look in.
+
+    Returns:
+        ``True`` when at least one record of :data:`_REMOVAL_ORDER` exists.
+    """
+    t = await _demo_tenant(session, tenant_id)
+    for model, base_id, _ in _REMOVAL_ORDER:
+        if await session.get(model, t.row_id(base_id)) is not None:
+            return True
+    return False
+
+
+async def _demo_tenant(session: AsyncSession, tenant_id: str) -> _DemoTenant:
+    """Describe ``tenant_id`` for a load or clear.
+
+    Args:
+        session: Database session used to read the tenant.
+        tenant_id: Id of the tenant.
+
+    Returns:
+        The tenant, flagged as using the legacy ids when it is ``Default``.
+    """
+    tenant = await session.get(Tenant, tenant_id)
+    return _DemoTenant(
+        id=tenant_id,
+        legacy_ids=tenant is not None and tenant.name == DEFAULT_TENANT_NAME,
+    )
+
+
+async def _retire_old_demo_mcp_servers(session: AsyncSession, t: _DemoTenant) -> None:
     """Remove demo MCP servers still stored under a retired id.
 
-    A demo tool mock pointing at one goes first -- it restricts the server's
-    deletion, and seeding registers it again against the server's new id. A
-    retired server that something else has come to reference (a workflow's
-    tool binding) is kept and logged like any referenced demo row; its new
-    namesake is then skipped as a name collision until it is removed.
+    Only ever relevant to the ``Default`` tenant, the one tenant the dataset
+    was seeded into while those ids were in use. A demo tool mock pointing at
+    one goes first -- it restricts the server's deletion, and loading
+    registers it again against the server's new id. A retired server that
+    something else has come to reference (a workflow's tool binding) is kept
+    and logged like any referenced demo row; its new namesake is then skipped
+    as a name collision until it is removed.
 
     Args:
         session: Database session used to read and delete the rows.
+        t: The tenant, whose ids are the legacy ones.
     """
     for old_id in _RETIRED_DEMO_MCP_SERVER_IDS:
         if await session.get(MCPServer, old_id) is None:
             continue
         for mock_spec in _DEMO_TOOL_MOCKS:
-            mock = await session.get(MCPToolMock, mock_spec.id)
+            mock = await session.get(MCPToolMock, t.row_id(mock_spec.id))
             if mock is not None and mock.mcp_server_id == old_id:
                 await _delete_demo_row(
                     session,
+                    t,
                     MCPToolMock,
                     mock_spec.id,
                     label=f"tool mock {mock_spec.name!r}",
                 )
         await _delete_demo_row(
-            session, MCPServer, old_id, label=f"MCP server under retired id {old_id}"
+            session, t, MCPServer, old_id, label=f"MCP server under retired id {old_id}"
         )
-
-
-async def _default_tenant_id(session: AsyncSession) -> str | None:
-    """Return the id of the seeded ``Default`` tenant, or ``None`` if absent.
-
-    Args:
-        session: Database session used to read the tenant.
-
-    Returns:
-        The tenant's id, or ``None`` when it has not been seeded.
-    """
-    stmt = select(Tenant).where(col(Tenant.name) == DEFAULT_TENANT_NAME).limit(1)
-    tenant = (await session.exec(stmt)).first()
-    return None if tenant is None else tenant.id
 
 
 async def _insert(session: AsyncSession, row: SQLModel, *, label: str) -> bool:
@@ -1551,7 +1542,7 @@ async def _insert(session: AsyncSession, row: SQLModel, *, label: str) -> bool:
     so an operator may already have a record of their own under one of them.
     The per-tenant unique constraint catches that; the collision is reported
     and the remaining demo records are still registered, rather than the
-    ``IntegrityError`` propagating out of the startup hook.
+    ``IntegrityError`` failing the whole load.
 
     Args:
         session: Database session used to insert the row.
@@ -1576,75 +1567,81 @@ async def _insert(session: AsyncSession, row: SQLModel, *, label: str) -> bool:
 
 
 async def _delete_demo_row(
-    session: AsyncSession, model: type[_RowT], row_id: str, *, label: str
-) -> None:
+    session: AsyncSession,
+    t: _DemoTenant,
+    model: type[_RowT],
+    base_id: str,
+    *,
+    label: str,
+) -> bool:
     """Delete one demo row by id, tolerating both absence and references.
 
     Args:
         session: Database session used to read and delete the row.
+        t: The tenant the row belongs to.
         model: Table model class the row belongs to.
-        row_id: Fixed identifier of the demo row.
+        base_id: Base id of the demo row (see :class:`_DemoTenant`).
         label: Human-readable description of the row used in the log message.
+
+    Returns:
+        ``True`` when the row is still there because other records reference
+        it, ``False`` when it is gone (or never existed).
     """
-    row = await session.get(model, row_id)
+    row = await session.get(model, t.row_id(base_id))
     if row is None:
-        return
+        return False
     try:
         await session.delete(row)
         await session.commit()
     except IntegrityError:
         await session.rollback()
         logger.warning(
-            "Could not remove the demo %s: other records still reference it. "
-            "Delete those first, then restart, or remove it in the admin UI.",
+            "Could not remove the demo %s from tenant %s: other records still "
+            "reference it. Delete those first, then clear again, or remove it "
+            "in the admin UI.",
             label,
+            t.id,
         )
+        return True
+    return False
 
 
-async def _seed_demo_users(session: AsyncSession, tenant_id: str) -> None:
-    """Create the demo approver and requester, reviving them if soft-deleted.
+async def _seed_demo_users(session: AsyncSession, t: _DemoTenant) -> None:
+    """Create the demo accounts, reviving them if soft-deleted.
 
-    The shared password is resolved only when at least one account is actually
-    missing, so a restart with everything already in place never generates —
-    and logs — a password nobody will use.
+    Each new account gets its own random password that is never shown or
+    stored anywhere else, so nobody can sign in as it: an ``admin`` uses the
+    account through impersonation, or sets a password on the Users page.
 
-    A previous removal may have left an account *soft*-deleted rather than
+    A previous clear may have left an account *soft*-deleted rather than
     gone (see :meth:`repositories.user.SqlUserRepository.delete`), because it
-    was still referenced through ``created_by`` / ``updated_by``. Re-enabling
-    the demo data revives such an account instead of leaving it disabled.
+    was still referenced through ``created_by`` / ``updated_by``. Loading the
+    demo data again revives such an account instead of leaving it disabled.
 
     Args:
         session: Database session used to read, insert, and update users.
-        tenant_id: Id of the ``Default`` tenant the accounts belong to.
+        t: The tenant the accounts belong to.
     """
-    missing: list[_DemoUserSpec] = []
     for spec in _DEMO_USERS:
-        existing = await session.get(User, spec.id)
-        if existing is None:
-            missing.append(spec)
-        else:
+        existing = await session.get(User, t.row_id(spec.id))
+        if existing is not None:
             await _revive_demo_user(session, existing, spec)
-    if not missing:
-        return
-    password = resolve_seed_password(
-        get_settings().demo_password, subject="demo users", env_var="DEMO_PASSWORD"
-    )
-    for spec in missing:
+            continue
         await _insert(
             session,
             User(
-                id=spec.id,
+                id=t.row_id(spec.id),
                 username=spec.username,
                 first_name=spec.first_name,
                 last_name=spec.last_name,
-                password=hash_password(password),
+                password=hash_password(secrets.token_urlsafe(32)),
                 email=f"{spec.username}@example.com",
                 enabled=True,
                 email_verified=False,
                 # No direct roles: every demo account inherits its role from
                 # the matching group seeded by _seed_demo_groups.
                 roles=[],
-                tenant_id=tenant_id,
+                tenant_id=t.id,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             ),
@@ -1660,16 +1657,16 @@ async def _revive_demo_user(
     Clears a soft delete, re-enables the account, and — for a database seeded
     by an older version of this module, which granted each demo account its
     role directly — strips the direct roles so the account gets them from its
-    group instead. Without that last step, upgrading with ``DEMO_DATA`` left
-    enabled would leave the role granted twice over, and removing a user from
-    their demo group would visibly fail to revoke anything.
+    group instead. Without that last step, a database upgraded with the demo
+    data in place would have the role granted twice over, and removing a user
+    from their demo group would visibly fail to revoke anything.
 
     Also brings the account's identity fields back in line with ``spec``: a
     row seeded under an older version of this module may still carry a
     previous generation's username (e.g. ``demo-developer`` before this
     module split it into a per-provider ``demo-aws-developer`` /
     ``demo-gcp-developer`` pair), which would otherwise never be corrected by
-    a later restart.
+    a later load.
 
     Args:
         session: Database session used to update the user.
@@ -1723,29 +1720,30 @@ async def _delete_demo_user(session: AsyncSession, user_id: str) -> None:
     await SqlUserRepository(session).delete(user_id)
 
 
-async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_groups(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo user groups and place each demo account in its group(s).
 
     Must run after :func:`_seed_demo_users`: the membership rows reference
     ``users.id``. A group whose row already exists is left alone, but its
     membership is re-asserted, so a member removed by hand in the admin UI
-    comes back on the next restart — matching this module's declarative
-    contract for every other record.
+    comes back on the next load — matching what a load does for every other
+    record.
 
     Nothing needs recomputing afterwards: a member's inherited roles are
     resolved from these rows on every request rather than stored on the user.
 
     Args:
         session: Database session used to read and insert groups and members.
-        tenant_id: Id of the ``Default`` tenant the groups belong to.
+        t: The tenant the groups belong to.
     """
     for spec in _DEMO_GROUPS:
-        if await session.get(UserGroup, spec.id) is None:
+        group_id = t.row_id(spec.id)
+        if await session.get(UserGroup, group_id) is None:
             await _insert(
                 session,
                 UserGroup(
-                    id=spec.id,
-                    tenant_id=tenant_id,
+                    id=group_id,
+                    tenant_id=t.id,
                     name=spec.name,
                     description=spec.description,
                     roles=[spec.role.value] if spec.role is not None else [],
@@ -1754,67 +1752,74 @@ async def _seed_demo_groups(session: AsyncSession, tenant_id: str) -> None:
                 ),
                 label=f"user group '{spec.name}'",
             )
-        if await session.get(UserGroup, spec.id) is None:
+        if await session.get(UserGroup, group_id) is None:
             # The insert collided with an operator's own group of that name;
             # there is nothing to attach a membership to.
             continue
-        for member_id in spec.member_ids:
-            if await session.get(UserGroupMember, (spec.id, member_id)) is None:
+        for member_base_id in spec.member_ids:
+            member_id = t.row_id(member_base_id)
+            if await session.get(UserGroupMember, (group_id, member_id)) is None:
                 await _insert(
                     session,
-                    UserGroupMember(group_id=spec.id, user_id=member_id),
+                    UserGroupMember(group_id=group_id, user_id=member_id),
                     label=f"membership of user group '{spec.name}'",
                 )
 
 
-async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_secrets(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo AWS, Google Cloud, and Azure credential secrets.
 
     The AWS access key and secret key live in a single secret as two entries,
     the way a Vault KV path holds several keys; the Google Cloud credential
     JSON is a second secret with a single entry; the Azure service
     principal's tenant id, client id, and client secret are a third secret
-    with three entries. Values come from ``DEMO_AWS_ACCESS_KEY_ID`` /
-    ``DEMO_AWS_SECRET_ACCESS_KEY`` / ``DEMO_GCP_CREDENTIALS_JSON`` /
-    ``DEMO_AZURE_TENANT_ID`` / ``DEMO_AZURE_CLIENT_ID`` /
-    ``DEMO_AZURE_CLIENT_SECRET`` when set, so a fully working demo is one
-    restart away, and fall back to a placeholder otherwise.
+    with three entries. In the ``Default`` tenant the values come from
+    ``DEMO_AWS_ACCESS_KEY_ID`` / ``DEMO_AWS_SECRET_ACCESS_KEY`` /
+    ``DEMO_GCP_CREDENTIALS_JSON`` / ``DEMO_AZURE_TENANT_ID`` /
+    ``DEMO_AZURE_CLIENT_ID`` / ``DEMO_AZURE_CLIENT_SECRET`` when set, so the
+    deployment's operator gets a fully working demo; every other tenant, and
+    every unset variable, gets a placeholder its admin replaces on the Secrets
+    page. The deployment's credentials are never handed to another tenant.
     They are stored as Fernet ciphertext under the tenant's data key, the same
     as any secret created through the API — the encryption lives in the
     service layer, which this out-of-request caller cannot use, so the cipher
     is applied directly here. Each secret is guarded by its own id check, so an
     operator's own record under one demo name never blocks seeding the other.
     The data key is unwrapped only when a secret is actually missing: a
-    restart that finds all three must not depend on it.
+    load that finds all three must not depend on it.
 
     Args:
         session: Database session used to read and insert secrets.
-        tenant_id: Id of the ``Default`` tenant the secrets belong to.
+        t: The tenant the secrets belong to.
     """
     settings = get_settings()
+
+    def value(configured: str | None) -> str:
+        return (configured if t.legacy_ids else None) or _PLACEHOLDER_SECRET_VALUE
+
     missing = {
         secret_id
         for secret_id in (DEMO_AWS_SECRET_ID, DEMO_GCP_SECRET_ID, DEMO_AZURE_SECRET_ID)
-        if await session.get(Secret, secret_id) is None
+        if await session.get(Secret, t.row_id(secret_id)) is None
     }
     if not missing:
         return
-    cipher = await TenantCiphers(session).for_tenant(tenant_id)
+    cipher = await TenantCiphers(session).for_tenant(t.id)
     if DEMO_AWS_SECRET_ID in missing:
         await _insert(
             session,
             Secret(
-                id=DEMO_AWS_SECRET_ID,
-                tenant_id=tenant_id,
+                id=t.row_id(DEMO_AWS_SECRET_ID),
+                tenant_id=t.id,
                 name=DEMO_AWS_SECRET_NAME,
                 description=_DEMO_AWS_SECRET_DESCRIPTION,
                 type=SecretType.local,
                 entries={
                     DEMO_ACCESS_KEY_ENTRY_KEY: cipher.encrypt(
-                        settings.demo_aws_access_key_id or _PLACEHOLDER_SECRET_VALUE
+                        value(settings.demo_aws_access_key_id)
                     ),
                     DEMO_SECRET_KEY_ENTRY_KEY: cipher.encrypt(
-                        settings.demo_aws_secret_access_key or _PLACEHOLDER_SECRET_VALUE
+                        value(settings.demo_aws_secret_access_key)
                     ),
                 },
                 created_by=SYSTEM_USER_ID,
@@ -1826,14 +1831,14 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
         await _insert(
             session,
             Secret(
-                id=DEMO_GCP_SECRET_ID,
-                tenant_id=tenant_id,
+                id=t.row_id(DEMO_GCP_SECRET_ID),
+                tenant_id=t.id,
                 name=DEMO_GCP_SECRET_NAME,
                 description=_DEMO_GCP_SECRET_DESCRIPTION,
                 type=SecretType.local,
                 entries={
                     DEMO_GCP_CREDENTIALS_ENTRY_KEY: cipher.encrypt(
-                        settings.demo_gcp_credentials_json or _PLACEHOLDER_SECRET_VALUE
+                        value(settings.demo_gcp_credentials_json)
                     ),
                 },
                 created_by=SYSTEM_USER_ID,
@@ -1845,20 +1850,20 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
         await _insert(
             session,
             Secret(
-                id=DEMO_AZURE_SECRET_ID,
-                tenant_id=tenant_id,
+                id=t.row_id(DEMO_AZURE_SECRET_ID),
+                tenant_id=t.id,
                 name=DEMO_AZURE_SECRET_NAME,
                 description=_DEMO_AZURE_SECRET_DESCRIPTION,
                 type=SecretType.local,
                 entries={
                     DEMO_AZURE_TENANT_ENTRY_KEY: cipher.encrypt(
-                        settings.demo_azure_tenant_id or _PLACEHOLDER_SECRET_VALUE
+                        value(settings.demo_azure_tenant_id)
                     ),
                     DEMO_AZURE_CLIENT_ID_ENTRY_KEY: cipher.encrypt(
-                        settings.demo_azure_client_id or _PLACEHOLDER_SECRET_VALUE
+                        value(settings.demo_azure_client_id)
                     ),
                     DEMO_AZURE_CLIENT_SECRET_ENTRY_KEY: cipher.encrypt(
-                        settings.demo_azure_client_secret or _PLACEHOLDER_SECRET_VALUE
+                        value(settings.demo_azure_client_secret)
                     ),
                 },
                 created_by=SYSTEM_USER_ID,
@@ -1868,7 +1873,7 @@ async def _seed_demo_secrets(session: AsyncSession, tenant_id: str) -> None:
         )
 
 
-async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_mcp_server(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo AWS MCP server.
 
     The AWS MCP Server is a managed remote endpoint rather than something to
@@ -1880,7 +1885,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
     :class:`infrastructure.secret_resolver.SecretResolver`, so the plaintext
     never lands in the ``mcp_servers`` row.
 
-    ``DEMO_AWS_REGION`` is carried in this row's own ``env`` (as
+    :data:`_DEMO_AWS_REGION` is carried in this row's own ``env`` (as
     ``AWS_REGION``) and referenced from ``args`` via ``${env:AWS_REGION}`` —
     the remote server reads that metadata value to pick the region its tools
     act on — kept apart from ``--region``, which only governs the signature
@@ -1888,16 +1893,15 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
 
     Args:
         session: Database session used to read and insert the server.
-        tenant_id: Id of the ``Default`` tenant the server belongs to.
+        t: The tenant the server belongs to.
     """
-    if await session.get(MCPServer, DEMO_MCP_SERVER_ID) is not None:
+    if await session.get(MCPServer, t.row_id(DEMO_MCP_SERVER_ID)) is not None:
         return
-    settings = get_settings()
     await _insert(
         session,
         MCPServer(
-            id=DEMO_MCP_SERVER_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_MCP_SERVER_ID),
+            tenant_id=t.id,
             name=DEMO_MCP_SERVER_NAME,
             description=_DEMO_MCP_SERVER_DESCRIPTION,
             transport=McpTransport.stdio,
@@ -1918,7 +1922,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
                 "AWS_SECRET_ACCESS_KEY": (
                     f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_SECRET_KEY_ENTRY_KEY}}}"
                 ),
-                "AWS_REGION": settings.demo_aws_region,
+                "AWS_REGION": _DEMO_AWS_REGION,
             },
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
@@ -1927,7 +1931,7 @@ async def _seed_demo_mcp_server(session: AsyncSession, tenant_id: str) -> None:
     )
 
 
-async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_gke_mcp_server(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo GKE MCP server.
 
     Google runs the GKE MCP server as a managed remote endpoint, so the row is
@@ -1945,15 +1949,15 @@ async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> No
 
     Args:
         session: Database session used to read and insert the server.
-        tenant_id: Id of the ``Default`` tenant the server belongs to.
+        t: The tenant the server belongs to.
     """
-    if await session.get(MCPServer, DEMO_GKE_MCP_SERVER_ID) is not None:
+    if await session.get(MCPServer, t.row_id(DEMO_GKE_MCP_SERVER_ID)) is not None:
         return
     await _insert(
         session,
         MCPServer(
-            id=DEMO_GKE_MCP_SERVER_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_GKE_MCP_SERVER_ID),
+            tenant_id=t.id,
             name=DEMO_GKE_MCP_SERVER_NAME,
             description=_DEMO_GKE_MCP_SERVER_DESCRIPTION,
             transport=McpTransport.streamable_http,
@@ -1972,7 +1976,7 @@ async def _seed_demo_gke_mcp_server(session: AsyncSession, tenant_id: str) -> No
 
 
 async def _seed_demo_cost_estimator_mcp_server(
-    session: AsyncSession, tenant_id: str
+    session: AsyncSession, t: _DemoTenant
 ) -> None:
     """Create the demo EC2 Cost Estimator, a Python script MCP server.
 
@@ -1986,15 +1990,18 @@ async def _seed_demo_cost_estimator_mcp_server(
 
     Args:
         session: Database session used to read and insert the server.
-        tenant_id: Id of the ``Default`` tenant the server belongs to.
+        t: The tenant the server belongs to.
     """
-    if await session.get(MCPServer, DEMO_COST_ESTIMATOR_MCP_SERVER_ID) is not None:
+    if (
+        await session.get(MCPServer, t.row_id(DEMO_COST_ESTIMATOR_MCP_SERVER_ID))
+        is not None
+    ):
         return
     await _insert(
         session,
         MCPServer(
-            id=DEMO_COST_ESTIMATOR_MCP_SERVER_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_COST_ESTIMATOR_MCP_SERVER_ID),
+            tenant_id=t.id,
             name=DEMO_COST_ESTIMATOR_MCP_SERVER_NAME,
             description=_DEMO_COST_ESTIMATOR_DESCRIPTION,
             transport=McpTransport.script,
@@ -2009,7 +2016,7 @@ async def _seed_demo_cost_estimator_mcp_server(
                 "AWS_SECRET_ACCESS_KEY": (
                     f"${{secret:{DEMO_AWS_SECRET_NAME}/{DEMO_SECRET_KEY_ENTRY_KEY}}}"
                 ),
-                "AWS_REGION": get_settings().demo_aws_region,
+                "AWS_REGION": _DEMO_AWS_REGION,
             },
             created_by=SYSTEM_USER_ID,
             updated_by=SYSTEM_USER_ID,
@@ -2019,7 +2026,7 @@ async def _seed_demo_cost_estimator_mcp_server(
 
 
 async def _seed_demo_k8s_toolkit_mcp_server(
-    session: AsyncSession, tenant_id: str
+    session: AsyncSession, t: _DemoTenant
 ) -> None:
     """Create the demo Kubernetes Manifest Toolkit, a JavaScript script MCP server.
 
@@ -2029,15 +2036,18 @@ async def _seed_demo_k8s_toolkit_mcp_server(
 
     Args:
         session: Database session used to read and insert the server.
-        tenant_id: Id of the ``Default`` tenant the server belongs to.
+        t: The tenant the server belongs to.
     """
-    if await session.get(MCPServer, DEMO_K8S_TOOLKIT_MCP_SERVER_ID) is not None:
+    if (
+        await session.get(MCPServer, t.row_id(DEMO_K8S_TOOLKIT_MCP_SERVER_ID))
+        is not None
+    ):
         return
     await _insert(
         session,
         MCPServer(
-            id=DEMO_K8S_TOOLKIT_MCP_SERVER_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_K8S_TOOLKIT_MCP_SERVER_ID),
+            tenant_id=t.id,
             name=DEMO_K8S_TOOLKIT_MCP_SERVER_NAME,
             description=_DEMO_K8S_TOOLKIT_DESCRIPTION,
             transport=McpTransport.script,
@@ -2052,7 +2062,7 @@ async def _seed_demo_k8s_toolkit_mcp_server(
     )
 
 
-async def _seed_demo_azure_mcp_server(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_azure_mcp_server(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo Azure MCP server.
 
     Microsoft ships the Azure MCP Server as an npm package, so the row is a
@@ -2066,14 +2076,14 @@ async def _seed_demo_azure_mcp_server(session: AsyncSession, tenant_id: str) -> 
 
     An existing row still launched with :data:`_RETIRED_AZURE_MCP_FLAG` has it
     removed -- the same way :func:`_ensure_demo_tag` brings an older tag's
-    flag in line -- so upgrading with ``DEMO_DATA`` left on starts asking for
+    flag in line -- so loading again starts asking for
     consent without a manual edit.
 
     Args:
         session: Database session used to read and insert the server.
-        tenant_id: Id of the ``Default`` tenant the server belongs to.
+        t: The tenant the server belongs to.
     """
-    existing = await session.get(MCPServer, DEMO_AZURE_MCP_SERVER_ID)
+    existing = await session.get(MCPServer, t.row_id(DEMO_AZURE_MCP_SERVER_ID))
     if existing is not None:
         if _RETIRED_AZURE_MCP_FLAG in existing.args:
             existing.args = [
@@ -2087,8 +2097,8 @@ async def _seed_demo_azure_mcp_server(session: AsyncSession, tenant_id: str) -> 
     await _insert(
         session,
         MCPServer(
-            id=DEMO_AZURE_MCP_SERVER_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_AZURE_MCP_SERVER_ID),
+            tenant_id=t.id,
             name=DEMO_AZURE_MCP_SERVER_NAME,
             description=_DEMO_AZURE_MCP_SERVER_DESCRIPTION,
             transport=McpTransport.stdio,
@@ -2112,7 +2122,7 @@ async def _seed_demo_azure_mcp_server(session: AsyncSession, tenant_id: str) -> 
 
 
 async def _seed_demo_secret_generator_mcp_server(
-    session: AsyncSession, tenant_id: str
+    session: AsyncSession, t: _DemoTenant
 ) -> None:
     """Create the demo Secret Value Generator, a JavaScript script MCP server.
 
@@ -2122,15 +2132,18 @@ async def _seed_demo_secret_generator_mcp_server(
 
     Args:
         session: Database session used to read and insert the server.
-        tenant_id: Id of the ``Default`` tenant the server belongs to.
+        t: The tenant the server belongs to.
     """
-    if await session.get(MCPServer, DEMO_SECRET_GENERATOR_MCP_SERVER_ID) is not None:
+    if (
+        await session.get(MCPServer, t.row_id(DEMO_SECRET_GENERATOR_MCP_SERVER_ID))
+        is not None
+    ):
         return
     await _insert(
         session,
         MCPServer(
-            id=DEMO_SECRET_GENERATOR_MCP_SERVER_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_SECRET_GENERATOR_MCP_SERVER_ID),
+            tenant_id=t.id,
             name=DEMO_SECRET_GENERATOR_MCP_SERVER_NAME,
             description=_DEMO_SECRET_GENERATOR_DESCRIPTION,
             transport=McpTransport.script,
@@ -2145,10 +2158,10 @@ async def _seed_demo_secret_generator_mcp_server(
     )
 
 
-async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_tool_mocks(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo tool mocks that let a draft run play through unattended.
 
-    Seven stubs, all in the seeded ``Default`` tenant: ``call_aws`` and
+    Seven stubs, all in the tenant the dataset is loaded into: ``call_aws`` and
     ``run_script`` on the demo AWS MCP server, each returning a successful EC2
     launch, ``patch_k8s_resource`` and ``delete_k8s_resource`` on the demo GKE
     MCP server, returning a successful rolling restart and a successful pod
@@ -2172,19 +2185,19 @@ async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
 
     Args:
         session: Database session used to read and insert the mocks.
-        tenant_id: Id of the ``Default`` tenant the mocks belong to.
+        t: The tenant the mocks belong to.
     """
     for spec in _DEMO_TOOL_MOCKS:
-        if await session.get(MCPToolMock, spec.id) is not None:
+        if await session.get(MCPToolMock, t.row_id(spec.id)) is not None:
             continue
         await _insert(
             session,
             MCPToolMock(
-                id=spec.id,
-                tenant_id=tenant_id,
+                id=t.row_id(spec.id),
+                tenant_id=t.id,
                 name=spec.name,
                 description=spec.description,
-                mcp_server_id=spec.mcp_server_id,
+                mcp_server_id=spec.mcp_server_id and t.row_id(spec.mcp_server_id),
                 tool_name=spec.tool_name,
                 responses=[spec.response],
                 created_by=SYSTEM_USER_ID,
@@ -2194,27 +2207,27 @@ async def _seed_demo_tool_mocks(session: AsyncSession, tenant_id: str) -> None:
         )
 
 
-async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str | None:
+async def _seed_demo_agent_skill(session: AsyncSession, t: _DemoTenant) -> str | None:
     """Create the demo agent skill pointing at the ``aws-ec2-launch`` sample.
 
     The repository is public, so no ``repo_auth_password`` is needed. The row is
     left ``pending``: cloning is the caller's job, since it is a network
-    operation that must not block application startup.
+    operation that must not hold up the load.
 
     Args:
         session: Database session used to read and insert the skill.
-        tenant_id: Id of the ``Default`` tenant the skill belongs to.
+        t: The tenant the skill belongs to.
 
     Returns:
         The skill's id when this call created it, else ``None``.
     """
-    if await session.get(AgentSkill, DEMO_AGENT_SKILL_ID) is not None:
+    if await session.get(AgentSkill, t.row_id(DEMO_AGENT_SKILL_ID)) is not None:
         return None
     created = await _insert(
         session,
         AgentSkill(
-            id=DEMO_AGENT_SKILL_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_AGENT_SKILL_ID),
+            tenant_id=t.id,
             name=DEMO_AGENT_SKILL_NAME,
             repo_url=_DEMO_SKILL_REPO_URL,
             repo_path=_DEMO_AWS_SKILL_REPO_PATH,
@@ -2227,11 +2240,11 @@ async def _seed_demo_agent_skill(session: AsyncSession, tenant_id: str) -> str |
         ),
         label=f"agent skill '{DEMO_AGENT_SKILL_NAME}'",
     )
-    return DEMO_AGENT_SKILL_ID if created else None
+    return t.row_id(DEMO_AGENT_SKILL_ID) if created else None
 
 
 async def _seed_demo_gke_agent_skill(
-    session: AsyncSession, tenant_id: str
+    session: AsyncSession, t: _DemoTenant
 ) -> str | None:
     """Create the demo agent skill pointing at the ``gke-pod-restart`` sample.
 
@@ -2244,18 +2257,18 @@ async def _seed_demo_gke_agent_skill(
 
     Args:
         session: Database session used to read and insert the skill.
-        tenant_id: Id of the ``Default`` tenant the skill belongs to.
+        t: The tenant the skill belongs to.
 
     Returns:
         The skill's id when this call created it, else ``None``.
     """
-    if await session.get(AgentSkill, DEMO_GKE_SKILL_ID) is not None:
+    if await session.get(AgentSkill, t.row_id(DEMO_GKE_SKILL_ID)) is not None:
         return None
     created = await _insert(
         session,
         AgentSkill(
-            id=DEMO_GKE_SKILL_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_GKE_SKILL_ID),
+            tenant_id=t.id,
             name=DEMO_GKE_SKILL_NAME,
             repo_url=_DEMO_SKILL_REPO_URL,
             repo_path=_DEMO_GKE_SKILL_REPO_PATH,
@@ -2270,11 +2283,11 @@ async def _seed_demo_gke_agent_skill(
         ),
         label=f"agent skill '{DEMO_GKE_SKILL_NAME}'",
     )
-    return DEMO_GKE_SKILL_ID if created else None
+    return t.row_id(DEMO_GKE_SKILL_ID) if created else None
 
 
 async def _seed_demo_azure_agent_skill(
-    session: AsyncSession, tenant_id: str
+    session: AsyncSession, t: _DemoTenant
 ) -> str | None:
     """Create the demo agent skill pointing at the ``azure-keyvault-secret-rotation`` sample.
 
@@ -2287,18 +2300,18 @@ async def _seed_demo_azure_agent_skill(
 
     Args:
         session: Database session used to read and insert the skill.
-        tenant_id: Id of the ``Default`` tenant the skill belongs to.
+        t: The tenant the skill belongs to.
 
     Returns:
         The skill's id when this call created it, else ``None``.
     """
-    if await session.get(AgentSkill, DEMO_AZURE_SKILL_ID) is not None:
+    if await session.get(AgentSkill, t.row_id(DEMO_AZURE_SKILL_ID)) is not None:
         return None
     created = await _insert(
         session,
         AgentSkill(
-            id=DEMO_AZURE_SKILL_ID,
-            tenant_id=tenant_id,
+            id=t.row_id(DEMO_AZURE_SKILL_ID),
+            tenant_id=t.id,
             name=DEMO_AZURE_SKILL_NAME,
             repo_url=_DEMO_SKILL_REPO_URL,
             repo_path=_DEMO_AZURE_SKILL_REPO_PATH,
@@ -2312,10 +2325,10 @@ async def _seed_demo_azure_agent_skill(
         ),
         label=f"agent skill '{DEMO_AZURE_SKILL_NAME}'",
     )
-    return DEMO_AZURE_SKILL_ID if created else None
+    return t.row_id(DEMO_AZURE_SKILL_ID) if created else None
 
 
-async def _seed_demo_knowledge_base(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_knowledge_base(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo ``AWS EC2 Pricing`` knowledge base and its one source.
 
     The source is the EC2 price sheet PDF shipped with this module, stored as
@@ -2324,18 +2337,18 @@ async def _seed_demo_knowledge_base(session: AsyncSession, tenant_id: str) -> No
     walkthrough has the AWS developer do that, which is how it shows a
     document turning into knowledge base pages. Each row is checked on its
     own, so a source deleted in the admin UI is registered again on the next
-    startup while a knowledge base renamed there is left alone.
+    load while a knowledge base renamed there is left alone.
 
     Args:
         session: Database session used to read and insert the rows.
-        tenant_id: Id of the ``Default`` tenant the rows belong to.
+        t: The tenant the rows belong to.
     """
-    if await session.get(KnowledgeBase, DEMO_PRICING_KB_ID) is None and not (
+    if await session.get(KnowledgeBase, t.row_id(DEMO_PRICING_KB_ID)) is None and not (
         await _insert(
             session,
             KnowledgeBase(
-                id=DEMO_PRICING_KB_ID,
-                tenant_id=tenant_id,
+                id=t.row_id(DEMO_PRICING_KB_ID),
+                tenant_id=t.id,
                 name=DEMO_PRICING_KB_NAME,
                 description=_DEMO_PRICING_KB_DESCRIPTION,
                 created_by=SYSTEM_USER_ID,
@@ -2345,15 +2358,15 @@ async def _seed_demo_knowledge_base(session: AsyncSession, tenant_id: str) -> No
         )
     ):
         return
-    if await session.get(KnowledgeSource, DEMO_PRICING_SOURCE_ID) is not None:
+    if await session.get(KnowledgeSource, t.row_id(DEMO_PRICING_SOURCE_ID)) is not None:
         return
     data = _DEMO_PRICING_FILE.read_bytes()
     await _insert(
         session,
         KnowledgeSource(
-            id=DEMO_PRICING_SOURCE_ID,
-            tenant_id=tenant_id,
-            knowledge_base_id=DEMO_PRICING_KB_ID,
+            id=t.row_id(DEMO_PRICING_SOURCE_ID),
+            tenant_id=t.id,
+            knowledge_base_id=t.row_id(DEMO_PRICING_KB_ID),
             kind=KnowledgeSourceKind.file,
             file_name=DEMO_PRICING_FILE_NAME,
             content_type="application/pdf",
@@ -2367,7 +2380,7 @@ async def _seed_demo_knowledge_base(session: AsyncSession, tenant_id: str) -> No
     )
 
 
-async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
+async def _seed_demo_tags(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the demo tags and attach them across six of the seven taggable kinds.
 
     ``AWS`` lands on the AWS secret, AWS MCP server, EC2 Cost Estimator, the
@@ -2401,11 +2414,11 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     Args:
         session: Database session used to read and insert tags and their
             attachments.
-        tenant_id: Id of the ``Default`` tenant the tags belong to.
+        t: The tenant the tags belong to.
     """
     if await _ensure_demo_tag(
         session,
-        tenant_id,
+        t,
         DEMO_AWS_TAG_ID,
         DEMO_AWS_TAG_NAME,
         TagColor.cyan,
@@ -2414,6 +2427,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     ):
         await _link_tag(
             session,
+            t,
             SecretTag,
             resource_model=Secret,
             resource_id=DEMO_AWS_SECRET_ID,
@@ -2422,6 +2436,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpServerTag,
             resource_model=MCPServer,
             resource_id=DEMO_MCP_SERVER_ID,
@@ -2430,6 +2445,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpServerTag,
             resource_model=MCPServer,
             resource_id=DEMO_COST_ESTIMATOR_MCP_SERVER_ID,
@@ -2441,6 +2457,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             AgentSkillTag,
             resource_model=AgentSkill,
             resource_id=DEMO_AGENT_SKILL_ID,
@@ -2449,6 +2466,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpToolMockTag,
             resource_model=MCPToolMock,
             resource_id=DEMO_CALL_AWS_MOCK_ID,
@@ -2457,6 +2475,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpToolMockTag,
             resource_model=MCPToolMock,
             resource_id=DEMO_RUN_SCRIPT_MOCK_ID,
@@ -2467,6 +2486,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             KnowledgeBaseTag,
             resource_model=KnowledgeBase,
             resource_id=DEMO_PRICING_KB_ID,
@@ -2477,6 +2497,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             UserGroupTag,
             resource_model=UserGroup,
             resource_id=DEMO_AWS_GROUP_ID,
@@ -2485,6 +2506,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             UserGroupTag,
             resource_model=UserGroup,
             resource_id=DEMO_APPROVERS_GROUP_ID,
@@ -2493,7 +2515,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
     if await _ensure_demo_tag(
         session,
-        tenant_id,
+        t,
         DEMO_GCP_TAG_ID,
         DEMO_GCP_TAG_NAME,
         TagColor.indigo,
@@ -2502,6 +2524,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     ):
         await _link_tag(
             session,
+            t,
             SecretTag,
             resource_model=Secret,
             resource_id=DEMO_GCP_SECRET_ID,
@@ -2510,6 +2533,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpServerTag,
             resource_model=MCPServer,
             resource_id=DEMO_GKE_MCP_SERVER_ID,
@@ -2520,6 +2544,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpServerTag,
             resource_model=MCPServer,
             resource_id=DEMO_K8S_TOOLKIT_MCP_SERVER_ID,
@@ -2531,6 +2556,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             AgentSkillTag,
             resource_model=AgentSkill,
             resource_id=DEMO_GKE_SKILL_ID,
@@ -2539,6 +2565,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpToolMockTag,
             resource_model=MCPToolMock,
             resource_id=DEMO_PATCH_WORKLOAD_MOCK_ID,
@@ -2550,6 +2577,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             McpToolMockTag,
             resource_model=MCPToolMock,
             resource_id=DEMO_DELETE_POD_MOCK_ID,
@@ -2560,6 +2588,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             UserGroupTag,
             resource_model=UserGroup,
             resource_id=DEMO_GCP_GROUP_ID,
@@ -2568,6 +2597,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             UserGroupTag,
             resource_model=UserGroup,
             resource_id=DEMO_APPROVERS_GROUP_ID,
@@ -2576,7 +2606,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
     if await _ensure_demo_tag(
         session,
-        tenant_id,
+        t,
         DEMO_AZURE_TAG_ID,
         DEMO_AZURE_TAG_NAME,
         TagColor.violet,
@@ -2585,6 +2615,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     ):
         await _link_tag(
             session,
+            t,
             SecretTag,
             resource_model=Secret,
             resource_id=DEMO_AZURE_SECRET_ID,
@@ -2600,6 +2631,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         ):
             await _link_tag(
                 session,
+                t,
                 McpServerTag,
                 resource_model=MCPServer,
                 resource_id=server_id,
@@ -2608,6 +2640,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             )
         await _link_tag(
             session,
+            t,
             AgentSkillTag,
             resource_model=AgentSkill,
             resource_id=DEMO_AZURE_SKILL_ID,
@@ -2620,6 +2653,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         ):
             await _link_tag(
                 session,
+                t,
                 McpToolMockTag,
                 resource_model=MCPToolMock,
                 resource_id=mock_id,
@@ -2632,6 +2666,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         ):
             await _link_tag(
                 session,
+                t,
                 UserGroupTag,
                 resource_model=UserGroup,
                 resource_id=group_id,
@@ -2640,7 +2675,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
             )
     if await _ensure_demo_tag(
         session,
-        tenant_id,
+        t,
         DEMO_APPROVAL_TAG_ID,
         DEMO_APPROVAL_TAG_NAME,
         TagColor.amber,
@@ -2648,6 +2683,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
     ):
         await _link_tag(
             session,
+            t,
             AgentSkillTag,
             resource_model=AgentSkill,
             resource_id=DEMO_AGENT_SKILL_ID,
@@ -2659,6 +2695,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             AgentSkillTag,
             resource_model=AgentSkill,
             resource_id=DEMO_GKE_SKILL_ID,
@@ -2669,6 +2706,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
         )
         await _link_tag(
             session,
+            t,
             AgentSkillTag,
             resource_model=AgentSkill,
             resource_id=DEMO_AZURE_SKILL_ID,
@@ -2682,7 +2720,7 @@ async def _seed_demo_tags(session: AsyncSession, tenant_id: str) -> None:
 
 async def _ensure_demo_tag(
     session: AsyncSession,
-    tenant_id: str,
+    t: _DemoTenant,
     tag_id: str,
     name: str,
     color: TagColor,
@@ -2700,7 +2738,7 @@ async def _ensure_demo_tag(
 
     Args:
         session: Database session used to read and insert the tag.
-        tenant_id: Id of the ``Default`` tenant the tag belongs to.
+        t: The tenant the tag belongs to.
         tag_id: Fixed identifier of the demo tag.
         name: Name shown in the admin UI.
         color: Palette slot the tag's chip is drawn in.
@@ -2713,7 +2751,7 @@ async def _ensure_demo_tag(
         was just created), ``False`` when creation was skipped by a name
         collision with an operator's own tag.
     """
-    existing = await session.get(Tag, tag_id)
+    existing = await session.get(Tag, t.row_id(tag_id))
     if existing is not None:
         if existing.access_control != access_control:
             existing.access_control = access_control
@@ -2724,8 +2762,8 @@ async def _ensure_demo_tag(
     return await _insert(
         session,
         Tag(
-            id=tag_id,
-            tenant_id=tenant_id,
+            id=t.row_id(tag_id),
+            tenant_id=t.id,
             name=name,
             color=color,
             description=description,
@@ -2739,6 +2777,7 @@ async def _ensure_demo_tag(
 
 async def _link_tag(
     session: AsyncSession,
+    t: _DemoTenant,
     link_model: type[TagLink],
     *,
     resource_model: type[SQLModel],
@@ -2755,13 +2794,15 @@ async def _link_tag(
 
     Args:
         session: Database session used to read and insert the join row.
+        t: The tenant both records belong to.
         link_model: The join table model, e.g. :class:`~models.tag.SecretTag`.
         resource_model: Table model class the record belongs to.
-        resource_id: Id of the record the tag attaches to.
-        tag_id: Id of the tag to attach.
+        resource_id: Base id of the record the tag attaches to.
+        tag_id: Base id of the tag to attach.
         label: Human-readable description of the attachment, used in the log
             message.
     """
+    resource_id, tag_id = t.row_id(resource_id), t.row_id(tag_id)
     if await session.get(resource_model, resource_id) is None:
         return
     if await session.get(link_model, (resource_id, tag_id)) is not None:
@@ -2773,16 +2814,16 @@ async def _link_tag(
 
 # ---------- workflows and run history (for the operations dashboard) ----------
 
-#: ``session_id`` prefix marking a demo history run. Regenerating the history
+#: ``session_id`` prefix marking a demo history run. Clearing the history
 #: deletes only runs carrying it, so a run someone really started on one of the
-#: demo workflows survives a restart.
+#: demo workflows survives a clear.
 _HISTORY_SESSION_PREFIX = "demo-history-"
 
 #: How far back the generated history reaches -- the dashboard's longest range.
 _HISTORY_DAYS = 90
 
-#: Seed of the history's random generator, so every startup draws the same
-#: shape; only the dates move, since they are laid out backwards from now.
+#: Seed of the history's random generator, so every load draws the same
+#: shape; only the dates move, since they are laid out backwards from the load.
 _HISTORY_SEED = 20261117
 
 #: How much of a run's lead time the approval step takes, relative to one for
@@ -3018,66 +3059,111 @@ _NOW_SCENARIO: tuple[tuple[_DemoWorkflowSpec, float, float, _Failure | None], ..
     ),
 )
 
+#: Every demo record but the users and the run history, in the order
+#: :func:`clear_demo_data` deletes them, as ``(model, base id, label)``. The
+#: order follows the foreign keys: a workflow restricts the deletion of its
+#: agent skill, and a tool mock -- ``call_aws`` and ``run_script`` on the AWS
+#: MCP server, for instance -- that of its MCP server. Groups come last, just
+#: before their members (see :func:`clear_demo_data`).
+_REMOVAL_ORDER: tuple[tuple[type[SQLModel], str, str], ...] = (
+    *((Workflow, s.id, f"workflow {s.name!r}") for s in _DEMO_WORKFLOWS),
+    *((MCPToolMock, s.id, f"tool mock {s.name!r}") for s in _DEMO_TOOL_MOCKS),
+    (AgentSkill, DEMO_AGENT_SKILL_ID, "EC2-launch agent skill"),
+    (AgentSkill, DEMO_GKE_SKILL_ID, "GKE pod-restart agent skill"),
+    (AgentSkill, DEMO_AZURE_SKILL_ID, "Azure secret-rotation agent skill"),
+    (MCPServer, DEMO_MCP_SERVER_ID, "AWS MCP server"),
+    (MCPServer, DEMO_GKE_MCP_SERVER_ID, "GKE MCP server"),
+    (MCPServer, DEMO_COST_ESTIMATOR_MCP_SERVER_ID, "EC2 Cost Estimator MCP server"),
+    (
+        MCPServer,
+        DEMO_K8S_TOOLKIT_MCP_SERVER_ID,
+        "Kubernetes Manifest Toolkit MCP server",
+    ),
+    (MCPServer, DEMO_AZURE_MCP_SERVER_ID, "Azure MCP server"),
+    (
+        MCPServer,
+        DEMO_SECRET_GENERATOR_MCP_SERVER_ID,
+        "Secret Value Generator MCP server",
+    ),
+    (Secret, DEMO_AWS_SECRET_ID, "AWS credentials secret"),
+    (Secret, DEMO_GCP_SECRET_ID, "Google Cloud credentials secret"),
+    (Secret, DEMO_AZURE_SECRET_ID, "Azure credentials secret"),
+    (KnowledgeBase, DEMO_PRICING_KB_ID, f"knowledge base '{DEMO_PRICING_KB_NAME}'"),
+    (Tag, DEMO_AWS_TAG_ID, f"tag '{DEMO_AWS_TAG_NAME}'"),
+    (Tag, DEMO_GCP_TAG_ID, f"tag '{DEMO_GCP_TAG_NAME}'"),
+    (Tag, DEMO_AZURE_TAG_ID, f"tag '{DEMO_AZURE_TAG_NAME}'"),
+    (Tag, DEMO_APPROVAL_TAG_ID, f"tag '{DEMO_APPROVAL_TAG_NAME}'"),
+    *((UserGroup, g.id, f"user group {g.name!r}") for g in _DEMO_GROUPS),
+)
 
-async def _seed_demo_workflows(session: AsyncSession, tenant_id: str) -> None:
+
+async def _seed_demo_workflows(session: AsyncSession, t: _DemoTenant) -> None:
     """Create the display-only demo workflows, already published.
 
     Args:
         session: Database session used to read and insert the workflows.
-        tenant_id: Id of the ``Default`` tenant the workflows belong to.
+        t: The tenant the workflows belong to.
     """
     for spec in _DEMO_WORKFLOWS:
-        if await session.get(Workflow, spec.id) is not None:
+        if await session.get(Workflow, t.row_id(spec.id)) is not None:
             continue
         await _insert(
             session,
             Workflow(
-                id=spec.id,
-                tenant_id=tenant_id,
+                id=t.row_id(spec.id),
+                tenant_id=t.id,
                 name=spec.name,
                 description=spec.description,
-                agent_skill_id=spec.skill_id,
+                agent_skill_id=t.row_id(spec.skill_id),
                 session_id=f"demo-workflow-design-{spec.id[-4:]}",
                 # ponytail: no clone exists at seed time and nothing runs this
                 # design, so a placeholder pin; a real run pins the skill's own.
                 agent_skill_commit_sha="0" * 40,
                 status=WorkflowStatus.published,
-                created_by=spec.developer_id,
-                updated_by=spec.developer_id,
+                created_by=t.row_id(spec.developer_id),
+                updated_by=t.row_id(spec.developer_id),
             ),
             label=f"workflow {spec.name!r}",
         )
 
 
-async def _delete_demo_run_history(session: AsyncSession) -> None:
-    """Delete every generated demo run; their tasks and approvals cascade.
+async def _delete_demo_run_history(session: AsyncSession, t: _DemoTenant) -> None:
+    """Delete one tenant's generated demo runs; their tasks and approvals cascade.
 
     Args:
         session: Database session used to delete the runs.
+        t: The tenant whose runs are deleted.
     """
     await session.exec(
         delete(WorkflowExecution).where(
-            col(WorkflowExecution.session_id).startswith(_HISTORY_SESSION_PREFIX)
+            col(WorkflowExecution.tenant_id) == t.id,
+            col(WorkflowExecution.session_id).startswith(_HISTORY_SESSION_PREFIX),
         )
     )
     await session.commit()
 
 
-async def _seed_demo_run_history(session: AsyncSession, tenant_id: str) -> None:
-    """Replace the demo workflows' run history with a fresh one ending now.
+async def _seed_demo_run_history(session: AsyncSession, t: _DemoTenant) -> None:
+    """Generate the demo workflows' run history, ending now, if it has none.
 
-    The history is regenerated on every startup rather than kept, because the
-    dashboard reads it through windows anchored on the present ("today", "the
-    last 24 hours", "the last 90 days"): rows written once would slide out of
-    them. A fixed seed keeps the shape the same from one start to the next,
-    and :data:`_NOW_SCENARIO` is added on top.
+    A tenant that already has a history keeps it: the dashboard reads it
+    through windows anchored on the present ("today", "the last 24 hours",
+    "the last 90 days"), so it drifts out of them as days pass, and an admin
+    brings it up to date by clearing the dataset and loading it again. A fixed
+    seed keeps the shape the same from one load to the next, and
+    :data:`_NOW_SCENARIO` is added on top.
 
     Args:
-        session: Database session used to delete and insert the rows.
-        tenant_id: Id of the ``Default`` tenant the rows belong to.
+        session: Database session used to read and insert the rows.
+        t: The tenant the rows belong to.
     """
-    await _delete_demo_run_history(session)
-    specs = [s for s in _DEMO_WORKFLOWS if await session.get(Workflow, s.id)]
+    existing = select(WorkflowExecution.id).where(
+        col(WorkflowExecution.tenant_id) == t.id,
+        col(WorkflowExecution.session_id).startswith(_HISTORY_SESSION_PREFIX),
+    )
+    if (await session.exec(existing.limit(1))).first() is not None:
+        return
+    specs = [s for s in _DEMO_WORKFLOWS if await session.get(Workflow, t.row_id(s.id))]
     if not specs:
         return
     rng = random.Random(_HISTORY_SEED)
@@ -3095,7 +3181,7 @@ async def _seed_demo_run_history(session: AsyncSession, tenant_id: str) -> None:
         rows.extend(
             _demo_run(
                 spec,
-                tenant_id=tenant_id,
+                t=t,
                 serial=len(rows),
                 start=start,
                 lead=lead,
@@ -3163,7 +3249,7 @@ def _random_failure(spec: _DemoWorkflowSpec, rng: random.Random) -> _Failure | N
 def _demo_run(
     spec: _DemoWorkflowSpec,
     *,
-    tenant_id: str,
+    t: _DemoTenant,
     serial: int,
     start: datetime,
     lead: timedelta,
@@ -3181,7 +3267,7 @@ def _demo_run(
 
     Args:
         spec: The workflow the run belongs to.
-        tenant_id: Id of the ``Default`` tenant.
+        t: The tenant.
         serial: Number making the run's ``session_id`` unique.
         start: When the run started.
         lead: How long it takes from start to finish (or to failing).
@@ -3211,22 +3297,22 @@ def _demo_run(
         status = WorkflowExecutionStatus.failed
 
     execution = WorkflowExecution(
-        tenant_id=tenant_id,
-        workflow_id=spec.id,
+        tenant_id=t.id,
+        workflow_id=t.row_id(spec.id),
         session_id=f"{_HISTORY_SESSION_PREFIX}{serial:06d}",
         name=spec.name,
-        agent_skill_id=spec.skill_id,
+        agent_skill_id=t.row_id(spec.skill_id),
         agent_skill_name=spec.skill_name,
         agent_skill_repo_url=_DEMO_SKILL_REPO_URL,
         agent_skill_repo_path=spec.skill_repo_path,
-        initiator_id=spec.requester_id,
+        initiator_id=t.row_id(spec.requester_id),
         workflow_version=1,
         status=status,
         finished_at=None if running else ends[last],
         created_at=start,
         updated_at=start if running else ends[last],
-        created_by=spec.requester_id,
-        updated_by=spec.requester_id,
+        created_by=t.row_id(spec.requester_id),
+        updated_by=t.row_id(spec.requester_id),
     )
     tasks: list[WorkflowTask] = []
     for index, title in enumerate(spec.tasks):
@@ -3245,7 +3331,7 @@ def _demo_run(
         failed = task_status is WorkflowTaskStatus.failed and failure is not None
         tasks.append(
             WorkflowTask(
-                tenant_id=tenant_id,
+                tenant_id=t.id,
                 workflow_execution_id=execution.id,
                 title=title,
                 status=task_status,
@@ -3253,8 +3339,8 @@ def _demo_run(
                 error_message=failure.message if failed and failure else None,
                 created_at=start,
                 updated_at=updated,
-                created_by=spec.requester_id,
-                updated_by=spec.requester_id,
+                created_by=t.row_id(spec.requester_id),
+                updated_by=t.row_id(spec.requester_id),
             )
         )
     rows: list[SQLModel] = [execution, *tasks]
@@ -3263,8 +3349,8 @@ def _demo_run(
     asked_at = ends[step - 1]
     if asked_at > now or (failure is not None and failure.task < step):
         return rows
-    approver, group_id = destination
-    decider = approver or DEMO_APPROVER_USER_ID
+    approver, group_id = (t.row_id(i) if i else None for i in destination)
+    decider = approver or t.row_id(DEMO_APPROVER_USER_ID)
     decided = not (running and ends[step] > now)
     if not decided:
         approval_status = ApprovalStatus.pending
@@ -3274,7 +3360,7 @@ def _demo_run(
         approval_status = ApprovalStatus.approved
     rows.append(
         Approval(
-            tenant_id=tenant_id,
+            tenant_id=t.id,
             workflow_execution_id=execution.id,
             workflow_task_id=tasks[step].id,
             title=spec.approval_title,
@@ -3285,8 +3371,8 @@ def _demo_run(
             decided_by=decider if decided else None,
             created_at=asked_at,
             updated_at=ends[step] if decided else asked_at,
-            created_by=spec.requester_id,
-            updated_by=decider if decided else spec.requester_id,
+            created_by=t.row_id(spec.requester_id),
+            updated_by=decider if decided else t.row_id(spec.requester_id),
         )
     )
     return rows

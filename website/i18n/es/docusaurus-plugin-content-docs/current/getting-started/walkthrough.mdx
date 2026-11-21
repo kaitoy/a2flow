@@ -32,14 +32,14 @@ Elige aquí un proveedor. Todos los bloques específicos de un proveedor de esta
 
 ## Antes de empezar \{#before-you-start\}
 
-- El backend está en marcha con los [datos de demostración](./demo-data.md) activados.
+- Los [datos de demostración](./demo-data.md#loading-it) están cargados en el tenant **Default**.
 - Conoces la contraseña de `root`: `ROOT_PASSWORD` o, si no se definió, la línea que el backend registró una vez al iniciarse ([Usuarios iniciales](../operations/configuration.md#seeded-users)).
 - Se puede acceder realmente al proveedor:
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  El [secreto](../guides/secrets.md) `demo-aws-credentials` contiene una clave de acceso real: o bien se definieron `DEMO_AWS_ACCESS_KEY_ID` y `DEMO_AWS_SECRET_ACCESS_KEY` antes del primer inicio, o bien editas el secreto en **Secretos**. La ejecución **lanza una instancia EC2 real**, que cuesta dinero hasta que la terminas.
+  El [secreto](../guides/secrets.md) `demo-aws-credentials` contiene una clave de acceso real: o bien el operador del despliegue la proporcionó antes de cargar los datos de demostración ([Configuración](../operations/configuration.md#demo-data)), o bien editas el secreto en **Secretos**. La ejecución **lanza una instancia EC2 real**, que cuesta dinero hasta que la terminas.
 
   El usuario de IAM de la clave necesita una política que le permita resolver la AMI, consultar la red y el par de claves, y lanzar la instancia. Con esta basta:
 
@@ -77,12 +77,12 @@ Elige aquí un proveedor. Todos los bloques específicos de un proveedor de esta
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 
-  El [secreto](../guides/secrets.md) `demo-gcp-credentials` contiene una credencial de Google Cloud cuya identidad puede acceder a un clúster de GKE: o bien se definió `DEMO_GCP_CREDENTIALS_JSON` antes del primer inicio, o bien editas el secreto en **Secretos**. Ten preparados un proyecto, un clúster, su región y una carga de trabajo que puedas reiniciar: la ejecución **la reinicia gradualmente de verdad**.
+  El [secreto](../guides/secrets.md) `demo-gcp-credentials` contiene una credencial de Google Cloud cuya identidad puede acceder a un clúster de GKE: o bien el operador del despliegue la proporcionó antes de cargar los datos de demostración ([Configuración](../operations/configuration.md#demo-data)), o bien editas el secreto en **Secretos**. Ten preparados un proyecto, un clúster, su región y una carga de trabajo que puedas reiniciar: la ejecución **la reinicia gradualmente de verdad**.
 
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  El [secreto](../guides/secrets.md) `demo-azure-credentials` contiene una entidad de servicio real: o bien se definieron `DEMO_AZURE_TENANT_ID`, `DEMO_AZURE_CLIENT_ID` y `DEMO_AZURE_CLIENT_SECRET` antes del primer inicio, o bien editas el secreto en **Secretos**. La entidad necesita un rol en un Key Vault que le permita enumerar y escribir secretos. Es preferible un rol personalizado que tenga únicamente las acciones de datos `Microsoft.KeyVault/vaults/secrets/readMetadata/action` y `Microsoft.KeyVault/vaults/secrets/setSecret/action` antes que el rol integrado **Key Vault Secrets Officer**, que además puede leer el valor de todos los secretos: así el agente no puede leer un valor aunque lo convenzan de intentarlo. En un Key Vault que use directivas de acceso, concede solo los permisos de secretos **List** y **Set**. Ten preparados ese Key Vault y un secreto suyo que puedas rotar: la ejecución **escribe de verdad una nueva versión del secreto**, y todo lo que lea su versión actual recibirá el nuevo valor.
+  El [secreto](../guides/secrets.md) `demo-azure-credentials` contiene una entidad de servicio real: o bien el operador del despliegue la proporcionó antes de cargar los datos de demostración ([Configuración](../operations/configuration.md#demo-data)), o bien editas el secreto en **Secretos**. La entidad necesita un rol en un Key Vault que le permita enumerar y escribir secretos. Es preferible un rol personalizado que tenga únicamente las acciones de datos `Microsoft.KeyVault/vaults/secrets/readMetadata/action` y `Microsoft.KeyVault/vaults/secrets/setSecret/action` antes que el rol integrado **Key Vault Secrets Officer**, que además puede leer el valor de todos los secretos: así el agente no puede leer un valor aunque lo convenzan de intentarlo. En un Key Vault que use directivas de acceso, concede solo los permisos de secretos **List** y **Set**. Ten preparados ese Key Vault y un secreto suyo que puedas rotar: la ejecución **escribe de verdad una nueva versión del secreto**, y todo lo que lea su versión actual recibirá el nuevo valor.
 
   </TabItem>
 </Tabs>

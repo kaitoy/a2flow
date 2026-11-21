@@ -11,6 +11,7 @@ from routers import (
     agent_skills,
     approvals,
     auth,
+    demo_data,
     health,
     impersonation_events,
     knowledge_bases,
@@ -73,6 +74,7 @@ api_router.include_router(system_settings.router, dependencies=_protected)
 api_router.include_router(tags.router, dependencies=_protected)
 api_router.include_router(tenant.router, dependencies=_protected)
 api_router.include_router(admin_settings.router, dependencies=_protected)
+api_router.include_router(demo_data.router, dependencies=_protected)
 api_router.include_router(user.router, dependencies=_protected)
 api_router.include_router(user_groups.router, dependencies=_protected)
 api_router.include_router(workflow_executions.router, dependencies=_protected)

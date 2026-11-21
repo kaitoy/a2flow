@@ -67,6 +67,21 @@ DB_URL=postgresql://user:password@localhost:5432/a2flow
 
 有効にすると、デプロイにアクセスでき、メールを受け取れる人は誰でもテナントを作れます。同じアドレスに送る確認メールは 1 分に 1 通までなので、フォームを使って他人の受信箱をあふれさせることはできませんが、それ以外の制限は、[システム設定](../guides/system-settings.md#tenant-limit)の**テナント数の上限**だけです。初期値は空欄で、無制限を意味します。テナントが際限なく増えると困る環境では、サインアップを有効にする前に上限を設定してください。
 
+## デモデータ {#demo-data}
+
+管理者は**管理者設定**から自分のテナントに[デモデータ](../getting-started/demo-data.md)をロードします。これらの変数の値は、**Default** テナントにロードしたときだけデモのシークレットに入ります。ほかのテナントではどのシークレットにも `REPLACE_ME` が入るので、デプロイ自身の認証情報がほかのテナントに渡ることはありません。どれも任意で、未設定のものもプレースホルダーになり、テナントの管理者が**シークレット**のページで置き換えます。
+
+| 変数 | 既定値 | 内容 |
+|---|---|---|
+| `DEMO_AWS_ACCESS_KEY_ID` | — | `demo-aws-credentials` シークレットに入れる AWS のアクセスキー ID |
+| `DEMO_AWS_SECRET_ACCESS_KEY` | — | それに対応するシークレットアクセスキー |
+| `DEMO_GCP_CREDENTIALS_JSON` | — | `demo-gcp-credentials` シークレットに入れる、1 行にした Google Cloud の認証情報 JSON |
+| `DEMO_AZURE_TENANT_ID` | — | `demo-azure-credentials` シークレットに入れるサービスプリンシパルの Microsoft Entra テナント ID |
+| `DEMO_AZURE_CLIENT_ID` | — | そのサービスプリンシパルのクライアント ID |
+| `DEMO_AZURE_CLIENT_SECRET` | — | そのサービスプリンシパルのクライアントシークレット |
+
+デモデータをロードしたあとに値を設定しても、保存済みのシークレットは変わりません。**シークレット**のページで編集するか、デモデータをクリアしてからロードし直してください。それぞれの認証情報に必要な権限は[デモデータ](../getting-started/demo-data.md#loading-it)のページにあります。
+
 ## セッションの有効期間 {#session-lifetime}
 
 | 変数 | 既定値 | 役割 |

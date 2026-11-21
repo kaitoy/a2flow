@@ -34,7 +34,7 @@ Every environment variable the backend reads is documented in the manual, and
 |---|---|
 | [LLM configuration](https://kaitoy.github.io/a2flow/docs/getting-started/llm-configuration) | `SYSTEM_DEFAULT_LLM_MODEL`, `SYSTEM_DEFAULT_LLM_API_KEY` and the provider API keys |
 | [Configuration reference](https://kaitoy.github.io/a2flow/docs/operations/configuration) | Server settings, the agent skill store, secret management, the database, the seeded users, session lifetime, CORS |
-| [Demo data](https://kaitoy.github.io/a2flow/docs/getting-started/demo-data) | `DEMO_DATA` and the records it seeds |
+| [Demo data](https://kaitoy.github.io/a2flow/docs/getting-started/demo-data) | The records an admin loads into a tenant from Admin Settings (`/api/v1/demo-data`); the `DEMO_*` credentials only the Default tenant receives are in the configuration reference |
 | [Horizontal scaling](https://kaitoy.github.io/a2flow/docs/operations/scaling) | What running more than one replica requires |
 | [Deployment](https://kaitoy.github.io/a2flow/docs/operations/deployment) | Reverse proxy and load balancer settings |
 

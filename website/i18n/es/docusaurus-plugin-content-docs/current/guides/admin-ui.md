@@ -34,7 +34,7 @@ La ruta de navegación situada sobre cada título refleja ese recorrido (`Inicio
 | **Ejecuciones de flujos de trabajo** | Las ejecuciones de los flujos de trabajo y su historial | Todos los que han iniciado sesión |
 | **Aprobaciones** | Solicitudes de aprobación y sus decisiones | Todos los que han iniciado sesión |
 | **Registros de auditoría** | Llamadas a herramientas, suplantaciones, autoridad concedida y correos enviados | Administrador, Superadministrador |
-| **Configuración de administrador** | Cómo bloquean los inicios de sesión fallidos las cuentas de tu tenant, y el Vault propio de tu tenant: consulta [Inicios de sesión fallidos](./users-and-groups.md#failed-sign-ins) y [El Vault del tenant](./users-and-groups.md#tenant-vault) | Administrador |
+| **Configuración de administrador** | Cómo bloquean los inicios de sesión fallidos las cuentas de tu tenant, y el Vault propio de tu tenant: consulta [Inicios de sesión fallidos](./users-and-groups.md#failed-sign-ins) y [El Vault del tenant](./users-and-groups.md#tenant-vault). También es donde cargas o borras los [datos de demostración](../getting-started/demo-data.md) | Administrador |
 | **Configuración del sistema** | El servidor de correo por el que se envían las notificaciones y la dirección del Vault global | Superadministrador |
 
 Si una sección no aparece en tu barra lateral, es que tus roles no pueden escribir en ella. La lectura sigue abierta, así que un compañero aún puede enviarte un enlace directo a un registro de esa sección: consulta [Roles y autorización](../concepts/authorization.md).

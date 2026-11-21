@@ -26,14 +26,12 @@ from infrastructure.bootstrap import (
     seed_system_user,
 )
 from infrastructure.database import engine
-from infrastructure.demo_data import sync_demo_data
 from infrastructure.locks import advisory_lock
 from infrastructure.logging_context import setup_logging
 from infrastructure.mcp_transport_tls import provision_transport_credentials
 from infrastructure.migrations import run_migrations
 from infrastructure.skill_manager import get_skill_manager
 from middleware.envelope import RequestContextMiddleware
-from models.user import SYSTEM_USER_ID
 from repositories.exceptions import HttpMappedError
 from routers import api_router
 from routers.exception_handlers import (
@@ -42,7 +40,6 @@ from routers.exception_handlers import (
     unhandled_exception_handler,
     validation_exception_handler,
 )
-from services.agent_skill_sync import sync_agent_skill
 from services.email_queue_worker import run_email_queue_worker
 from services.session_runner import SessionRunner, run_session_dispatcher
 from services.session_stream import run_stream_listener
@@ -66,7 +63,7 @@ BOOTSTRAP_LOCK_KEY = "startup-bootstrap"
 _BOOTSTRAP_WAIT_SECONDS = 600.0
 
 
-async def _bootstrap() -> list[str]:
+async def _bootstrap() -> None:
     """Migrate the schema, finish any master-key rotation, and seed the baseline data.
 
     One replica at a time. Every step is check-then-write: a migration reads ``alembic_version`` and
@@ -75,10 +72,6 @@ async def _bootstrap() -> list[str]:
     collide on DDL or primary keys, so the whole sequence runs under the
     :data:`BOOTSTRAP_LOCK_KEY` advisory lock. The first replica does the work;
     the rest wait for it and then find nothing left to do.
-
-    Returns:
-        Ids of demo agent skills this run registered, whose clones the caller
-        still has to start.
 
     Raises:
         LockNotAcquiredError: Another replica still held the lock after
@@ -101,12 +94,9 @@ async def _bootstrap() -> list[str]:
             await apply_system_settings_env_overrides(session)
             # seed_root_user's skip check ("any real user exists") must run
             # before seed_default_tenant_and_admin_user creates its own real
-            # user, or root would never be seeded on a fresh database. The
-            # demo users are real users too, so sync_demo_data comes after
-            # both.
+            # user, or root would never be seeded on a fresh database.
             await seed_root_user(session)
             await seed_default_tenant_and_admin_user(session)
-            return await sync_demo_data(session)
 
 
 @asynccontextmanager
@@ -122,11 +112,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Seeds the system, root, and Default-tenant admin users and the singleton
     system-settings row, applies any ``SMTP_*`` environment
     overrides onto that row, loads ``SYSTEM_DEFAULT_LLM_*`` into the LLM
-    fields it still has empty, then registers or removes the optional demo
-    dataset depending on ``DEMO_DATA``. A demo agent skill registered by this
-    run still needs its repository cloned; that runs as a background task
-    rather than inline, so a slow or unreachable remote delays nothing
-    (``sync_agent_skill`` records every failure on the skill row itself).
+    fields it still has empty.
 
     Unless ``EMAIL_WORKER_IN_PROCESS`` is off, the outgoing-email queue worker
     is also started here, so a plain ``uvicorn main:app`` delivers notification
@@ -143,19 +129,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     on any replica wakes the viewers watching it here at once
     (:func:`services.session_stream.run_stream_listener`).
     """
-    demo_skill_ids = await _bootstrap()
+    await _bootstrap()
     # Holds a strong reference to the background tasks for as long as the
     # application runs, so they cannot be garbage-collected mid-flight.
     background: set[asyncio.Task[None]] = set()
     stream_listener = asyncio.create_task(run_stream_listener())
     background.add(stream_listener)
     stream_listener.add_done_callback(background.discard)
-    for demo_skill_id in demo_skill_ids:
-        clone = asyncio.create_task(
-            sync_agent_skill(demo_skill_id, user_id=SYSTEM_USER_ID)
-        )
-        background.add(clone)
-        clone.add_done_callback(background.discard)
     session_dispatcher = asyncio.create_task(
         run_session_dispatcher(
             SessionRunner(
