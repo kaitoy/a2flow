@@ -33,6 +33,7 @@ from infrastructure.llm_settings import LlmSettingsResolver
 from infrastructure.locks import advisory_lock, agent_run_key
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.skill_manager import SkillManager
+from infrastructure.streamed_text_dedup import drop_restreamed_text
 from infrastructure.summarizer import (
     build_design_transcript,
     describe_design_transcript,
@@ -577,7 +578,7 @@ async def generate_workflow_design(
         )
         run_error: RunErrorEvent | None = None
         async with advisory_lock(agent_run_key(scoped_app_name, owner_id, session_id)):
-            async for event in agent.run(input_data):
+            async for event in drop_restreamed_text(agent.run(input_data)):
                 # ``ADKAgent`` never raises an LLM failure — it yields it as a
                 # ``RunErrorEvent`` and ends the stream normally. Keeping the
                 # first one preserves the root cause (later events, if any, are

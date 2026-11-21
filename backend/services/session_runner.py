@@ -41,6 +41,7 @@ from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_
 from infrastructure.secret_cipher import get_secret_cipher
 from infrastructure.session_fork import fork_adk_session
 from infrastructure.skill_manager import SkillManager
+from infrastructure.streamed_text_dedup import drop_restreamed_text
 from models.execution_session import (
     ExecutionSession,
     ExecutionSessionKind,
@@ -287,7 +288,7 @@ class SessionRunner:
         await writer.start()
         events: list[BaseEvent] = []
         try:
-            async for event in agent.run(input_data):
+            async for event in drop_restreamed_text(agent.run(input_data)):
                 events.append(event)
                 await writer.write(event)
         finally:

@@ -51,6 +51,7 @@ from dependencies.service import (
 )
 from infrastructure.agent import tenant_app_name, with_user_id
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from infrastructure.streamed_text_dedup import drop_restreamed_text
 from models.knowledge import KnowledgeBaseIdsUpdate, KnowledgeBaseRead
 from models.response import ApiResponse
 from models.tag import TagIdsUpdate
@@ -314,7 +315,7 @@ async def design_session_agent(
     async def event_generator() -> AsyncGenerator[str, None]:
         async with run_stack:
             try:
-                async for event in adk_agent.run(input_data):
+                async for event in drop_restreamed_text(adk_agent.run(input_data)):
                     yield encoder.encode(event)
             finally:
                 # A client that goes away mid-stream (tab closed, page reloaded)
