@@ -79,6 +79,29 @@ def upgrade() -> None:
         sa.Column(
             "login_lockout_minutes", sa.Integer(), nullable=False, server_default="15"
         ),
+        sa.Column(
+            "oidc_enabled", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+        sa.Column("oidc_issuer", sa.String(), nullable=True),
+        sa.Column("oidc_client_id", sa.String(), nullable=True),
+        sa.Column("oidc_client_secret", sa.String(), nullable=True),
+        sa.Column(
+            "oidc_groups_claim", sa.String(), nullable=False, server_default="groups"
+        ),
+        sa.Column(
+            "oidc_trust_email", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+        sa.Column(
+            "llm_mode",
+            sa.Enum("system_default", "super_admin", "tenant_admin", name="llmmode"),
+            nullable=False,
+            server_default="system_default",
+        ),
+        sa.Column("llm_model", sa.String(), nullable=True),
+        sa.Column("llm_api_key", sa.String(), nullable=True),
+        sa.Column("llm_api_key_ref", sa.String(), nullable=True),
+        sa.Column("oidc_client_secret_ref", sa.String(), nullable=True),
+        sa.Column("data_key", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("display_name", name="uq_tenants_display_name"),
         sa.UniqueConstraint("name", name="uq_tenants_name"),
@@ -102,7 +125,7 @@ def upgrade() -> None:
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("first_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("last_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("password", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("password", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("email", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False),
         sa.Column("email_verified", sa.Boolean(), nullable=False),
@@ -120,6 +143,14 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("language", sa.String(length=16), nullable=True),
+        sa.Column("oidc_subject", sa.String(length=255), nullable=True),
+        sa.Column(
+            "must_change_password",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
@@ -158,6 +189,14 @@ def upgrade() -> None:
         postgresql_where=sa.text("tenant_id IS NULL"),
         sqlite_where=sa.text("tenant_id IS NULL"),
     )
+    op.create_index(
+        "ix_users_tenant_id_oidc_subject",
+        "users",
+        ["tenant_id", "oidc_subject"],
+        unique=True,
+        postgresql_where=sa.text("oidc_subject IS NOT NULL"),
+        sqlite_where=sa.text("oidc_subject IS NOT NULL"),
+    )
     with op.batch_alter_table("tenants", schema=None) as batch_op:
         # SQLite's batch mode rebuilds the table and requires every
         # constraint to have an explicit name (unlike a plain CREATE TABLE,
@@ -183,7 +222,6 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("updated_by", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("app_base_url", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("smtp_enabled", sa.Boolean(), nullable=False),
         sa.Column("smtp_host", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("smtp_port", sa.Integer(), nullable=False),
@@ -197,6 +235,9 @@ def upgrade() -> None:
         sa.Column("smtp_from_email", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("smtp_from_name", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("vault_addr", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("llm_model", sa.String(), nullable=True),
+        sa.Column("llm_api_key", sa.String(), nullable=True),
+        sa.Column("max_tenants", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
@@ -289,8 +330,25 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),
     )
+    op.create_table(
+        "pending_signups",
+        sa.Column("id", sa.String(), nullable=False),
+        sa.Column("email", sa.String(), nullable=False),
+        sa.Column("username", sa.String(), nullable=False),
+        sa.Column("first_name", sa.String(), nullable=False),
+        sa.Column("last_name", sa.String(), nullable=False),
+        sa.Column("password", sa.String(), nullable=False),
+        sa.Column("token_hash", sa.String(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("token_hash", name="uq_pending_signups_token_hash"),
+    )
     op.create_index(
-        "ix_auth_sessions_token_hash", "auth_sessions", ["token_hash"], unique=False
+        "ix_pending_signups_email_created_at",
+        "pending_signups",
+        ["email", "created_at"],
+        unique=False,
     )
     op.create_table(
         "login_failures",
@@ -869,6 +927,11 @@ def upgrade() -> None:
         sa.Column("workflow_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("link", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("tenant_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column(
+            "params",
+            sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
+            nullable=True,
+        ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
@@ -893,7 +956,10 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_notifications_user_id", "notifications", ["user_id"], unique=False
+        "ix_notifications_user_id_created_at",
+        "notifications",
+        ["user_id", "created_at"],
+        unique=False,
     )
     op.create_index(
         "ix_notifications_workflow_execution_id",
@@ -1042,6 +1108,9 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_execution_sessions_tenant_id", "execution_sessions", ["tenant_id"]
+    )
+    op.create_index(
+        "ix_execution_sessions_status", "execution_sessions", ["status"], unique=False
     )
     op.create_index(
         "ix_execution_sessions_workflow_execution_id",
@@ -1409,6 +1478,7 @@ def upgrade() -> None:
             sa.JSON().with_variant(postgresql.JSONB(astext_type=Text()), "postgresql"),
             nullable=False,
         ),
+        sa.Column("idp_group", sa.String(length=255), nullable=True),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="RESTRICT"),
@@ -1424,6 +1494,14 @@ def upgrade() -> None:
         "user_groups",
         ["tenant_id", "name"],
         unique=False,
+    )
+    op.create_index(
+        "ix_user_groups_tenant_id_idp_group",
+        "user_groups",
+        ["tenant_id", "idp_group"],
+        unique=True,
+        postgresql_where=sa.text("idp_group IS NOT NULL"),
+        sqlite_where=sa.text("idp_group IS NOT NULL"),
     )
     with op.batch_alter_table("approvals", schema=None) as batch_op:
         # Deferred for the same reason as the tenants/users circular FK
@@ -1909,6 +1987,7 @@ def downgrade() -> None:
     with op.batch_alter_table("approvals", schema=None) as batch_op:
         # Must go before user_groups is dropped below: this FK references it.
         batch_op.drop_constraint("fk_approvals_approver_group_id", type_="foreignkey")
+    op.drop_index("ix_user_groups_tenant_id_idp_group", table_name="user_groups")
     op.drop_index("ix_user_groups_tenant_id_name", table_name="user_groups")
     op.drop_table("user_groups")
     op.drop_index(
@@ -1975,6 +2054,7 @@ def downgrade() -> None:
     op.drop_index(
         "ix_execution_sessions_workflow_execution_id", table_name="execution_sessions"
     )
+    op.drop_index("ix_execution_sessions_status", table_name="execution_sessions")
     op.drop_index("ix_execution_sessions_tenant_id", table_name="execution_sessions")
     op.drop_table("execution_sessions")
     op.drop_index("ix_outbound_emails_tenant_id", table_name="outbound_emails")
@@ -1985,7 +2065,7 @@ def downgrade() -> None:
     op.drop_table("outbound_emails")
     op.drop_index("ix_notifications_workflow_id", table_name="notifications")
     op.drop_index("ix_notifications_workflow_execution_id", table_name="notifications")
-    op.drop_index("ix_notifications_user_id", table_name="notifications")
+    op.drop_index("ix_notifications_user_id_created_at", table_name="notifications")
     op.drop_index("ix_notifications_tenant_id", table_name="notifications")
     op.drop_table("notifications")
     op.drop_index(
@@ -2026,7 +2106,8 @@ def downgrade() -> None:
     op.drop_table("impersonation_events")
     op.drop_index("ix_login_failures_key_failed_at", table_name="login_failures")
     op.drop_table("login_failures")
-    op.drop_index("ix_auth_sessions_token_hash", table_name="auth_sessions")
+    op.drop_index("ix_pending_signups_email_created_at", table_name="pending_signups")
+    op.drop_table("pending_signups")
     op.drop_table("auth_sessions")
     op.drop_index("ix_agent_skills_tenant_id_name", table_name="agent_skills")
     op.drop_table("agent_skills")
@@ -2041,6 +2122,7 @@ def downgrade() -> None:
         batch_op.drop_constraint("uq_users_tenant_id_username", type_="unique")
         batch_op.drop_index("ix_users_tenant_id_username")
         batch_op.drop_index("ix_users_username_platform_scoped")
+        batch_op.drop_index("ix_users_tenant_id_oidc_subject")
         # Both CHECK constraints reference tenant_id, so they must be dropped
         # before the column itself or SQLite's batch-mode table rebuild fails
         # with "no such column: tenant_id" while recreating the table.
