@@ -32,14 +32,14 @@ import TabItem from '@theme/TabItem';
 
 ## 事前準備 \{#before-you-start\}
 
-- [デモデータ](./demo-data.md)を有効にしてバックエンドが起動している。
+- [デモデータ](./demo-data.md#loading-it)が **Default** テナントにロードされている。
 - `root` のパスワードが分かっている。`ROOT_PASSWORD` か、未設定なら起動時にバックエンドが一度だけログに出した行です([初期投入されるユーザー](../operations/configuration.md#seeded-users))。
 - プロバイダに実際に届く:
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  [シークレット](../guides/secrets.md) `demo-aws-credentials` に本物のアクセスキーが入っていること。初回起動前に `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` を設定しておくか、あとから**シークレット**でシークレットを編集します。実行すると**本物の EC2 インスタンスが起動し**、終了させるまで課金されます。
+  [シークレット](../guides/secrets.md) `demo-aws-credentials` に本物のアクセスキーが入っていること。デモデータをロードする前にデプロイの運用者が値を用意しておくか([設定](../operations/configuration.md#demo-data))、あとから**シークレット**でシークレットを編集します。実行すると**本物の EC2 インスタンスが起動し**、終了させるまで課金されます。
 
   アクセスキーの IAM ユーザーには、AMI の解決、ネットワークとキーペアの確認、インスタンスの起動を許すポリシーが必要です。次のポリシーで足ります。
 
@@ -77,12 +77,12 @@ import TabItem from '@theme/TabItem';
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 
-  [シークレット](../guides/secrets.md) `demo-gcp-credentials` に、GKE クラスタへ届く身元の Google Cloud 認証情報が入っていること。初回起動前に `DEMO_GCP_CREDENTIALS_JSON` を設定しておくか、あとから**シークレット**でシークレットを編集します。プロジェクト、クラスタ、そのリージョン、再起動してよいワークロードを決めておいてください。実行すると**本当にローリング再起動されます**。
+  [シークレット](../guides/secrets.md) `demo-gcp-credentials` に、GKE クラスタへ届く身元の Google Cloud 認証情報が入っていること。デモデータをロードする前にデプロイの運用者が値を用意しておくか([設定](../operations/configuration.md#demo-data))、あとから**シークレット**でシークレットを編集します。プロジェクト、クラスタ、そのリージョン、再起動してよいワークロードを決めておいてください。実行すると**本当にローリング再起動されます**。
 
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  [シークレット](../guides/secrets.md) `demo-azure-credentials` に本物のサービスプリンシパルが入っていること。初回起動前に `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET` を設定しておくか、あとから**シークレット**でシークレットを編集します。サービスプリンシパルには、Key Vault のシークレットを一覧・書き込みできるロールが必要です。組み込みの **Key Vault Secrets Officer** ロールはすべてのシークレットの値も読めてしまうので、`Microsoft.KeyVault/vaults/secrets/readMetadata/action` と `Microsoft.KeyVault/vaults/secrets/setSecret/action` のデータアクションだけを持つカスタムロールをおすすめします。こうしておけば、エージェントが言いくるめられても値は読めません。アクセスポリシー方式の Key Vault なら、シークレットの権限は **List** と **Set** だけを付与します。その Key Vault と、ローテーションしてよいシークレットを決めておいてください。実行すると**シークレットの新しいバージョンが本当に書き込まれ**、現在のバージョンを読むものはすべて新しい値を使うようになります。
+  [シークレット](../guides/secrets.md) `demo-azure-credentials` に本物のサービスプリンシパルが入っていること。デモデータをロードする前にデプロイの運用者が値を用意しておくか([設定](../operations/configuration.md#demo-data))、あとから**シークレット**でシークレットを編集します。サービスプリンシパルには、Key Vault のシークレットを一覧・書き込みできるロールが必要です。組み込みの **Key Vault Secrets Officer** ロールはすべてのシークレットの値も読めてしまうので、`Microsoft.KeyVault/vaults/secrets/readMetadata/action` と `Microsoft.KeyVault/vaults/secrets/setSecret/action` のデータアクションだけを持つカスタムロールをおすすめします。こうしておけば、エージェントが言いくるめられても値は読めません。アクセスポリシー方式の Key Vault なら、シークレットの権限は **List** と **Set** だけを付与します。その Key Vault と、ローテーションしてよいシークレットを決めておいてください。実行すると**シークレットの新しいバージョンが本当に書き込まれ**、現在のバージョンを読むものはすべて新しい値を使うようになります。
 
   </TabItem>
 </Tabs>

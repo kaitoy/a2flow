@@ -3,9 +3,9 @@ import { expect } from "e2e";
 import { loginAsAdmin } from "./login.ts";
 
 /**
- * The manual's AWS walkthrough on its no-account path: the demo developer
- * generates a workflow from the demo skill and runs the draft with the seeded
- * tool mocks, so nothing reaches AWS or waits on an approver. The backend's
+ * The manual's AWS walkthrough on its no-account path: the admin loads the demo
+ * data from Admin Settings, then the demo developer generates a workflow from
+ * the demo skill and runs the draft with the seeded tool mocks, so nothing reaches AWS or waits on an approver. The backend's
  * scripted LLM (backend/scripts/e2e_server.py) plays both agents; its closing
  * message is FINAL_TEXT there.
  *
@@ -20,6 +20,14 @@ test(
 
     await loginAsAdmin(app, screen);
 
+    // Load the demo data. Loading again (a CI retry) just restores what is missing.
+    await app.open("/admin-settings");
+    await screen.getByTestId("demo-data-load").click();
+    await screen.getByTestId("confirm-dialog-confirm").click();
+    await expect(screen.getByTestId("demo-data-status")).toHaveText(/^loaded in this tenant/i, {
+      timeout: 60_000,
+    });
+
     // Act as the demo developer: only a developer may run a draft.
     await app.open("/users");
     await row("demo-aws-developer").getByTestId("user-impersonate").click();
@@ -29,7 +37,7 @@ test(
       { timeout: 15_000 }
     );
 
-    // The skill is cloned from GitHub in the background after startup.
+    // The skill is cloned from GitHub in the background after the load.
     await app.open("/agent-skills");
     const skill = row("Demo AWS EC2 Launch");
     await expect

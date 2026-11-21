@@ -292,6 +292,28 @@ export const fr = {
   "admin.workflowGenerationStarted": "Génération du workflow lancée",
   "admin.workflowName": "Nom du workflow",
   "adminSettings.adminSettingsUpdated": "Paramètres administrateur mis à jour",
+  "adminSettings.demoData.title": "Données de démonstration",
+  "adminSettings.demoData.description":
+    "Des utilisateurs, groupes d'utilisateurs, secrets, serveurs MCP, compétences d'agent, simulations d'outils et un historique d'exécutions d'exemple pour essayer A2Flow dans ce tenant.",
+  "adminSettings.demoData.loaded": "Chargées dans ce tenant.",
+  "adminSettings.demoData.notLoaded": "Non chargées dans ce tenant.",
+  "adminSettings.demoData.load": "Charger les données de démonstration",
+  "adminSettings.demoData.loading": "Chargement…",
+  "adminSettings.demoData.clear": "Effacer les données de démonstration",
+  "adminSettings.demoData.clearing": "Effacement…",
+  "adminSettings.demoData.loadConfirmTitle": "Charger les données de démonstration ?",
+  "adminSettings.demoData.loadConfirmDescription":
+    "Ajoute à ce tenant onze utilisateurs de démonstration, leurs groupes d'utilisateurs, ainsi que des secrets, serveurs MCP, compétences d'agent, simulations d'outils, étiquettes et workflows d'exemple. Personne ne connaît le mot de passe des utilisateurs de démonstration : utilisez « Agir en tant que » depuis Utilisateurs. Ce qui est déjà chargé reste tel quel.",
+  "adminSettings.demoData.clearConfirmTitle": "Effacer les données de démonstration ?",
+  "adminSettings.demoData.clearConfirmDescription":
+    "Supprime les enregistrements de démonstration de ce tenant. Ceux qu'un autre enregistrement utilise désormais, comme un workflow créé à partir d'une compétence de démonstration, sont conservés.",
+  "adminSettings.demoData.loadedToast": "Données de démonstration chargées",
+  "adminSettings.demoData.clearedToast": "Données de démonstration effacées",
+  "adminSettings.demoData.keptToast": {
+    one: "Données de démonstration effacées. {count} enregistrement a été conservé, car d'autres enregistrements l'utilisent.",
+    other:
+      "Données de démonstration effacées. {count} enregistrements ont été conservés, car d'autres enregistrements les utilisent.",
+  },
   "adminSettings.oidc.title": "Authentification unique",
   "adminSettings.oidc.enable": "Activer l'authentification unique",
   "adminSettings.oidc.issuerUrl": "URL de l'émetteur",

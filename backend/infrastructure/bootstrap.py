@@ -179,7 +179,8 @@ async def apply_system_settings_env_overrides(session: AsyncSession) -> None:
 _GENERATED_PASSWORD_BYTES = 16
 
 #: Name (slug) of the tenant seeded on first startup to hold the initial
-#: ``admin`` user. Also the tenant the demo dataset is registered in — see
+#: ``admin`` user. Also the one tenant the demo dataset keeps its legacy ids
+#: in and receives the ``DEMO_*`` credentials -- see
 #: :mod:`infrastructure.demo_data`.
 DEFAULT_TENANT_NAME = "default"
 
@@ -282,8 +283,8 @@ async def seed_system_user(session: AsyncSession) -> None:
 def resolve_seed_password(configured: str | None, *, subject: str, env_var: str) -> str:
     """Return a configured seed password, or generate and log one once.
 
-    Shared by the seed functions below and by :mod:`infrastructure.demo_data`,
-    so every bootstrap account follows the same configure-or-generate rule.
+    Shared by the seed functions below, so every bootstrap account follows the
+    same configure-or-generate rule.
 
     Args:
         configured: Password read from settings (e.g.

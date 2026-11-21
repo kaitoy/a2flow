@@ -2,7 +2,8 @@
  * @module AdminSettingsPage — Admin page for the settings a tenant's own
  * `admin` manages: how failed sign-ins lock the tenant's accounts, the
  * tenant's own HashiCorp Vault, its OpenID Connect single sign-on and — only
- * while a super admin has handed it over — the tenant's LLM.
+ * while a super admin has handed it over — the tenant's LLM. Below the form,
+ * the admin loads or clears the tenant's demo data.
  */
 "use client";
 
@@ -15,6 +16,7 @@ import { AdminPageContainer } from "@/components/admin/admin-page-container";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import type { CredentialSourceBinding } from "@/components/admin/credential-source-field";
+import { DemoDataPanel } from "@/components/admin/demo-data-panel";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import {
@@ -304,6 +306,7 @@ export default function AdminSettingsPage() {
             </Button>
           </div>
         </form>
+        <DemoDataPanel />
       </FormLayout>
     </AdminPageContainer>
   );

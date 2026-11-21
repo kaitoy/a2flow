@@ -5,35 +5,28 @@ sidebar_position: 4
 
 # デモデータ
 
-バックエンドで `DEMO_DATA=true` を設定すると、承認つきで状態を変える 3 つの例 — 「EC2 インスタンスを起動する」例、「GKE の Pod を再起動する」例、「Azure Key Vault のシークレットをローテーションする」例 — に必要なものが一式、初期投入された **Default** テナントに登録されます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。実行する[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、実際に生成するところからの手順が[ウォークスルー](./walkthrough.mdx)です。そのほかに架空の実行履歴も登録されるので、[ダッシュボード](../guides/dashboard.md)には最初から数値が表示されます。
+管理者は、承認つきで状態を変える 3 つの例 — 「EC2 インスタンスを起動する」例、「GKE の Pod を再起動する」例、「Azure Key Vault のシークレットをローテーションする」例 — に必要なものを一式、自分のテナントにロードできます。一つずつ手で登録しなくても、すぐに動かせるものが手元にある状態になります。**Default** テナントを含め、どのテナントでもロードでき、テナントごとに別々のコピーが作られます。実行する[ワークフロー](../guides/workflows.md)自体はあえて登録しません。これらはワークフローを生成するための材料で、実際に生成するところからの手順が[ウォークスルー](./walkthrough.mdx)です。そのほかに架空の実行履歴も登録されるので、[ダッシュボード](../guides/dashboard.md)には最初から数値が表示されます。
 
-## 有効にする {#enabling-it}
+## ロードする {#loading-it}
 
-`backend/.env` にフラグを足してバックエンドを再起動します。[Docker Compose](./docker-compose.md) ならすでに有効です。`compose.yml` が `DEMO_DATA: ${DEMO_DATA:-true}` を設定しています。
+1. そのテナントの管理者でログインします。上位管理者は、先にアプリバーのテナントセレクタでテナントを選びます。
+2. 管理サイドバーの**管理者設定**を開きます。
+3. **デモデータ**の**デモデータをロード**を押し、ダイアログの**デモデータをロード**で確定します。
 
-```env
-DEMO_DATA=true
-DEMO_PASSWORD=change-me-now-123
-DEMO_AWS_ACCESS_KEY_ID=AKIA...
-DEMO_AWS_SECRET_ACCESS_KEY=...
-DEMO_AWS_REGION=us-east-1
-DEMO_GCP_CREDENTIALS_JSON='{"type":"service_account",...}'
-DEMO_AZURE_TENANT_ID=...
-DEMO_AZURE_CLIENT_ID=...
-DEMO_AZURE_CLIENT_SECRET=...
-```
+表示が「このテナントにロード済みです。」に変わります。あとでもう一度**デモデータをロード**を押しても問題ありません。その後に削除されたデモレコードが復元され、残りはそのままです。
 
-- `DEMO_PASSWORD` は 11 のデモユーザーで共有され、`ROOT_PASSWORD` や `ADMIN_PASSWORD` と同じく、未設定なら生成してログに一度だけ出力します。参照されるのは、そのアカウントがまだ存在しないときだけです。
-- AWS、Google Cloud、Azure の認証情報はいずれも任意です。未設定なら `REPLACE_ME` というプレースホルダーが保存されるので、形としてはデモが揃った状態になり、実際の値は[シークレット](../guides/secrets.md)のページから入れられます。
-- `DEMO_AWS_REGION` は、デモの AWS MCP サーバーのツールが操作する対象のリージョンです。既定は `us-east-1` です。
-- `DEMO_GCP_CREDENTIALS_JSON` は Google Cloud の認証情報 JSON を 1 行にしたものです。サービスアカウントの鍵か、OAuth クライアント ID とシークレットで一度ログインしたあとに `gcloud` が書き出す authorized-user JSON のどちらかを入れます。GKE MCP サーバーはここからアクセストークンを発行します。Google の MCP サーバーは API キーを受け付けません。入手方法は [Google Cloud の MCP サーバー](../guides/mcp-servers.md#google-cloud-mcp-servers)を参照してください。
-- `DEMO_AZURE_TENANT_ID`・`DEMO_AZURE_CLIENT_ID`・`DEMO_AZURE_CLIENT_SECRET` は Azure のサービスプリンシパルです。`az ad sp create-for-rbac` が表示するテナント、アプリのクライアント ID、クライアントシークレットをそのまま入れます。デモでシークレットをローテーションする Key Vault に対して、`Microsoft.KeyVault/vaults/secrets/readMetadata/action` と `Microsoft.KeyVault/vaults/secrets/setSecret/action` のデータアクションだけを持つカスタムロールを付与しておいてください。アクセスポリシー方式の Key Vault なら、シークレットの権限は **List** と **Set** だけを付与します。組み込みの **Key Vault Secrets Officer** ロールでも動きますが、すべてのシークレットの値まで読めてしまいます。
+- **デモユーザーのパスワードは誰も知りません。** [代理ログイン](../concepts/impersonation.md)で使います。**ユーザー**を開き、そのアカウントの行で**代理ログイン**を押して確定します。そのアカウントで直接ログインしたい場合は、先にユーザーのページでパスワードを設定してください。
+- **認証情報は最初はプレースホルダーです。** 各デモシークレットには、[シークレット](../guides/secrets.md)のページで本物の値を入れるまで `REPLACE_ME` が入っています。**Default** テナントに限り、デプロイの運用者があらかじめ値を用意しておくこともできます。[設定](../operations/configuration.md#demo-data)を参照してください。その値がほかのテナントにコピーされることはありません。
+- **AWS のツールは `us-east-1` を操作します。** ほかのリージョンを使うには、`AWS MCP Server` の [MCP サーバー](../guides/mcp-servers.md)のページで、環境変数の `AWS_REGION` を変更します。
+- AWS のシークレットには、AWS のアクセスキー ID とシークレットアクセスキーを入れます。ツールが行う操作の権限に加えて、マネージド AWS MCP エンドポイントを呼び出す権限が必要です。
+- Google Cloud のシークレットには、Google Cloud の認証情報 JSON を 1 行にして入れます。サービスアカウントの鍵か、OAuth クライアント ID とシークレットで一度ログインしたあとに `gcloud` が書き出す authorized-user JSON のどちらかを入れます。GKE MCP サーバーはここからアクセストークンを発行します。Google の MCP サーバーは API キーを受け付けません。入手方法は [Google Cloud の MCP サーバー](../guides/mcp-servers.md#google-cloud-mcp-servers)を参照してください。
+- Azure のシークレットには、Azure のサービスプリンシパルを入れます。`az ad sp create-for-rbac` が表示するテナント、アプリのクライアント ID、クライアントシークレットをそのまま入れます。デモでシークレットをローテーションする Key Vault に対して、`Microsoft.KeyVault/vaults/secrets/readMetadata/action` と `Microsoft.KeyVault/vaults/secrets/setSecret/action` のデータアクションだけを持つカスタムロールを付与しておいてください。アクセスポリシー方式の Key Vault なら、シークレットの権限は **List** と **Set** だけを付与します。組み込みの **Key Vault Secrets Officer** ロールでも動きますが、すべてのシークレットの値まで読めてしまいます。
 
 ⚠️ AWS・GKE・Azure の MCP サーバーは、読み取りだけでなく、**状態を変える**操作を実行できます。AWS MCP サーバーの認証情報は実際の AWS リソースを作成・削除でき、GKE MCP サーバーの身元は実際のクラスタでワークロードのローリング再起動や Pod の削除を行え、Azure MCP サーバーのサービスプリンシパルは Key Vault のシークレットを書き込めます。いずれも使い捨てのアカウントか、権限を絞った認証情報を使ってください。実際のプロバイダにまったく触れずにデモを試す方法は、下の[試してみる](#trying-it-out)を参照してください。
 
 ## 登録されるもの {#what-gets-registered}
 
-- **[エージェントスキル](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — インスタンスの構成を聞き取り、それについて管理職の明示的な承認を得てから、MCP ツールでインスタンスを起動します。リポジトリは起動後にバックグラウンドで clone するので、使えるようになるまでの間スキルは `クローン中` と表示されます。
+- **[エージェントスキル](../guides/agent-skills.md) `Demo AWS EC2 Launch`** — インスタンスの構成を聞き取り、それについて管理職の明示的な承認を得てから、MCP ツールでインスタンスを起動します。リポジトリはロード後にバックグラウンドで clone するので、使えるようになるまでの間スキルは `クローン中` と表示されます。
 - **[エージェントスキル](../guides/agent-skills.md) `Demo GKE Pod Restart`** — 対象(プロジェクト・クラスタ・namespace・そして Deployment/StatefulSet 名か単一の Pod 名のいずれか)をユーザーと合意し、その対象について管理職の明示的な承認を得てから、既定では GKE MCP Server でワークロードをローリング再起動し、ユーザーが1つの Pod だけを望む場合はその Pod を削除して所有コントローラーに再作成させ、結果を報告します。リポジトリの clone も同じ仕組みなので、最初は同様に `クローン中` と表示されます。
 - **[エージェントスキル](../guides/agent-skills.md) `Demo Azure Key Vault Secret Rotation`** — Key Vault と、その中にある既存のシークレットをユーザーと合意し、そのシークレットについて管理職の明示的な承認を得てから、新しく生成したランダムな値をシークレットの新しいバージョンとして Azure MCP Server で書き込み、新しいバージョンの作成日時を報告します。値はチャットに表示しません。リポジトリの clone も同じ仕組みなので、最初は同様に `クローン中` と表示されます。
 - **[MCP サーバー](../guides/mcp-servers.md) `AWS MCP Server`** — AWS のマネージド AWS MCP Server に接続する `stdio` サーバーです。EC2 のツールはここから来ます。
@@ -48,7 +41,7 @@ DEMO_AZURE_CLIENT_SECRET=...
 - **[シークレット](../guides/secrets.md) `demo-azure-credentials`** — Azure MCP Server がサインインに使う、Azure サービスプリンシパルのテナント ID・クライアント ID・クライアントシークレットです。
 - **[ツールモック](../guides/tool-mocks.md)** — デモ実行で副作用のあるツールのスタブです。AWS MCP Server の `aws___call_aws` と `aws___run_script`(どちらも起動成功を返す)、GKE MCP Server の `patch_k8s_resource`(ローリング再起動成功を返す)と `delete_k8s_resource`(Pod 削除成功を返す)、Azure MCP Server の `keyvault_secret_get`(Key Vault のシークレット一覧を返す)と `keyvault_secret_create`(新しいシークレットバージョンを返す)、および組み込みの `request_approval`(承認済みを返す)。下書きの実行の**実行**ダイアログで選ぶと、AWS や実際の GKE クラスタ、実際の Key Vault に触れることも管理職の承認を待つこともなく、3 つのワークフローのどれも最後まで動きます。
 - **[タグ](../guides/tags.md)** `AWS`・`GCP`・`Azure` — それぞれ[アクセス制御タグ](../guides/tags.md#access-control-tags)です。`Demo AWS Group`/`Demo GCP Group`/`Demo Azure Group` のメンバー(および管理者、上位管理者)以外には、そのプロバイダのタグが付いた上記のレコードは見えません。`EC2 Cost Estimator` と `AWS EC2 Pricing` ナレッジベースには `AWS`、`Kubernetes Manifest Toolkit` には `GCP`、`Secret Value Generator` には `Azure` が付いており、それぞれが補助するプロバイダのレコードと同じ扱いになります。`Approval Required` は 3 つのエージェントスキルすべてに付く普通のタグで、何も制限しません。
-- **実行履歴つきの[ワークフロー](../guides/workflows.md)** — 公開済みのワークフロー 4 件（`Provision Dev EC2 Instance`、`Launch GPU Training Instance`、`Restart Crashlooping GKE Pod`、`Rotate Database Password`）と、その約 90 日分の過去の実行・タスク・承認です。[ダッシュボード](../guides/dashboard.md)に表示する中身を用意するためのもので、表示専用です。タスクテンプレートがないので実行しても意味のある処理は行われず、これらの実行のチャットは空です。いくつかの実行は常に進行中でデモの承認者を待っているため、その承認者の **承認** にも依頼が並びます。履歴は起動のたびに現在時刻を終点として作り直されるので、ダッシュボードはいつ見ても最新に見えます。これらのワークフローで自分で開始した実行は消えずに残ります。
+- **実行履歴つきの[ワークフロー](../guides/workflows.md)** — 公開済みのワークフロー 4 件（`Provision Dev EC2 Instance`、`Launch GPU Training Instance`、`Restart Crashlooping GKE Pod`、`Rotate Database Password`）と、その約 90 日分の過去の実行・タスク・承認です。[ダッシュボード](../guides/dashboard.md)に表示する中身を用意するためのもので、表示専用です。タスクテンプレートがないので実行しても意味のある処理は行われず、これらの実行のチャットは空です。いくつかの実行は常に進行中でデモの承認者を待っているため、その承認者の **承認** にも依頼が並びます。履歴はデモデータをロードした時点を終点とするので、日が経つにつれてダッシュボードの直近の数値は空いていきます。最新にしたいときは、デモデータを[クリア](#clearing-it)してからロードし直してください。クリアせずにロードし直しても履歴はそのままです。これらのワークフローで自分で開始した実行は、どちらの場合も消えずに残ります。
 - **デモユーザーとグループ:**
 
 | ユーザー | ロール | アクセス制御グループ | 役割 |
@@ -68,14 +61,14 @@ DEMO_AZURE_CLIENT_SECRET=...
 
 ## 試してみる {#trying-it-out}
 
-どの例も、生成、公開、実行、承認、結果の確認までを一気に通す手順が[ウォークスルー](./walkthrough.mdx)です。`root` で一度ログインし、デモアカウントを順に[代理ログイン](../concepts/impersonation.md)で演じます。`DEMO_PASSWORD` で各アカウントにログインし直しても同じことができます。誰が何をするかは上の表のとおりです。
+どの例も、生成、公開、実行、承認、結果の確認までを一気に通す手順が[ウォークスルー](./walkthrough.mdx)です。管理者で一度ログインし、デモアカウントを順に[代理ログイン](../concepts/impersonation.md)で演じます。誰が何をするかは上の表のとおりです。
 
-`Demo AWS Group`・`Demo GCP Group`・`Demo Azure Group` はそれぞれ自分のプロバイダのレコードしか見えないため、`demo-aws-developer` は `Demo GKE Pod Restart` を開けず、`demo-gcp-developer` は `Demo Azure Key Vault Secret Rotation` を開けません。`Demo Approvers` は 3 つのアクセス制御タグすべてを直接持っているので、承認者アカウントはどの例でもどちらでも構いません。GKE の例を実際に動かすには、実際の GKE クラスタに届く権限を持つ身元の認証情報を `DEMO_GCP_CREDENTIALS_JSON` に設定しておく必要があります。ローテーションを実際に動かすには、`DEMO_AZURE_*` のサービスプリンシパルが実際の Key Vault のシークレットを書き込める必要があります。
+`Demo AWS Group`・`Demo GCP Group`・`Demo Azure Group` はそれぞれ自分のプロバイダのレコードしか見えないため、`demo-aws-developer` は `Demo GKE Pod Restart` を開けず、`demo-gcp-developer` は `Demo Azure Key Vault Secret Rotation` を開けません。`Demo Approvers` は 3 つのアクセス制御タグすべてを直接持っているので、承認者アカウントはどの例でもどちらでも構いません。GKE の例を実際に動かすには、実際の GKE クラスタに届く権限を持つ身元の認証情報が `demo-gcp-credentials` シークレットに入っている必要があります。ローテーションを実際に動かすには、`demo-azure-credentials` のサービスプリンシパルが実際の Key Vault のシークレットを書き込める必要があります。
 
 **AWS アカウントも GKE クラスタも Key Vault もない場合。** 公開せず、`下書き` のまま実行してください。開発者であるそのプロバイダの開発者アカウント(`demo-aws-developer`、`demo-gcp-developer`、`demo-azure-developer`)はそれができ、[ツールモック](../guides/tool-mocks.md)を選べる**実行**ダイアログが出るのは下書きの実行のときだけです。**モックツール**に並ぶ同梱のスタブ(起動用の `aws___call_aws` または `aws___run_script`、Pod 再起動用の `patch_k8s_resource` または `delete_k8s_resource`、ローテーション用の `keyvault_secret_get` と `keyvault_secret_create`、`request_approval`)にチェックを入れれば、実際のプロバイダに届くことも人の承認を待つこともなく、ワークフローが最後まで動きます。ローテーションのモックを選んだ場合は Key Vault のシークレット一覧も作り物になるので、その中から `db-password` を選んでください。
 
-## 削除する {#removing-it}
+## クリアする {#clearing-it}
 
-`DEMO_DATA=false` にすると(または行を削除すると)、次の起動時にこれらのレコードが**削除されます**。どちらの方向にも宣言的に働くということです。
+**管理者設定**の**デモデータ**で**デモデータをクリア**を押し、ダイアログの**デモデータをクリア**で確定します。デモレコードは自分のテナントからだけ削除され、ほかのテナントのコピーには影響しません。
 
-意図的に残るものが 2 つあります。ほかから依存されるようになったデモレコード(デモスキルの上に作られたワークフローなど)は、削除せずログに記録して残します。レコードを作成したデモユーザーは論理削除にとどめるので、そのレコード上で名前は引き続き解決できます。
+意図的に残るものが 2 つあります。ほかから依存されるようになったデモレコード(デモスキルの上に作られたワークフローなど)は削除せずに残し、残した件数はクリア後のメッセージに表示されます。レコードを作成したデモユーザーはユーザー一覧から消えますが、そのレコード上では引き続き名前が表示されます。残ったレコードを削除するには、それに依存しているものを先に削除してから、もう一度クリアしてください。

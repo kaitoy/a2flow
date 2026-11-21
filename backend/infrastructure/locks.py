@@ -124,6 +124,21 @@ def knowledge_base_key(kb_id: str) -> str:
     return f"knowledge-base:{kb_id}"
 
 
+def demo_data_key(tenant_id: str) -> str:
+    """Build the lock key serializing loads and clears of one tenant's demo data.
+
+    Without it, two admins pressing **Load** together would each delete and
+    rewrite the generated run history, leaving it twice over.
+
+    Args:
+        tenant_id: Id of the tenant whose demo data is loaded or cleared.
+
+    Returns:
+        The key to pass to :func:`advisory_lock`.
+    """
+    return f"demo-data:{tenant_id}"
+
+
 def email_queue_key() -> str:
     """Return the lock key electing the one process that drains outgoing email.
 

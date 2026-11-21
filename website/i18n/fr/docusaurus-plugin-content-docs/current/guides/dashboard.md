@@ -11,7 +11,7 @@ Il est conçu pour rester ouvert : chaque chiffre est relu toutes les 15 seconde
 
 Deux sortes d'exécutions sont exclues de tous les chiffres : les exécutions de test lancées depuis un workflow encore à l'état de brouillon, et les exécutions qu'une [étiquette de contrôle d'accès](./tags.md#access-control-tags) vous masque.
 
-Pour voir le tableau de bord rempli avant que votre tenant ait exécuté quoi que ce soit, activez les [données de démonstration](../getting-started/demo-data.md) : elles comprennent environ quatre-vingt-dix jours d'exécutions fictives.
+Pour voir le tableau de bord rempli avant que votre tenant ait exécuté quoi que ce soit, chargez les [données de démonstration](../getting-started/demo-data.md) : elles comprennent environ quatre-vingt-dix jours d'exécutions fictives.
 
 ## La barre d'outils {#the-toolbar}
 

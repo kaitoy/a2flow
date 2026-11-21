@@ -32,14 +32,14 @@ Pick a provider here. Every provider-specific block on this page follows the cho
 
 ## Before you start \{#before-you-start\}
 
-- The backend is running with [demo data](./demo-data.md) enabled.
+- The [demo data](./demo-data.md#loading-it) is loaded into the **Default** tenant.
 - You know the `root` password — `ROOT_PASSWORD`, or the line the backend logged once at startup when it was left unset ([Seeded users](../operations/configuration.md#seeded-users)).
 - The provider can really be reached:
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  The `demo-aws-credentials` [secret](../guides/secrets.md) holds a real access key: either `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` were set before the first start, or you edit the secret under **Secrets**. The run **launches a real EC2 instance**, which costs money until you terminate it.
+  The `demo-aws-credentials` [secret](../guides/secrets.md) holds a real access key: either the deployment's operator supplied it before the demo data was loaded ([Configuration](../operations/configuration.md#demo-data)), or you edit the secret under **Secrets**. The run **launches a real EC2 instance**, which costs money until you terminate it.
 
   The key's IAM user needs a policy that lets it resolve the AMI, look up the network and key pair, and launch the instance. This is enough:
 
@@ -77,12 +77,12 @@ Pick a provider here. Every provider-specific block on this page follows the cho
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 
-  The `demo-gcp-credentials` [secret](../guides/secrets.md) holds a Google Cloud credential whose identity can reach a GKE cluster: either `DEMO_GCP_CREDENTIALS_JSON` was set before the first start, or you edit the secret under **Secrets**. Have a project, a cluster, its region, and a workload you may restart ready — the run **really rolling-restarts it**.
+  The `demo-gcp-credentials` [secret](../guides/secrets.md) holds a Google Cloud credential whose identity can reach a GKE cluster: either the deployment's operator supplied it before the demo data was loaded ([Configuration](../operations/configuration.md#demo-data)), or you edit the secret under **Secrets**. Have a project, a cluster, its region, and a workload you may restart ready — the run **really rolling-restarts it**.
 
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  The `demo-azure-credentials` [secret](../guides/secrets.md) holds a real service principal: either `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET` were set before the first start, or you edit the secret under **Secrets**. The principal needs a role on a vault that lets it list and write secrets. Prefer a custom role with only the `Microsoft.KeyVault/vaults/secrets/readMetadata/action` and `Microsoft.KeyVault/vaults/secrets/setSecret/action` data actions over the built-in **Key Vault Secrets Officer** role, which can also read every secret's value: the agent then cannot read a value even if it is talked into trying. On a vault that uses access policies instead, grant only the **List** and **Set** secret permissions. Have that vault and a secret in it you may rotate ready — the run **really writes a new version of the secret**, and anything that reads its current version picks up the new value.
+  The `demo-azure-credentials` [secret](../guides/secrets.md) holds a real service principal: either the deployment's operator supplied it before the demo data was loaded ([Configuration](../operations/configuration.md#demo-data)), or you edit the secret under **Secrets**. The principal needs a role on a vault that lets it list and write secrets. Prefer a custom role with only the `Microsoft.KeyVault/vaults/secrets/readMetadata/action` and `Microsoft.KeyVault/vaults/secrets/setSecret/action` data actions over the built-in **Key Vault Secrets Officer** role, which can also read every secret's value: the agent then cannot read a value even if it is talked into trying. On a vault that uses access policies instead, grant only the **List** and **Set** secret permissions. Have that vault and a secret in it you may rotate ready — the run **really writes a new version of the secret**, and anything that reads its current version picks up the new value.
 
   </TabItem>
 </Tabs>

@@ -20,6 +20,7 @@ import type {
   ApprovedCall,
   AvatarConfig,
   CertificateGrant,
+  DemoDataStatus,
   ExecuteWorkflowRequest,
   ExecutionSession as ExecutionSessionModel,
   FailedExecutionEntry,
@@ -435,6 +436,7 @@ export type {
   ApprovedCall,
   AvatarConfig,
   CertificateGrant,
+  DemoDataStatus,
   FailedExecutionEntry,
   FailedTaskEntry,
   GenerateWorkflowRequest,
@@ -1204,6 +1206,27 @@ export async function updateAdminSettings(body: AdminSettingsUpdate): Promise<Ad
   return unwrap(
     sdk.updateAdminSettingsApiV1AdminSettingsPatch({ body: body })
   ) as Promise<AdminSettings>;
+}
+
+/**
+ * Report whether the acting tenant holds the demo dataset. `admin` only; a
+ * `super_admin` gets the tenant selected in the tenant switcher.
+ */
+export async function getDemoData(options?: CallOptions): Promise<DemoDataStatus> {
+  return unwrap(sdk.getDemoDataApiV1DemoDataGet(), options) as Promise<DemoDataStatus>;
+}
+
+/** Load the demo dataset into the acting tenant, restoring anything missing. `admin` only. */
+export async function loadDemoData(): Promise<DemoDataStatus> {
+  return unwrap(sdk.loadTenantDemoDataApiV1DemoDataPost()) as Promise<DemoDataStatus>;
+}
+
+/**
+ * Delete the demo dataset from the acting tenant. `keptCount` says how many
+ * records stayed because other records use them. `admin` only.
+ */
+export async function clearDemoData(): Promise<DemoDataStatus> {
+  return unwrap(sdk.clearTenantDemoDataApiV1DemoDataDelete()) as Promise<DemoDataStatus>;
 }
 
 /**

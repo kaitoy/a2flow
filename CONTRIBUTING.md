@@ -150,7 +150,7 @@ runner built on Playwright. It covers two flows:
 | Test | Flow |
 |---|---|
 | `tests/tags.e2e.ts` | An admin creates, edits, and deletes a tag |
-| `tests/aws-walkthrough.e2e.ts` | The manual's AWS walkthrough on its tool-mock path: impersonate `demo-aws-developer`, generate a workflow from the demo skill, run the draft with the seeded mocks, and see it complete |
+| `tests/aws-walkthrough.e2e.ts` | The manual's AWS walkthrough on its tool-mock path: load the demo data from Admin Settings, impersonate `demo-aws-developer`, generate a workflow from the demo skill, run the draft with the seeded mocks, and see it complete |
 
 [e2e.yml](.github/workflows/e2e.yml) runs it on every push and pull request that
 touches `backend/`, `frontend/`, or `e2e/`; a failed run uploads the traces,
@@ -164,7 +164,7 @@ the design agent registers two task templates, and the execution agent works bot
 tasks through to `completed`. No production code knows about it. Change the script
 when a flow under test needs different agent behaviour.
 
-The demo skill is still cloned from GitHub at startup, so the suite needs network
+The demo skill is still cloned from GitHub once the test loads the demo data, so the suite needs network
 access. Both servers bind `127.0.0.1` (backend on 8099, frontend on 3099) against a
 throwaway database that `start.sh` deletes on exit.
 

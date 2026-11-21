@@ -32,14 +32,14 @@ Choisissez ici un fournisseur. Tous les blocs propres à un fournisseur sur cett
 
 ## Avant de commencer \{#before-you-start\}
 
-- Le backend tourne avec les [données de démonstration](./demo-data.md) activées.
+- Les [données de démonstration](./demo-data.md#loading-it) sont chargées dans le tenant **Default**.
 - Vous connaissez le mot de passe de `root` : `ROOT_PASSWORD`, ou la ligne que le backend a consignée une seule fois au démarrage s'il n'était pas défini ([Utilisateurs initiaux](../operations/configuration.md#seeded-users)).
 - Le fournisseur est réellement joignable :
 
 <Tabs groupId="provider" queryString>
   <TabItem value="aws" label="AWS">
 
-  Le [secret](../guides/secrets.md) `demo-aws-credentials` contient une vraie clé d'accès : soit `DEMO_AWS_ACCESS_KEY_ID` / `DEMO_AWS_SECRET_ACCESS_KEY` ont été définis avant le premier démarrage, soit vous modifiez le secret sous **Secrets**. L'exécution **lance une véritable instance EC2**, qui vous est facturée jusqu'à ce que vous la résiliiez.
+  Le [secret](../guides/secrets.md) `demo-aws-credentials` contient une vraie clé d'accès : soit l'opérateur du déploiement l'a fourni avant le chargement des données de démonstration ([Configuration](../operations/configuration.md#demo-data)), soit vous modifiez le secret sous **Secrets**. L'exécution **lance une véritable instance EC2**, qui vous est facturée jusqu'à ce que vous la résiliiez.
 
   L'utilisateur IAM de la clé a besoin d'une stratégie qui lui permette de résoudre l'AMI, de consulter le réseau et la paire de clés, et de lancer l'instance. Celle-ci suffit :
 
@@ -77,12 +77,12 @@ Choisissez ici un fournisseur. Tous les blocs propres à un fournisseur sur cett
   </TabItem>
   <TabItem value="gcp" label="Google Cloud">
 
-  Le [secret](../guides/secrets.md) `demo-gcp-credentials` contient un identifiant Google Cloud dont l'identité peut accéder à un cluster GKE : soit `DEMO_GCP_CREDENTIALS_JSON` a été défini avant le premier démarrage, soit vous modifiez le secret sous **Secrets**. Préparez un projet, un cluster, sa région et une charge de travail que vous avez le droit de redémarrer : l'exécution **la redémarre réellement de façon progressive**.
+  Le [secret](../guides/secrets.md) `demo-gcp-credentials` contient un identifiant Google Cloud dont l'identité peut accéder à un cluster GKE : soit l'opérateur du déploiement l'a fourni avant le chargement des données de démonstration ([Configuration](../operations/configuration.md#demo-data)), soit vous modifiez le secret sous **Secrets**. Préparez un projet, un cluster, sa région et une charge de travail que vous avez le droit de redémarrer : l'exécution **la redémarre réellement de façon progressive**.
 
   </TabItem>
   <TabItem value="azure" label="Azure">
 
-  Le [secret](../guides/secrets.md) `demo-azure-credentials` contient un vrai principal de service : soit `DEMO_AZURE_TENANT_ID` / `DEMO_AZURE_CLIENT_ID` / `DEMO_AZURE_CLIENT_SECRET` ont été définis avant le premier démarrage, soit vous modifiez le secret sous **Secrets**. Le principal a besoin, sur un coffre, d'un rôle qui lui permette de lister et d'écrire les secrets. Préférez un rôle personnalisé limité aux actions de données `Microsoft.KeyVault/vaults/secrets/readMetadata/action` et `Microsoft.KeyVault/vaults/secrets/setSecret/action` au rôle intégré **Key Vault Secrets Officer**, qui peut aussi lire la valeur de tous les secrets : l'agent ne peut alors lire aucune valeur, même si on le persuade d'essayer. Sur un coffre qui utilise plutôt des stratégies d'accès, accordez uniquement les autorisations de secret **List** et **Set**. Préparez ce coffre et un secret dont vous avez le droit d'effectuer la rotation : l'exécution **écrit réellement une nouvelle version du secret**, et tout ce qui lit sa version actuelle récupère la nouvelle valeur.
+  Le [secret](../guides/secrets.md) `demo-azure-credentials` contient un vrai principal de service : soit l'opérateur du déploiement l'a fourni avant le chargement des données de démonstration ([Configuration](../operations/configuration.md#demo-data)), soit vous modifiez le secret sous **Secrets**. Le principal a besoin, sur un coffre, d'un rôle qui lui permette de lister et d'écrire les secrets. Préférez un rôle personnalisé limité aux actions de données `Microsoft.KeyVault/vaults/secrets/readMetadata/action` et `Microsoft.KeyVault/vaults/secrets/setSecret/action` au rôle intégré **Key Vault Secrets Officer**, qui peut aussi lire la valeur de tous les secrets : l'agent ne peut alors lire aucune valeur, même si on le persuade d'essayer. Sur un coffre qui utilise plutôt des stratégies d'accès, accordez uniquement les autorisations de secret **List** et **Set**. Préparez ce coffre et un secret dont vous avez le droit d'effectuer la rotation : l'exécution **écrit réellement une nouvelle version du secret**, et tout ce qui lit sa version actuelle récupère la nouvelle valeur.
 
   </TabItem>
 </Tabs>

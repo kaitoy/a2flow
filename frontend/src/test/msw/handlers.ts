@@ -533,6 +533,12 @@ export const handlers = [
     })
   ),
 
+  http.get(`${BASE}/api/v1/demo-data`, () => envelope({ loaded: false, keptCount: 0 })),
+
+  http.post(`${BASE}/api/v1/demo-data`, () => envelope({ loaded: true, keptCount: 0 })),
+
+  http.delete(`${BASE}/api/v1/demo-data`, () => envelope({ loaded: false, keptCount: 0 })),
+
   http.get(`${BASE}/api/v1/system-settings`, () => envelope(SYSTEM_SETTINGS)),
 
   http.patch(`${BASE}/api/v1/system-settings`, () => envelope(SYSTEM_SETTINGS)),

@@ -34,7 +34,7 @@ sidebar_position: 1
 | **워크플로 실행** | 워크플로 실행과 실행 기록 | 로그인한 모든 사용자 |
 | **승인** | 승인 요청과 그 결정 | 로그인한 모든 사용자 |
 | **감사 로그** | 도구 호출, 대리 로그인, 부여된 권한, 보낸 메일 | 관리자, 슈퍼 관리자 |
-| **관리자 설정** | 로그인 실패 시 테넌트의 계정을 잠그는 방식과 테넌트 자체 Vault. [로그인 실패](./users-and-groups.md#failed-sign-ins)와 [테넌트의 Vault](./users-and-groups.md#tenant-vault)를 참조하세요 | 관리자 |
+| **관리자 설정** | 로그인 실패 시 테넌트의 계정을 잠그는 방식과 테넌트 자체 Vault. [로그인 실패](./users-and-groups.md#failed-sign-ins)와 [테넌트의 Vault](./users-and-groups.md#tenant-vault)를 참조하세요. [데모 데이터](../getting-started/demo-data.md)를 로드하거나 지우는 곳이기도 합니다 | 관리자 |
 | **시스템 설정** | 알림을 보내는 메일 서버와 전역 Vault의 주소 | 슈퍼 관리자 |
 
 사이드바에 없는 섹션은 내 역할로 쓰기 권한이 없는 섹션입니다. 읽기는 열려 있으므로 동료가 그 안의 레코드로 연결되는 직접 링크를 보내 주면 열어 볼 수 있습니다. [역할과 권한 부여](../concepts/authorization.md)를 참조하세요.

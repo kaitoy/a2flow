@@ -4,9 +4,9 @@ Usage (from ``backend/``, with ``SYSTEM_DEFAULT_LLM_MODEL=e2e-fake``)::
 
     uv run python -m scripts.e2e_server
 
-The suite plays the demo AWS EC2 launch through with tool mocks, so it needs an
-agent that behaves the same on every run and costs nothing. :class:`E2eFakeLlm`
-is that agent. It is registered with ADK's :class:`LLMRegistry` under the name
+The suite loads the demo data from Admin Settings and plays the demo AWS EC2
+launch through with tool mocks, so it needs an agent that behaves the same on
+every run and costs nothing. :class:`E2eFakeLlm` is that agent. It is registered with ADK's :class:`LLMRegistry` under the name
 ``e2e-fake`` before the app is imported, and :func:`infrastructure.agent.resolve_model`
 hands any name without the ``litellm:`` prefix to that registry, so every agent
 and the summarizer reach it without a line of production code knowing it exists.

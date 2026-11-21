@@ -42,10 +42,9 @@ async def test_concurrent_startups_bootstrap_one_at_a_time(
         overlapped = overlapped or running > 1
         await asyncio.sleep(0.05)
 
-    async def leave(_session: object) -> list[str]:
+    async def leave(_session: object) -> None:
         nonlocal running
         running -= 1
-        return []
 
     async def noop(_session: object) -> None:
         return None
@@ -57,10 +56,9 @@ async def test_concurrent_startups_bootstrap_one_at_a_time(
         "seed_system_settings",
         "apply_system_settings_env_overrides",
         "seed_root_user",
-        "seed_default_tenant_and_admin_user",
     ):
         monkeypatch.setattr(main, name, noop)
-    monkeypatch.setattr(main, "sync_demo_data", leave)
+    monkeypatch.setattr(main, "seed_default_tenant_and_admin_user", leave)
 
     await asyncio.gather(*(main._bootstrap() for _ in range(3)))
     assert not overlapped

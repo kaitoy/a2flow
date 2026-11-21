@@ -67,6 +67,21 @@ El registro envía a cada visitante un enlace de confirmación, así que tambié
 
 Así, cualquiera que llegue al despliegue y reciba correo puede crear tenants. Una dirección recibe como máximo un correo de confirmación por minuto, lo que impide usar el formulario para inundar el buzón de otra persona, pero el único otro límite es el **Número máximo de Tenants** de los [ajustes del sistema](../guides/system-settings.md#tenant-limit). Está vacío por defecto, lo que significa que no hay límite, así que fija uno antes de activar el registro donde un número ilimitado de tenants sería un problema.
 
+## Datos de demostración {#demo-data}
+
+Un administrador carga los [datos de demostración](../getting-started/demo-data.md) en su tenant desde **Configuración de administrador**. Estas variables rellenan sus secretos cuando se cargan en el tenant **Default**; cualquier otro tenant recibe un marcador `REPLACE_ME` en cada uno, de modo que las credenciales propias del despliegue nunca llegan a otro tenant. Todas son opcionales: una sin definir también queda como marcador, que el administrador del tenant sustituye en la página **Secretos**.
+
+| Variable | Valor predeterminado | Qué hace |
+|---|---|---|
+| `DEMO_AWS_ACCESS_KEY_ID` | — | ID de clave de acceso de AWS que se guarda en el secreto `demo-aws-credentials` |
+| `DEMO_AWS_SECRET_ACCESS_KEY` | — | La clave de acceso secreta correspondiente |
+| `DEMO_GCP_CREDENTIALS_JSON` | — | JSON de credencial de Google Cloud, en una sola línea, que se guarda en el secreto `demo-gcp-credentials` |
+| `DEMO_AZURE_TENANT_ID` | — | ID de tenant de Microsoft Entra de la entidad de servicio que se guarda en el secreto `demo-azure-credentials` |
+| `DEMO_AZURE_CLIENT_ID` | — | ID de cliente de esa entidad de servicio |
+| `DEMO_AZURE_CLIENT_SECRET` | — | Secreto de cliente de esa entidad de servicio |
+
+Un valor definido después de cargar los datos de demostración no cambia el secreto guardado; edítalo en la página **Secretos**, o borra los datos de demostración y vuelve a cargarlos. Lo que necesita cada credencial está en la página [Datos de demostración](../getting-started/demo-data.md#loading-it).
+
 ## Duración de la sesión {#session-lifetime}
 
 | Variable | Valor predeterminado | Qué hace |

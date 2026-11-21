@@ -289,6 +289,27 @@ export const en = {
   "admin.workflowGenerationStarted": "Workflow generation started",
   "admin.workflowName": "Workflow Name",
   "adminSettings.adminSettingsUpdated": "Admin settings updated",
+  "adminSettings.demoData.title": "Demo data",
+  "adminSettings.demoData.description":
+    "Sample users, user groups, secrets, MCP servers, agent skills, tool mocks, and a run history for trying A2Flow out in this tenant.",
+  "adminSettings.demoData.loaded": "Loaded in this tenant.",
+  "adminSettings.demoData.notLoaded": "Not loaded in this tenant.",
+  "adminSettings.demoData.load": "Load demo data",
+  "adminSettings.demoData.loading": "Loading…",
+  "adminSettings.demoData.clear": "Clear demo data",
+  "adminSettings.demoData.clearing": "Clearing…",
+  "adminSettings.demoData.loadConfirmTitle": "Load demo data?",
+  "adminSettings.demoData.loadConfirmDescription":
+    "Adds eleven demo users, their user groups, and sample secrets, MCP servers, agent skills, tool mocks, tags, and workflows to this tenant. Demo users have no password you know: impersonate them from Users. Anything already loaded is left as it is.",
+  "adminSettings.demoData.clearConfirmTitle": "Clear demo data?",
+  "adminSettings.demoData.clearConfirmDescription":
+    "Deletes the demo records from this tenant. Records something else now uses, such as a workflow built on a demo skill, are kept.",
+  "adminSettings.demoData.loadedToast": "Demo data loaded",
+  "adminSettings.demoData.clearedToast": "Demo data cleared",
+  "adminSettings.demoData.keptToast": {
+    one: "Demo data cleared. {count} record was kept because other records use it.",
+    other: "Demo data cleared. {count} records were kept because other records use them.",
+  },
   "adminSettings.oidc.title": "Single sign-on",
   "adminSettings.oidc.enable": "Enable single sign-on",
   "adminSettings.oidc.issuerUrl": "Issuer URL",
