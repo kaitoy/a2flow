@@ -22,6 +22,7 @@ from infrastructure.agent import (
     with_user_id,
 )
 from infrastructure.locks import LockNotAcquiredError, advisory_lock, agent_run_key
+from infrastructure.streamed_text_dedup import drop_restreamed_text
 from models.user import Role
 from repositories.exceptions import SessionRunInProgressError
 from services.session_stream import SSE_HEADERS
@@ -116,7 +117,7 @@ async def agent_endpoint(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         async with run_stack:
-            async for event in adk_agent.run(input_data):
+            async for event in drop_restreamed_text(adk_agent.run(input_data)):
                 yield encoder.encode(event)
 
     await db.close()
