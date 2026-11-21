@@ -39,7 +39,7 @@
     "@react-spring/web": "^10.1.2",
     "@reduxjs/toolkit": "^2.15.0",
     "@scalar/nextjs-api-reference": "^0.12.21",
-    "@xyflow/react": "^12.12.1",
+    "@xyflow/react": "^13.0.2",
     "acorn": "^8.19.0",
     "boring-avatars": "^2.0.4",
     "codemirror": "^6.0.2",
