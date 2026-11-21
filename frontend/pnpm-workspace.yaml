@@ -10,3 +10,10 @@ allowBuilds:
 overrides:
   js-yaml: ^4.3.2
   dompurify: ^3.4.13
+
+# @a2ui/markdown-it 0.2.2 (the latest) declares a peer of @a2ui/web_core
+# ^0.14.0, but imports only types from it, so it runs unchanged on 0.15. Drop
+# this once a markdown-it release accepts the installed web_core.
+peerDependencyRules:
+  allowedVersions:
+    "@a2ui/markdown-it>@a2ui/web_core": "0.15"

@@ -22,9 +22,9 @@
   },
   "dependencies": {
     "@a2ui/markdown-it": "0.2.2",
-    "@a2ui/react": "0.14.0",
-    "@a2ui/web_core": "0.14.0",
-    "@ag-ui/a2ui-middleware": "^0.0.13",
+    "@a2ui/react": "0.15.0",
+    "@a2ui/web_core": "0.15.0",
+    "@ag-ui/a2ui-middleware": "^0.0.16",
     "@ag-ui/client": "^1.0.5",
     "@ag-ui/core": "^1.0.5",
     "@codemirror/commands": "^6.11.1",
