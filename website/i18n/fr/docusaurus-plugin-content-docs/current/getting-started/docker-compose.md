@@ -20,7 +20,7 @@ Définissez `APP_PORT` dans `.env` pour publier l'application sur un autre port 
 
 | Conteneur | Rôle |
 |---|---|
-| **db** | PostgreSQL 17. Tout ce qu'A2Flow enregistre se trouve ici |
+| **db** | PostgreSQL 18. Tout ce qu'A2Flow enregistre se trouve ici |
 | **backend** | L'agent et l'API |
 | **worker** | Envoie les [e-mails de notification](../guides/notifications.md#the-delivery-queue) mis en file d'attente par le backend |
 | **mcp-proxy** | Exécute les [serveurs MCP](../guides/mcp-servers.md) que vous enregistrez — voir [pourquoi il est séparé](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |

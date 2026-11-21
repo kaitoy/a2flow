@@ -20,7 +20,7 @@ Define `APP_PORT` en `.env` para publicar la aplicación en otro puerto del host
 
 | Contenedor | Qué hace |
 |---|---|
-| **db** | PostgreSQL 17. Aquí se guarda todo lo que registra A2Flow |
+| **db** | PostgreSQL 18. Aquí se guarda todo lo que registra A2Flow |
 | **backend** | El agente y la API |
 | **worker** | Envía los [correos de notificación](../guides/notifications.md#the-delivery-queue) que el backend pone en cola |
 | **mcp-proxy** | Ejecuta los [servidores MCP](../guides/mcp-servers.md) que registras; consulta [por qué está separado](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |

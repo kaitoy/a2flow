@@ -20,7 +20,7 @@ docker compose up --build
 
 | コンテナ | 役割 |
 |---|---|
-| **db** | PostgreSQL 17。A2Flow が記録するものはすべてここに入ります |
+| **db** | PostgreSQL 18。A2Flow が記録するものはすべてここに入ります |
 | **backend** | エージェントと API |
 | **worker** | バックエンドが積んだ[通知メール](../guides/notifications.md#the-delivery-queue)を送ります |
 | **mcp-proxy** | 登録した [MCP サーバー](../guides/mcp-servers.md)を実行します。分けている理由は[登録したサーバーが動く場所](../architecture/mcp-gateway-and-proxy.md#the-sandbox)を参照してください |

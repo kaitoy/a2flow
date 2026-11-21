@@ -1,4 +1,4 @@
-# Full A2Flow stack: PostgreSQL 17 + backend (FastAPI/ADK) + frontend (Next.js).
+# Full A2Flow stack: PostgreSQL 18 + backend (FastAPI/ADK) + frontend (Next.js).
 #
 # Usage (Google AI Studio — default):
 #   echo SYSTEM_DEFAULT_LLM_API_KEY=<your-key> > .env
@@ -42,7 +42,7 @@
 # manual's "Run with Docker Compose" page for connecting A2Flow to it.
 services:
   db:
-    image: postgres:17
+    image: postgres:18
     environment:
       POSTGRES_USER: a2flow
       POSTGRES_PASSWORD: a2flow
@@ -53,7 +53,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
 
   backend:
     build:
@@ -281,7 +281,7 @@ services:
   # Alembic autogenerate never sees OpenBao's table and proposes dropping it.
   openbao-db-init:
     profiles: ["openbao"]
-    image: postgres:17
+    image: postgres:18
     environment:
       PGHOST: db
       PGUSER: a2flow
@@ -308,7 +308,7 @@ services:
   # the data unreadable -- fine for a local trial, not for production.
   openbao:
     profiles: ["openbao"]
-    image: openbao/openbao:2.7.2
+    image: openbao/openbao:2.7.3
     entrypoint:
       [
         "sh",
@@ -342,7 +342,7 @@ services:
   # inside and out.
   keycloak:
     profiles: ["keycloak"]
-    image: quay.io/keycloak/keycloak:26.7.3
+    image: quay.io/keycloak/keycloak:26.8.2
     command: ["start-dev", "--import-realm", "--http-port=8180"]
     environment:
       KC_HOSTNAME: http://keycloak.localhost:8180

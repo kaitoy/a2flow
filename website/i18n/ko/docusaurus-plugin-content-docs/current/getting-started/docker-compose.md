@@ -20,7 +20,7 @@ docker compose up --build
 
 | 컨테이너 | 역할 |
 |---|---|
-| **db** | PostgreSQL 17. A2Flow가 기록하는 모든 내용이 여기에 저장됩니다 |
+| **db** | PostgreSQL 18. A2Flow가 기록하는 모든 내용이 여기에 저장됩니다 |
 | **backend** | 에이전트와 API |
 | **worker** | 백엔드가 대기열에 넣은 [알림 이메일](../guides/notifications.md#the-delivery-queue)을 보냅니다 |
 | **mcp-proxy** | 등록한 [MCP 서버](../guides/mcp-servers.md)를 실행합니다. [분리된 이유](../architecture/mcp-gateway-and-proxy.md#the-sandbox)를 참조하세요 |

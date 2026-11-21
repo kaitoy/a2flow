@@ -20,7 +20,7 @@ Set `APP_PORT` in `.env` to publish the app on a different host port; the app's 
 
 | Container | What it does |
 |---|---|
-| **db** | PostgreSQL 17. Everything A2Flow records lives here |
+| **db** | PostgreSQL 18. Everything A2Flow records lives here |
 | **backend** | The agent and the API |
 | **worker** | Sends the [notification email](../guides/notifications.md#the-delivery-queue) the backend queues |
 | **mcp-proxy** | Runs the [MCP servers](../guides/mcp-servers.md) you register — see [why it is separate](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |

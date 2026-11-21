@@ -16,15 +16,11 @@ name: a2flow-test
 
 services:
   db:
-    image: postgres:17
+    image: postgres:18
     environment:
       POSTGRES_USER: a2flow
       POSTGRES_PASSWORD: a2flow
       POSTGRES_DB: a2flow_test
-      # A subdirectory of the tmpfs mount below, rather than the mount point
-      # itself: the entrypoint creates and chowns PGDATA as root before
-      # dropping to the postgres user, which it cannot do to the mount root.
-      PGDATA: /var/lib/postgresql/data/pgdata
     # max_connections covers every pytest-xdist worker (half the host's cores)
     # holding a pooled engine of its own, with room to spare.
     command: >
@@ -34,9 +30,11 @@ services:
       -c max_connections=300
     # Nothing here outlives the container, and durability is worthless for a
     # database that is recreated on every `up`. Paired with fsync=off above,
-    # this is what keeps per-test TRUNCATE cheap.
+    # this is what keeps per-test TRUNCATE cheap. The image's PGDATA,
+    # 18/docker, is a subdirectory of this mount, which the entrypoint can
+    # create and chown (it cannot chown the mount root itself).
     tmpfs:
-      - /var/lib/postgresql/data
+      - /var/lib/postgresql
     ports:
       # 5433, not 5432, so this never collides with a locally installed
       # PostgreSQL or with compose.yml's `db` service.

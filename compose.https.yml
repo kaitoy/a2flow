@@ -31,7 +31,7 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-https://localhost}
 
   caddy:
-    image: caddy:2.10.2
+    image: caddy:2.11.9
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
