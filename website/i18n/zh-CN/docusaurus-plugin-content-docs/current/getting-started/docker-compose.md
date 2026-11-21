@@ -20,7 +20,7 @@ docker compose up --build
 
 | 容器 | 作用 |
 |---|---|
-| **db** | PostgreSQL 17。A2Flow 记录的所有内容都保存在这里 |
+| **db** | PostgreSQL 18。A2Flow 记录的所有内容都保存在这里 |
 | **backend** | 代理和 API |
 | **worker** | 发送后端排队的[通知邮件](../guides/notifications.md#the-delivery-queue) |
 | **mcp-proxy** | 运行您注册的 [MCP 服务器](../guides/mcp-servers.md)，参阅[为什么要单独运行](../architecture/mcp-gateway-and-proxy.md#the-sandbox) |

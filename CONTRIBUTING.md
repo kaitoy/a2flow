@@ -83,7 +83,7 @@ the repository root to wire it into `.git/hooks/`. See
 
 ### Or: Docker Compose
 
-The whole stack — PostgreSQL 17, the backend, the outgoing-email worker, the MCP proxy,
+The whole stack — PostgreSQL 18, the backend, the outgoing-email worker, the MCP proxy,
 and the frontend — comes up with [compose.yml](compose.yml):
 
 ```bash
@@ -195,7 +195,7 @@ instead. [compose.test.yml](compose.test.yml) brings up a throwaway server for
 exactly that:
 
 ```bash
-docker compose -f compose.test.yml up -d          # PostgreSQL 17 on port 5433
+docker compose -f compose.test.yml up -d          # PostgreSQL 18 on port 5433
 cd backend && A2FLOW_TEST_PG_URL=postgresql+asyncpg://a2flow:a2flow@localhost:5433/a2flow_test uv run pytest
 docker compose -f compose.test.yml down
 ```
