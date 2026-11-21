@@ -71,9 +71,9 @@ export function WorkflowTaskGraph({
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
-        colorMode={theme}
+        forceColorMode={theme}
         fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+        fitViewOptions={{ padding: "15%", maxZoom: 1 }}
         nodesDraggable={false}
         nodesConnectable={false}
         edgesFocusable={false}

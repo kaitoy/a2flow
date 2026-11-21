@@ -5,9 +5,9 @@ description = "Google ADK agent with SSE streaming"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = [
-    "google-adk>=2.13.0,<3.0.0",
-    "anyio>=4.15.1",
-    "fastapi>=0.162.0",
+    "google-adk>=2.15.0,<3.0.0",
+    "anyio>=4.16.0",
+    "fastapi>=0.165.0",
     "uvicorn[standard]>=0.54.0",
     "python-dotenv>=1.2.4",
     # Floor at 1.93.2: 1.92.0 dropped litellm's pure-Python `py3-none-any`
@@ -15,39 +15,39 @@ dependencies = [
     # back to the sdist and need a Rust/maturin toolchain to build. 1.93.2 is
     # the first release with wheels for every platform, and it knows gpt-5.6
     # and Claude Sonnet 5.
-    "litellm>=1.106.2",
+    "litellm>=1.110.2",
     "ag-ui-protocol>=1.0.0",
-    "ag-ui-adk>=0.11.0,<0.12.0",
+    "ag-ui-adk>=0.13.0,<0.14.0",
     # Required by litellm's Bedrock route (SYSTEM_DEFAULT_LLM_MODEL=litellm:bedrock/...). The
     # [crt] extra pulls awscrt for SigV4a, used to sign the cross-region
     # inference profiles (e.g. bedrock/global.anthropic.claude-*).
-    "boto3>=1.43.118",
-    "botocore[crt]>=1.43.118",
-    "pydantic[email]>=2.14.1",
-    "pydantic-settings>=2.16.1",
-    "sqlmodel>=0.0.48",
+    "boto3>=1.44.9",
+    "botocore[crt]>=1.44.9",
+    "pydantic[email]>=2.14.4",
+    "pydantic-settings>=2.16.3",
+    "sqlmodel>=0.0.50",
     # SQLAlchemy 2.1 no longer installs greenlet by default; the [asyncio]
     # extra brings it back for AsyncEngine / AsyncSession.
-    "sqlalchemy[asyncio]>=2.1.6",
+    "sqlalchemy[asyncio]>=2.1.9",
     "aiosqlite>=0.20.0",
     "asyncpg>=0.32.0",
-    "uuid-utils>=1.1.0",
-    "dulwich>=1.2.19",
+    "uuid-utils>=1.2.0",
+    "dulwich>=1.2.21",
     "bcrypt>=5.0.0",
     "mcp>=2.3.0",
     "httpx>=0.27.0",
     # The HTTP client the mcp SDK's streamable-HTTP transport runs on
     # (infrastructure/mcp_client.py builds it). Already pulled in by mcp.
-    "httpx2>=2.16.0",
+    "httpx2>=2.16.2",
     "websockets>=15.0.1",
     # Mints Google OAuth 2.0 access tokens for ${gcp-token:NAME/KEY} placeholders
     # (infrastructure/google_token.py). Already pulled in by google-adk; declared
     # here because it is imported directly.
-    "google-auth>=2.62.0",
+    "google-auth>=2.63.0",
     "cryptography>=50.0.2",
     # Verifies OIDC ID tokens (RS256/ES256 need the [crypto] extra).
     "pyjwt[crypto]>=2.15.1",
-    "python-multipart>=0.0.32",
+    "python-multipart>=0.0.34",
     "alembic>=1.20.1",
     "prometheus-client>=0.21",
     "jsonschema>=4.26.0",
@@ -55,8 +55,8 @@ dependencies = [
     "pyyaml>=6.0",
     # IANA time zone data for zoneinfo (session_runner, metrics, config): Windows
     # and slim container images ship no system zoneinfo database.
-    "tzdata>=2026.1",
-    "regex>=2026.9.29",
+    "tzdata>=2026.6",
+    "regex>=2026.11.19",
 ]
 
 [project.scripts]
@@ -71,12 +71,12 @@ python-preference = "only-system"
 
 [dependency-groups]
 dev = [
-    "mypy>=2.4.0",
-    "ruff>=0.17.2",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
+    "mypy>=2.4.1",
+    "ruff>=0.17.6",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
     "pyyaml>=6.0.0",
-    "types-pyyaml>=6.0.12.20260906",
+    "types-pyyaml>=6.0.12.20261113",
     "pytest-xdist>=3.8.0",
 ]
 
