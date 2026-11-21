@@ -17,7 +17,7 @@ dependencies = [
     # and Claude Sonnet 5.
     "litellm>=1.110.2",
     "ag-ui-protocol>=1.0.0",
-    "ag-ui-adk>=0.11.0,<0.12.0",
+    "ag-ui-adk>=0.13.0,<0.14.0",
     # Required by litellm's Bedrock route (SYSTEM_DEFAULT_LLM_MODEL=litellm:bedrock/...). The
     # [crt] extra pulls awscrt for SigV4a, used to sign the cross-region
     # inference profiles (e.g. bedrock/global.anthropic.claude-*).

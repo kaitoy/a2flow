@@ -66,7 +66,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ag-ui-adk", specifier = ">=0.11.0,<0.12.0" },
+    { name = "ag-ui-adk", specifier = ">=0.13.0,<0.14.0" },
     { name = "ag-ui-protocol", specifier = ">=1.0.0" },
     { name = "aiosqlite", specifier = ">=0.20.0" },
     { name = "alembic", specifier = ">=1.20.1" },
@@ -115,24 +115,23 @@ dev = [
 
 [[package]]
 name = "a2ui-agent-sdk"
-version = "0.9.0"
+version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "a2ui-core" },
     { name = "antlr4-python3-runtime" },
-    { name = "httpx" },
     { name = "jsonschema" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/71/0c/d959c21d4320206b525cf931c60dbd89c799b3f9a972346de122888a0da2/a2ui_agent_sdk-0.9.0.tar.gz", hash = "sha256:3caa48ab0b2d9bc835e2d96976a3698256d6f4bba778ccc03a25a9c654ad6294", size = 305820, upload-time = "2026-10-17T01:03:34.863Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/21/db/7d11ffeeff358b604e406dc2fa1428ff38ad8a6327b51308fa447a391518/a2ui_agent_sdk-0.10.0.tar.gz", hash = "sha256:6ec0ca6e8237584fbd156711064eceb703d431f8dd9af29c201dd9b14d47e1e3", size = 405243, upload-time = "2026-11-02T02:42:51.104Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/0c/c9097e6b5eba90a0166020b0c3416fb573d51ca0b9afa6675bfd594a7ef2/a2ui_agent_sdk-0.9.0-py3-none-any.whl", hash = "sha256:d195025e3a88db32957c79295e9f1555a7a2a884ce3077f96722b31fab7f23d9", size = 251596, upload-time = "2026-10-17T01:03:32.367Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/c8/2dd79dc705aadf5ecf0f2c7b6e68df531d354170c26adb5c9961c65b0184/a2ui_agent_sdk-0.10.0-py3-none-any.whl", hash = "sha256:1d5bdec10456c19d604464f0f5b53cd54aa33d51b128809fef0b5a938a34fa2d", size = 318578, upload-time = "2026-11-02T02:42:45.347Z" },
 ]
 
 [[package]]
 name = "a2ui-core"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "babel" },
@@ -141,9 +140,9 @@ dependencies = [
     { name = "referencing" },
     { name = "regex" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/b4/bc9c54a5b19f2aa1548f1791f7f7e0f75888b93668b7c03ede4474c804d9/a2ui_core-0.4.0.tar.gz", hash = "sha256:840749f45c477a1a4958a64a9c521dca13192693d745cbf45caafb34902ed6fc", size = 278287, upload-time = "2026-10-17T01:03:33.709Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/71/0edb713697a23d12618ab47816c9e2abb12c002498ba47e1b7f87a13c2d6/a2ui_core-0.5.0.tar.gz", hash = "sha256:ea1d9a59808bd92c13d55b6af9ae5a21ba6f4f8eb3e874ffc8727b92c9e8cc24", size = 334963, upload-time = "2026-11-02T02:42:49.815Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/30/07a774bccf1d3339c402877753329d3c2d727104fb41ea67e6415c48f0e0/a2ui_core-0.4.0-py3-none-any.whl", hash = "sha256:e9839f96003d731b44e40cf6e8ad251282ded398281067412f08b0bbcd16951d", size = 247823, upload-time = "2026-10-17T01:03:30.985Z" },
+    { url = "https://files.pythonhosted.org/packages/57/7f/734cad38a5b595b0bb11171b653dd928e4fdaa10ad569851cdb8d18050df/a2ui_core-0.5.0-py3-none-any.whl", hash = "sha256:609404f78c663126960bcafa4002934a49e76cf29ac928777be9d88d5118ef8c", size = 282941, upload-time = "2026-11-02T02:42:43.482Z" },
 ]
 
 [[package]]
@@ -157,7 +156,7 @@ wheels = [
 
 [[package]]
 name = "ag-ui-adk"
-version = "0.11.1"
+version = "0.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "a2ui-agent-sdk" },
@@ -172,9 +171,9 @@ dependencies = [
     { name = "sse-starlette" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5b/ce/8492254d103a2fe2269a7cba6df2f68ba3ac5b62b7e40c6091f06ae02f3c/ag_ui_adk-0.11.1.tar.gz", hash = "sha256:043ce72fc61b220c6a35c863628878fc27d368bbf5b12df63d075755e4a7b929", size = 129329, upload-time = "2026-10-30T21:04:45.232Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/6d/daf4aac444eaf156e0e0a91ef153965315713efd9b3d43047fba9bf2a7ad/ag_ui_adk-0.13.0.tar.gz", hash = "sha256:d50624a818aaf4e8a92c629f20b2f275c5f64911e437fe7e81db7c059f1cb525", size = 140533, upload-time = "2026-11-12T06:15:09.186Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/37/4ceff58aaa7d2ce5a4a55ccb6e18c0f4133f6e630cf62c02b1be23b70d7d/ag_ui_adk-0.11.1-py3-none-any.whl", hash = "sha256:eb3c918a9c00ae29f717c71e93db82b994ac66eddb71707ea023c047117bd2c3", size = 137253, upload-time = "2026-10-30T21:04:44.199Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/37/08ead42df5a455d474b1f5dbc831787d6c15b684d72f5e5d8728aa941f04/ag_ui_adk-0.13.0-py3-none-any.whl", hash = "sha256:f2d4dfd88fc33c305367afb3213a57932d06fa64adfe364d9d94d8a27a40792f", size = 149010, upload-time = "2026-11-12T06:15:07.541Z" },
 ]
 
 [[package]]
