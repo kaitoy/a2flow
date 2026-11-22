@@ -1,6 +1,6 @@
 import { animated } from "@react-spring/web";
 import { render, waitFor } from "@testing-library/react";
-import { useRef } from "react";
+import { StrictMode, useRef } from "react";
 import { describe, expect, it } from "vitest";
 import {
   measureIndicator,
@@ -68,13 +68,15 @@ describe("measureIndicator", () => {
 /** Renders the hook against two fixed-width items, exposing its state to the test. */
 function Harness({
   activeKey,
+  fromKey,
   onState,
 }: {
   activeKey: string | null;
+  fromKey?: string;
   onState: (state: SlidingIndicatorState) => void;
 }) {
   const itemMap = useRef<Map<string, HTMLElement | null>>(new Map());
-  const state = useSlidingIndicator({ itemMap, activeKey, axis: "horizontal" });
+  const state = useSlidingIndicator({ itemMap, activeKey, fromKey, axis: "horizontal" });
   onState(state);
 
   return (
@@ -137,6 +139,49 @@ describe("useSlidingIndicator", () => {
       expect(state?.size.get()).toBe(90);
       expect(state?.offset.get()).toBe(60);
       expect(state?.opacity.get()).toBe(1);
+    });
+  });
+
+  it("places the first position without sliding in, even under StrictMode", async () => {
+    // StrictMode's dev-only effect replay stops every spring where it stands. An
+    // `immediate` start had not landed by then, so the replay sprang in from 0.
+    // Asserted, not annotated: the callback assigns it, so TS would narrow it to `null`.
+    let state = null as SlidingIndicatorState | null;
+    render(
+      <StrictMode>
+        <Harness
+          activeKey="b"
+          onState={(s) => {
+            state = s;
+          }}
+        />
+      </StrictMode>
+    );
+
+    expect(state?.offset.get()).toBe(60);
+    expect(state?.size.get()).toBe(90);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(state?.offset.get()).toBe(60);
+  });
+
+  it("starts on fromKey and springs to the active item", async () => {
+    // Asserted, not annotated: the callback assigns it, so TS would narrow it to `null`.
+    let state = null as SlidingIndicatorState | null;
+    render(
+      <Harness
+        activeKey="a"
+        fromKey="b"
+        onState={(s) => {
+          state = s;
+        }}
+      />
+    );
+
+    expect(state?.offset.get()).toBe(60);
+    expect(state?.size.get()).toBe(90);
+    await waitFor(() => {
+      expect(state?.offset.get()).toBe(0);
+      expect(state?.size.get()).toBe(60);
     });
   });
 

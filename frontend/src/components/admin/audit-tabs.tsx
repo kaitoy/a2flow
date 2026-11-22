@@ -12,6 +12,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useT } from "@/i18n/provider";
 
@@ -26,6 +27,14 @@ export const AUDIT_TABS = [
 /** The route segment identifying one audit list. */
 export type AuditTab = (typeof AUDIT_TABS)[number]["value"];
 
+/**
+ * The tab a click just left. Each list renders its own bar, so a switch remounts
+ * it; the new bar starts its pill here so the switch still reads as a slide. Set
+ * only by a click, so arriving any other way (the sidebar, back/forward) places
+ * the pill without moving it.
+ */
+let leftTab: AuditTab | null = null;
+
 /** Props for {@link AuditTabs}. */
 export interface AuditTabsProps {
   /** The list currently being shown. */
@@ -33,18 +42,28 @@ export interface AuditTabsProps {
 }
 
 /**
- * The audit section's tab bar. Selecting a tab navigates to that list.
+ * The audit section's tab bar. Selecting a tab navigates to that list, and the
+ * next list's bar slides its pill over from the tab just left (see {@link leftTab}).
  *
  * @param props - The currently active list.
  */
 export function AuditTabs({ active }: AuditTabsProps) {
   const t = useT();
   const router = useRouter();
+  // Read once on mount and consumed, so only the bar right after the click slides.
+  const [slideFrom] = useState(() => leftTab);
+  useEffect(() => {
+    leftTab = null;
+  }, []);
   return (
     <SegmentedControl
       options={AUDIT_TABS}
       value={active}
-      onChange={(tab) => router.push(`/audit/${tab}`)}
+      slideFrom={slideFrom ?? undefined}
+      onChange={(tab) => {
+        leftTab = active;
+        router.push(`/audit/${tab}`);
+      }}
       aria-label={t("admin.auditLog")}
       className="mb-4"
     />

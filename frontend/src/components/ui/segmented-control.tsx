@@ -28,6 +28,12 @@ export interface SegmentedControlProps<T extends string> {
   value: T;
   /** Called with the new value when the user selects a different option. */
   onChange: (value: T) => void;
+  /**
+   * Option the selection pill sits on when the control mounts, sliding from there
+   * to {@link value}. For a control rebuilt on every change (the audit tabs
+   * remount with each route); omitted, the pill starts on {@link value}.
+   */
+  slideFrom?: T;
   /** Accessible label describing what the control switches between. */
   "aria-label": string;
   /** Optional extra class names for the container. */
@@ -78,6 +84,7 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  slideFrom,
   "aria-label": ariaLabel,
   className,
 }: SegmentedControlProps<T>) {
@@ -91,6 +98,7 @@ export function SegmentedControl<T extends string>({
   const { ref, offset, size, opacity } = useSlidingIndicator({
     itemMap,
     activeKey: value,
+    fromKey: slideFrom,
     axis: "horizontal",
     deps: [optionsKey],
   });

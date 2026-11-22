@@ -9,6 +9,11 @@
  * item resizes, place the very first position without animating it in, and honor
  * `prefers-reduced-motion`. That geometry lives here once; each consumer supplies
  * only its axis, extent, and appearance.
+ *
+ * The first position is set synchronously rather than through an `immediate`
+ * start: an immediate start only lands on the next frame, and StrictMode's
+ * dev-only effect replay stops every spring where it stands before then, so the
+ * replayed effect sprang the indicator in from 0.
  */
 "use client";
 
@@ -25,6 +30,13 @@ export interface UseSlidingIndicatorOptions {
   itemMap: React.RefObject<Map<string, HTMLElement | null>>;
   /** Key of the active item in {@link itemMap}, or `null` to hide the indicator. */
   activeKey: string | null;
+  /**
+   * Item the indicator sits on when it mounts, springing from there to
+   * {@link activeKey}. For a control that is rebuilt on every change (the audit
+   * tabs remount with each route), so a switch still reads as a slide. Omitted,
+   * the first position is placed directly on {@link activeKey}. Read on mount only.
+   */
+  fromKey?: string | null;
   /** Axis the indicator travels along (defaults to `vertical`). */
   axis?: SlidingAxis;
   /**
@@ -92,12 +104,13 @@ export interface SlidingIndicatorState {
 /**
  * Measure the active item and spring an indicator to it.
  *
- * @param options - Item map, active key, axis, and motion configuration.
+ * @param options - Item map, active and starting keys, axis, and motion configuration.
  * @returns The ref to attach to the indicator plus its animated offset/size/opacity.
  */
 export function useSlidingIndicator({
   itemMap,
   activeKey,
+  fromKey,
   axis = "vertical",
   extent = 1,
   deps = [],
@@ -123,14 +136,16 @@ export function useSlidingIndicator({
       return;
     }
 
-    const measure = () => {
-      api.start({
-        ...measureIndicator(container, target, axis, extent),
-        opacity: 1,
-        immediate: firstMountRef.current,
-        config,
-      });
+    if (firstMountRef.current) {
+      const origin = (fromKey != null && itemMap.current?.get(fromKey)) || target;
+      api.set({ ...measureIndicator(container, origin, axis, extent), opacity: 1 });
       firstMountRef.current = false;
+    }
+
+    // Starting from where the indicator already is, so on mount without a
+    // `fromKey` this lands where it stands and nothing moves.
+    const measure = () => {
+      api.start({ ...measureIndicator(container, target, axis, extent), opacity: 1, config });
     };
 
     measure();
@@ -142,7 +157,7 @@ export function useSlidingIndicator({
     }
 
     return () => ro.disconnect();
-  }, [activeKey, api, axis, config, extent, itemMap, ...deps]);
+  }, [activeKey, fromKey, api, axis, config, extent, itemMap, ...deps]);
 
   return { ref, offset: style.offset, size: style.size, opacity: style.opacity };
 }
