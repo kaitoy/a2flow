@@ -321,7 +321,9 @@ export function SecretFields(props: SecretFieldsProps) {
                 valueType="password"
                 keyPlaceholder={t("common.exampleValue", { value: "AWS_ACCESS_KEY_ID" })}
                 valuePlaceholder={
-                  showPlaceholders ? t("admin.valueStoredEncrypted") : t("admin.leaveBlankToKeep")
+                  showPlaceholders
+                    ? t("admin.valueStoredEncrypted")
+                    : t("common.savedLeaveEmptyToKeepIt")
                 }
               />
             )}

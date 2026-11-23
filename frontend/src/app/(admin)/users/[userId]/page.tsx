@@ -422,7 +422,7 @@ export default function UserDetailPage() {
             >
               <PasswordInput
                 id="password"
-                placeholder={t("users.leaveBlankToKeepUnchanged")}
+                placeholder={t("common.savedLeaveEmptyToKeepIt")}
                 {...register("password")}
               />
               {/* Resetting your own password does not make you change it again. */}
