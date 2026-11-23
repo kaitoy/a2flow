@@ -98,7 +98,7 @@ Abre el tenant en **Tenants** y elige **Quién configura el LLM**:
 
 | Opción | Qué ocurre |
 |---|---|
-| **Predeterminado del sistema** | El tenant usa el LLM del sistema. Todos los tenants empiezan así. |
+| **Predeterminado del sistema** | El tenant usa el LLM del sistema. Un tenant nuevo empieza así, salvo que un Superadministrador haya [elegido otro valor predeterminado](./system-settings.md#llm) en Configuración del sistema. |
 | **Lo configura un superadministrador** | Los campos **Modelo** y **Clave de API** aparecen en la página del tenant y el Superadministrador los rellena. |
 | **Lo configura el administrador del tenant** | Los Administradores del tenant los introducen en **Configuración de administrador**, en una sección **LLM** que solo aparece en un tenant con esta opción. |
 

@@ -992,6 +992,8 @@ export const ja = {
   "status.skipped": "スキップ",
   "status.timeout": "タイムアウト",
   "status.unclassified": "未分類",
+  "systemSettings.aNewTenantStartsWithThisChoiceIncluding":
+    "新しいテナントは、サインアップで作られるものも含め、この選択で始まります。あとから上位管理者がテナントのページで変えられます。既存のテナントは変わりません。",
   "systemSettings.clear": "クリア",
   "systemSettings.clearSmtpSettings": "SMTP 設定をクリア",
   "systemSettings.clearSmtpSettings2": "SMTP 設定をクリア",
@@ -1029,6 +1031,7 @@ export const ja = {
     "テストメッセージは {em1} の設定を使い、自分のアドレスに送られます。変更した直後なら先に保存してください。",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "SMTP のホスト、認証情報、送信元アドレスをクリアし、メール配信を無効にします。この操作は取り消せません。",
+  "systemSettings.whoSetsTheLlmForNewTenants": "新しいテナントで LLM を設定する人",
   "tagColor.amber": "アンバー",
   "tagColor.cyan": "シアン",
   "tagColor.indigo": "インディゴ",

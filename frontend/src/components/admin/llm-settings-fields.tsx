@@ -88,32 +88,49 @@ export interface LlmModeFieldProps {
   mode: LlmMode;
   /** Called when another mode is picked. */
   onModeChange: (mode: LlmMode) => void;
+  /** Whether to print the "LLM" heading; off where another field already did. */
+  withTitle?: boolean;
+  /** The field's label; defaults to "Who sets the LLM". */
+  label?: MessageKey;
+  /**
+   * One hint for every mode, in place of the per-mode ones that speak of "this
+   * tenant" — for the default new tenants start with, which has no tenant yet.
+   */
+  hint?: MessageKey;
 }
 
 /**
  * The "LLM" section heading and the choice of who sets the tenant's LLM: the
  * system's setting as it is, a super admin, or the tenant's own admin.
  */
-export function LlmModeField({ mode, onModeChange }: LlmModeFieldProps) {
+export function LlmModeField({
+  mode,
+  onModeChange,
+  withTitle = true,
+  label = "llm.mode",
+  hint,
+}: LlmModeFieldProps) {
   const t = useT();
-  const hint: Record<LlmMode, MessageKey> = {
+  const modeHint: Record<LlmMode, MessageKey> = {
     system_default: "llm.modeSystemDefaultHint",
     super_admin: "llm.modeSuperAdminHint",
     tenant_admin: "llm.modeTenantAdminHint",
   };
   return (
     <>
-      <h2 className="font-display text-lg font-semibold tracking-tight text-on-surface">
-        {t("llm.title")}
-      </h2>
-      <FormField htmlFor="llmMode" label={t("llm.mode")}>
+      {withTitle && (
+        <h2 className="font-display text-lg font-semibold tracking-tight text-on-surface">
+          {t("llm.title")}
+        </h2>
+      )}
+      <FormField htmlFor="llmMode" label={t(label)}>
         <SegmentedControl
           options={MODE_OPTIONS}
           value={mode}
           onChange={onModeChange}
-          aria-label={t("llm.mode")}
+          aria-label={t(label)}
         />
-        <p className="text-xs text-on-surface-variant">{t(hint[mode])}</p>
+        <p className="text-xs text-on-surface-variant">{t(hint ?? modeHint[mode])}</p>
       </FormField>
     </>
   );

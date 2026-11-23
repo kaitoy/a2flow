@@ -59,6 +59,7 @@ The LLM is the model every agent runs on, and the key it is reached with. What i
 |---|---|
 | **Model** | A Gemini model name such as `gemini-3.8-flash`, or `litellm:<provider>/<model>` for any other provider, for example `litellm:openai/gpt-6.1-sol`. Left empty, the built-in default model is used. |
 | **API key** | The provider's API key. It is **write-only**, like the SMTP password: once one is stored the field shows blank with a "Saved" placeholder, and saving with it left empty keeps the stored key. Left empty with none stored, the key set in the server's environment for that provider is used. |
+| **Who sets the LLM for new tenants** | The starting choice of **Who sets the LLM** for a tenant when it is created: **System default**, **Set by a Super Admin** or **Set by the tenant's Admin**, as on the [tenant's page](./users-and-groups.md#tenant-llm). It applies to every new tenant, including one created through [sign-up](../getting-started/sign-up.md), and changes no existing tenant. |
 
 A change reaches a run the next time its agent answers; nothing needs a restart. Like the mail settings, both fields can also be set from the server's environment, which is re-applied on every startup and overwrites what was typed here — see [LLM](../operations/configuration.md#llm). Setting up a provider is covered in [LLM configuration](../getting-started/llm-configuration.md).
 

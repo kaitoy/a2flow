@@ -98,7 +98,7 @@ Ouvrez le tenant sous **Tenants**, puis choisissez **Qui configure le LLM** :
 
 | Option | Effet |
 |---|---|
-| **Par défaut du système** | Le tenant utilise le LLM du système. Tous les tenants commencent ainsi. |
+| **Par défaut du système** | Le tenant utilise le LLM du système. Un nouveau tenant commence ainsi, sauf si un Super administrateur a [choisi une autre valeur par défaut](./system-settings.md#llm) dans Paramètres système. |
 | **Configuré par un super administrateur** | Les champs **Modèle** et **Clé d'API** apparaissent sur la page du tenant, et le Super administrateur les remplit. |
 | **Configuré par l'administrateur du tenant** | Les Administrateurs du tenant les saisissent dans **Paramètres administrateur**, dans une section **LLM** qui n'apparaît que pour un tenant réglé sur cette option. |
 

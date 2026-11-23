@@ -520,6 +520,41 @@ async def test_a_new_tenant_runs_on_the_platform_llm(
     assert body["llmApiKeySet"] is False
 
 
+async def test_a_new_tenant_starts_on_the_system_default_llm_mode(
+    tenant_client: AsyncClient,
+) -> None:
+    assert_ok(
+        await tenant_client.patch(
+            _SETTINGS_PATH, json={"defaultTenantLlmMode": "tenant_admin"}
+        )
+    )
+
+    body = assert_ok(
+        await tenant_client.post("/api/v1/tenants", json=_CREATE_BODY), status=201
+    )
+
+    assert body["llmMode"] == "tenant_admin"
+
+
+async def test_an_explicit_llm_mode_beats_the_system_default(
+    tenant_client: AsyncClient,
+) -> None:
+    assert_ok(
+        await tenant_client.patch(
+            _SETTINGS_PATH, json={"defaultTenantLlmMode": "tenant_admin"}
+        )
+    )
+
+    body = assert_ok(
+        await tenant_client.post(
+            "/api/v1/tenants", json={**_CREATE_BODY, "llmMode": "system_default"}
+        ),
+        status=201,
+    )
+
+    assert body["llmMode"] == "system_default"
+
+
 async def test_super_admin_sets_the_tenants_llm_and_mode(
     tenant_client: AsyncClient,
 ) -> None:

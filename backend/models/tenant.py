@@ -222,6 +222,9 @@ class TenantCreate(TenantUpdate):
     enabled: bool = True
     login_max_failures: LoginMaxFailures = DEFAULT_LOGIN_MAX_FAILURES
     login_lockout_minutes: LoginLockoutMinutes = DEFAULT_LOGIN_LOCKOUT_MINUTES
+    #: Left out of a create request, :attr:`models.system_settings.SystemSettingsUpdate.default_tenant_llm_mode`
+    #: is used instead (:meth:`services.tenant.TenantService.create`); this
+    #: default is only what a tenant row is built with when nothing decides.
     llm_mode: LlmMode = LlmMode.system_default
 
 

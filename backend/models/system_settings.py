@@ -39,6 +39,7 @@ from sqlmodel._compat import SQLModelConfig
 
 from models.base import BaseEntity
 from models.constraints import PersonName, PrivateHttpUrl, ShortText, SmtpHost
+from models.tenant import LlmMode
 
 _alias_config = SQLModelConfig(alias_generator=to_camel, populate_by_name=True)
 
@@ -110,6 +111,11 @@ class SystemSettingsUpdate(SQLModel):
     #: created, by a ``super_admin`` or through self-service sign-up; lowering it
     #: below the current count stops new tenants but removes none.
     max_tenants: int | None = Field(default=None, ge=1)
+    #: Who sets the LLM of a tenant created without an explicit
+    #: :attr:`models.tenant.TenantUpdate.llm_mode` -- by a ``super_admin`` or
+    #: through self-service sign-up. Existing tenants are unaffected. ``null`` is
+    #: ignored: the column cannot be empty.
+    default_tenant_llm_mode: LlmMode | None = None
 
 
 class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
@@ -136,6 +142,8 @@ class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
     #: Fernet ciphertext, longer than the plaintext the update payload caps, so
     #: redeclared without that cap.
     llm_api_key: str | None = None
+    #: Redeclared non-nullable: a fresh deployment keeps the LLM on the system's.
+    default_tenant_llm_mode: LlmMode = LlmMode.system_default
 
 
 class SystemSettingsRead(BaseEntity):
@@ -162,6 +170,7 @@ class SystemSettingsRead(BaseEntity):
     #: Whether an LLM API key is stored. The key itself is never serialized.
     llm_api_key_set: bool = False
     max_tenants: int | None = None
+    default_tenant_llm_mode: LlmMode = LlmMode.system_default
 
     @classmethod
     def from_settings(cls, settings: SystemSettings) -> "SystemSettingsRead":

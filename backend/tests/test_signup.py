@@ -16,6 +16,7 @@ from dependencies.singletons import get_email_sender
 from infrastructure.email_sender import SmtpConfig
 from main import app
 from models.system_settings import SmtpSecurity
+from models.tenant import LlmMode
 from repositories.exceptions import EmailSendError
 from repositories.tenant import SqlTenantRepository
 from services.signup import tenant_name_for
@@ -118,6 +119,21 @@ async def test_signup_mails_a_link_that_creates_the_tenant_and_signs_in(
         json={"username": "New.User", "password": FORM["password"], "tenantName": name},
     )
     assert assert_ok(login)["id"] == data["user"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_signed_up_tenant_starts_on_the_system_default_llm_mode(
+    auth_client: AsyncClient, mail: FakeMail, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def tenant_admin(_self: SqlTenantRepository) -> LlmMode:
+        return LlmMode.tenant_admin
+
+    monkeypatch.setattr(SqlTenantRepository, "default_llm_mode", tenant_admin)
+    assert_ok(await auth_client.post("/api/v1/auth/signup", json=FORM))
+    assert_ok(await _complete(auth_client, mail.token()))
+
+    settings = assert_ok(await auth_client.get("/api/v1/admin-settings"))
+    assert settings["llmMode"] == "tenant_admin"
 
 
 @pytest.mark.asyncio

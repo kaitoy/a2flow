@@ -979,6 +979,8 @@ export const ko = {
   "status.skipped": "건너뜀",
   "status.timeout": "시간 초과",
   "status.unclassified": "미분류",
+  "systemSettings.aNewTenantStartsWithThisChoiceIncluding":
+    "새 테넌트는 가입으로 만들어지는 경우를 포함해 이 선택으로 시작합니다. 이후 슈퍼 관리자가 테넌트 페이지에서 바꿀 수 있습니다. 기존 테넌트는 바뀌지 않습니다.",
   "systemSettings.clear": "지우기",
   "systemSettings.clearSmtpSettings": "SMTP 설정 지우기",
   "systemSettings.clearSmtpSettings2": "SMTP 설정 지우기",
@@ -1016,6 +1018,7 @@ export const ko = {
     "테스트 메시지는 {em1} 설정을 사용하며 본인 주소로 전송됩니다. 방금 변경했다면 먼저 저장하세요.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "SMTP 호스트, 자격 증명, 보내는 주소를 지우고 이메일 전송을 사용 중지합니다. 이 작업은 취소할 수 없습니다.",
+  "systemSettings.whoSetsTheLlmForNewTenants": "새 테넌트의 LLM을 설정하는 사람",
   "tagColor.amber": "앰버",
   "tagColor.cyan": "시안",
   "tagColor.indigo": "인디고",

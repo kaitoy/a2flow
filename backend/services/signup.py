@@ -240,8 +240,10 @@ class SignupService:
             raise ForbiddenError("Sign-up is disabled")
         # ponytail: count-then-insert, so completions racing within a few
         # milliseconds can overshoot the limit by one; take a lock if that matters.
-        if await SqlTenantRepository(self._session).at_capacity():
+        tenants = SqlTenantRepository(self._session)
+        if await tenants.at_capacity():
             raise TenantLimitReachedError()
+        llm_mode = await tenants.default_llm_mode()
         stmt = select(PendingSignup).where(
             col(PendingSignup.token_hash) == hash_token(token),
             col(PendingSignup.expires_at) > datetime.now(UTC),
@@ -259,6 +261,7 @@ class SignupService:
                 display_name=name,
                 name=name,
                 enabled=True,
+                llm_mode=llm_mode,
                 created_by=SYSTEM_USER_ID,
                 updated_by=SYSTEM_USER_ID,
             )

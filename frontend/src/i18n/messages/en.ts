@@ -991,6 +991,8 @@ export const en = {
   "status.skipped": "skipped",
   "status.timeout": "timeout",
   "status.unclassified": "unclassified",
+  "systemSettings.aNewTenantStartsWithThisChoiceIncluding":
+    "A new tenant starts with this choice, including one created through sign-up. A Super Admin can change it on the tenant's page afterwards. Existing tenants are not changed.",
   "systemSettings.clear": "Clear",
   "systemSettings.clearSmtpSettings": "Clear SMTP settings",
   "systemSettings.clearSmtpSettings2": "Clear SMTP Settings",
@@ -1029,6 +1031,7 @@ export const en = {
     "The test message uses the {em1} settings and goes to your own address. Save first if you have just changed something.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "This clears the SMTP host, credentials, and sender address, and disables email delivery. This cannot be undone.",
+  "systemSettings.whoSetsTheLlmForNewTenants": "Who sets the LLM for new tenants",
   "tagColor.amber": "Amber",
   "tagColor.cyan": "Cyan",
   "tagColor.indigo": "Indigo",

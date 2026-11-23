@@ -1025,6 +1025,8 @@ export const es = {
   "status.skipped": "omitido",
   "status.timeout": "tiempo de espera agotado",
   "status.unclassified": "sin clasificar",
+  "systemSettings.aNewTenantStartsWithThisChoiceIncluding":
+    "Un Tenant nuevo empieza con esta opción, también el que se crea mediante el registro. Un superadministrador puede cambiarla después en la página del Tenant. Los Tenants existentes no cambian.",
   "systemSettings.clear": "Borrar",
   "systemSettings.clearSmtpSettings": "Borrar la configuración SMTP",
   "systemSettings.clearSmtpSettings2": "Borrar la configuración SMTP",
@@ -1066,6 +1068,7 @@ export const es = {
     "El mensaje de prueba usa la configuración {em1} y se envía a tu propia dirección. Guarda primero si acabas de cambiar algo.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "Esto borra el host SMTP, las credenciales y la dirección del remitente, y deshabilita la entrega de correo. Esta acción no se puede deshacer.",
+  "systemSettings.whoSetsTheLlmForNewTenants": "Quién configura el LLM de los Tenants nuevos",
   "tagColor.amber": "Ámbar",
   "tagColor.cyan": "Cian",
   "tagColor.indigo": "Índigo",

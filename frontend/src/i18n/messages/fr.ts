@@ -1025,6 +1025,8 @@ export const fr = {
   "status.skipped": "ignoré",
   "status.timeout": "délai dépassé",
   "status.unclassified": "non classé",
+  "systemSettings.aNewTenantStartsWithThisChoiceIncluding":
+    "Un nouveau Tenant démarre avec ce choix, y compris celui créé par l'inscription. Un super administrateur peut ensuite le modifier sur la page du Tenant. Les Tenants existants ne changent pas.",
   "systemSettings.clear": "Effacer",
   "systemSettings.clearSmtpSettings": "Effacer les paramètres SMTP",
   "systemSettings.clearSmtpSettings2": "Effacer les paramètres SMTP",
@@ -1066,6 +1068,7 @@ export const fr = {
     "Le message de test utilise les paramètres {em1} et est envoyé à votre propre adresse. Enregistrez d'abord si vous venez de modifier quelque chose.",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "Cela efface l'hôte SMTP, les identifiants et l'adresse de l'expéditeur, et désactive l'envoi d'e-mails. Cette action est irréversible.",
+  "systemSettings.whoSetsTheLlmForNewTenants": "Qui configure le LLM des nouveaux Tenants",
   "tagColor.amber": "Ambre",
   "tagColor.cyan": "Cyan",
   "tagColor.indigo": "Indigo",

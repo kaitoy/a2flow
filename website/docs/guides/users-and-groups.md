@@ -98,7 +98,7 @@ Open the tenant under **Tenants** and choose **Who sets the LLM**:
 
 | Option | What happens |
 |---|---|
-| **System default** | The tenant uses the system's LLM. Every tenant starts here. |
+| **System default** | The tenant uses the system's LLM. A new tenant starts here unless a Super Admin has [chosen another default](./system-settings.md#llm) in System Settings. |
 | **Set by a Super Admin** | The **Model** and **API key** fields appear on the tenant's page, and the Super Admin fills them in. |
 | **Set by the tenant's Admin** | The tenant's Admins enter them under **Admin Settings**, in an **LLM** section that appears only for a tenant set to this option. |
 

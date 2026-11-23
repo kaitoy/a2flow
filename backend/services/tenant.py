@@ -292,6 +292,10 @@ class TenantService:
         if await self._repo.at_capacity():
             raise TenantLimitReachedError()
         payload = data.model_dump()
+        # `llm_mode` has a field default, so only the fields the caller set tell
+        # "left it out" (take the system's default) from "chose system_default".
+        if "llm_mode" not in data.model_fields_set:
+            payload["llm_mode"] = await self._repo.default_llm_mode()
         # The row does not exist yet, so its data key is made here: the
         # credentials in the payload are encrypted with it before the insert.
         data_key = new_data_key()

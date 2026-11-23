@@ -206,4 +206,26 @@ describe("LlmModeField", () => {
 
     expect(onModeChange).toHaveBeenCalledWith("tenant_admin");
   });
+
+  it("prints the LLM heading unless told not to", () => {
+    const { rerender } = render(<LlmModeField mode="system_default" onModeChange={() => {}} />);
+    expect(screen.getByRole("heading", { name: "LLM" })).toBeInTheDocument();
+
+    rerender(<LlmModeField mode="system_default" onModeChange={() => {}} withTitle={false} />);
+    expect(screen.queryByRole("heading", { name: "LLM" })).toBeNull();
+  });
+
+  it("takes its own label and one hint for every mode", () => {
+    render(
+      <LlmModeField
+        mode="tenant_admin"
+        onModeChange={() => {}}
+        label="systemSettings.whoSetsTheLlmForNewTenants"
+        hint="systemSettings.aNewTenantStartsWithThisChoiceIncluding"
+      />
+    );
+    expect(screen.getByText("Who sets the LLM for new tenants")).toBeInTheDocument();
+    expect(screen.getByText(/^A new tenant starts with this choice/)).toBeInTheDocument();
+    expect(screen.queryByText("This tenant's Admins set its LLM in Admin Settings.")).toBeNull();
+  });
 });

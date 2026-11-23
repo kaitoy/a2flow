@@ -945,6 +945,8 @@ export const zhCN = {
   "status.skipped": "已跳过",
   "status.timeout": "超时",
   "status.unclassified": "未分类",
+  "systemSettings.aNewTenantStartsWithThisChoiceIncluding":
+    "新租户（包括通过自助注册创建的）以此选项开始。之后超级管理员可在该租户的页面上更改。已有的租户不会改变。",
   "systemSettings.clear": "清除",
   "systemSettings.clearSmtpSettings": "清除 SMTP 设置",
   "systemSettings.clearSmtpSettings2": "清除 SMTP 设置",
@@ -979,6 +981,7 @@ export const zhCN = {
     "测试邮件使用 {em1} 设置，并发送到您自己的地址。如果刚做过更改，请先保存。",
   "systemSettings.thisClearsTheSmtpHostCredentialsAnd":
     "这会清除 SMTP 主机、凭据和发件人地址，并停用邮件投递。此操作无法撤销。",
+  "systemSettings.whoSetsTheLlmForNewTenants": "由谁设置新租户的 LLM",
   "tagColor.amber": "琥珀",
   "tagColor.cyan": "青蓝",
   "tagColor.indigo": "靛蓝",

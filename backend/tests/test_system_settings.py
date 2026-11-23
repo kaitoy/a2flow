@@ -153,6 +153,37 @@ async def test_get_returns_seeded_defaults(settings_client: AsyncClient) -> None
     assert body["smtpPasswordSet"] is False
 
 
+async def test_default_tenant_llm_mode_starts_on_the_system_llm(
+    settings_client: AsyncClient,
+) -> None:
+    body = assert_ok(await settings_client.get(_PATH))
+    assert body["defaultTenantLlmMode"] == "system_default"
+
+
+async def test_default_tenant_llm_mode_can_be_changed_and_a_null_keeps_it(
+    settings_client: AsyncClient,
+) -> None:
+    body = assert_ok(
+        await settings_client.patch(_PATH, json={"defaultTenantLlmMode": "super_admin"})
+    )
+    assert body["defaultTenantLlmMode"] == "super_admin"
+
+    body = assert_ok(
+        await settings_client.patch(_PATH, json={"defaultTenantLlmMode": None})
+    )
+    assert body["defaultTenantLlmMode"] == "super_admin"
+
+
+async def test_an_unknown_default_tenant_llm_mode_is_rejected(
+    settings_client: AsyncClient,
+) -> None:
+    assert_err(
+        await settings_client.patch(_PATH, json={"defaultTenantLlmMode": "everyone"}),
+        code="VALIDATION_ERROR",
+        status=422,
+    )
+
+
 async def test_get_never_returns_the_password(settings_client: AsyncClient) -> None:
     assert_ok(
         await settings_client.patch(

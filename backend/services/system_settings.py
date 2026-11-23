@@ -97,6 +97,9 @@ class SystemSettingsService:
                 payload["smtp_password"] = self._cipher.encrypt(password)
             elif password is not None:
                 payload.pop("smtp_password")
+        # A non-nullable column: an explicit null means "leave as is".
+        if payload.get("default_tenant_llm_mode", 0) is None:
+            payload.pop("default_tenant_llm_mode")
         prepare_llm_fields(payload, self._cipher)
         _assert_usable(current, payload)
         return await self._repo.update(

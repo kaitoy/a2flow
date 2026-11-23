@@ -11,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from models.system_settings import SystemSettings
 from models.tenant import (
     AdminSettingsUpdate,
+    LlmMode,
     Tenant,
     TenantCreate,
     TenantRead,
@@ -60,6 +61,8 @@ class TenantRepository(Protocol):
 
     async def at_capacity(self) -> bool: ...
 
+    async def default_llm_mode(self) -> LlmMode: ...
+
 
 class SqlTenantRepository:
     """SQLModel-backed implementation of TenantRepository.
@@ -95,6 +98,20 @@ class SqlTenantRepository:
             return False
         count = (await self._db.exec(select(func.count()).select_from(Tenant))).one()
         return count >= limit
+
+    async def default_llm_mode(self) -> LlmMode:
+        """Return who sets the LLM of a tenant created without saying so.
+
+        Reads ``system_settings.default_tenant_llm_mode``. No settings row yet
+        means the LLM stays on the system's.
+
+        Returns:
+            The mode a new tenant starts with.
+        """
+        mode = (
+            await self._db.exec(select(SystemSettings.default_tenant_llm_mode))
+        ).first()
+        return LlmMode.system_default if mode is None else LlmMode(mode)
 
     async def get_by_name(self, name: str) -> Tenant | None:
         """Return the tenant with the given name, or ``None`` if no match exists.

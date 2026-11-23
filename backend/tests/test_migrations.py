@@ -20,16 +20,17 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from alembic.config import Config
 from sqlalchemy import Connection, inspect, make_url, text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
-from alembic import command
 from infrastructure.database import to_async_url
-from tests._engine import PG_URL_ENV, pg_url
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
+# The app's own upgrade, not a bare ``command.upgrade``: that would leave
+# ``env.py`` to call ``fileConfig()``, which disables every logger that already
+# exists and so breaks any ``caplog`` test that runs later in the same process.
+from infrastructure.migrations import _upgrade_to_head
+from tests._engine import PG_URL_ENV, pg_url
 
 #: Reflected alongside the model tables but owned by Alembic, not by the models.
 _ALEMBIC_TABLE = "alembic_version"
@@ -147,8 +148,7 @@ def migration_db(
 
 
 def test_upgrade_head_matches_model_metadata(migration_db: str) -> None:
-    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
-    command.upgrade(cfg, "head")
+    _upgrade_to_head()
 
     actual_tables, actual_columns, actual_indexes = asyncio.run(
         _reflect_url(migration_db)
@@ -192,6 +192,6 @@ async def _users_password_nullable(url: str) -> bool:
 
 def test_upgrade_head_makes_user_password_nullable(migration_db: str) -> None:
     """An SSO-only user has no password, so the migrated column must allow NULL."""
-    command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
+    _upgrade_to_head()
 
     assert asyncio.run(_users_password_nullable(migration_db)) is True

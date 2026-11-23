@@ -381,6 +381,53 @@ describe("SystemSettingsPage LLM", () => {
   });
 });
 
+describe("SystemSettingsPage default tenant LLM mode", () => {
+  /** Serve `settings` and capture the PATCH body the page sends. */
+  function capturePatch(settings: object) {
+    const captured: { body: Record<string, unknown> | null } = { body: null };
+    server.use(
+      http.get(`${BASE}/api/v1/system-settings`, () => envelope(settings)),
+      http.patch(`${BASE}/api/v1/system-settings`, async ({ request }) => {
+        captured.body = (await request.json()) as Record<string, unknown>;
+        return envelope(settings);
+      })
+    );
+    return captured;
+  }
+
+  it("selects the saved mode", async () => {
+    capturePatch({ ...CONFIGURED, defaultTenantLlmMode: "tenant_admin" });
+    renderPage();
+    const group = await screen.findByRole("tablist", { name: "Who sets the LLM for new tenants" });
+    expect(within(group).getByRole("tab", { name: "Set by the tenant's Admin" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+  });
+
+  it("starts on the system default when none is saved", async () => {
+    capturePatch(CONFIGURED);
+    renderPage();
+    const group = await screen.findByRole("tablist", { name: "Who sets the LLM for new tenants" });
+    expect(within(group).getByRole("tab", { name: "System default" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+  });
+
+  it("sends the mode that is picked", async () => {
+    const captured = capturePatch({ ...CONFIGURED, defaultTenantLlmMode: "system_default" });
+    renderPage();
+    const group = await screen.findByRole("tablist", { name: "Who sets the LLM for new tenants" });
+    await userEvent.click(within(group).getByRole("tab", { name: "Set by a Super Admin" }));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(captured.body).toMatchObject({ defaultTenantLlmMode: "super_admin" })
+    );
+  });
+});
+
 describe("SystemSettingsPage tenant limit", () => {
   /** Serve `settings` and capture the PATCH body the page sends. */
   function capturePatch(settings: object) {

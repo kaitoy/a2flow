@@ -581,6 +581,8 @@ The dispatcher also exposes `exists_for_session` as a pass-through, which is wha
 
 `max_tenants` caps how many tenants the deployment holds (`null` is no limit, and the column is `ge=1`). `SqlTenantRepository.at_capacity` compares it with the number of every `tenants` row, disabled ones included, and raises nothing itself: `TenantService.create` and `SignupService.request` / `complete` turn it into `409 TENANT_LIMIT_REACHED`, and `SignupService.available` reports sign-up as unavailable at the limit, which hides the sign-in page's link. The check is count-then-insert, so two creations racing can overshoot by one. The default tenant seeded at startup (`seed_default_tenant_and_admin_user`) skips it, and lowering the limit below the current count removes nothing.
 
+`default_tenant_llm_mode` is the `llm_mode` a tenant starts with (non-null, `system_default` unless changed; a `null` in a PATCH is ignored). `TenantService.create` takes it when the request leaves `llmMode` out (`model_fields_set`, since the field has a default and an explicit `system_default` must still win), and `SignupService.complete` always does, through `SqlTenantRepository.default_llm_mode`. The default tenant seeded at startup is not read from it, which makes no difference on a fresh database. It changes no existing tenant, and has no environment override.
+
 The deployment's base URL is not a system setting. `APP_BASE_URL` is read from the environment only (`config.Settings.app_base_url`), validated as a bare http(s) origin at startup, and also supplies the defaults of `CORS_ORIGINS` and `SESSION_COOKIE_SECURE`.
 
 ---

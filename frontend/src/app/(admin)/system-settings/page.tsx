@@ -19,6 +19,7 @@ import { FormField } from "@/components/admin/form-field";
 import { FormLayout } from "@/components/admin/form-layout";
 import { FormSkeleton } from "@/components/admin/form-skeleton";
 import {
+  LlmModeField,
   LlmSettingsFields,
   llmShape,
   toLlmBody,
@@ -95,6 +96,7 @@ function buildSchema(passwordSet: boolean) {
       smtpFromName: z.string(),
       vaultAddr: z.string(),
       maxTenants: z.string(),
+      defaultTenantLlmMode: z.enum(["system_default", "super_admin", "tenant_admin"]),
       ...llmShape,
     })
     .superRefine((values, ctx) => {
@@ -199,6 +201,7 @@ function toFormValues(settings: Partial<SystemSettings>): FormValues {
     smtpFromName: settings.smtpFromName ?? "",
     vaultAddr: settings.vaultAddr ?? "",
     maxTenants: settings.maxTenants == null ? "" : String(settings.maxTenants),
+    defaultTenantLlmMode: settings.defaultTenantLlmMode ?? "system_default",
     ...toLlmFormValues(settings),
   };
 }
@@ -221,6 +224,7 @@ function toBody(values: FormValues): SystemSettingsUpdate {
     smtpFromName: values.smtpFromName || null,
     vaultAddr: values.vaultAddr || null,
     maxTenants: values.maxTenants === "" ? null : Number(values.maxTenants),
+    defaultTenantLlmMode: values.defaultTenantLlmMode,
     ...toLlmBody(values),
   };
   if (values.smtpPassword !== "") {
@@ -422,6 +426,20 @@ export default function SystemSettingsPage() {
               llmModel: errors.llmModel?.message,
               llmApiKey: errors.llmApiKey?.message,
             }}
+          />
+
+          <Controller
+            control={control}
+            name="defaultTenantLlmMode"
+            render={({ field }) => (
+              <LlmModeField
+                mode={field.value}
+                onModeChange={field.onChange}
+                withTitle={false}
+                label="systemSettings.whoSetsTheLlmForNewTenants"
+                hint="systemSettings.aNewTenantStartsWithThisChoiceIncluding"
+              />
+            )}
           />
 
           <hr className="border-outline-variant" />
