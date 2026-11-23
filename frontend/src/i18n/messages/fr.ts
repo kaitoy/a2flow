@@ -586,6 +586,7 @@ export const fr = {
   "common.endpoint": "Point de terminaison",
   "common.error": "Erreur",
   "common.exampleValue": "p. ex. {value}",
+  "common.privacyPolicy": "Politique de confidentialité",
   "common.failed": "Échec",
   "common.firstName": "Prénom",
   "common.generateWorkflow": "Générer un workflow",
@@ -1044,6 +1045,9 @@ export const fr = {
   "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
     "Laissez vide pour ne fixer aucune limite. Tous les Tenants comptent, y compris les Tenants désactivés. Une fois la limite atteinte, aucun Tenant ne peut être créé, ni par vous ni par l'inscription, et le lien d'inscription est masqué.",
   "systemSettings.maximumNumberOfTenants": "Nombre maximal de Tenants",
+  "systemSettings.privacyPolicyUrl": "URL de la politique de confidentialité",
+  "systemSettings.privacyPolicyUrlHint":
+    "Un lien y mène depuis les pages de connexion et d'inscription, pour que les visiteurs puissent lire comment leur nom et leur adresse e-mail sont utilisés. Laissez vide pour n'afficher aucun lien.",
   "systemSettings.maximumNumberOfTenantsMustBeAWhole":
     "Le nombre maximal de Tenants doit être un entier d'au moins 1",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":

@@ -27,4 +27,17 @@ describe("AuthCard", () => {
     fireEvent.submit(form as HTMLFormElement);
     expect(onSubmit).toHaveBeenCalledOnce();
   });
+
+  it("links the privacy policy in a new tab when given its address", () => {
+    render(<AuthCard title="Sign in" privacyPolicyUrl="https://example.com/privacy" />);
+    const link = screen.getByTestId("auth-privacy-policy");
+    expect(link).toHaveAttribute("href", "https://example.com/privacy");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("shows no privacy policy link without an address", () => {
+    render(<AuthCard title="Sign in" privacyPolicyUrl={null} />);
+    expect(screen.queryByTestId("auth-privacy-policy")).toBeNull();
+  });
 });

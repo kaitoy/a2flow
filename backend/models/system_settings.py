@@ -1,4 +1,4 @@
-"""Platform-wide system settings: the SMTP relay and the global Vault.
+"""Platform-wide system settings: the SMTP relay, the global Vault, and more.
 
 A2Flow's notifications are otherwise in-app only — a row in ``notifications``
 that the toolbar bell polls for. This table holds the configuration needed to
@@ -11,6 +11,11 @@ a Vault of its own (:class:`models.tenant.TenantVaultFields`) reads its
 with one of its own (:class:`models.tenant.TenantGlobalVaultFields`), and the
 Vault policies attached to it keep tenants apart (see
 :mod:`infrastructure.vault_client`).
+
+It also holds the address of the operator's **privacy policy**, which the
+sign-in and sign-up pages link to so visitors can read how their name and email
+address are used. That one field is public: the unauthenticated login-options
+route returns it.
 
 The record is **platform-scoped, not tenant-scoped**: it inherits
 :class:`~models.base.BaseEntity` alone, the same shape as
@@ -116,6 +121,11 @@ class SystemSettingsUpdate(SQLModel):
     #: through self-service sign-up. Existing tenants are unaffected. ``null`` is
     #: ignored: the column cannot be empty.
     default_tenant_llm_mode: LlmMode | None = None
+    #: Address of the operator's privacy policy, linked from the sign-in and
+    #: sign-up pages; ``null`` shows no link. :data:`~models.constraints.PrivateHttpUrl`
+    #: because the server never fetches it (an intranet page is fine) and its
+    #: ``http(s)://`` pattern keeps a ``javascript:`` URL out of the link.
+    privacy_policy_url: PrivateHttpUrl | None = None
 
 
 class SystemSettings(SystemSettingsUpdate, BaseEntity, table=True):
@@ -171,6 +181,7 @@ class SystemSettingsRead(BaseEntity):
     llm_api_key_set: bool = False
     max_tenants: int | None = None
     default_tenant_llm_mode: LlmMode = LlmMode.system_default
+    privacy_policy_url: str | None = None
 
     @classmethod
     def from_settings(cls, settings: SystemSettings) -> "SystemSettingsRead":

@@ -903,7 +903,7 @@ export const handlers = [
 
   http.post(`${BASE}/api/v1/auth/login`, () => envelope(USER_1)),
   http.get(`${BASE}/api/v1/auth/login-options`, () =>
-    envelope({ tenantName: null, sso: false, signup: false })
+    envelope({ tenantName: null, sso: false, signup: false, privacyPolicyUrl: null })
   ),
 
   http.post(`${BASE}/api/v1/auth/logout`, () => envelope(null)),

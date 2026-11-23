@@ -583,6 +583,8 @@ The dispatcher also exposes `exists_for_session` as a pass-through, which is wha
 
 `default_tenant_llm_mode` is the `llm_mode` a tenant starts with (non-null, `system_default` unless changed; a `null` in a PATCH is ignored). `TenantService.create` takes it when the request leaves `llmMode` out (`model_fields_set`, since the field has a default and an explicit `system_default` must still win), and `SignupService.complete` always does, through `SqlTenantRepository.default_llm_mode`. The default tenant seeded at startup is not read from it, which makes no difference on a fresh database. It changes no existing tenant, and has no environment override.
 
+`privacy_policy_url` is the one system setting readable without a session: `GET /auth/login-options` returns it as `privacyPolicyUrl` on every host, and the sign-in and sign-up pages link to it. It is a `PrivateHttpUrl` (the server never fetches it, and the `http(s)://` pattern keeps a `javascript:` URL out of the link); `null` shows no link. `SystemSettingsService.privacy_policy_url` returns `None` rather than raising when the settings row is missing, so the sign-in page still loads.
+
 The deployment's base URL is not a system setting. `APP_BASE_URL` is read from the environment only (`config.Settings.app_base_url`), validated as a bare http(s) origin at startup, and also supplies the defaults of `CORS_ORIGINS` and `SESSION_COOKIE_SECURE`.
 
 ---

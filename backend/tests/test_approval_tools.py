@@ -293,8 +293,8 @@ async def test_list_users_returns_seeded_users(engine: AsyncEngine) -> None:
     assert {"alice", "bob", "carol", "owner", "tester"} <= usernames
     alice = next(u for u in result["users"] if u["username"] == "alice")
     assert alice["id"] == "alice"
-    assert alice["email"] == "alice@test.local"
-    assert set(alice) == {"id", "username", "first_name", "last_name", "email"}
+    # No email: the result goes to the LLM, which needs no contact details.
+    assert set(alice) == {"id", "username", "first_name", "last_name"}
 
 
 async def test_list_users_excludes_system_user(engine: AsyncEngine) -> None:

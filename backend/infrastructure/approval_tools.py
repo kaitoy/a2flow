@@ -883,13 +883,17 @@ async def request_approval(
 
 
 def _user_to_dict(user: User) -> dict[str, Any]:
-    """Convert a User into the plain dict the approver-selection tool returns."""
+    """Convert a User into the plain dict the approver-selection tool returns.
+
+    The email address is deliberately left out: the result goes to the LLM, and
+    ``id`` plus ``username`` already identify the person, so sending the address
+    to the model provider would only add personal data it does not need.
+    """
     return {
         "id": user.id,
         "username": user.username,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "email": user.email,
     }
 
 
@@ -911,8 +915,8 @@ async def list_users(tool_context: ToolContext) -> dict[str, Any]:
             to the model.
 
     Returns:
-        On success ``{"users": [{"id", "username", "first_name", "last_name",
-        "email"}, ...]}`` ordered by creation time (newest first). On failure
+        On success ``{"users": [{"id", "username", "first_name", "last_name"},
+        ...]}`` ordered by creation time (newest first). On failure
         ``{"error": <message>}`` if the session cannot be resolved to a tenant.
     """
     try:

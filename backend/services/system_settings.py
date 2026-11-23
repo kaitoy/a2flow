@@ -106,6 +106,17 @@ class SystemSettingsService:
             SystemSettingsUpdate.model_construct(**payload), user_id=user_id
         )
 
+    async def privacy_policy_url(self) -> str | None:
+        """Return the privacy policy address the sign-in pages link to.
+
+        Returns:
+            The configured URL, or ``None`` when none is set or the settings row
+            is missing -- the sign-in page must still load then, so unlike
+            :meth:`get` this never raises.
+        """
+        settings = await self._repo.get()
+        return settings.privacy_policy_url if settings else None
+
     def to_read(self, settings: SystemSettings) -> SystemSettingsRead:
         """Project the settings row onto its password-free read view.
 

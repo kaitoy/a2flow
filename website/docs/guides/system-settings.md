@@ -51,6 +51,12 @@ The **Maximum Number of Tenants** caps how many tenants the deployment may hold.
 
 Once the limit is reached, no further tenant can be created: a Super Admin creating one under [Tenants](./users-and-groups.md#tenants) is refused with "The maximum number of tenants has been reached.", and a visitor [signing up](../getting-started/sign-up.md) is refused the same way. The sign-in page also stops offering **Create an account**. Lowering the limit below the current number removes no tenant; it only stops new ones. Raise it or empty the field to make room again.
 
+## The privacy policy {#privacy-policy}
+
+The **Privacy Policy URL** is the address of the page where the deployment's operator explains how users' personal data, such as their name and email address, is used. Once it is set, the sign-in page and the [sign-up](../getting-started/sign-up.md) page show a **Privacy Policy** link at the foot of the form, which opens the page in a new tab. The link appears at the main address and at every tenant's own address.
+
+The address must start with `http://` or `https://`, and it may be on a private network. Leave the field empty and save to remove the link, which is how a fresh install starts.
+
 ## The LLM {#llm}
 
 The LLM is the model every agent runs on, and the key it is reached with. What is set here is the **system's** LLM: a tenant uses it unless a Super Admin has given the tenant one of its own — see [The tenant's LLM](./users-and-groups.md#tenant-llm).

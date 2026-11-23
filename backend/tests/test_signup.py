@@ -53,6 +53,10 @@ class FakeMail:
         """Return the configured relay, or ``None`` when delivery is off."""
         return self.smtp
 
+    async def privacy_policy_url(self) -> str | None:
+        """Return no privacy policy; the login-options route asks for one."""
+        return None
+
     async def send(
         self, config: SmtpConfig, *, to: str, subject: str, body: str
     ) -> None:

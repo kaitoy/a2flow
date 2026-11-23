@@ -585,6 +585,7 @@ export const es = {
   "common.endpoint": "Endpoint",
   "common.error": "Error",
   "common.exampleValue": "p. ej., {value}",
+  "common.privacyPolicy": "Política de privacidad",
   "common.failed": "Fallido",
   "common.firstName": "Nombre",
   "common.generateWorkflow": "Generar flujo de trabajo",
@@ -1044,6 +1045,9 @@ export const es = {
   "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
     "Déjelo vacío para no imponer ningún límite. Cuentan todos los Tenants, también los desactivados. Al alcanzar el límite no se puede crear ningún Tenant, ni usted ni mediante el registro, y el enlace de registro se oculta.",
   "systemSettings.maximumNumberOfTenants": "Número máximo de Tenants",
+  "systemSettings.privacyPolicyUrl": "URL de la política de privacidad",
+  "systemSettings.privacyPolicyUrlHint":
+    "Se enlaza desde las páginas de inicio de sesión y de registro, para que los visitantes puedan leer cómo se usan su nombre y su dirección de correo electrónico. Déjelo vacío para no mostrar ningún enlace.",
   "systemSettings.maximumNumberOfTenantsMustBeAWhole":
     "El número máximo de Tenants debe ser un entero de al menos 1",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":

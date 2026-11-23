@@ -203,6 +203,24 @@ describe("LoginPage", () => {
     else expect(link).not.toBeInTheDocument();
   });
 
+  it("links the privacy policy the backend reports", async () => {
+    server.use(
+      http.get("http://localhost:8000/api/v1/auth/login-options", () =>
+        envelope({
+          tenantName: null,
+          sso: false,
+          signup: false,
+          privacyPolicyUrl: "https://example.com/privacy",
+        })
+      )
+    );
+    render(<LoginPage />);
+    expect(await screen.findByTestId("auth-privacy-policy")).toHaveAttribute(
+      "href",
+      "https://example.com/privacy"
+    );
+  });
+
   describe("single sign-on", () => {
     const originalLocation = window.location;
     afterEach(() => {

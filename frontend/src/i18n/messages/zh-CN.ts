@@ -542,6 +542,7 @@ export const zhCN = {
   "common.endpoint": "端点",
   "common.error": "错误",
   "common.exampleValue": "例如 {value}",
+  "common.privacyPolicy": "隐私政策",
   "common.failed": "失败",
   "common.firstName": "名",
   "common.generateWorkflow": "生成工作流",
@@ -961,6 +962,9 @@ export const zhCN = {
   "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
     "留空表示不限制。已停用的租户也计入。达到上限后，无论是管理员创建还是自助注册都无法再创建租户，注册链接也会隐藏。",
   "systemSettings.maximumNumberOfTenants": "租户数量上限",
+  "systemSettings.privacyPolicyUrl": "隐私政策 URL",
+  "systemSettings.privacyPolicyUrlHint":
+    "登录页面和注册页面会显示指向它的链接，访问者可以查看其姓名和电子邮件地址的用途。留空则不显示链接。",
   "systemSettings.maximumNumberOfTenantsMustBeAWhole": "租户数量上限必须是不小于 1 的整数",
   "systemSettings.passwordIsRequiredWhenAUsernameIs": "设置用户名时必须填写密码",
   "systemSettings.portMustBeAWholeNumberBetween": "端口必须是 1 到 65535 之间的整数",

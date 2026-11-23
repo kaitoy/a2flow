@@ -96,6 +96,7 @@ function buildSchema(passwordSet: boolean) {
       smtpFromName: z.string(),
       vaultAddr: z.string(),
       maxTenants: z.string(),
+      privacyPolicyUrl: z.string(),
       defaultTenantLlmMode: z.enum(["system_default", "super_admin", "tenant_admin"]),
       ...llmShape,
     })
@@ -155,6 +156,12 @@ function buildSchema(passwordSet: boolean) {
       }
 
       validateOptional(values.vaultAddr, zSystemSettingsUpdate.shape.vaultAddr, ctx, "vaultAddr");
+      validateOptional(
+        values.privacyPolicyUrl,
+        zSystemSettingsUpdate.shape.privacyPolicyUrl,
+        ctx,
+        "privacyPolicyUrl"
+      );
 
       // Empty means "no limit"; otherwise a whole number of at least 1.
       if (values.maxTenants !== "") {
@@ -201,6 +208,7 @@ function toFormValues(settings: Partial<SystemSettings>): FormValues {
     smtpFromName: settings.smtpFromName ?? "",
     vaultAddr: settings.vaultAddr ?? "",
     maxTenants: settings.maxTenants == null ? "" : String(settings.maxTenants),
+    privacyPolicyUrl: settings.privacyPolicyUrl ?? "",
     defaultTenantLlmMode: settings.defaultTenantLlmMode ?? "system_default",
     ...toLlmFormValues(settings),
   };
@@ -224,6 +232,7 @@ function toBody(values: FormValues): SystemSettingsUpdate {
     smtpFromName: values.smtpFromName || null,
     vaultAddr: values.vaultAddr || null,
     maxTenants: values.maxTenants === "" ? null : Number(values.maxTenants),
+    privacyPolicyUrl: values.privacyPolicyUrl || null,
     defaultTenantLlmMode: values.defaultTenantLlmMode,
     ...toLlmBody(values),
   };
@@ -413,6 +422,23 @@ export default function SystemSettingsPage() {
             <Input id="maxTenants" inputMode="numeric" {...register("maxTenants")} />
             <p className="text-xs text-on-surface-variant">
               {t("systemSettings.leaveEmptyForNoLimitEveryTenantCounts")}
+            </p>
+          </FormField>
+
+          <hr className="border-outline-variant" />
+
+          <FormField
+            htmlFor="privacyPolicyUrl"
+            label={t("systemSettings.privacyPolicyUrl")}
+            error={errors.privacyPolicyUrl?.message}
+          >
+            <Input
+              id="privacyPolicyUrl"
+              placeholder={t("common.exampleValue", { value: "https://example.com/privacy" })}
+              {...register("privacyPolicyUrl")}
+            />
+            <p className="text-xs text-on-surface-variant">
+              {t("systemSettings.privacyPolicyUrlHint")}
             </p>
           </FormField>
 

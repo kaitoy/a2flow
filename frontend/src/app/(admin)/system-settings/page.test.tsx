@@ -111,6 +111,39 @@ describe("SystemSettingsPage", () => {
     expect(Object.keys(body ?? {}).filter((key) => key.startsWith("vault"))).toEqual(["vaultAddr"]);
   });
 
+  it("sends the privacy policy URL, and null once it is cleared", async () => {
+    server.use(
+      http.get(`${BASE}/api/v1/system-settings`, () =>
+        envelope({ ...CONFIGURED, privacyPolicyUrl: "https://example.com/privacy" })
+      )
+    );
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.patch(`${BASE}/api/v1/system-settings`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return envelope(CONFIGURED);
+      })
+    );
+
+    renderPage();
+    const input = await screen.findByLabelText("Privacy Policy URL");
+    expect(input).toHaveValue("https://example.com/privacy");
+    await userEvent.clear(input);
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(body).toBeDefined());
+    expect(body).toMatchObject({ privacyPolicyUrl: null });
+  });
+
+  it("rejects a privacy policy URL that is not http(s)", async () => {
+    serveConfigured();
+    renderPage();
+    const input = await screen.findByLabelText("Privacy Policy URL");
+    await userEvent.type(input, "javascript:alert(1)");
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    expect(await screen.findByText(/must match pattern/i)).toBeInTheDocument();
+  });
+
   it("sends the password when one is typed", async () => {
     serveConfigured();
     let body: Record<string, unknown> | undefined;

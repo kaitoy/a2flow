@@ -51,6 +51,12 @@ El **Número máximo de Tenants** limita cuántos tenants puede tener el desplie
 
 Al alcanzar el límite no se puede crear ningún tenant más: si un Superadministrador intenta crear uno en [Tenants](./users-and-groups.md#tenants), se le rechaza con «Se ha alcanzado el número máximo de Tenants.», y lo mismo le ocurre a un visitante que intenta [registrarse](../getting-started/sign-up.md). La pantalla de inicio de sesión también deja de ofrecer **Crear una cuenta**. Bajar el límite por debajo del número actual no elimina ningún tenant; solo impide crear otros. Súbelo o vacía el campo para volver a hacer sitio.
 
+## La política de privacidad {#privacy-policy}
+
+La **URL de la política de privacidad** es la dirección de la página en la que el operador del despliegue explica cómo se usan los datos personales de los usuarios, como su nombre y su dirección de correo electrónico. Una vez configurada, la pantalla de inicio de sesión y la de [registro](../getting-started/sign-up.md) muestran un enlace **Política de privacidad** al pie del formulario, que abre la página en una pestaña nueva. El enlace aparece en la dirección principal y en la dirección propia de cada tenant.
+
+La dirección debe empezar por `http://` o `https://`, y puede estar en una red privada. Deja el campo vacío y guarda para quitar el enlace, que es como empieza una instalación nueva.
+
 ## El LLM {#llm}
 
 El LLM es el modelo con el que se ejecuta cada agente y la clave con la que se accede a él. Lo que se define aquí es el LLM **del sistema**: un tenant lo usa salvo que un Superadministrador le haya dado uno propio; consulta [El LLM del tenant](./users-and-groups.md#tenant-llm).

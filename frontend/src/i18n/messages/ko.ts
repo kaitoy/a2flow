@@ -566,6 +566,7 @@ export const ko = {
   "common.endpoint": "엔드포인트",
   "common.error": "오류",
   "common.exampleValue": "예: {value}",
+  "common.privacyPolicy": "개인정보 처리방침",
   "common.failed": "실패",
   "common.firstName": "이름",
   "common.generateWorkflow": "워크플로 생성",
@@ -997,6 +998,9 @@ export const ko = {
   "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
     "비워 두면 제한이 없습니다. 비활성화된 테넌트도 포함해 셉니다. 한도에 도달하면 관리자 생성도 가입도 받지 않으며, 가입 링크도 표시되지 않습니다.",
   "systemSettings.maximumNumberOfTenants": "최대 테넌트 수",
+  "systemSettings.privacyPolicyUrl": "개인정보 처리방침 URL",
+  "systemSettings.privacyPolicyUrlHint":
+    "로그인 화면과 가입 화면에 링크가 표시되어, 방문자가 이름과 이메일 주소의 이용 목적을 확인할 수 있습니다. 비워 두면 링크가 표시되지 않습니다.",
   "systemSettings.maximumNumberOfTenantsMustBeAWhole": "최대 테넌트 수는 1 이상의 정수여야 합니다",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":
     "사용자 이름을 설정하면 비밀번호가 필요합니다",

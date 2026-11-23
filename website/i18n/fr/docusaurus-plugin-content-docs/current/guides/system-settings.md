@@ -51,6 +51,12 @@ Le **Nombre maximal de Tenants** limite le nombre de tenants que le déploiement
 
 Une fois la limite atteinte, aucun tenant de plus ne peut être créé : un Super administrateur qui en crée un sous [Tenants](./users-and-groups.md#tenants) est refusé avec « Le nombre maximal de Tenants est atteint. », et il en va de même pour un visiteur qui [s'inscrit](../getting-started/sign-up.md). L'écran de connexion cesse aussi de proposer **Créer un compte**. Abaisser la limite sous le nombre actuel ne supprime aucun tenant ; cela empêche seulement d'en créer de nouveaux. Relevez-la ou videz le champ pour refaire de la place.
 
+## La politique de confidentialité {#privacy-policy}
+
+L'**URL de la politique de confidentialité** est l'adresse de la page où l'opérateur du déploiement explique comment les données personnelles des utilisateurs, comme leur nom et leur adresse e-mail, sont utilisées. Une fois qu'elle est définie, l'écran de connexion et celui d'[inscription](../getting-started/sign-up.md) affichent un lien **Politique de confidentialité** au pied du formulaire, qui ouvre la page dans un nouvel onglet. Le lien apparaît à l'adresse principale et à l'adresse propre de chaque tenant.
+
+L'adresse doit commencer par `http://` ou `https://`, et peut se trouver sur un réseau privé. Laissez le champ vide et enregistrez pour retirer le lien, ce qui est l'état d'une installation neuve.
+
 ## Le LLM {#llm}
 
 Le LLM est le modèle sur lequel s'exécute chaque agent, et la clé avec laquelle on l'atteint. Ce qui est défini ici est le LLM **du système** : un tenant l'utilise, sauf si un Super administrateur lui en a donné un qui lui est propre ; voir [Le LLM du tenant](./users-and-groups.md#tenant-llm).

@@ -457,6 +457,38 @@ async def test_test_send_maps_a_relay_failure_to_502(
     assert "Connection refused" not in str(err)
 
 
+# ---------- privacy policy ----------
+
+
+async def test_privacy_policy_url_reaches_the_sign_in_page_and_null_clears_it(
+    settings_client: AsyncClient,
+) -> None:
+    url = "https://intranet.example/privacy"
+    body = assert_ok(await settings_client.patch(_PATH, json={"privacyPolicyUrl": url}))
+    assert body["privacyPolicyUrl"] == url
+    options = "/api/v1/auth/login-options"
+    resp = await settings_client.get(options, params={"host": "a2.test"})
+    assert assert_ok(resp)["privacyPolicyUrl"] == url
+
+    body = assert_ok(
+        await settings_client.patch(_PATH, json={"privacyPolicyUrl": None})
+    )
+    assert body["privacyPolicyUrl"] is None
+    resp = await settings_client.get(options, params={"host": "a2.test"})
+    assert assert_ok(resp)["privacyPolicyUrl"] is None
+
+
+@pytest.mark.parametrize("url", ["javascript:alert(1)", "ftp://example.com/p", ""])
+async def test_a_non_http_privacy_policy_url_is_rejected(
+    settings_client: AsyncClient, url: str
+) -> None:
+    assert_err(
+        await settings_client.patch(_PATH, json={"privacyPolicyUrl": url}),
+        code="VALIDATION_ERROR",
+        status=422,
+    )
+
+
 # ---------- global vault ----------
 
 

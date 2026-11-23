@@ -571,6 +571,7 @@ export const ja = {
   "common.endpoint": "エンドポイント",
   "common.error": "エラー",
   "common.exampleValue": "例: {value}",
+  "common.privacyPolicy": "プライバシーポリシー",
   "common.failed": "失敗",
   "common.firstName": "名",
   "common.generateWorkflow": "ワークフローを生成",
@@ -1009,6 +1010,9 @@ export const ja = {
   "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
     "空欄にすると無制限です。無効化したテナントも数えます。上限に達すると、管理者による作成もサインアップも受け付けず、サインアップのリンクも表示されなくなります。",
   "systemSettings.maximumNumberOfTenants": "テナント数の上限",
+  "systemSettings.privacyPolicyUrl": "プライバシーポリシーのURL",
+  "systemSettings.privacyPolicyUrlHint":
+    "ログイン画面とサインアップ画面にリンクが表示され、訪問者は名前やメールアドレスの利用目的を確認できます。空欄にするとリンクは表示されません。",
   "systemSettings.maximumNumberOfTenantsMustBeAWhole":
     "テナント数の上限は 1 以上の整数にしてください",
   "systemSettings.passwordIsRequiredWhenAUsernameIs":

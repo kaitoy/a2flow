@@ -28,6 +28,8 @@ interface HostOptions {
   sso: boolean;
   /** Whether to link to the sign-up page (main host, sign-up enabled). */
   signup: boolean;
+  /** The operator's privacy policy, linked at the foot of the card. */
+  privacyPolicyUrl: string | null;
   /** Set while the browser is on its way to the identity provider. */
   redirecting: boolean;
 }
@@ -58,7 +60,8 @@ function startSso(tenant: string, onSubdomain: boolean, next: string) {
  * behind a link. `?local` stays too, with the password fields already open,
  * for an account that has only a password. A tenant without SSO shows only the
  * password fields. On the main host of a deployment that enables sign-up, a
- * link leads to `/signup`. Signing out lands on `/signed-out`, not here, so it never
+ * link leads to `/signup`. The operator's privacy policy, when System Settings
+ * has one, is linked at the foot of the card on every host. Signing out lands on `/signed-out`, not here, so it never
  * bounces off the identity provider's own session straight back in.
  */
 export default function LoginPage() {
@@ -86,11 +89,11 @@ export default function LoginPage() {
     setNextPath(next);
     let cancelled = false;
     getLoginOptions(window.location.hostname)
-      .catch(() => ({ tenantName: null, sso: false, signup: false }))
-      .then(({ tenantName = null, sso = false, signup = false }) => {
+      .catch(() => ({ tenantName: null, sso: false, signup: false, privacyPolicyUrl: null }))
+      .then(({ tenantName = null, sso = false, signup = false, privacyPolicyUrl = null }) => {
         if (cancelled) return;
         const redirecting = tenantName !== null && sso && !stay;
-        setOptions({ tenantName, sso, signup, redirecting });
+        setOptions({ tenantName, sso, signup, privacyPolicyUrl, redirecting });
         if (redirecting) startSso(tenantName, true, next);
       });
     return () => {
@@ -135,7 +138,11 @@ export default function LoginPage() {
   );
 
   return (
-    <AuthCard title={t("login.signInToA2flow")} onSubmit={onSubmit}>
+    <AuthCard
+      title={t("login.signInToA2flow")}
+      onSubmit={onSubmit}
+      privacyPolicyUrl={options?.privacyPolicyUrl}
+    >
       {options === null ? null : options.redirecting ? (
         <p className="text-center text-sm text-on-surface-variant" role="status">
           {t("login.redirectingToSso")}

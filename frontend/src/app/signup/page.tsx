@@ -29,6 +29,7 @@ export default function SignupPage() {
   const t = useT();
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);
+  const [privacyPolicyUrl, setPrivacyPolicyUrl] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const submit = useAsyncAction({ showDone: false });
@@ -36,9 +37,10 @@ export default function SignupPage() {
   useEffect(() => {
     let cancelled = false;
     getLoginOptions(window.location.hostname)
-      .catch(() => ({ signup: false }))
-      .then(({ signup: offered = false }) => {
+      .catch(() => ({ signup: false, privacyPolicyUrl: null }))
+      .then(({ signup: offered = false, privacyPolicyUrl: policy = null }) => {
         if (cancelled) return;
+        setPrivacyPolicyUrl(policy);
         if (offered) setAllowed(true);
         else router.replace("/login");
       });
@@ -75,7 +77,7 @@ export default function SignupPage() {
 
   if (sentTo !== null) {
     return (
-      <AuthCard title={t("signup.checkEmailTitle")}>
+      <AuthCard title={t("signup.checkEmailTitle")} privacyPolicyUrl={privacyPolicyUrl}>
         <p className="text-center text-sm text-on-surface-variant" data-testid="signup-sent">
           {t("signup.checkEmailMessage", { email: sentTo })}
         </p>
@@ -87,7 +89,7 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthCard title={t("signup.title")} onSubmit={onSubmit}>
+    <AuthCard title={t("signup.title")} onSubmit={onSubmit} privacyPolicyUrl={privacyPolicyUrl}>
       {allowed && (
         <>
           <FormField htmlFor="email" label={t("common.email")} required>

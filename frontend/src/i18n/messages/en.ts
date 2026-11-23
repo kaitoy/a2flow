@@ -573,6 +573,7 @@ export const en = {
   "common.endpoint": "Endpoint",
   "common.error": "Error",
   "common.exampleValue": "e.g. {value}",
+  "common.privacyPolicy": "Privacy Policy",
   "common.failed": "Failed",
   "common.firstName": "First Name",
   "common.generateWorkflow": "Generate Workflow",
@@ -1010,6 +1011,9 @@ export const en = {
   "systemSettings.leaveEmptyForNoLimitEveryTenantCounts":
     "Leave empty for no limit. Every tenant counts, disabled ones too. Once the limit is reached, no tenant can be created, by you or through sign-up, and the sign-up link is hidden.",
   "systemSettings.maximumNumberOfTenants": "Maximum Number of Tenants",
+  "systemSettings.privacyPolicyUrl": "Privacy Policy URL",
+  "systemSettings.privacyPolicyUrlHint":
+    "Linked from the sign-in and sign-up pages, so visitors can read how their name and email address are used. Leave empty to show no link.",
   "systemSettings.maximumNumberOfTenantsMustBeAWhole":
     "Maximum number of tenants must be a whole number of at least 1",
   "systemSettings.passwordIsRequiredWhenAUsernameIs": "Password is required when a username is set",

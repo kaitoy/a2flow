@@ -33,7 +33,11 @@ from dependencies.auth import (
 from dependencies.authz import require_actor_roles
 from dependencies.context import ApiMetaDep
 from dependencies.repository import EffectiveRoleRepositoryDep
-from dependencies.service import OidcLoginServiceDep, SignupServiceDep
+from dependencies.service import (
+    OidcLoginServiceDep,
+    SignupServiceDep,
+    SystemSettingsServiceDep,
+)
 from models.constraints import Password, TenantSlug
 from models.response import ApiResponse
 from models.user import Role, User, UserRead
@@ -96,13 +100,16 @@ class LoginOptions(BaseModel):
     ``sso`` says the page should go straight to the tenant's identity provider.
     ``signup`` says the page may offer the sign-up page: only on the main host,
     and only while sign-up is available (``SIGNUP_ENABLED`` and ``APP_BASE_URL``
-    set, email delivery configured).
+    set, email delivery configured). ``privacy_policy_url`` is the operator's
+    privacy policy (System Settings), linked from the sign-in and sign-up pages
+    on every host; ``None`` shows no link.
     """
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     tenant_name: str | None = None
     sso: bool = False
     signup: bool = False
+    privacy_policy_url: str | None = None
 
 
 class SignupResponse(BaseModel):
@@ -416,6 +423,7 @@ async def login_options(
     host: str,
     service: OidcLoginServiceDep,
     signup_service: SignupServiceDep,
+    system_settings: SystemSettingsServiceDep,
     meta: ApiMetaDep,
 ) -> ApiResponse[LoginOptions]:
     """Tell the login page at ``host`` which tenant it signs in to, and how.
@@ -427,6 +435,7 @@ async def login_options(
         host: The hostname the browser shows, without a port.
         service: The sign-in service.
         signup_service: Says whether sign-up is available.
+        system_settings: Supplies the privacy policy address.
         meta: The envelope's request metadata.
     """
     tenant_name = get_settings().tenant_from_host(host)
@@ -434,7 +443,12 @@ async def login_options(
     signup = tenant_name is None and await signup_service.available()
     return ApiResponse(
         meta=meta,
-        data=LoginOptions(tenant_name=tenant_name, sso=sso, signup=signup),
+        data=LoginOptions(
+            tenant_name=tenant_name,
+            sso=sso,
+            signup=signup,
+            privacy_policy_url=await system_settings.privacy_policy_url(),
+        ),
     )
 
 
